@@ -71,7 +71,7 @@ const musicId = computed(() => Number(route.params.id))
 const music = ref<Music | null>(null)
 const difficulties = ref<MusicDifficulty[]>([])
 const vocals = ref<MusicVocal[]>([])
-const translation = ref<string>('')
+const translation = computed(() => masterStore.translations[musicId.value] || '')
 const relatedEvent = ref<EventData | null>(null)
 const characters = ref<Character[]>([])
 const outsideCharacters = ref<OutsideCharacter[]>([])
@@ -408,7 +408,7 @@ async function loadData() {
       musicsData, 
       difficultiesData, 
       vocalsData, 
-      translationsData,
+      ,  // translations loaded into store directly
       eventsData,
       eventMusicsData,
       charactersData,
@@ -431,8 +431,6 @@ async function loadData() {
     // 获取歌曲数据
     music.value = musicsData.find(m => m.id === musicId.value) || null
 
-    // 获取翻译
-    translation.value = translationsData[musicId.value] || ''
 
     // 获取难度数据
     difficulties.value = difficultiesData

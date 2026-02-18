@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, toRef } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
@@ -31,7 +31,7 @@ const settingsStore = useSettingsStore()
 
 const musics = ref<Music[]>([])
 const musicDifficulties = ref<MusicDifficulty[]>([])
-const translations = ref<Record<number, string>>({})
+const translations = toRef(masterStore, 'translations')
 const isLoading = ref(true)
 
 // Assets host based on login status
@@ -123,14 +123,13 @@ const paginatedMusics = computed(() => {
 async function loadData() {
   isLoading.value = true
   try {
-    const [musicData, diffData, transData] = await Promise.all([
+    const [musicData, diffData] = await Promise.all([
       masterStore.getMaster<Music>('musics'),
       masterStore.getMaster<MusicDifficulty>('musicDifficulties'),
       masterStore.getTranslations()
     ])
     musics.value = musicData
     musicDifficulties.value = diffData
-    translations.value = transData
   } catch (error) {
     console.error('加载歌曲数据失败:', error)
   } finally {
