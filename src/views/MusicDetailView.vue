@@ -9,6 +9,7 @@ import {
   PlayCircle, Zap
 } from 'lucide-vue-next'
 import AssetImage from '@/components/AssetImage.vue'
+import { alignFurigana } from '@/utils/furigana'
 
 interface Music {
   id: number
@@ -488,6 +489,16 @@ const matchedIcons = computed(() => {
     .map(([, icon]) => icon)
 })
 
+// 注音 (furigana) - 实验性
+const furiganaSegments = computed(() => {
+  if (!music.value?.pronunciation) return []
+  return alignFurigana(music.value.title, music.value.pronunciation)
+})
+
+const hasFurigana = computed(() => {
+  return furiganaSegments.value.some(s => s.ruby)
+})
+
 onMounted(loadData)
 </script>
 
@@ -533,12 +544,12 @@ onMounted(loadData)
 
           <!-- 标题区 -->
           <div class="text-center mt-6 w-full">
-            <h1 class="text-2xl font-bold text-base-content select-all">{{ music.title }}</h1>
-            
-            <!-- 读音 (平假名) -->
-            <p v-if="music.pronunciation" class="text-sm font-medium text-primary mt-1 select-all font-mono opacity-80">
-              {{ music.pronunciation }}
-            </p>
+            <h1 v-if="music.pronunciation && hasFurigana" class="text-2xl font-bold text-base-content select-all leading-relaxed">
+              <template v-for="(seg, i) in furiganaSegments" :key="i">
+                <ruby v-if="seg.ruby">{{ seg.text }}<rp>(</rp><rt class="text-xs font-medium text-primary/70 select-none">{{ seg.ruby }}</rt><rp>)</rp></ruby><template v-else>{{ seg.text }}</template>
+              </template>
+            </h1>
+            <h1 v-else class="text-2xl font-bold text-base-content select-all">{{ music.title }}</h1>
             
             <!-- 翻译 -->
             <p v-if="translation" class="text-base-content/70 mt-2 select-all">{{ translation }}</p>
