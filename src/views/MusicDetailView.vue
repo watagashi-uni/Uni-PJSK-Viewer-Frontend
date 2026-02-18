@@ -2,6 +2,7 @@
 import { ref, onMounted, computed, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
 import { useMasterStore } from '@/stores/master'
+import { useSettingsStore } from '@/stores/settings'
 import { 
   Play, Pause, BarChart2, Eye, Download, ChevronLeft, 
   Disc3, Sparkles, Mic, Volume2, VolumeX, SkipBack, SkipForward,
@@ -66,6 +67,7 @@ interface OutsideCharacter {
 
 const route = useRoute()
 const masterStore = useMasterStore()
+const settingsStore = useSettingsStore()
 
 const musicId = computed(() => Number(route.params.id))
 const music = ref<Music | null>(null)
@@ -442,6 +444,20 @@ async function loadData() {
 
     // 获取声乐数据
     vocals.value = vocalsData.filter(v => v.musicId === musicId.value)
+    
+    // 根据设置选择默认 vocal
+    if (settingsStore.defaultVocal === 'sekai') {
+      const sekaiIndex = vocals.value.findIndex(v => 
+        v.musicVocalType === 'sekai' || v.caption.includes('セカイ')
+      )
+      if (sekaiIndex !== -1) {
+        currentVocalIndex.value = sekaiIndex
+      } else {
+        currentVocalIndex.value = 0
+      }
+    } else {
+      currentVocalIndex.value = 0
+    }
     
     // 获取关联活动
     const eventMusic = eventMusicsData.find(em => em.musicId === musicId.value)
