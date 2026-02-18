@@ -45,9 +45,11 @@ async function handleClearTranslationCache() {
     await clearTranslationCache()
     // 清除内存中的翻译缓存
     masterStore.translations = {}
-    alert('翻译缓存已清空！下次访问歌曲页时将重新拉取。')
+    // 立即重新拉取最新翻译
+    await masterStore.getTranslations()
+    alert('翻译已刷新！')
   } catch (e) {
-    alert('清空翻译缓存失败：' + (e instanceof Error ? e.message : '未知错误'))
+    alert('刷新翻译失败：' + (e instanceof Error ? e.message : '未知错误'))
   } finally {
     isClearingTranslation.value = false
   }
@@ -168,7 +170,7 @@ async function handleClearTranslationCache() {
           >
             <RefreshCw v-if="isClearingTranslation" class="w-4 h-4 animate-spin" />
             <Trash2 v-else class="w-4 h-4" />
-            {{ isClearingTranslation ? '清空中...' : '清空翻译缓存' }}
+            {{ isClearingTranslation ? '刷新中...' : '刷新翻译' }}
           </button>
         </div>
       </div>
