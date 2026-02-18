@@ -1,27 +1,15 @@
 # Uni PJSK Viewer Frontend
 
-> 🎵 探索 Project SEKAI 的精彩世界 — 一个用于浏览 Project SEKAI 游戏资源的 Web 应用前端。
+> 🎵一个用于浏览 Project SEKAI 游戏资源的 Web 应用前端。
 
 ## ✨ 功能特性
 
-- 📋 **卡牌浏览** — 查看所有角色卡牌详情、插画与剧情
+- 📋 **卡牌浏览** — 查看所有角色卡牌详情
 - 🎶 **曲目列表** — 浏览完整曲库信息，支持分类筛选
 - 🎵 **谱面预览** — 在线预览游戏谱面
 - 📊 **活动信息** — 查看活动详情与排名数据
 - 📱 **PWA 支持** — 可安装为本地应用，支持离线缓存
-- 🌙 **多主题** — 支持亮色/暗色等多种主题切换
 
-## 🛠️ 技术栈
-
-| 技术 | 说明 |
-|------|------|
-| [Vue 3](https://vuejs.org/) | 前端框架 |
-| [TypeScript](https://www.typescriptlang.org/) | 类型安全 |
-| [Vite](https://vitejs.dev/) | 构建工具 |
-| [Tailwind CSS](https://tailwindcss.com/) | 原子化 CSS |
-| [DaisyUI](https://daisyui.com/) | UI 组件库 |
-| [Pinia](https://pinia.vuejs.org/) | 状态管理 |
-| [Vue Router](https://router.vuejs.org/) | 路由管理 |
 
 ## 🚀 快速开始
 
