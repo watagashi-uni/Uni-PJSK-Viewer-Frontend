@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import { useSettingsStore } from '@/stores/settings'
 import { useMasterStore } from '@/stores/master'
 import { Settings, Trash2, Database, Eye, Palette, RefreshCw, Languages } from 'lucide-vue-next'
-import { clearAllCache, clearTranslationCache } from '@/utils/masterDB'
+import { clearAllCache } from '@/utils/masterDB'
 
 const settingsStore = useSettingsStore()
 const masterStore = useMasterStore()
@@ -42,11 +42,7 @@ async function handleClearCache() {
 async function handleClearTranslationCache() {
   isClearingTranslation.value = true
   try {
-    await clearTranslationCache()
-    // 清除内存中的翻译缓存
-    masterStore.translations = {}
-    // 立即重新拉取最新翻译
-    await masterStore.getTranslations()
+    await masterStore.refreshTranslations()
     alert('翻译已刷新！')
   } catch (e) {
     alert('刷新翻译失败：' + (e instanceof Error ? e.message : '未知错误'))

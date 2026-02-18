@@ -8,6 +8,7 @@ import {
     getCachedData,
     setCachedData,
     clearAllCache,
+    clearTranslationCache,
     getTranslationTimestamp,
     setTranslationTimestamp,
 } from '@/utils/masterDB'
@@ -170,6 +171,27 @@ export const useMasterStore = defineStore('master', () => {
     }
 
     /**
+     * 强制刷新翻译（跳过所有缓存）
+     */
+    async function refreshTranslations(): Promise<Record<number, string>> {
+        // 清除所有缓存
+        await clearTranslationCache()
+        translations.value = {}
+
+        // 直接从服务器获取
+        try {
+            const data = await getMusicTranslations()
+            translations.value = data
+            await setCachedData('translations', data as any)
+            await setTranslationTimestamp(Date.now())
+            return data
+        } catch (error) {
+            console.error('刷新翻译数据失败:', error)
+            return {}
+        }
+    }
+
+    /**
      * 批量获取多个 master 数据
      */
     async function getMasters(names: MasterDataName[]): Promise<void> {
@@ -211,6 +233,7 @@ export const useMasterStore = defineStore('master', () => {
         getMaster,
         getMasters,
         getTranslations,
+        refreshTranslations,
         refresh,
     }
 })
