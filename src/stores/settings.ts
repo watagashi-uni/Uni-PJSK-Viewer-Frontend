@@ -9,6 +9,9 @@ export const useSettingsStore = defineStore('settings', () => {
     // 主题状态: 'light' | 'dark' | 'auto'
     const theme = ref<string>('auto')
 
+    // 默认 vocal 设置: 'sekai' | 'virtual_singer'
+    const defaultVocal = ref<string>('sekai')
+
     // 应用主题
     function applyTheme(newTheme: string) {
         if (newTheme === 'auto') {
@@ -25,6 +28,11 @@ export const useSettingsStore = defineStore('settings', () => {
     function setTheme(newTheme: string) {
         theme.value = newTheme
         applyTheme(newTheme)
+    }
+
+    // 设置默认 vocal
+    function setDefaultVocal(vocal: string) {
+        defaultVocal.value = vocal
     }
 
     // 初始化：从 localStorage 恢复状态
@@ -45,6 +53,11 @@ export const useSettingsStore = defineStore('settings', () => {
             applyTheme(savedTheme)
         } else {
             applyTheme('auto')
+        }
+
+        const savedDefaultVocal = localStorage.getItem('settings_defaultVocal')
+        if (savedDefaultVocal) {
+            defaultVocal.value = savedDefaultVocal
         }
 
         // 监听系统主题变化
@@ -77,13 +90,19 @@ export const useSettingsStore = defineStore('settings', () => {
         localStorage.setItem('settings_theme', value)
     })
 
+    watch(defaultVocal, (value) => {
+        localStorage.setItem('settings_defaultVocal', value)
+    })
+
     return {
         showSpoilers,
         maskSpoilers,
         theme,
+        defaultVocal,
         initialize,
         toggleSpoilers,
         toggleMaskSpoilers,
         setTheme,
+        setDefaultVocal,
     }
 })

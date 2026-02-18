@@ -2,7 +2,7 @@
 import { ref } from 'vue'
 import { useSettingsStore } from '@/stores/settings'
 import { useMasterStore } from '@/stores/master'
-import { Settings, Trash2, Database, Eye, Palette, RefreshCw, Languages } from 'lucide-vue-next'
+import { Settings, Trash2, Database, Eye, Palette, RefreshCw, Languages, Mic } from 'lucide-vue-next'
 import { clearAllCache } from '@/utils/masterDB'
 
 const settingsStore = useSettingsStore()
@@ -15,6 +15,11 @@ const themes = [
   { value: 'light', label: '浅色' },
   { value: 'dark', label: '深色' },
   { value: 'auto', label: '跟随系统' },
+]
+
+const vocalOptions = [
+  { value: 'sekai', label: 'Sekai 版' },
+  { value: 'virtual_singer', label: 'Virtual Singer 版' },
 ]
 
 
@@ -123,27 +128,27 @@ async function handleClearTranslationCache() {
         </div>
       </div>
 
-      <!-- 缓存管理 -->
+      <!-- 音频设置 -->
       <div class="card bg-base-100 shadow-lg">
         <div class="card-body">
           <h2 class="card-title text-lg mb-4">
-            <Database class="w-5 h-5" />
-            缓存管理
+            <Mic class="w-5 h-5" />
+            默认 Vocal 版本
           </h2>
           
-          <p class="text-sm text-base-content/60 mb-4">
-            Master 数据会缓存到本地 IndexedDB，加快后续访问速度。如遇到数据显示异常，可尝试清空缓存。
-          </p>
-          
-          <button 
-            class="btn btn-error btn-outline"
-            :disabled="isClearing"
-            @click="handleClearCache"
-          >
-            <RefreshCw v-if="isClearing" class="w-4 h-4 animate-spin" />
-            <Trash2 v-else class="w-4 h-4" />
-            {{ isClearing ? '清空中...' : '清空master缓存' }}
-          </button>
+          <div class="flex flex-col gap-2">
+            <div class="flex gap-2">
+              <button 
+                v-for="option in vocalOptions"
+                :key="option.value"
+                class="btn btn-sm"
+                :class="settingsStore.defaultVocal === option.value ? 'btn-primary' : 'btn-ghost'"
+                @click="settingsStore.setDefaultVocal(option.value)"
+              >
+                {{ option.label }}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -167,6 +172,30 @@ async function handleClearTranslationCache() {
             <RefreshCw v-if="isClearingTranslation" class="w-4 h-4 animate-spin" />
             <Trash2 v-else class="w-4 h-4" />
             {{ isClearingTranslation ? '刷新中...' : '刷新翻译' }}
+          </button>
+        </div>
+      </div>
+
+      <!-- 缓存管理 -->
+      <div class="card bg-base-100 shadow-lg">
+        <div class="card-body">
+          <h2 class="card-title text-lg mb-4">
+            <Database class="w-5 h-5" />
+            缓存管理
+          </h2>
+          
+          <p class="text-sm text-base-content/60 mb-4">
+            Master 数据会缓存到本地 IndexedDB，加快后续访问速度。如遇到数据显示异常，可尝试清空缓存。
+          </p>
+          
+          <button 
+            class="btn btn-error btn-outline"
+            :disabled="isClearing"
+            @click="handleClearCache"
+          >
+            <RefreshCw v-if="isClearing" class="w-4 h-4 animate-spin" />
+            <Trash2 v-else class="w-4 h-4" />
+            {{ isClearing ? '清空中...' : '清空master缓存' }}
           </button>
         </div>
       </div>
