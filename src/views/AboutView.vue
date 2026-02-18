@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { 
-  Music, Code, Rocket, Wrench, ExternalLink, Github, Heart 
+  Music, Code, Wrench, ExternalLink, Github, Heart, Languages 
 } from 'lucide-vue-next'
 </script>
 
@@ -81,6 +81,30 @@ import {
           >
             <Heart class="w-4 h-4" />
             加入开发
+            <ExternalLink class="w-3 h-3" />
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- 参与翻译 -->
+    <div class="card bg-base-100 shadow-lg mb-6 animate-fade-in-up animation-delay-200">
+      <div class="card-body">
+        <h3 class="card-title text-lg flex items-center gap-2">
+          <Languages class="w-5 h-5 text-primary" /> 参与翻译
+        </h3>
+        <p class="text-base-content/70 mt-2">
+          歌曲标题的中文翻译由社区贡献者在 ParaTranz 平台上协作完成。欢迎加入我们，帮助翻译还没有中文名的歌曲！
+        </p>
+        <div class="mt-4">
+          <a 
+            href="https://paratranz.cn/projects/18073" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            class="btn btn-secondary btn-sm gap-2"
+          >
+            <Languages class="w-4 h-4" />
+            前往 ParaTranz 贡献翻译
             <ExternalLink class="w-3 h-3" />
           </a>
         </div>

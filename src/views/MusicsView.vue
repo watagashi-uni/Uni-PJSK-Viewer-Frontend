@@ -3,7 +3,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
-import { Search, ArrowUpDown } from 'lucide-vue-next'
+import { Search, ArrowUpDown, Languages } from 'lucide-vue-next'
 import MusicCard from '@/components/MusicCard.vue'
 import Pagination from '@/components/Pagination.vue'
 import { toRomaji } from '@/utils/kanaToRomaji'
@@ -229,6 +229,17 @@ watch(() => route.query.page, () => {
           <option value="master">Master</option>
           <option value="append">Append</option>
         </select>
+
+        <!-- 贡献翻译 -->
+        <a 
+          href="https://paratranz.cn/projects/18073" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          class="btn btn-ghost btn-sm gap-1 ml-auto text-primary/70 hover:text-primary"
+        >
+          <Languages class="w-4 h-4" />
+          贡献翻译
+        </a>
       </div>
     </div>
 

@@ -528,6 +528,15 @@ onMounted(loadData)
             
             <!-- 翻译 -->
             <p v-if="translation" class="text-base-content/70 mt-2 select-all">{{ translation }}</p>
+            <a 
+              v-else
+              href="https://paratranz.cn/projects/18073" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              class="text-sm text-primary/60 hover:text-primary mt-2 inline-flex items-center gap-1 transition-colors"
+            >
+              贡献翻译 →
+            </a>
           </div>
           
           <div class="mt-6 w-full space-y-3 px-4">
