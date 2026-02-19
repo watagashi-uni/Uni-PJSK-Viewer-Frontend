@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch, toRef } from 'vue'
+import { ref, computed, onMounted, watch, toRef, onUnmounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
@@ -149,9 +149,31 @@ const b30List = computed<B30Entry[]>(() => {
 
 const b30Total = computed(() => b30List.value.reduce((sum, e) => sum + e.score, 0))
 
-// 分页
+// 分页 (Grid视图)
 const pageSize = 30
 const currentPage = computed(() => Number(route.query.page) || 1)
+
+// 无限滚动 (List视图)
+const displayedCount = ref(50)
+const loadMoreTrigger = ref<HTMLElement | null>(null)
+let observer: IntersectionObserver | null = null
+
+const displayedMusics = computed(() => {
+  return filteredMusics.value.slice(0, displayedCount.value)
+})
+
+function setupObserver() {
+  if (observer) observer.disconnect()
+  observer = new IntersectionObserver((entries) => {
+    if (entries[0]?.isIntersecting && displayedCount.value < filteredMusics.value.length) {
+      displayedCount.value += 50
+    }
+  }, { rootMargin: '200px' })
+  
+  if (loadMoreTrigger.value) {
+    observer.observe(loadMoreTrigger.value)
+  }
+}
 
 // 难度映射
 const musicDifficultiesMap = computed(() => {
@@ -287,6 +309,26 @@ onMounted(() => {
   loadFromCache()
 })
 
+onUnmounted(() => {
+  if (observer) observer.disconnect()
+})
+
+// 监听过滤/排序变化 -> 重置显示数量
+watch([searchText, sortKey, sortOrder, resultFilter, filterDifficulty], () => {
+  displayedCount.value = 50
+  window.scrollTo({ top: 0, behavior: 'auto' })
+})
+
+// 监听视图切换 -> 重新设置 observer
+watch(viewMode, async (newMode) => {
+  if (newMode === 'list') {
+    await nextTick()
+    setupObserver()
+  } else {
+    if (observer) observer.disconnect()
+  }
+})
+
 // 监听侧边栏 suite 刷新完成 → 重新从缓存加载
 watch(() => accountStore.suiteRefreshing, (isRefreshing, wasRefreshing) => {
   if (wasRefreshing && !isRefreshing) {
@@ -347,7 +389,7 @@ watch(() => route.query.page, () => {})
         <select 
           v-if="sortKey === 'level'"
           v-model="selectedDiffType"
-          class="select select-bordered select-sm shrink-0"
+          class="select select-bordered select-sm shrink-0 w-auto max-w-[100px]"
         >
           <option value="easy">Easy</option>
           <option value="normal">Normal</option>
@@ -504,8 +546,9 @@ watch(() => route.query.page, () => {})
                 >{{ diffLabels[d] }}</th>
               </tr>
             </thead>
+
             <tbody>
-              <tr v-for="music in filteredMusics" :key="music.id" class="hover text-sm">
+              <tr v-for="music in displayedMusics" :key="music.id" class="hover text-sm">
                 <td class="p-2">
                   <AssetImage 
                     :src="`${assetsHost}/startapp/music/jacket/${music.assetbundleName}/${music.assetbundleName}.png`" 
@@ -540,7 +583,7 @@ watch(() => route.query.page, () => {})
 
         <!-- Mobile List View -->
         <div class="block sm:hidden space-y-2">
-          <div v-for="music in filteredMusics" :key="music.id" class="bg-base-100 p-2 rounded-lg flex gap-3 shadow-sm">
+          <div v-for="music in displayedMusics" :key="music.id" class="bg-base-100 p-2 rounded-lg flex gap-3 shadow-sm">
             <AssetImage 
               :src="`${assetsHost}/startapp/music/jacket/${music.assetbundleName}/${music.assetbundleName}.png`" 
               :alt="music.title"
@@ -575,6 +618,13 @@ watch(() => route.query.page, () => {})
               </div>
             </div>
           </div>
+        </div>
+
+        
+        <!-- 加载更多触发器 -->
+        <div ref="loadMoreTrigger" class="h-10 flex justify-center items-center mt-4">
+          <span v-if="displayedCount < filteredMusics.length" class="loading loading-spinner loading-md text-primary/50"></span>
+          <span v-else class="text-xs text-base-content/40">已加载全部</span>
         </div>
       </div>
 
