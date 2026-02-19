@@ -492,43 +492,43 @@ watch(() => route.query.page, () => {})
 
       <!-- 列表视图 -->
       <div v-else-if="viewMode === 'list'">
-        <div class="overflow-x-auto">
+        <!-- Desktop Table View -->
+        <div class="hidden sm:block overflow-x-auto">
           <table class="table table-sm w-full">
             <thead>
               <tr>
-                <th class="w-12 sm:w-16"></th>
+                <th class="w-16"></th>
                 <th>曲名</th>
-                <th v-for="d in allDifficulties" :key="d" class="text-center w-14 sm:w-20 lg:w-24"
+                <th v-for="d in allDifficulties" :key="d" class="text-center w-20 lg:w-24"
                   :style="{ color: diffColors[d] }"
                 >{{ diffLabels[d] }}</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="music in filteredMusics" :key="music.id" class="hover text-xs sm:text-sm">
-                <td class="p-1 sm:p-2">
+              <tr v-for="music in filteredMusics" :key="music.id" class="hover text-sm">
+                <td class="p-2">
                   <AssetImage 
                     :src="`${assetsHost}/startapp/music/jacket/${music.assetbundleName}/${music.assetbundleName}.png`" 
                     :alt="music.title"
-                    class="w-10 h-10 sm:w-12 sm:h-12 rounded object-cover"
+                    class="w-12 h-12 rounded object-cover"
                   />
                 </td>
-                <td class="p-1 sm:p-2">
+                <td class="p-2">
                   <RouterLink :to="`/musics/${music.id}`" class="hover:text-primary">
-                    <div class="font-medium truncate max-w-[120px] sm:max-w-[200px] lg:max-w-[400px]">{{ music.title }}</div>
-                    <div v-if="getTranslation(music.id)" class="text-[10px] sm:text-xs text-base-content/50 truncate max-w-[120px] sm:max-w-[200px] lg:max-w-[400px]">{{ getTranslation(music.id) }}</div>
+                    <div class="font-medium truncate max-w-[200px] lg:max-w-[400px]">{{ music.title }}</div>
+                    <div v-if="getTranslation(music.id)" class="text-xs text-base-content/50 truncate max-w-[200px] lg:max-w-[400px]">{{ getTranslation(music.id) }}</div>
                   </RouterLink>
                 </td>
-                <td v-for="d in allDifficulties" :key="d" class="text-center p-1 sm:p-2">
+                <td v-for="d in allDifficulties" :key="d" class="text-center p-2">
                   <template v-if="musicDifficultiesMap[music.id]?.[d] !== undefined">
-                    <div class="text-[10px] sm:text-xs text-base-content/50">{{ musicDifficultiesMap[music.id]?.[d] }}</div>
+                    <div class="text-xs text-base-content/50">{{ musicDifficultiesMap[music.id]?.[d] }}</div>
                     <div 
                       v-if="musicResultsMap[music.id]?.[d]"
-                      class="font-bold px-1 rounded inline-block mt-0.5 min-w-[2rem]"
+                      class="font-bold px-1 rounded inline-block mt-0.5 min-w-[2rem] text-xs"
                       :class="{
                         'result-ap': musicResultsMap[music.id]?.[d] === 'AP',
                         'result-fc': musicResultsMap[music.id]?.[d] === 'FC',
                         'result-clear': musicResultsMap[music.id]?.[d] === 'C',
-                        'text-[10px] sm:text-xs': true
                       }"
                     >{{ musicResultsMap[music.id]?.[d] }}</div>
                   </template>
@@ -536,6 +536,45 @@ watch(() => route.query.page, () => {})
               </tr>
             </tbody>
           </table>
+        </div>
+
+        <!-- Mobile List View -->
+        <div class="block sm:hidden space-y-2">
+          <div v-for="music in filteredMusics" :key="music.id" class="bg-base-100 p-2 rounded-lg flex gap-3 shadow-sm">
+            <AssetImage 
+              :src="`${assetsHost}/startapp/music/jacket/${music.assetbundleName}/${music.assetbundleName}.png`" 
+              :alt="music.title"
+              class="w-16 h-16 rounded object-cover shrink-0"
+            />
+            <div class="flex-1 min-w-0 flex flex-col gap-1">
+              <RouterLink :to="`/musics/${music.id}`" class="hover:text-primary">
+                <div class="font-medium truncate text-sm leading-tight">{{ music.title }}</div>
+                <div v-if="getTranslation(music.id)" class="text-xs text-base-content/50 truncate leading-tight">{{ getTranslation(music.id) }}</div>
+              </RouterLink>
+              
+              <div class="grid grid-cols-6 gap-0.5 mt-auto">
+                <div v-for="d in allDifficulties" :key="d" class="flex flex-col items-center justify-center bg-base-200/50 rounded p-0.5">
+                  <template v-if="musicDifficultiesMap[music.id]?.[d] !== undefined">
+                    <span class="text-[10px] leading-none font-bold mb-0.5" :style="{ color: diffColors[d] }">{{ musicDifficultiesMap[music.id]?.[d] }}</span>
+                    <div 
+                      v-if="musicResultsMap[music.id]?.[d]"
+                      class="mt-0.5 text-[9px] font-bold px-0.5 rounded leading-none w-full text-center"
+                      :class="{
+                        'result-ap': musicResultsMap[music.id]?.[d] === 'AP',
+                        'result-fc': musicResultsMap[music.id]?.[d] === 'FC',
+                        'result-clear': musicResultsMap[music.id]?.[d] === 'C',
+                        'text-base-content/50 border border-base-content/20': !musicResultsMap[music.id]?.[d]
+                      }"
+                    >{{ musicResultsMap[music.id]?.[d] }}</div>
+                    <div v-else class="h-[13px]"></div>
+                  </template>
+                  <template v-else>
+                     <div class="h-full w-full"></div>
+                  </template>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 

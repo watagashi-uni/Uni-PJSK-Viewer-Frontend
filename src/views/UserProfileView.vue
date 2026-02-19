@@ -603,11 +603,11 @@ watch(currentUserId, () => {
                   <Star class="w-5 h-5 text-primary" />
                   卡组 - {{ profileData.userDeck.name }}
                 </h3>
-                <div class="flex flex-wrap gap-2 justify-center">
+                <div class="grid grid-cols-5 gap-1 sm:gap-2">
                   <div
                     v-for="dc in deckCards"
                     :key="dc.cardId"
-                    class="w-20 sm:w-24 text-center"
+                    class="text-center"
                   >
                     <RouterLink
                       :to="`/cards/${dc.cardId}`"
@@ -619,7 +619,7 @@ watch(currentUserId, () => {
                         :master-rank="dc.userCard?.masterRank || 0"
                       />
                     </RouterLink>
-                    <div class="text-xs mt-1">
+                    <div class="text-[10px] sm:text-xs mt-1 truncate">
                       <span class="font-medium">Lv.{{ dc.userCard?.level || '?' }}</span>
                     </div>
                   </div>
