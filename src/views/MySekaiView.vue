@@ -512,8 +512,8 @@ function drawPoints() {
                 ctx.stroke()
             }
             
-            // Display reward popup with filtered reward
-            createRewardPopup(rewardToShow, displayX + displayGridWidth * 0.4, displayY + displayGridWidth * 0.4, displayX, displayY, containsRareItem, reverseXY)
+            // Display reward popup centered on the dot
+            createRewardPopup(rewardToShow, displayX, displayY, displayX, displayY, containsRareItem, reverseXY)
         } else {
              ctx.fillStyle = 'black'
              ctx.font = '12px Arial'
@@ -524,7 +524,7 @@ function drawPoints() {
     adjustItemListPositions()
 }
 
-function createRewardPopup(reward: any, x: number, y: number, anchorX: number, anchorY: number, ifContainRareItem: boolean, reverseXY: boolean) {
+function createRewardPopup(reward: any, x: number, y: number, anchorX: number, anchorY: number, ifContainRareItem: boolean, _reverseXY: boolean) {
     if (!popupContainerRef.value) return
     
     const itemList = document.createElement('div')
@@ -535,19 +535,16 @@ function createRewardPopup(reward: any, x: number, y: number, anchorX: number, a
     itemList.dataset.anchorX = String(anchorX)
     itemList.dataset.anchorY = String(anchorY)
 
-    // Position setup
-    if (reverseXY) {
-        itemList.style.left = `${x}px`
-        itemList.style.top = `${y - 10}px`
-    } else {
-        itemList.style.left = `${x}px`
-        itemList.style.top = `${y}px`
-    }
+    // Position centered on the dot
+    itemList.style.left = `${x}px`
+    itemList.style.top = `${y}px`
+    itemList.style.transform = 'translate(-50%, -50%)'
     
     if (ifContainRareItem || reward.hasOwnProperty("mysekai_music_record")) {
         if (doContainsRareItem(reward, true)) {
             itemList.style.backgroundColor = 'rgba(220, 38, 38, 0.6)'
             itemList.style.borderColor = 'rgba(254, 202, 202, 0.5)'
+            itemList.classList.add('rare-flare-container')
         } else {
             itemList.style.backgroundColor = 'rgba(37, 99, 235, 0.6)'
             itemList.style.borderColor = 'rgba(191, 219, 254, 0.5)'
@@ -593,65 +590,61 @@ function createRewardPopup(reward: any, x: number, y: number, anchorX: number, a
         return 0
     })
 
-    const mainItem = allItems[0]
-    if (!mainItem) return // Should not happen due to length check above
-
+    // First item = main (big icon)
+    const mainItem = allItems[0]!
     const subItems = allItems.slice(1)
 
-    // Create Main Item Container
     const mainContainer = document.createElement('div')
     mainContainer.className = 'relative flex-shrink-0'
-    
+
     const mainImg = document.createElement('img')
     mainImg.src = mainItem.texture
     if (mainItem.isRecord) mainImg.onerror = () => { mainImg.style.display = 'none' }
-    // Reduced size: w-6 -> w-4 (16px)
-    mainImg.className = 'w-4 h-4 object-contain drop-shadow-sm' 
-    
-    // Add glow effect for rare items
-    if (mainItem.isRare) {
-        mainImg.classList.add('rare-glow')
-    }
-    
-    const mainQty = document.createElement('span')
-    // Smaller font: text-[9px] -> text-[7px]
-    mainQty.className = 'absolute -bottom-1 -right-1 text-[7px] font-bold leading-none text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)]'
-    mainQty.textContent = mainItem.quantity > 1 ? `x${mainItem.quantity}` : ''
-    
+    mainImg.className = 'w-4 h-4 object-contain drop-shadow-sm'
+
     mainContainer.appendChild(mainImg)
-    if (mainItem.quantity > 1) mainContainer.appendChild(mainQty)
+
+    // Main quantity subscript
+    if (mainItem.quantity > 1) {
+        const qty = document.createElement('span')
+        qty.style.cssText = 'position:absolute;bottom:-2px;right:-3px;font-size:7px;font-weight:bold;color:#fff;line-height:1;text-shadow:0 0 2px #000,0 0 2px #000;'
+        qty.textContent = `${mainItem.quantity}`
+        mainContainer.appendChild(qty)
+    }
+
     itemList.appendChild(mainContainer)
 
-    // Create Sub Items Container
+    // Sub items = small icons with subscript in bottom-right
     if (subItems.length > 0) {
         const subContainer = document.createElement('div')
-        mainContainer.appendChild(subContainer)
-        // Offset adjustments for smaller main item
-        subContainer.className = 'absolute -top-1 -right-3 flex flex-col gap-0 items-start pl-0.5'
-        
-        subItems.forEach(sub => {
-             const subWrap = document.createElement('div')
-             // Smaller padding
-             subWrap.className = 'relative flex items-center bg-black/30 rounded-full pr-0.5 pl-0 mt-0.5 backdrop-blur-[1px]'
-             
-             const subImg = document.createElement('img')
-             subImg.src = sub.texture
-             // Reduced size: w-3 -> w-2 (8px), maybe 2.5 (10px)? Let's try w-2.5 h-2.5
-             subImg.className = 'w-2.5 h-2.5 object-contain'
-             if (sub.isRecord) subImg.onerror = () => { subImg.style.display = 'none' }
+        subContainer.className = 'flex flex-col gap-0.5'
 
-             const subQty = document.createElement('span')
-             // Smaller font: text-[7px] -> text-[6px]
-             subQty.className = 'text-[6px] font-bold text-white ml-0.5 leading-none'
-             subQty.textContent = sub.quantity > 1 ? `x${sub.quantity}` : ''
-             
-             subWrap.appendChild(subImg)
-             if (sub.quantity > 1) subWrap.appendChild(subQty)
-             
-             subContainer.appendChild(subWrap)
+        subItems.forEach(sub => {
+            const wrap = document.createElement('div')
+            wrap.className = 'relative flex-shrink-0'
+            wrap.style.width = '12px'
+            wrap.style.height = '12px'
+
+            const img = document.createElement('img')
+            img.src = sub.texture
+            if (sub.isRecord) img.onerror = () => { img.style.display = 'none' }
+            img.className = 'w-full h-full object-contain'
+
+            wrap.appendChild(img)
+
+            if (sub.quantity > 1) {
+                const qty = document.createElement('span')
+                qty.style.cssText = 'position:absolute;bottom:-3px;right:-4px;font-size:6px;font-weight:bold;color:#fff;line-height:1;text-shadow:0 0 2px #000,0 0 2px #000;'
+                qty.textContent = `${sub.quantity}`
+                wrap.appendChild(qty)
+            }
+
+            subContainer.appendChild(wrap)
         })
+
+        itemList.appendChild(subContainer)
     }
-    
+
     if (itemList.hasChildNodes()) {
          popupContainerRef.value.appendChild(itemList)
     }
@@ -697,118 +690,141 @@ function getValidPeriodStart(now: Date): Date {
     return start
 }
 
-// Updated adjustItemListPositions with better collision resolution
+// Grid-based layout: group overlapping popups into clusters, arrange in rows
 function adjustItemListPositions() {
     if (!popupContainerRef.value) return
-    const itemLists = Array.from(popupContainerRef.value.querySelectorAll('.item-list-popup')) as HTMLElement[]
-    
-    // Iterative relaxation
-    const iterations = 10
-    
-    for (let iter = 0; iter < iterations; iter++) {
-        let moved = false
-        for (let i = 0; i < itemLists.length; i++) {
-            const itemI = itemLists[i]
-            if (!itemI) continue
-            const rect1 = itemI.getBoundingClientRect()
-            const x1 = rect1.left + rect1.width / 2
-            const y1 = rect1.top + rect1.height / 2
-            
-            for (let j = i + 1; j < itemLists.length; j++) {
-                 const itemJ = itemLists[j]
-                 if (!itemJ) continue
-                 const rect2 = itemJ.getBoundingClientRect()
-                 
-                 // Check overlap
-                 if (!(rect1.right < rect2.left || 
-                       rect1.left > rect2.right || 
-                       rect1.bottom < rect2.top || 
-                       rect1.top > rect2.bottom)) {
-                     
-                     // Overlapping
-                     const x2 = rect2.left + rect2.width / 2
-                     const y2 = rect2.top + rect2.height / 2
-                     
-                     let dx = x2 - x1
-                     let dy = y2 - y1
-                     
-                     // If exactly same position, jitter
-                     if (dx === 0 && dy === 0) {
-                         dx = (Math.random() - 0.5) * 5
-                         dy = (Math.random() - 0.5) * 5
-                     }
-                     
-                     // Normalize
-                     const dist = Math.sqrt(dx * dx + dy * dy)
-                     const ndx = dx / dist
-                     const ndy = dy / dist
-                     
-                     // Push amount
-                     const moveX = ndx * 2 // Small steps
-                     const moveY = ndy * 2
-                     
-                     const currentLeftJ = parseFloat(itemJ.style.left || '0')
-                     const currentTopJ = parseFloat(itemJ.style.top || '0')
-                     
-                     if (!isNaN(currentLeftJ) && !isNaN(currentTopJ)) {
-                         itemJ.style.left = `${currentLeftJ + moveX}px`
-                         itemJ.style.top = `${currentTopJ + moveY}px`
-                         moved = true
-                     }
-                 }
-            }
-        }
-        if (!moved) break;
+    const items = Array.from(popupContainerRef.value.querySelectorAll('.item-list-popup')) as HTMLElement[]
+    if (items.length === 0) return
+
+    // Get popup sizes (they're all similar)
+    const POPUP_W = 36 // approx width of a compact popup
+    const POPUP_H = 28 // approx height
+    const GAP = 3
+    const CLUSTER_RADIUS = 30 // popups within this distance are clustered
+
+    // Extract current positions (center of each popup)
+    interface PopupInfo {
+        el: HTMLElement
+        cx: number
+        cy: number
+        anchorX: number
+        anchorY: number
+        w: number
+        h: number
+        clusterId: number
     }
 
-    // Draw connecting lines
+    const popups: PopupInfo[] = items.map(el => {
+        const ax = parseFloat(el.dataset.anchorX || '0')
+        const ay = parseFloat(el.dataset.anchorY || '0')
+        return {
+            el,
+            cx: ax,
+            cy: ay,
+            anchorX: ax,
+            anchorY: ay,
+            w: el.offsetWidth || POPUP_W,
+            h: el.offsetHeight || POPUP_H,
+            clusterId: -1
+        }
+    })
+
+    // Simple clustering: union-find by distance
+    let nextCluster = 0
+    for (let i = 0; i < popups.length; i++) {
+        const pi = popups[i]!
+        if (pi.clusterId === -1) {
+            pi.clusterId = nextCluster++
+        }
+        for (let j = i + 1; j < popups.length; j++) {
+            const pj = popups[j]!
+            const dx = pi.anchorX - pj.anchorX
+            const dy = pi.anchorY - pj.anchorY
+            const dist = Math.sqrt(dx * dx + dy * dy)
+            if (dist < CLUSTER_RADIUS) {
+                if (pj.clusterId === -1) {
+                    pj.clusterId = pi.clusterId
+                } else if (pj.clusterId !== pi.clusterId) {
+                    const oldId = pj.clusterId
+                    const newId = pi.clusterId
+                    popups.forEach(p => { if (p.clusterId === oldId) p.clusterId = newId })
+                }
+            }
+        }
+    }
+
+    // Group by cluster
+    const clusters = new Map<number, PopupInfo[]>()
+    popups.forEach(p => {
+        if (!clusters.has(p.clusterId)) clusters.set(p.clusterId, [])
+        clusters.get(p.clusterId)!.push(p)
+    })
+
+    // Arrange each cluster
+    clusters.forEach(group => {
+        if (group.length === 1) {
+            const p = group[0]!
+            p.el.style.left = `${p.anchorX}px`
+            p.el.style.top = `${p.anchorY}px`
+            p.el.style.transform = 'translate(-50%, -50%)'
+            return
+        }
+
+        // Calculate cluster center
+        let centerX = 0, centerY = 0
+        group.forEach(p => { centerX += p.anchorX; centerY += p.anchorY })
+        centerX /= group.length
+        centerY /= group.length
+
+        // Determine grid layout
+        const cols = Math.ceil(Math.sqrt(group.length))
+        const rows = Math.ceil(group.length / cols)
+
+        // Measure actual popup size from first element
+        const cellW = (group[0]!.w || POPUP_W) + GAP
+        const cellH = (group[0]!.h || POPUP_H) + GAP
+
+        // Grid starts at top-left, centered around cluster center
+        const gridW = cols * cellW
+        const gridH = rows * cellH
+        const startX = centerX - gridW / 2 + cellW / 2
+        const startY = centerY - gridH / 2 + cellH / 2
+
+        group.forEach((p, idx) => {
+            const col = idx % cols
+            const row = Math.floor(idx / cols)
+            const px = startX + col * cellW
+            const py = startY + row * cellH
+            p.el.style.left = `${px}px`
+            p.el.style.top = `${py}px`
+            p.el.style.transform = 'translate(-50%, -50%)'
+        })
+    })
+
+    // Draw connecting lines from anchor to popup
     const canvas = canvasRef.value
     if (!canvas) return
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
     ctx.save()
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)'
-    ctx.lineWidth = 1.5
-    
-    itemLists.forEach(item => {
-        const anchorX = parseFloat(item.dataset.anchorX || '0')
-        const anchorY = parseFloat(item.dataset.anchorY || '0')
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)'
+    ctx.lineWidth = 1
+
+    popups.forEach(p => {
+        const popLeft = parseFloat(p.el.style.left || '0')
+        const popTop = parseFloat(p.el.style.top || '0')
         
-        const currentLeft = parseFloat(item.style.left || '0')
-        const currentTop = parseFloat(item.style.top || '0')
-        const width = item.offsetWidth
-        const height = item.offsetHeight
-        
-        // Target (popup) rectangle
-        const rectLeft = currentLeft
-        const rectTop = currentTop
-        const rectRight = currentLeft + width
-        const rectBottom = currentTop + height
-        
-        // Find nearest point on rectangle to anchor
-        
-        // Default to center if inside? No, point is usually outside.
-        // Clamping logic:
-        // x = clamp(anchorX, rectLeft, rectRight)
-        // y = clamp(anchorY, rectTop, rectBottom)
-        // Does this work?
-        // If anchor is to the left, x = rectLeft. y = clamped Y.
-        // This finds the point on the rectangle closest to the anchor.
-        
-        const nearestX = Math.max(rectLeft, Math.min(anchorX, rectRight))
-        const nearestY = Math.max(rectTop, Math.min(anchorY, rectBottom))
-        
-        // Draw line from anchor to nearest point
-        ctx.beginPath()
-        ctx.moveTo(anchorX, anchorY)
-        ctx.lineTo(nearestX, nearestY)
-        ctx.stroke()
-        
-        // Draw a small dot at anchor to verify position (already drawn by main loop, but reinforce)
-        // Actually main loop draws colored dots. We don't need to redraw.
+        // Only draw line if popup moved away from anchor
+        const dist = Math.sqrt((popLeft - p.anchorX) ** 2 + (popTop - p.anchorY) ** 2)
+        if (dist > 5) {
+            ctx.beginPath()
+            ctx.moveTo(p.anchorX, p.anchorY)
+            ctx.lineTo(popLeft, popTop)
+            ctx.stroke()
+        }
     })
-    
+
     ctx.restore()
 }
 
@@ -933,53 +949,36 @@ onMounted(() => {
     transform: scale(1.1);
 }
 
-/* Optical Flare Effect */
-@keyframes flare-rotate {
-  0% { transform: translate(-50%, -50%) rotate(0deg) scale(1); opacity: 0.8; }
-  50% { transform: translate(-50%, -50%) rotate(180deg) scale(1.2); opacity: 1; }
-  100% { transform: translate(-50%, -50%) rotate(360deg) scale(1); opacity: 0.8; }
-}
-
-@keyframes flare-pulse {
-   0% { box-shadow: 0 0 5px #ff5555, 0 0 10px #ff0000; }
-   100% { box-shadow: 0 0 10px #ff8888, 0 0 20px #ff2222; }
+/* Optical Flare Effect for Super Rare Items — uses box-shadow (not clipped by overflow) */
+@keyframes rare-flare-pulse {
+  0% {
+    box-shadow:
+      0 0 8px 4px rgba(255, 100, 50, 0.8),
+      0 0 20px 10px rgba(255, 50, 30, 0.5),
+      0 0 40px 20px rgba(255, 30, 0, 0.3),
+      0 0 80px 40px rgba(255, 0, 0, 0.15);
+  }
+  50% {
+    box-shadow:
+      0 0 12px 6px rgba(255, 150, 80, 0.9),
+      0 0 30px 15px rgba(255, 80, 40, 0.6),
+      0 0 60px 30px rgba(255, 40, 10, 0.35),
+      0 0 100px 50px rgba(255, 10, 0, 0.2);
+  }
+  100% {
+    box-shadow:
+      0 0 8px 4px rgba(255, 100, 50, 0.8),
+      0 0 20px 10px rgba(255, 50, 30, 0.5),
+      0 0 40px 20px rgba(255, 30, 0, 0.3),
+      0 0 80px 40px rgba(255, 0, 0, 0.15);
+  }
 }
 
 .rare-flare-container {
     position: relative;
-}
-
-/* Central strong glow */
-.rare-flare-container::before {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 200%;
-    height: 200%;
-    transform: translate(-50%, -50%);
-    background: radial-gradient(circle, rgba(255, 200, 150, 0.6) 0%, rgba(255, 50, 50, 0.2) 40%, transparent 70%);
-    mix-blend-mode: screen;
-    pointer-events: none;
-    z-index: 0;
-    animation: flare-rotate 4s infinite linear;
-}
-
-/* Cross flare (Horizontal) */
-.rare-flare-container::after {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 10%;
-    width: 80%; /* reduced width relative to container to avoid huge spills */
-    height: 2px;
-    background: linear-gradient(90deg, transparent, #fff, transparent);
-    box-shadow: 0 0 4px #ff5555;
-    transform: translateY(-50%);
-    pointer-events: none;
-    z-index: 20;
-    animation: pulse-width 2s infinite ease-in-out;
-    opacity: 0.8;
+    z-index: 20 !important;
+    animation: rare-flare-pulse 1.5s infinite ease-in-out;
+    border-radius: 6px;
 }
 
 </style>
