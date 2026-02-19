@@ -1,64 +1,67 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { RouterView, useRoute } from 'vue-router'
 import AppNavbar from '@/components/AppNavbar.vue'
 import ToastContainer from '@/components/ToastContainer.vue'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
-import { Music, Image, BarChart3, Info, Settings, Calendar, Gift, Share2, Zap, User } from 'lucide-vue-next'
+import { useAccountStore } from '@/stores/account'
+import { Music, Image, BarChart3, Info, Settings, Calendar, Gift, Share2, Zap, User, RefreshCw } from 'lucide-vue-next'
 
 const route = useRoute()
 const masterStore = useMasterStore()
 const settingsStore = useSettingsStore()
+const accountStore = useAccountStore()
 
-// Check if current route is fullscreen
+const refreshError = ref('')
+
 const isFullscreen = computed(() => route.meta.fullscreen === true)
 
 onMounted(async () => {
-  // 清理旧版 SW 的 external-images 缓存（可能包含缓存的 404 opaque response）
   if ('caches' in window) {
     caches.delete('external-images')
   }
-  
-  // 初始化各个 store
   settingsStore.initialize()
+  accountStore.initialize()
   await masterStore.initialize()
 })
+
+async function handleProfileRefresh() {
+  if (!accountStore.currentUserId) return
+  refreshError.value = ''
+  try {
+    await accountStore.refreshProfile(accountStore.currentUserId)
+  } catch (e: any) {
+    refreshError.value = e.message
+  }
+}
+
+async function handleSuiteRefresh() {
+  if (!accountStore.currentUserId) return
+  refreshError.value = ''
+  try {
+    await accountStore.refreshSuite(accountStore.currentUserId)
+  } catch (e: any) {
+    refreshError.value = e.message
+  }
+}
 </script>
 
 <template>
-  <!-- 全屏模式：直接渲染路由组件 -->
   <div v-if="isFullscreen" class="min-h-screen" data-theme="unipjsk">
     <RouterView />
   </div>
   
-  <!-- 普通模式：带侧边栏布局 -->
   <div v-else class="drawer lg:drawer-open min-h-screen bg-base-200" data-theme="unipjsk">
     <input id="my-drawer-2" type="checkbox" class="drawer-toggle" />
     
-    <!-- Drawer Content -->
     <div class="drawer-content flex flex-col">
-      <!-- Navbar (Only visible on mobile/tablet or just a header) -->
       <AppNavbar />
       
-      <!-- Global Alert Banner -->
-      <!-- <AlertBanner 
-        v-if="showBanner" 
-        type="warning" 
-        dismissible 
-        @dismiss="dismissBanner"
-        class="mx-4 mt-4"
-      >
-        <strong>⚠ 内测中！</strong> 该网站还在内部测试中，出现问题请及时反馈<br/>
-        剧透内容默认不显示，如需查看请在设置页面开启
-      </AlertBanner> -->
-      
-      <!-- Main Content -->
       <main class="flex-1 w-full max-w-7xl mx-auto px-4 py-6">
         <RouterView />
       </main>
       
-      <!-- Footer -->
       <footer class="footer items-center p-4 bg-base-300 text-base-content mt-auto">
         <aside class="items-center grid-flow-col">
           <p>Uni PJSK Viewer © {{ new Date().getFullYear() }} - Created by 綿菓子ウニ</p>
@@ -66,11 +69,10 @@ onMounted(async () => {
       </footer>
     </div>
     
-    <!-- Drawer Side (Sidebar) -->
+    <!-- Sidebar -->
     <div class="drawer-side z-50">
       <label for="my-drawer-2" aria-label="close sidebar" class="drawer-overlay"></label>
       <ul class="menu p-4 w-80 min-h-full bg-base-100 text-base-content shadow-xl gap-2">
-        <!-- Sidebar Header -->
         <li class="mb-4">
           <RouterLink to="/" class="text-2xl font-bold text-primary px-2 hover:bg-transparent">
             Uni PJSK
@@ -78,7 +80,6 @@ onMounted(async () => {
           </RouterLink>
         </li>
 
-        <!-- Menu Items -->
         <li>
           <RouterLink to="/musics" active-class="active">
             <Music class="w-5 h-5" /> 歌曲列表
@@ -121,13 +122,67 @@ onMounted(async () => {
         </li>
         <li>
           <RouterLink to="/profile" active-class="active">
-            <User class="w-5 h-5" /> 用户档案
+            <User class="w-5 h-5" /> 个人信息
           </RouterLink>
         </li>
+
+        <div class="divider my-1"></div>
+
+        <!-- 账号管理 -->
+        <li class="menu-title text-xs">账号</li>
+        <li v-if="accountStore.accounts.length > 0" class="px-2">
+          <select
+            :value="accountStore.currentUserId"
+            @change="accountStore.selectAccount(($event.target as HTMLSelectElement).value)"
+            class="select select-bordered select-sm w-full"
+          >
+            <option value="">未选择</option>
+            <option v-for="acc in accountStore.accounts" :key="acc.userId" :value="acc.userId">
+              {{ acc.userId }} - {{ acc.name }}
+            </option>
+          </select>
+        </li>
+        <li v-else class="px-2">
+          <span class="text-xs text-base-content/40 p-0 hover:bg-transparent cursor-default">
+            在个人信息页添加账号
+          </span>
+        </li>
+        <li v-if="accountStore.currentUserId" class="px-2">
+          <div class="flex gap-1 p-0 hover:bg-transparent">
+            <button
+              class="btn btn-xs btn-ghost flex-1 gap-1"
+              :disabled="accountStore.profileRefreshing"
+              @click="handleProfileRefresh"
+            >
+              <RefreshCw class="w-3 h-3" :class="{ 'animate-spin': accountStore.profileRefreshing }" />
+              Profile
+            </button>
+            <button
+              class="btn btn-xs btn-ghost flex-1 gap-1"
+              :disabled="accountStore.suiteRefreshing"
+              @click="handleSuiteRefresh"
+            >
+              <RefreshCw class="w-3 h-3" :class="{ 'animate-spin': accountStore.suiteRefreshing }" />
+              Suite
+            </button>
+          </div>
+        </li>
+        <li v-if="accountStore.currentUserId && (accountStore.lastRefreshText || accountStore.uploadTimeText)" class="px-2">
+          <div class="flex flex-col gap-0 p-0 hover:bg-transparent cursor-default">
+            <span v-if="accountStore.lastRefreshText" class="text-[10px] text-base-content/40">
+              Profile: {{ accountStore.lastRefreshText }}
+            </span>
+            <span v-if="accountStore.uploadTimeText" class="text-[10px] text-base-content/40">
+              Suite数据: {{ accountStore.uploadTimeText }}
+            </span>
+          </div>
+        </li>
+        <li v-if="refreshError" class="px-2">
+          <span class="text-[10px] text-error p-0 hover:bg-transparent">{{ refreshError }}</span>
+        </li>
+
+        <div class="divider my-1"></div>
         
-        <div class="divider"></div>
-        
-        <!-- System Links -->
         <li>
           <RouterLink to="/about" active-class="active">
             <Info class="w-5 h-5" /> 关于项目
@@ -141,13 +196,11 @@ onMounted(async () => {
       </ul>
     </div>
     
-    <!-- Toast 容器 (PWA 更新 + Master 加载) -->
     <ToastContainer />
   </div>
 </template>
 
 <style>
-/* 全局过渡动画 */
 .fade-enter-active,
 .fade-leave-active {
   transition: opacity 0.3s ease;

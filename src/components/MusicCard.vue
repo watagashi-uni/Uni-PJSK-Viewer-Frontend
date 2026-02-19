@@ -17,6 +17,8 @@ const props = defineProps<{
   assetbundleName: string
   difficulties: Record<string, number>
   categories: string[]
+  // 成绩数据: difficulty -> 'AP' | 'FC' | 'C' | ''
+  results?: Record<string, string>
 }>()
 
 // 类别 -> 图标文件名映射
@@ -50,6 +52,20 @@ const difficultyLabels: Record<string, string> = {
   expert: 'EXPERT',
   master: 'MASTER',
   append: 'APPEND'
+}
+
+// 成绩显示
+function getResultLabel(diff: string): string {
+  if (!props.results) return ''
+  return props.results[diff] || ''
+}
+
+function getResultClass(diff: string): string {
+  const r = getResultLabel(diff)
+  if (r === 'AP') return 'result-ap'
+  if (r === 'FC') return 'result-fc'
+  if (r === 'C') return 'result-clear'
+  return ''
 }
 
 // 获取有效的难度列表
@@ -126,6 +142,34 @@ const coverUrl = computed(() => {
           <span class="text-[10px] font-black leading-none">{{ difficulties[diff] }}</span>
         </div>
       </div>
+
+      <!-- 成绩行 -->
+      <div v-if="results" class="flex gap-1 justify-between">
+        <div 
+          v-for="diff in availableDifficulties" 
+          :key="`r-${diff}`"
+          class="flex-1 flex items-center justify-center rounded min-w-[1.2rem] h-4"
+          :class="getResultClass(diff)"
+        >
+          <span class="text-[9px] font-bold leading-none">{{ getResultLabel(diff) }}</span>
+        </div>
+      </div>
     </div>
   </RouterLink>
 </template>
+
+<style scoped>
+.result-ap {
+  background: linear-gradient(135deg, #F06292, #64B5F6);
+  color: white;
+}
+.result-fc {
+  background-color: #F06292;
+  color: white;
+}
+.result-clear {
+  background-color: rgba(255, 255, 255, 0.15);
+  color: currentColor;
+  border: 1px solid rgba(128, 128, 128, 0.3);
+}
+</style>
