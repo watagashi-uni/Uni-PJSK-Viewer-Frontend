@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useMasterStore } from '@/stores/master'
+import { useAccountStore } from '@/stores/account'
 import SekaiCard from '@/components/SekaiCard.vue'
 import { 
   Info, Play, Users, User,
@@ -9,6 +10,7 @@ import {
 } from 'lucide-vue-next'
 
 const masterStore = useMasterStore()
+const accountStore = useAccountStore()
 const route = useRoute()
 
 // ==================== 类型定义 ====================
@@ -108,22 +110,6 @@ interface RecommendDeckResult {
 // ==================== 状态 ====================
 const userId = ref('')
 const mode = ref<'1' | '2'>('2') // 1=挑战, 2=活动
-
-// 账号列表（与 Profile 页共享）
-interface StoredAccount {
-  userId: string
-  name: string
-  lastRefresh: number
-}
-const STORAGE_KEY = 'sekaiUserProfiles'
-const savedAccounts = ref<StoredAccount[]>([])
-
-function loadSavedAccounts() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) savedAccounts.value = JSON.parse(raw)
-  } catch { savedAccounts.value = [] }
-}
 
 
 const selectedEventId = ref<number | null>(null)
@@ -231,10 +217,9 @@ function closeDropdowns(e: MouseEvent) {
 
 onMounted(async () => {
   document.addEventListener('click', closeDropdowns)
-  loadSavedAccounts()
-  // 优先用已保存账号，其次用deckRecommend专属存储
-  if (savedAccounts.value.length > 0) {
-    userId.value = savedAccounts.value[0]!.userId
+  // 优先用侧边栏已选账号
+  if (accountStore.currentUserId) {
+    userId.value = accountStore.currentUserId
   } else {
     const savedUid = localStorage.getItem('deckRecommend_userId')
     if (savedUid) userId.value = savedUid
@@ -328,9 +313,8 @@ async function handleCalculate() {
   const uid = userId.value.trim()
   localStorage.setItem('deckRecommend_userId', uid)
   // 自动添加到共享账号列表
-  if (!savedAccounts.value.some(a => a.userId === uid)) {
-    savedAccounts.value.push({ userId: uid, name: uid, lastRefresh: Date.now() })
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(savedAccounts.value))
+  if (!accountStore.accounts.some(a => a.userId === uid)) {
+    accountStore.addAccount({ userId: uid, name: uid, lastRefresh: Date.now() })
   }
   if (!selectedMusic.value || !selectedDifficulty.value) { errorMsg.value = '请选择歌曲和难度'; return }
   if (mode.value === '1' && !selectedCharacter.value) { errorMsg.value = '请选择角色'; return }
@@ -340,6 +324,13 @@ async function handleCalculate() {
   recommend.value = null
   challengeHighScore.value = 0
   calculating.value = true
+
+  // 自动刷新 suite 数据
+  try {
+    await accountStore.refreshSuite(uid)
+  } catch {
+    // suite 刷新失败不影响组卡
+  }
 
   workerRef = new Worker(
     new URL('../utils/deckRecommendWorker.ts', import.meta.url),
@@ -458,17 +449,17 @@ const rarityList = [
             <label class="label"><span class="label-text font-medium">用户ID</span></label>
             <div class="flex gap-2 items-center max-w-md">
               <select
-                v-if="savedAccounts.length > 0"
+                v-if="accountStore.accounts.length > 0"
                 v-model="userId"
                 class="select select-bordered flex-1"
               >
-                <option v-for="acc in savedAccounts" :key="acc.userId" :value="acc.userId">
+                <option v-for="acc in accountStore.accounts" :key="acc.userId" :value="acc.userId">
                   {{ acc.userId }} - {{ acc.name }}
                 </option>
                 <option value="">手动输入...</option>
               </select>
               <input
-                v-if="savedAccounts.length === 0 || userId === ''"
+                v-if="accountStore.accounts.length === 0 || userId === ''"
                 v-model="userId"
                 type="text"
                 placeholder="输入Sekai用户ID"
@@ -591,7 +582,7 @@ const rarityList = [
           <button class="btn btn-primary w-full max-w-md h-14 text-lg" @click="handleCalculate">
             <Loader2 v-if="calculating" class="w-5 h-5 animate-spin" />
             <Play v-else class="w-5 h-5" />
-            {{ calculating ? '取消（计算中...可能要等30秒）' : '自动组卡！' }}
+            {{ calculating ? '取消（计算中...可能要等30秒）' : '刷新数据并自动组卡！' }}
           </button>
         </div>
       </div>

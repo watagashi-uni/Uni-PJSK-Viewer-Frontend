@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { useMasterStore } from '@/stores/master'
+import { useAccountStore } from '@/stores/account'
 import SekaiCard from '@/components/SekaiCard.vue'
 import SekaiProfileHonor from '@/components/SekaiProfileHonor.vue'
 import {
@@ -9,13 +10,9 @@ import {
 } from 'lucide-vue-next'
 
 const masterStore = useMasterStore()
+const accountStore = useAccountStore()
 
-// ==================== 类型定义 ====================
-interface StoredAccount {
-  userId: string
-  name: string
-  lastRefresh: number
-}
+
 
 interface ProfileData {
   totalPower: {
@@ -88,12 +85,13 @@ interface GameCharacterUnit {
   unit: string
 }
 
-// ==================== 状态 ====================
-const STORAGE_KEY = 'sekaiUserProfiles'
 const PROFILE_DATA_KEY = 'sekaiUserProfileData'
 
-const accounts = ref<StoredAccount[]>([])
-const currentUserId = ref<string>('')
+const accounts = computed(() => accountStore.accounts)
+const currentUserId = computed({
+  get: () => accountStore.currentUserId,
+  set: (v) => accountStore.selectAccount(v)
+})
 const profileData = ref<ProfileData | null>(null)
 const isLoading = ref(false)
 const isInitLoading = ref(true)
@@ -153,14 +151,11 @@ function getHonor(seq: number) {
 
 // ==================== 账号管理 ====================
 function loadAccounts() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) accounts.value = JSON.parse(raw)
-  } catch { accounts.value = [] }
+  // accountStore already initialized in App.vue
 }
 
 function saveAccounts() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(accounts.value))
+  accountStore.save()
 }
 
 function loadProfileData() {
@@ -204,10 +199,8 @@ async function addAccount() {
       : []
 
     profileData.value = data
-    const account: StoredAccount = { userId: uid, name: data.user.name, lastRefresh: Date.now() }
-    accounts.value.push(account)
+    accountStore.addAccount({ userId: uid, name: data.user.name, lastRefresh: Date.now() })
     currentUserId.value = uid
-    saveAccounts()
     saveProfileData()
     newUserIdInput.value = ''
   } catch (e: any) {
@@ -229,12 +222,7 @@ async function refreshProfile() {
       : []
 
     profileData.value = data
-    const acc = accounts.value.find(a => a.userId === currentUserId.value)
-    if (acc) {
-      acc.name = data.user.name
-      acc.lastRefresh = Date.now()
-      saveAccounts()
-    }
+    accountStore.addAccount({ userId: currentUserId.value, name: data.user.name, lastRefresh: Date.now() })
     saveProfileData()
   } catch (e: any) {
     errorMsg.value = e.message || '刷新失败'
@@ -250,13 +238,9 @@ function switchAccount(userId: string) {
 }
 
 function deleteAccount(userId: string) {
-  accounts.value = accounts.value.filter(a => a.userId !== userId)
+  accountStore.removeAccount(userId)
   localStorage.removeItem(`${PROFILE_DATA_KEY}_${userId}`)
-  saveAccounts()
-  if (currentUserId.value === userId) {
-    currentUserId.value = accounts.value[0]?.userId || ''
-    loadProfileData()
-  }
+  loadProfileData()
 }
 
 function exportAccounts() {
@@ -308,12 +292,15 @@ function importAccounts() {
 }
 
 // ==================== 计算属性 ====================
-const currentAccount = computed(() => accounts.value.find(a => a.userId === currentUserId.value))
+
 
 const lastRefreshText = computed(() => {
-  if (!currentAccount.value?.lastRefresh) return ''
-  return new Date(currentAccount.value.lastRefresh).toLocaleString('zh-CN')
+  const acc = accountStore.currentAccount
+  if (!acc?.lastRefresh) return ''
+  return new Date(acc.lastRefresh).toLocaleString('zh-CN')
 })
+
+const suiteUploadTimeText = computed(() => accountStore.uploadTimeText)
 
 // 卡组数据
 const deckCards = computed(() => {
@@ -503,7 +490,17 @@ watch(currentUserId, () => {
               @click="refreshProfile"
             >
               <RefreshCw class="w-3.5 h-3.5" :class="{ 'animate-spin': isLoading }" />
-              刷新
+              刷新Profile
+            </button>
+            <!-- Suite 刷新 -->
+            <button
+              v-if="currentUserId"
+              class="btn btn-sm btn-ghost gap-1"
+              :disabled="accountStore.suiteRefreshing"
+              @click="accountStore.refreshSuite(currentUserId)"
+            >
+              <RefreshCw class="w-3.5 h-3.5" :class="{ 'animate-spin': accountStore.suiteRefreshing }" />
+              刷新Suite
             </button>
             <!-- 删除 -->
             <button
@@ -528,6 +525,7 @@ watch(currentUserId, () => {
           <!-- 上次刷新时间 -->
           <p v-if="lastRefreshText" class="text-xs text-base-content/50">
             上次刷新: {{ lastRefreshText }}
+            <template v-if="suiteUploadTimeText"> | Suite数据更新: {{ suiteUploadTimeText }}</template>
           </p>
         </div>
       </div>

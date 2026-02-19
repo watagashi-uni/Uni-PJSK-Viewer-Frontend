@@ -103,7 +103,7 @@ const routes: RouteRecordRaw[] = [
         path: '/profile',
         name: 'UserProfile',
         component: () => import('@/views/UserProfileView.vue'),
-        meta: { title: '用户档案' },
+        meta: { title: '个人信息' },
     },
     // 兼容旧路由
     {
