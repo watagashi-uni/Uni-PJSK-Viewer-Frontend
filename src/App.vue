@@ -70,9 +70,9 @@ async function handleSuiteRefresh() {
     </div>
     
     <!-- Sidebar -->
-    <div class="drawer-side z-50">
+    <div class="drawer-side z-50 overflow-hidden">
       <label for="my-drawer-2" aria-label="close sidebar" class="drawer-overlay"></label>
-      <ul class="menu p-4 w-80 min-h-full bg-base-100 text-base-content shadow-xl gap-2">
+      <ul class="menu p-4 w-80 h-full overflow-y-auto overflow-x-hidden overscroll-y-contain flex flex-col flex-nowrap bg-base-100 text-base-content shadow-xl gap-2">
         <li class="mb-4">
           <RouterLink to="/" class="text-2xl font-bold text-primary px-2 hover:bg-transparent">
             Uni PJSK
