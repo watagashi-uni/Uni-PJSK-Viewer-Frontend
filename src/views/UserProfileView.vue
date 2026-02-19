@@ -1,0 +1,836 @@
+<script setup lang="ts">
+import { ref, computed, onMounted, watch } from 'vue'
+import { useMasterStore } from '@/stores/master'
+import SekaiCard from '@/components/SekaiCard.vue'
+import SekaiProfileHonor from '@/components/SekaiProfileHonor.vue'
+import {
+  User, Plus, Trash2, Download, Upload, RefreshCw, Eye, EyeOff,
+  Trophy, Star, Zap, Music
+} from 'lucide-vue-next'
+
+const masterStore = useMasterStore()
+
+// ==================== 类型定义 ====================
+interface StoredAccount {
+  userId: string
+  name: string
+  lastRefresh: number
+}
+
+interface ProfileData {
+  totalPower: {
+    areaItemBonus: number
+    basicCardTotalPower: number
+    characterRankBonus: number
+    honorBonus: number
+    mysekaiFixtureGameCharacterPerformanceBonus: number
+    mysekaiGateLevelBonus: number
+    totalPower: number
+  }
+  user: { name: string; rank: number; userId: number }
+  userCards: Array<{
+    cardId: number
+    defaultImage: string
+    level: number
+    masterRank: number
+    specialTrainingStatus: string
+  }>
+  userChallengeLiveSoloResult: { characterId: number; highScore: number }
+  userChallengeLiveSoloStages: Array<{ characterId: number; rank: number }>
+  userCharacters: Array<{ characterId: number; characterRank: number }>
+  userDeck: {
+    deckId: number
+    leader: number
+    member1: number
+    member2: number
+    member3: number
+    member4: number
+    member5: number
+    name: string
+    subLeader: number
+    userId: number
+  }
+  userMusicDifficultyClearCount: Array<{
+    allPerfect: number
+    fullCombo: number
+    liveClear: number
+    musicDifficultyType: string
+  }>
+  userProfile: {
+    profileImageType: string
+    twitterId: string
+    userId: number
+    word: string
+  }
+  userProfileHonors: Array<{
+    bondsHonorViewType: string
+    bondsHonorWordId: number
+    honorId: number
+    honorLevel: number
+    profileHonorType: string
+    seq: number
+  }>
+  userMultiLiveTopScoreCount: { mvp: number; superStar: number }
+  userHonorMissions: Array<{ honorMissionType: string; progress: number }>
+}
+
+interface CardInfo {
+  id: number
+  characterId: number
+  cardRarityType: string
+  attr: string
+  assetbundleName: string
+}
+
+interface GameCharacterUnit {
+  id: number
+  gameCharacterId: number
+  unit: string
+}
+
+// ==================== 状态 ====================
+const STORAGE_KEY = 'sekaiUserProfiles'
+const PROFILE_DATA_KEY = 'sekaiUserProfileData'
+
+const accounts = ref<StoredAccount[]>([])
+const currentUserId = ref<string>('')
+const profileData = ref<ProfileData | null>(null)
+const isLoading = ref(false)
+const isInitLoading = ref(true)
+const errorMsg = ref('')
+const newUserIdInput = ref('')
+const showUserId = ref(true)
+const characterTab = ref<'rank' | 'stage'>('rank')
+
+// Master data
+const allCards = ref<CardInfo[]>([])
+const gameCharacterUnits = ref<GameCharacterUnit[]>([])
+
+// ==================== 难度颜色 ====================
+const difficultyColors: Record<string, string> = {
+  easy: 'bg-success text-success-content',
+  normal: 'bg-info text-info-content',
+  hard: 'bg-warning text-warning-content',
+  expert: 'bg-error text-error-content',
+  master: 'diff-master',
+  append: 'diff-append',
+}
+
+const difficultyOrder = ['easy', 'normal', 'hard', 'expert', 'master', 'append']
+
+// ==================== 团队颜色 ====================
+const unitColorMap: Record<string, string> = {
+  light_sound: '#4455dd',
+  idol: '#88dd44',
+  street: '#ee1166',
+  theme_park: '#ff9900',
+  school_refusal: '#884499',
+  piapro: '#00bfbf',
+}
+
+// 根据角色ID获取所属团队
+function getCharaUnit(characterId: number): string {
+  if (characterId >= 21) return 'piapro'
+  const unitMap: Record<number, string> = {
+    1: 'light_sound', 2: 'light_sound', 3: 'light_sound', 4: 'light_sound',
+    5: 'idol', 6: 'idol', 7: 'idol', 8: 'idol',
+    9: 'street', 10: 'street', 11: 'street', 12: 'street',
+    13: 'theme_park', 14: 'theme_park', 15: 'theme_park', 16: 'theme_park',
+    17: 'school_refusal', 18: 'school_refusal', 19: 'school_refusal', 20: 'school_refusal',
+  }
+  return unitMap[characterId] || 'piapro'
+}
+
+function getCharaPillColor(characterId: number): string {
+  return unitColorMap[getCharaUnit(characterId)] || '#00bfbf'
+}
+
+// Helper: Get honor by sequence
+function getHonor(seq: number) {
+  if (!profileData.value?.userProfileHonors) return undefined
+  return profileData.value.userProfileHonors.find((h) => h.seq === seq)
+}
+
+// ==================== 账号管理 ====================
+function loadAccounts() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (raw) accounts.value = JSON.parse(raw)
+  } catch { accounts.value = [] }
+}
+
+function saveAccounts() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(accounts.value))
+}
+
+function loadProfileData() {
+  if (!currentUserId.value) { profileData.value = null; return }
+  try {
+    const raw = localStorage.getItem(`${PROFILE_DATA_KEY}_${currentUserId.value}`)
+    if (raw) profileData.value = JSON.parse(raw)
+    else profileData.value = null
+  } catch { profileData.value = null }
+}
+
+function saveProfileData() {
+  if (!currentUserId.value || !profileData.value) return
+  localStorage.setItem(`${PROFILE_DATA_KEY}_${currentUserId.value}`, JSON.stringify(profileData.value))
+}
+
+async function fetchProfile(userId: string): Promise<ProfileData> {
+  const url = `https://api.unipjsk.com/api/user/%7Buser_id%7D/${userId}/profile`
+  const res = await fetch(url)
+  if (!res.ok) {
+    if (res.status === 404) throw new Error('用户不存在')
+    if (res.status === 403) throw new Error('该用户未公开Profile')
+    throw new Error(`请求失败: ${res.status}`)
+  }
+  return await res.json()
+}
+
+async function addAccount() {
+  const uid = newUserIdInput.value.trim()
+  if (!uid) { errorMsg.value = '请输入用户ID'; return }
+  if (accounts.value.some(a => a.userId === uid)) { errorMsg.value = '该账号已添加'; return }
+
+  isLoading.value = true
+  errorMsg.value = ''
+  try {
+    const data = await fetchProfile(uid)
+    // 构建 userHonorMissions（从 master AP 数获取 progress）
+    const masterClear = data.userMusicDifficultyClearCount?.find(d => d.musicDifficultyType === 'master')
+    data.userHonorMissions = masterClear
+      ? [{ honorMissionType: 'master_full_perfect', progress: masterClear.allPerfect }]
+      : []
+
+    profileData.value = data
+    const account: StoredAccount = { userId: uid, name: data.user.name, lastRefresh: Date.now() }
+    accounts.value.push(account)
+    currentUserId.value = uid
+    saveAccounts()
+    saveProfileData()
+    newUserIdInput.value = ''
+  } catch (e: any) {
+    errorMsg.value = e.message || '获取数据失败'
+  } finally {
+    isLoading.value = false
+  }
+}
+
+async function refreshProfile() {
+  if (!currentUserId.value) return
+  isLoading.value = true
+  errorMsg.value = ''
+  try {
+    const data = await fetchProfile(currentUserId.value)
+    const masterClear = data.userMusicDifficultyClearCount?.find(d => d.musicDifficultyType === 'master')
+    data.userHonorMissions = masterClear
+      ? [{ honorMissionType: 'master_full_perfect', progress: masterClear.allPerfect }]
+      : []
+
+    profileData.value = data
+    const acc = accounts.value.find(a => a.userId === currentUserId.value)
+    if (acc) {
+      acc.name = data.user.name
+      acc.lastRefresh = Date.now()
+      saveAccounts()
+    }
+    saveProfileData()
+  } catch (e: any) {
+    errorMsg.value = e.message || '刷新失败'
+  } finally {
+    isLoading.value = false
+  }
+}
+
+function switchAccount(userId: string) {
+  currentUserId.value = userId
+  loadProfileData()
+  showUserId.value = false
+}
+
+function deleteAccount(userId: string) {
+  accounts.value = accounts.value.filter(a => a.userId !== userId)
+  localStorage.removeItem(`${PROFILE_DATA_KEY}_${userId}`)
+  saveAccounts()
+  if (currentUserId.value === userId) {
+    currentUserId.value = accounts.value[0]?.userId || ''
+    loadProfileData()
+  }
+}
+
+function exportAccounts() {
+  const exportData: Record<string, any> = {}
+  for (const acc of accounts.value) {
+    const raw = localStorage.getItem(`${PROFILE_DATA_KEY}_${acc.userId}`)
+    exportData[acc.userId] = {
+      account: acc,
+      profile: raw ? JSON.parse(raw) : null,
+    }
+  }
+  const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `sekai_profiles_${Date.now()}.json`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+function importAccounts() {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.json'
+  input.onchange = async (e: any) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    try {
+      const text = await file.text()
+      const data = JSON.parse(text)
+      for (const [userId, entry] of Object.entries(data) as [string, any][]) {
+        if (!accounts.value.some(a => a.userId === userId)) {
+          accounts.value.push(entry.account)
+        }
+        if (entry.profile) {
+          localStorage.setItem(`${PROFILE_DATA_KEY}_${userId}`, JSON.stringify(entry.profile))
+        }
+      }
+      saveAccounts()
+      if (!currentUserId.value && accounts.value.length > 0) {
+        currentUserId.value = accounts.value[0]!.userId
+        loadProfileData()
+      }
+    } catch {
+      errorMsg.value = '导入失败：文件格式不正确'
+    }
+  }
+  input.click()
+}
+
+// ==================== 计算属性 ====================
+const currentAccount = computed(() => accounts.value.find(a => a.userId === currentUserId.value))
+
+const lastRefreshText = computed(() => {
+  if (!currentAccount.value?.lastRefresh) return ''
+  return new Date(currentAccount.value.lastRefresh).toLocaleString('zh-CN')
+})
+
+// 卡组数据
+const deckCards = computed(() => {
+  if (!profileData.value) return []
+  const deck = profileData.value.userDeck
+  const memberIds = [deck.member1, deck.member2, deck.member3, deck.member4, deck.member5]
+
+  return memberIds.map(cardId => {
+    const userCard = profileData.value!.userCards.find(c => c.cardId === cardId)
+    const masterCard = allCards.value.find(c => c.id === cardId)
+    if (!masterCard) return null
+    return {
+      cardId,
+      masterCard,
+      userCard,
+      trained: userCard?.specialTrainingStatus === 'done',
+    }
+  }).filter(Boolean) as Array<{
+    cardId: number
+    masterCard: CardInfo
+    userCard: ProfileData['userCards'][0] | undefined
+    trained: boolean
+  }>
+})
+
+// 难度统计排序
+const sortedClearCounts = computed(() => {
+  if (!profileData.value) return []
+  return difficultyOrder
+    .map(d => profileData.value!.userMusicDifficultyClearCount.find(c => c.musicDifficultyType === d))
+    .filter(Boolean) as ProfileData['userMusicDifficultyClearCount']
+})
+
+// 角色头像
+function getCharaIcon(characterId: number): string {
+  // 用 gameCharacterUnits 找到 unitId
+  const unit = gameCharacterUnits.value.find(u => u.gameCharacterId === characterId && u.id <= 26)
+  const unitId = unit?.id || characterId
+  if (unitId <= 20) return `/chr_ts_90_${unitId}.png`
+  if (characterId === 21) return unitId === 21 ? '/chr_ts_90_21.png' : `/chr_ts_90_21_${unitId - 25}.png`
+  return `/chr_ts_90_${characterId}_2.png`
+}
+
+// 挑战Live最高角色图标
+const challengeCharaIcon = computed(() => {
+  if (!profileData.value) return ''
+  return getCharaIcon(profileData.value.userChallengeLiveSoloResult.characterId)
+})
+
+// 角色分组：21-24一行, 25-26一行, 1-20每行四个
+const characterRows = computed(() => {
+  if (!profileData.value) return []
+  const chars = profileData.value.userCharacters
+  const rows: Array<Array<{ characterId: number; value: number }>> = []
+
+  // VS row 1: 21-24
+  const vs1 = [21, 22, 23, 24]
+    .map(id => {
+      const c = chars.find(ch => ch.characterId === id)
+      if (!c) return null
+      const value = characterTab.value === 'rank'
+        ? c.characterRank
+        : getMaxStage(id)
+      return { characterId: id, value }
+    })
+    .filter(Boolean) as Array<{ characterId: number; value: number }>
+  if (vs1.length > 0) rows.push(vs1)
+
+  // VS row 2: 25-26
+  const vs2 = [25, 26]
+    .map(id => {
+      const c = chars.find(ch => ch.characterId === id)
+      if (!c) return null
+      const value = characterTab.value === 'rank'
+        ? c.characterRank
+        : getMaxStage(id)
+      return { characterId: id, value }
+    })
+    .filter(Boolean) as Array<{ characterId: number; value: number }>
+  if (vs2.length > 0) rows.push(vs2)
+
+  // 1-20: 每行4个
+  for (let i = 1; i <= 20; i += 4) {
+    const row = []
+    for (let j = i; j < i + 4 && j <= 20; j++) {
+      const c = chars.find(ch => ch.characterId === j)
+      if (!c) continue
+      const value = characterTab.value === 'rank'
+        ? c.characterRank
+        : getMaxStage(j)
+      row.push({ characterId: j, value })
+    }
+    if (row.length > 0) rows.push(row)
+  }
+  return rows
+})
+
+function getMaxStage(characterId: number): number {
+  if (!profileData.value) return 0
+  const stages = profileData.value.userChallengeLiveSoloStages.filter(s => s.characterId === characterId)
+  if (stages.length === 0) return 0
+  return Math.max(...stages.map(s => s.rank))
+}
+
+// ==================== 初始化 ====================
+onMounted(async () => {
+  try {
+    if (!masterStore.isReady) await masterStore.initialize()
+    const [cardsData, unitsData] = await Promise.all([
+      masterStore.getMaster<CardInfo>('cards'),
+      masterStore.getMaster<GameCharacterUnit>('gameCharacterUnits'),
+    ])
+    allCards.value = cardsData
+    gameCharacterUnits.value = unitsData
+  } catch (e) {
+    console.error('加载master数据失败:', e)
+  }
+
+  loadAccounts()
+  if (accounts.value.length > 0) {
+    currentUserId.value = accounts.value[0]!.userId
+    loadProfileData()
+  }
+  isInitLoading.value = false
+})
+
+watch(currentUserId, () => {
+  showUserId.value = false
+})
+</script>
+
+<template>
+  <div class="max-w-6xl mx-auto space-y-6">
+    <h1 class="text-3xl font-bold flex items-center gap-3">
+      <User class="w-8 h-8 text-primary" />
+      用户档案
+    </h1>
+
+    <!-- 加载中 -->
+    <div v-if="isInitLoading" class="flex justify-center py-20">
+      <span class="loading loading-spinner loading-lg text-primary"></span>
+    </div>
+
+    <template v-else>
+      <!-- ==================== 账号管理 ==================== -->
+      <div class="card bg-base-100 shadow-lg">
+        <div class="card-body space-y-4">
+          <!-- 添加账号 -->
+          <div class="flex flex-wrap gap-2 items-end">
+            <div class="form-control flex-1 min-w-[200px] max-w-sm">
+              <label class="label"><span class="label-text font-medium">添加账号</span></label>
+              <input
+                v-model="newUserIdInput"
+                type="text"
+                placeholder="输入用户ID"
+                class="input input-bordered w-full"
+                @keyup.enter="addAccount"
+              />
+            </div>
+            <button class="btn btn-primary" :disabled="isLoading" @click="addAccount">
+              <Plus class="w-4 h-4" />
+              添加
+            </button>
+          </div>
+
+          <!-- 错误提示 -->
+          <div v-if="errorMsg" class="alert alert-error py-2">
+            <span class="text-sm">{{ errorMsg }}</span>
+          </div>
+
+          <!-- 已添加的账号列表 -->
+          <div v-if="accounts.length > 0" class="flex flex-wrap gap-2 items-center">
+            <select
+              :value="currentUserId"
+              @change="switchAccount(($event.target as HTMLSelectElement).value)"
+              class="select select-bordered select-sm"
+            >
+              <option v-for="acc in accounts" :key="acc.userId" :value="acc.userId">
+                {{ acc.userId }} - {{ acc.name }}
+              </option>
+            </select>
+            <!-- 刷新 -->
+            <button
+              v-if="currentUserId"
+              class="btn btn-sm btn-ghost gap-1"
+              :disabled="isLoading"
+              @click="refreshProfile"
+            >
+              <RefreshCw class="w-3.5 h-3.5" :class="{ 'animate-spin': isLoading }" />
+              刷新
+            </button>
+            <!-- 删除 -->
+            <button
+              v-if="currentUserId"
+              class="btn btn-sm btn-ghost text-error gap-1"
+              @click="deleteAccount(currentUserId)"
+            >
+              <Trash2 class="w-3.5 h-3.5" />
+              删除
+            </button>
+            <!-- 导出/导入 -->
+            <button class="btn btn-sm btn-ghost gap-1" @click="exportAccounts">
+              <Download class="w-3.5 h-3.5" />
+              导出
+            </button>
+            <button class="btn btn-sm btn-ghost gap-1" @click="importAccounts">
+              <Upload class="w-3.5 h-3.5" />
+              导入
+            </button>
+          </div>
+
+          <!-- 上次刷新时间 -->
+          <p v-if="lastRefreshText" class="text-xs text-base-content/50">
+            上次刷新: {{ lastRefreshText }}
+          </p>
+        </div>
+      </div>
+
+      <!-- ==================== Profile 展示 ==================== -->
+      <template v-if="profileData">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <!-- ========== 左侧：用户信息 ========== -->
+          <div class="space-y-6">
+            <!-- 用户基本信息 -->
+            <div class="card bg-base-100 shadow-lg">
+              <div class="card-body">
+                <div class="flex items-center gap-4 mb-4">
+                  <div class="flex-1">
+                    <h2 class="text-2xl font-bold">{{ profileData.user.name }}</h2>
+                    <div class="flex items-center gap-2 mt-1">
+                      <span class="badge badge-primary">等级 {{ profileData.user.rank }}</span>
+                      <button
+                        class="btn btn-xs btn-ghost gap-1"
+                        @click="showUserId = !showUserId"
+                      >
+                        <Eye v-if="showUserId" class="w-3 h-3" />
+                        <EyeOff v-else class="w-3 h-3" />
+                        id:{{ showUserId ? profileData.user.userId : '保密' }}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 称号 (3-in-a-row with placeholders) -->
+                <div class="flex items-center gap-1 h-8 mb-4">
+                  <template v-for="i in 3" :key="i">
+                    <div v-if="getHonor(i)" class="h-full">
+                      <SekaiProfileHonor
+                        :data="getHonor(i)!"
+                        :user-honor-missions="profileData.userHonorMissions"
+                        class="h-full w-auto block"
+                      />
+                    </div>
+                    <div v-else class="h-full">
+                      <img
+                        v-if="i === 1"
+                        src="/honor/frame_degree_m_1.png"
+                        class="h-full w-auto opacity-50"
+                        alt="empty-slot-main"
+                      />
+                      <img
+                        v-else
+                        src="/honor/frame_degree_s_1.png"
+                        class="h-full w-auto opacity-50"
+                        alt="empty-slot-sub"
+                      />
+                    </div>
+                  </template>
+                </div>
+
+                <!-- Twitter ID -->
+                <div class="flex items-center gap-2 text-sm mb-1">
+                  <span class="font-medium">𝕏</span>
+                  <span v-if="profileData.userProfile.twitterId?.trim()">@{{ profileData.userProfile.twitterId.trim() }}</span>
+                  <span v-else class="text-base-content/40">未设置</span>
+                </div>
+                <!-- 签名 -->
+                <div class="text-sm text-base-content/70 italic">
+                  <template v-if="profileData.userProfile.word">「{{ profileData.userProfile.word }}」</template>
+                  <span v-else class="text-base-content/40 not-italic">暂无签名</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 卡组 (Deck) -->
+            <div class="card bg-base-100 shadow-lg">
+              <div class="card-body">
+                <h3 class="text-lg font-medium mb-3 flex items-center gap-2">
+                  <Star class="w-5 h-5 text-primary" />
+                  卡组 - {{ profileData.userDeck.name }}
+                </h3>
+                <div class="flex flex-wrap gap-2 justify-center">
+                  <div
+                    v-for="dc in deckCards"
+                    :key="dc.cardId"
+                    class="w-20 sm:w-24 text-center"
+                  >
+                    <RouterLink
+                      :to="`/cards/${dc.cardId}`"
+                      class="block hover:scale-105 transition-transform"
+                    >
+                      <SekaiCard
+                        :card="dc.masterCard"
+                        :trained="dc.trained"
+                        :master-rank="dc.userCard?.masterRank || 0"
+                      />
+                    </RouterLink>
+                    <div class="text-xs mt-1">
+                      <span class="font-medium">Lv.{{ dc.userCard?.level || '?' }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 综合力 -->
+            <div class="card bg-base-100 shadow-lg">
+              <div class="card-body">
+                <h3 class="text-lg font-medium mb-3 flex items-center gap-2">
+                  <Zap class="w-5 h-5 text-primary" />
+                  综合力
+                  <span class="text-2xl font-bold text-primary ml-auto">
+                    {{ profileData.totalPower.totalPower.toLocaleString() }}
+                  </span>
+                </h3>
+                <div class="grid grid-cols-2 gap-2 text-sm">
+                  <div class="flex justify-between">
+                    <span class="text-base-content/60">基础综合力</span>
+                    <span class="font-medium">{{ profileData.totalPower.basicCardTotalPower.toLocaleString() }}</span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="text-base-content/60">区域道具</span>
+                    <span class="font-medium">{{ profileData.totalPower.areaItemBonus.toLocaleString() }}</span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="text-base-content/60">角色等级</span>
+                    <span class="font-medium">{{ profileData.totalPower.characterRankBonus.toLocaleString() }}</span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="text-base-content/60">称号</span>
+                    <span class="font-medium">{{ profileData.totalPower.honorBonus.toLocaleString() }}</span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="text-base-content/60">MySekai娃娃</span>
+                    <span class="font-medium">{{ profileData.totalPower.mysekaiFixtureGameCharacterPerformanceBonus.toLocaleString() }}</span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="text-base-content/60">MySekai门</span>
+                    <span class="font-medium">{{ profileData.totalPower.mysekaiGateLevelBonus.toLocaleString() }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 难度清除统计 -->
+            <div class="card bg-base-100 shadow-lg">
+              <div class="card-body">
+                <h3 class="text-lg font-medium mb-3 flex items-center gap-2">
+                  <Music class="w-5 h-5 text-primary" />
+                  难度统计
+                </h3>
+                <!-- CLEAR -->
+                <div class="mb-3">
+                  <div class="text-center font-bold mb-1">CLEAR</div>
+                  <div class="grid grid-cols-6 gap-1">
+                    <div v-for="c in sortedClearCounts" :key="'clear-' + c.musicDifficultyType" class="text-center">
+                      <div class="badge badge-sm w-full" :class="difficultyColors[c.musicDifficultyType]">
+                        {{ c.musicDifficultyType.toUpperCase() }}
+                      </div>
+                      <div class="text-sm font-bold mt-0.5">{{ c.liveClear }}</div>
+                    </div>
+                  </div>
+                </div>
+                <!-- FULL COMBO -->
+                <div class="mb-3">
+                  <div class="text-center font-bold mb-1">FULL COMBO</div>
+                  <div class="grid grid-cols-6 gap-1">
+                    <div v-for="c in sortedClearCounts" :key="'fc-' + c.musicDifficultyType" class="text-center">
+                      <div class="badge badge-sm w-full" :class="difficultyColors[c.musicDifficultyType]">
+                        {{ c.musicDifficultyType.toUpperCase() }}
+                      </div>
+                      <div class="text-sm font-bold mt-0.5">{{ c.fullCombo }}</div>
+                    </div>
+                  </div>
+                </div>
+                <!-- ALL PERFECT -->
+                <div>
+                  <div class="text-center font-bold mb-1">ALL PERFECT</div>
+                  <div class="grid grid-cols-6 gap-1">
+                    <div v-for="c in sortedClearCounts" :key="'ap-' + c.musicDifficultyType" class="text-center">
+                      <div class="badge badge-sm w-full" :class="difficultyColors[c.musicDifficultyType]">
+                        {{ c.musicDifficultyType.toUpperCase() }}
+                      </div>
+                      <div class="text-sm font-bold mt-0.5">{{ c.allPerfect }}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ========== 右侧：成就与角色 ========== -->
+          <div class="space-y-6">
+            <!-- MULTI LIVE -->
+            <div class="card bg-base-100 shadow-lg">
+              <div class="card-body">
+                <h3 class="text-lg font-medium mb-3 flex items-center gap-2">
+                  <Trophy class="w-5 h-5 text-primary" />
+                  MULTI LIVE
+                </h3>
+                <div class="flex gap-6 justify-center">
+                  <div class="text-center">
+                    <div class="badge badge-primary badge-lg mb-1">MVP</div>
+                    <div class="text-2xl font-bold">{{ profileData.userMultiLiveTopScoreCount.mvp.toLocaleString() }}<span class="text-sm text-base-content/60 ml-1">回</span></div>
+                  </div>
+                  <div class="text-center">
+                    <div class="badge badge-secondary badge-lg mb-1">SUPER STAR</div>
+                    <div class="text-2xl font-bold">{{ profileData.userMultiLiveTopScoreCount.superStar.toLocaleString() }}<span class="text-sm text-base-content/60 ml-1">回</span></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- CHALLENGE LIVE -->
+            <div class="card bg-base-100 shadow-lg">
+              <div class="card-body">
+                <h3 class="text-lg font-medium mb-3 flex items-center gap-2">
+                  <Star class="w-5 h-5 text-primary" />
+                  CHALLENGE LIVE
+                </h3>
+                <div class="flex items-center gap-4 justify-center">
+                  <span class="badge badge-primary badge-lg">SOLO</span>
+                  <div class="w-10 h-10 rounded-full overflow-hidden ring-2 ring-primary">
+                    <img :src="challengeCharaIcon" class="w-full h-full object-cover" />
+                  </div>
+                  <span class="text-2xl font-bold">{{ profileData.userChallengeLiveSoloResult.highScore.toLocaleString() }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 角色等级 / 挑战Live Stage -->
+            <div class="card bg-base-100 shadow-lg">
+              <div class="card-body">
+                <h3 class="text-lg font-medium mb-3">
+                  {{ characterTab === 'rank' ? 'CHARACTER RANK' : 'CHALLENGE LIVE STAGE' }}
+                </h3>
+                <!-- Tab 切换 -->
+                <div class="tabs tabs-boxed mb-4 justify-center">
+                  <button
+                    class="tab"
+                    :class="{ 'tab-active': characterTab === 'rank' }"
+                    @click="characterTab = 'rank'"
+                  >
+                    角色等级
+                  </button>
+                  <button
+                    class="tab"
+                    :class="{ 'tab-active': characterTab === 'stage' }"
+                    @click="characterTab = 'stage'"
+                  >
+                    挑战Live Stage
+                  </button>
+                </div>
+
+                <!-- 角色网格 (pill layout, fill width) -->
+                <div class="space-y-2">
+                  <div
+                    v-for="(row, rowIdx) in characterRows"
+                    :key="rowIdx"
+                    class="grid grid-cols-4 gap-2"
+                  >
+                    <div
+                      v-for="item in row"
+                      :key="item.characterId"
+                      class="flex items-center gap-1 rounded-full pr-3"
+                      :style="{ backgroundColor: getCharaPillColor(item.characterId) + '40' }"
+                    >
+                      <div class="w-9 h-9 rounded-full overflow-hidden ring-2 flex-shrink-0" :style="{ borderColor: getCharaPillColor(item.characterId) }">
+                        <img :src="getCharaIcon(item.characterId)" class="w-full h-full object-cover" />
+                      </div>
+                      <span class="text-sm font-bold flex-1 text-center">{{ item.value }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <!-- 无数据提示 -->
+      <div v-else-if="accounts.length === 0" class="text-center py-20 text-base-content/60">
+        <User class="w-16 h-16 mx-auto mb-4 opacity-30" />
+        <p class="text-lg">还没有添加账号</p>
+        <p class="text-sm">输入用户ID添加你的第一个账号</p>
+      </div>
+    </template>
+  </div>
+</template>
+
+<style scoped>
+/* Honor 组件高度跟随容器，宽度自适应 */
+:deep(.sekai-honor),
+:deep(.sekai-honor-bonds) {
+  width: auto !important;
+  height: 100% !important;
+}
+
+/* 难度颜色: MASTER 紫色 */
+.diff-master {
+  background-color: #9b59b6;
+  color: #fff;
+}
+
+/* 难度颜色: APPEND 浅紫色 */
+.diff-append {
+  background-color: #c39bd3;
+  color: #fff;
+}
+</style>

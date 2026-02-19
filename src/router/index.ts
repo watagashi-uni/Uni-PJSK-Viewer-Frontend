@@ -99,6 +99,12 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/GachaDetailView.vue'),
         meta: { title: '卡池详情' },
     },
+    {
+        path: '/profile',
+        name: 'UserProfile',
+        component: () => import('@/views/UserProfileView.vue'),
+        meta: { title: '用户档案' },
+    },
     // 兼容旧路由
     {
         path: '/deck-recommend',
