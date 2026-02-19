@@ -109,6 +109,23 @@ interface RecommendDeckResult {
 const userId = ref('')
 const mode = ref<'1' | '2'>('2') // 1=挑战, 2=活动
 
+// 账号列表（与 Profile 页共享）
+interface StoredAccount {
+  userId: string
+  name: string
+  lastRefresh: number
+}
+const STORAGE_KEY = 'sekaiUserProfiles'
+const savedAccounts = ref<StoredAccount[]>([])
+
+function loadSavedAccounts() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (raw) savedAccounts.value = JSON.parse(raw)
+  } catch { savedAccounts.value = [] }
+}
+
+
 const selectedEventId = ref<number | null>(null)
 const selectedCharacterId = ref<number>(21)
 const selectedMusicId = ref<number | null>(null)
@@ -214,8 +231,14 @@ function closeDropdowns(e: MouseEvent) {
 
 onMounted(async () => {
   document.addEventListener('click', closeDropdowns)
-  const savedUid = localStorage.getItem('deckRecommend_userId')
-  if (savedUid) userId.value = savedUid
+  loadSavedAccounts()
+  // 优先用已保存账号，其次用deckRecommend专属存储
+  if (savedAccounts.value.length > 0) {
+    userId.value = savedAccounts.value[0]!.userId
+  } else {
+    const savedUid = localStorage.getItem('deckRecommend_userId')
+    if (savedUid) userId.value = savedUid
+  }
 
   try {
     if (!masterStore.isReady) await masterStore.initialize()
@@ -302,7 +325,13 @@ async function handleCalculate() {
   }
 
   if (!userId.value.trim()) { errorMsg.value = '请填写用户ID'; return }
-  localStorage.setItem('deckRecommend_userId', userId.value.trim())
+  const uid = userId.value.trim()
+  localStorage.setItem('deckRecommend_userId', uid)
+  // 自动添加到共享账号列表
+  if (!savedAccounts.value.some(a => a.userId === uid)) {
+    savedAccounts.value.push({ userId: uid, name: uid, lastRefresh: Date.now() })
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(savedAccounts.value))
+  }
   if (!selectedMusic.value || !selectedDifficulty.value) { errorMsg.value = '请选择歌曲和难度'; return }
   if (mode.value === '1' && !selectedCharacter.value) { errorMsg.value = '请选择角色'; return }
   if (mode.value === '2' && !selectedEvent.value) { errorMsg.value = '请选择活动'; return }
@@ -413,7 +442,7 @@ const rarityList = [
       <div class="text-sm">
         <p>使用前请先将用户数据传到 <a href="https://haruki.seiunx.com/upload_suite" target="_blank" class="link font-medium">Haruki工具箱</a>。</p>
         <p>计算过程全部在您的浏览器中进行，不会记录任何用户数据。手机性能有限建议使用电脑。</p>
-        <p>本页面抄的 <a href="https://3-3.dev/sekai/deck-recommend" target="_blank" class="link font-medium">3-3.dev</a>，33牛逼！</p>
+        <p>本页面抄的 <a href="https://3-3.dev/sekai/deck-recommend" target="_blank" class="link font-medium">3-3.dev</a></p>
       </div>
     </div>
 
@@ -427,7 +456,25 @@ const rarityList = [
           <!-- 用户ID -->
           <div class="form-control">
             <label class="label"><span class="label-text font-medium">用户ID</span></label>
-            <input v-model="userId" type="text" placeholder="输入Sekai用户ID" class="input input-bordered w-full max-w-md" />
+            <div class="flex gap-2 items-center max-w-md">
+              <select
+                v-if="savedAccounts.length > 0"
+                v-model="userId"
+                class="select select-bordered flex-1"
+              >
+                <option v-for="acc in savedAccounts" :key="acc.userId" :value="acc.userId">
+                  {{ acc.userId }} - {{ acc.name }}
+                </option>
+                <option value="">手动输入...</option>
+              </select>
+              <input
+                v-if="savedAccounts.length === 0 || userId === ''"
+                v-model="userId"
+                type="text"
+                placeholder="输入Sekai用户ID"
+                class="input input-bordered flex-1"
+              />
+            </div>
           </div>
 
           <!-- 模式 -->

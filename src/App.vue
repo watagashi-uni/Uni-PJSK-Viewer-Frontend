@@ -5,7 +5,7 @@ import AppNavbar from '@/components/AppNavbar.vue'
 import ToastContainer from '@/components/ToastContainer.vue'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
-import { Music, Image, BarChart3, Info, Settings, Calendar, Gift, Share2, Zap } from 'lucide-vue-next'
+import { Music, Image, BarChart3, Info, Settings, Calendar, Gift, Share2, Zap, User } from 'lucide-vue-next'
 
 const route = useRoute()
 const masterStore = useMasterStore()
@@ -117,6 +117,11 @@ onMounted(async () => {
         <li>
           <RouterLink to="/deck-recommend" active-class="active">
             <Zap class="w-5 h-5" /> 自动组队
+          </RouterLink>
+        </li>
+        <li>
+          <RouterLink to="/profile" active-class="active">
+            <User class="w-5 h-5" /> 用户档案
           </RouterLink>
         </li>
         
