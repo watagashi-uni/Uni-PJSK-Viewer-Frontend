@@ -105,6 +105,12 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/UserProfileView.vue'),
         meta: { title: '个人信息' },
     },
+    {
+        path: '/never-gonna-give-you-up',
+        name: 'MySekai',
+        component: () => import('@/views/MySekaiView.vue'),
+        meta: { title: 'MySekai 透视' },
+    },
     // 兼容旧路由
     {
         path: '/deck-recommend',
