@@ -31,6 +31,13 @@ const themesList = [
   { value: 'auto', label: '跟随系统' }
 ]
 
+function selectTheme(val: any) {
+  settingsStore.setTheme(val)
+  if (document.activeElement instanceof HTMLElement) {
+    document.activeElement.blur()
+  }
+}
+
 interface EventData {
   id: number
   eventType: string
@@ -247,7 +254,7 @@ onMounted(async () => {
 <template>
   <div class="space-y-6">
     <!-- 头部欢迎区与用户简影 -->
-    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-base-100 p-6 rounded-xl shadow-sm border border-base-200">
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-base-100 p-6 rounded-xl shadow-sm">
       
       <!-- App Info & Theme Dropdown -->
       <div class="flex-1 flex flex-row items-center gap-2 sm:gap-4 w-full">
@@ -272,7 +279,7 @@ onMounted(async () => {
             <li v-for="t in themesList" :key="t.value">
               <a 
                 :class="{ 'active': settingsStore.theme === t.value }"
-                @click="settingsStore.setTheme(t.value as any)"
+                @click="selectTheme(t.value)"
               >
                 {{ t.label }}
               </a>
@@ -347,9 +354,10 @@ onMounted(async () => {
         
         <div v-if="isLoading" class="skeleton h-64 w-full rounded-xl"></div>
         
-        <div 
+        <RouterLink 
           v-else-if="currentEvent"
-          class="block group relative rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all border border-base-200 bg-base-100 flex flex-col xl:flex-row"
+          :to="`/events/${currentEvent.id}`"
+          class="block group relative rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all border border-base-200 bg-base-100 flex flex-col xl:flex-row cursor-pointer"
         >
           <!-- Banner 图片侧 (左侧/顶部) -->
           <div class="w-full xl:w-1/2 p-4 xl:p-6 xl:pr-0 flex flex-col items-center justify-start order-1 shrink-0 bg-base-100 z-10">
@@ -403,7 +411,8 @@ onMounted(async () => {
               <RouterLink 
                 v-if="currentEvent.status === 'ongoing'"
                 to="/ranking"
-                class="btn btn-sm btn-primary btn-outline w-fit z-10 pointer-events-auto shadow-sm"
+                @click.stop
+                class="btn btn-sm btn-primary btn-outline w-fit z-20 relative pointer-events-auto shadow-sm"
               >
                 <BarChart3 class="w-4 h-4" />
                 查看榜线
@@ -411,9 +420,7 @@ onMounted(async () => {
             </div>
           </div>
           
-          <!-- 全卡片链接放到最后避免遮罩层级问题 -->
-          <RouterLink :to="`/events/${currentEvent.id}`" class="absolute inset-0 z-0 cursor-pointer"></RouterLink>
-        </div>
+        </RouterLink>
         <div v-else class="text-center py-10 text-base-content/60 bg-base-100 rounded-xl">
           暂无活动信息
         </div>
