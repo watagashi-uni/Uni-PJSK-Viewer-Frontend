@@ -8,6 +8,7 @@ import {
 } from 'lucide-vue-next'
 import SekaiCard from '@/components/SekaiCard.vue'
 import AssetImage from '@/components/AssetImage.vue'
+import SekaiHonor from '@/components/SekaiHonor.vue'
 
 const route = useRoute()
 const masterStore = useMasterStore()
@@ -23,6 +24,15 @@ interface EventData {
   aggregateAt: number
   closedAt: number
   unit: string
+  eventRankingRewardRanges?: {
+    id: number
+    fromRank: number
+    toRank: number
+    eventRankingRewards: {
+        id: number
+        resourceBoxId: number
+    }[]
+  }[]
 }
 
 interface EventMusic {
@@ -73,6 +83,16 @@ interface MusicVocal {
   characters: { characterId: number }[]
 }
 
+interface ResourceBox {
+  resourceBoxPurpose: string
+  id: number
+  details: Array<{
+    resourceType: string
+    resourceId?: number
+    resourceLevel?: number
+  }>
+}
+
 const event = ref<EventData | null>(null)
 const eventMusics = ref<EventMusic[]>([])
 const eventCards = ref<EventCard[]>([])
@@ -81,6 +101,7 @@ const gameCharacterUnits = ref<GameCharacterUnit[]>([])
 const musics = ref<MusicInfo[]>([])
 const cards = ref<CardInfo[]>([])
 const musicVocals = ref<MusicVocal[]>([])
+const resourceBoxes = ref<ResourceBox[]>([])
 
 const isLoading = ref(true)
 const currentImageIndex = ref(0)
@@ -234,6 +255,44 @@ const eventCardList = computed(() => {
     .filter(Boolean)
 })
 
+// 获取排名牌子
+const rankingHonors = computed(() => {
+  if (!event.value || !event.value.eventRankingRewardRanges) return []
+  
+  const honorsList = []
+  
+  for (const range of event.value.eventRankingRewardRanges) {
+    let matchedHonor = null
+    
+    for (const reward of range.eventRankingRewards) {
+      const box = resourceBoxes.value.find(
+        b => b.id === reward.resourceBoxId && b.resourceBoxPurpose === 'event_ranking_reward'
+      )
+      
+      if (box) {
+        const honorDetail = box.details.find(d => d.resourceType === 'honor')
+        if (honorDetail && honorDetail.resourceId) {
+          matchedHonor = {
+            id: range.id,
+            fromRank: range.fromRank,
+            toRank: range.toRank,
+            rankString: range.fromRank === range.toRank ? `${range.fromRank}` : `${range.fromRank}-${range.toRank}`,
+            honorId: honorDetail.resourceId,
+            honorLevel: honorDetail.resourceLevel || 1
+          }
+          break
+        }
+      }
+    }
+    
+    if (matchedHonor) {
+      honorsList.push(matchedHonor)
+    }
+  }
+  
+  return honorsList.sort((a, b) => a.fromRank - b.fromRank)
+})
+
 // 格式化日期时间
 function formatDateTime(timestamp: number): string {
   return new Date(timestamp).toLocaleString('zh-CN', {
@@ -265,7 +324,7 @@ async function loadData() {
     const eventId = Number(route.params.id)
     
     const [eventsData, eventMusicsData, eventCardsData, eventBonusesData, 
-           gameCharUnitsData, musicsData, cardsData, musicVocalsData] = await Promise.all([
+           gameCharUnitsData, musicsData, cardsData, musicVocalsData, resourceBoxesData] = await Promise.all([
       masterStore.getMaster<EventData>('events'),
       masterStore.getMaster<EventMusic>('eventMusics'),
       masterStore.getMaster<EventCard>('eventCards'),
@@ -274,6 +333,7 @@ async function loadData() {
       masterStore.getMaster<MusicInfo>('musics'),
       masterStore.getMaster<CardInfo>('cards'),
       masterStore.getMaster<MusicVocal>('musicVocals'),
+      masterStore.getMaster<ResourceBox>('resourceBoxes'),
     ])
 
     event.value = eventsData.find(e => e.id === eventId) || null
@@ -284,6 +344,7 @@ async function loadData() {
     musics.value = musicsData
     cards.value = cardsData
     musicVocals.value = musicVocalsData
+    resourceBoxes.value = resourceBoxesData || []
   } catch (e) {
     console.error('加载活动数据失败:', e)
   } finally {
@@ -512,6 +573,8 @@ watch(() => route.params.id, loadData)
         </div>
       </div>
 
+
+
       <!-- 活动歌曲 -->
       <div v-if="eventMusicList.length > 0" class="card bg-base-100 shadow-lg">
         <div class="card-body">
@@ -544,5 +607,42 @@ watch(() => route.params.id, loadData)
         </div>
       </div>
     </div>
-  </div>
+
+      <!-- 排名牌子 -->
+      <div v-if="rankingHonors.length > 0" class="card bg-base-100 shadow-lg mt-6">
+        <div class="card-body">
+          <h3 class="text-lg font-medium mb-3 flex items-center gap-2">
+            <Trophy class="w-5 h-5" />
+            牌子奖励
+          </h3>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            <div 
+              v-for="honor in rankingHonors" 
+              :key="honor.id"
+              class="group relative rounded-2xl bg-base-200/40 border border-base-200 hover:bg-base-200 hover:-translate-y-1 hover:shadow-md transition-all duration-300 overflow-hidden"
+            >
+              <!-- 排名标签 -->
+              <div class="absolute top-0 left-0 bg-primary/90 backdrop-blur text-primary-content font-black italic px-4 py-1 rounded-br-2xl text-sm shadow-sm z-10 flex items-center gap-1">
+                <span class="opacity-80 text-xs">TOP</span>
+                <span>{{ honor.rankString }}</span>
+              </div>
+              
+              <!-- 背景装饰图（可选，增加层次感） -->
+              <div class="absolute inset-0 bg-gradient-to-br from-base-100/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+
+              <!-- 牌子图片容器 -->
+              <div class="relative py-8 px-4 flex justify-center items-center h-full w-full">
+                <div class="w-full max-w-[280px] drop-shadow-sm group-hover:drop-shadow-md group-hover:scale-105 transition-all duration-300">
+                  <SekaiHonor 
+                    :honorId="honor.honorId" 
+                    :honorLevel="honor.honorLevel"
+                    main
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
 </template>
