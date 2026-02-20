@@ -34,8 +34,8 @@ interface ProfileData {
     masterRank: number
     specialTrainingStatus: string
   }>
-  userChallengeLiveSoloResult: { characterId: number; highScore: number }
-  userChallengeLiveSoloStages: Array<{ characterId: number; rank: number }>
+  userChallengeLiveSoloResult?: { characterId: number; highScore: number }
+  userChallengeLiveSoloStages?: Array<{ characterId: number; rank: number }>
   userCharacters: Array<{ characterId: number; characterRank: number }>
   userDeck: {
     deckId: number
@@ -315,7 +315,7 @@ function getCharaIcon(characterId: number): string {
 
 // 挑战Live最高角色图标
 const challengeCharaIcon = computed(() => {
-  if (!profileData.value) return ''
+  if (!profileData.value?.userChallengeLiveSoloResult) return ''
   return getCharaIcon(profileData.value.userChallengeLiveSoloResult.characterId)
 })
 
@@ -369,7 +369,7 @@ const characterRows = computed(() => {
 
 function getMaxStage(characterId: number): number {
   if (!profileData.value) return 0
-  const stages = profileData.value.userChallengeLiveSoloStages.filter(s => s.characterId === characterId)
+  const stages = (profileData.value.userChallengeLiveSoloStages || []).filter(s => s.characterId === characterId)
   if (stages.length === 0) return 0
   return Math.max(...stages.map(s => s.rank))
 }
@@ -720,10 +720,10 @@ watch(currentUserId, () => {
                 </h3>
                 <div class="flex items-center gap-4 justify-center">
                   <span class="badge badge-primary badge-lg">SOLO</span>
-                  <div class="w-10 h-10 rounded-full overflow-hidden ring-2 ring-primary">
+                  <div v-if="challengeCharaIcon" class="w-10 h-10 rounded-full overflow-hidden ring-2 ring-primary">
                     <img :src="challengeCharaIcon" class="w-full h-full object-cover" />
                   </div>
-                  <span class="text-2xl font-bold">{{ profileData.userChallengeLiveSoloResult.highScore.toLocaleString() }}</span>
+                  <span class="text-2xl font-bold">{{ (profileData.userChallengeLiveSoloResult?.highScore || 0).toLocaleString() }}</span>
                 </div>
               </div>
             </div>
