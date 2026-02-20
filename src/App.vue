@@ -6,7 +6,7 @@ import ToastContainer from '@/components/ToastContainer.vue'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
 import { useAccountStore } from '@/stores/account'
-import { Music, Image, BarChart3, Info, Settings, Calendar, Gift, Share2, Zap, User, RefreshCw } from 'lucide-vue-next'
+import { Music, Image, BarChart3, Info, Settings, Calendar, Gift, Share2, Zap, User, RefreshCw, Github } from 'lucide-vue-next'
 
 const route = useRoute()
 const masterStore = useMasterStore()
@@ -73,11 +73,19 @@ async function handleSuiteRefresh() {
     <div class="drawer-side z-50 overflow-hidden">
       <label for="my-drawer-2" aria-label="close sidebar" class="drawer-overlay"></label>
       <ul class="menu p-4 w-80 h-full overflow-y-auto overflow-x-hidden overscroll-y-contain flex flex-col flex-nowrap bg-base-100 text-base-content shadow-xl gap-2">
-        <li class="mb-4">
-          <RouterLink to="/" class="text-2xl font-bold text-primary px-2 hover:bg-transparent">
+        <li class="mb-4 relative">
+          <RouterLink to="/" class="text-2xl font-bold text-primary px-2 hover:bg-transparent pr-12">
             Uni PJSK
             <span class="text-base-content/60 text-sm font-normal">Viewer</span>
           </RouterLink>
+          <a 
+            href="https://github.com/watagashi-uni/Uni-PJSK-Viewer-Frontend" 
+            target="_blank" 
+            class="absolute right-2 top-1/2 -translate-y-1/2 p-2 hover:bg-base-200 rounded-full transition-colors z-10"
+            title="GitHub 仓库"
+          >
+            <Github class="w-5 h-5 text-base-content/60 hover:text-base-content" />
+          </a>
         </li>
 
         <li>
