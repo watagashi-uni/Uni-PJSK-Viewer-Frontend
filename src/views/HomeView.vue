@@ -9,7 +9,7 @@ import {
 import AssetImage from '@/components/AssetImage.vue'
 
 // 前端版本号 - 每次发布时更新
-const FRONTEND_VERSION = '2.4.3'
+const FRONTEND_VERSION = '2.4.4'
 
 const masterStore = useMasterStore()
 const assetsHost = 'https://assets.unipjsk.com'
