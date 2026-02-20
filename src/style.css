@@ -287,14 +287,16 @@ html {
   transform: scale(1.02);
 }
 
-/* Remove harsh borders from header/ghost buttons */
+/* Remove harsh borders and shadows from header/ghost buttons */
 [data-theme="jirai"] .btn-ghost {
   border-color: transparent;
   background-color: transparent;
+  box-shadow: none;
 }
 
 [data-theme="jirai"] .btn-ghost:hover {
   background-color: rgba(214, 90, 133, 0.2);
+  box-shadow: none;
 }
 
 /* Add lace frill under standard cards */
