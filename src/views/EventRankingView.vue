@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useMasterStore } from '@/stores/master'
 import SekaiCard from '@/components/SekaiCard.vue'
 import SekaiProfileHonor from '@/components/SekaiProfileHonor.vue'
@@ -78,8 +78,12 @@ async function initData() {
         cardsMap.value[c.id] = c
       })
 
-      // 加载榜单数据
-      await refreshData()
+      // 加载首屏数据 (Top 100)
+      if (activeTab.value === 'top100') {
+        await fetchTop100()
+      } else {
+        await fetchBorders()
+      }
     }
   } catch (e) {
     console.error('Failed to init ranking data:', e)
@@ -88,27 +92,32 @@ async function initData() {
   }
 }
 
+// 监听 Tab 切换实现按需加载
+watch(activeTab, async (newTab) => {
+  if (newTab === 'borders' && borderData.value.length === 0) {
+    await fetchBorders()
+  }
+})
+
+// 点击刷新按钮
 async function refreshData() {
+  if (activeTab.value === 'top100') {
+    await fetchTop100()
+  } else {
+    // Refresh both or just borders? Usually just refresh what's active.
+    await fetchBorders()
+  }
+}
+
+// 抽取 Top 100 逻辑
+async function fetchTop100() {
   if (!eventId.value) return
-  
   isLoading.value = true
   top100Error.value = ''
-  borderError.value = ''
-  
-  // No userId needed as per requirement, utilizing literal '{user_id}' placeholder
-  
   try {
-    // 并行获取 Top 100 和 Borders
-    // Note: User specified not to touch 'user_id' segment, so we use literal %7Buser_id%7D
-    const [top100Res, borderRes] = await Promise.allSettled([
-      fetch(`https://api.unipjsk.com/api/user/%7Buser_id%7D/event/${eventId.value}/ranking?rankingViewType=top100`).then(r => r.json()),
-      fetch(`https://api.unipjsk.com/api/event/${eventId.value}/ranking-border`).then(r => r.json())
-    ])
-
-    // 处理 Top 100
-    if (top100Res.status === 'fulfilled') {
-      const data = top100Res.value
-      // rankingViewType=top100 returns { rankings: [...] }
+    const top100Res = await fetch(`https://api.unipjsk.com/api/user/%7Buser_id%7D/event/${eventId.value}/ranking?rankingViewType=top100`)
+    if (top100Res.ok) {
+      const data = await top100Res.json()
       if (data.rankings) {
         top100Data.value = data.rankings
       } else {
@@ -118,13 +127,25 @@ async function refreshData() {
     } else {
       top100Error.value = '加载 Top 100 失败'
     }
+    lastUpdate.value = Date.now()
+  } catch (e) {
+    console.error('Fetch top 100 failed:', e)
+    top100Error.value = '加载 Top 100 失败'
+  } finally {
+    isLoading.value = false
+  }
+}
 
-    // 处理 Borders
-    if (borderRes.status === 'fulfilled') {
-      const data = borderRes.value
-      // ranking-border returns { borderRankings: [...] }
+// 抽取 Border 逻辑
+async function fetchBorders() {
+  if (!eventId.value) return
+  isLoading.value = true
+  borderError.value = ''
+  try {
+    const borderRes = await fetch(`https://api.unipjsk.com/api/event/${eventId.value}/ranking-border`)
+    if (borderRes.ok) {
+      const data = await borderRes.json()
       if (data.borderRankings) {
-        // Sort borders by rank ascending (though usually they come sorted)
         borderData.value = data.borderRankings.sort((a: any, b: any) => a.rank - b.rank)
       } else {
         console.warn('Unknown Border data format:', data)
@@ -133,10 +154,10 @@ async function refreshData() {
     } else {
       borderError.value = '加载榜线失败'
     }
-    
     lastUpdate.value = Date.now()
   } catch (e) {
-    console.error('Refresh failed:', e)
+    console.error('Fetch borders failed:', e)
+    borderError.value = '加载榜线失败'
   } finally {
     isLoading.value = false
   }

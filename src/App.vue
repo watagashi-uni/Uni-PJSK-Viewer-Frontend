@@ -48,11 +48,11 @@ async function handleSuiteRefresh() {
 </script>
 
 <template>
-  <div v-if="isFullscreen" class="min-h-screen" data-theme="unipjsk">
+  <div v-if="isFullscreen" class="min-h-screen">
     <RouterView />
   </div>
   
-  <div v-else class="drawer lg:drawer-open min-h-screen bg-base-200" data-theme="unipjsk">
+  <div v-else class="drawer lg:drawer-open min-h-screen bg-base-200">
     <input id="my-drawer-2" type="checkbox" class="drawer-toggle" />
     
     <div class="drawer-content flex flex-col">
