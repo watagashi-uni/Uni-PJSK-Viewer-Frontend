@@ -21,8 +21,31 @@
   --color-warning: #f59e0b;
   --color-error: #e11d48;
   --radius-box: 1.5rem;
-  --radius-btn: 1.9rem;
   --radius-badge: 1.9rem;
+}
+
+@plugin "daisyui/theme" {
+  name: "jirai";
+  default: false;
+  prefersdark: true;
+  color-scheme: "dark";
+  --color-base-100: #1a151b;
+  --color-base-200: #261f28;
+  --color-base-300: #332936;
+  --color-base-content: #f4e6e6;
+  --color-primary: #d65a85;
+  --color-primary-content: #ffffff;
+  --color-secondary: #8c7694;
+  --color-secondary-content: #ffffff;
+  --color-accent: #ff85a1;
+  --color-neutral: #8b92a5;
+  --color-info: #0ea5e9;
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-error: #e11d48;
+  --radius-box: 0.8rem;
+  --radius-btn: 0.5rem;
+  --radius-badge: 0.5rem;
 }
 
 /* 自定义基础样式 */
@@ -203,4 +226,116 @@ html {
 
 .animate-fade-in-up {
   animation: fadeInUp 0.6s ease-out;
+}
+
+/* ========================================================== */
+/* Jirai Theme UI Overrides */
+/* ========================================================== */
+
+[data-theme="jirai"] .drawer-side .menu {
+  background-color: #1a151b;
+  /* Dark cross checker pattern */
+  background-image: linear-gradient(45deg, #1e1820 25%, transparent 25%, transparent 75%, #1e1820 75%, #1e1820), linear-gradient(45deg, #1e1820 25%, transparent 25%, transparent 75%, #1e1820 75%, #1e1820);
+  background-size: 40px 40px;
+  background-position: 0 0, 20px 20px;
+  border-right: 2px solid #d65a85;
+  position: relative;
+  overflow: visible;
+}
+
+/* Vertical Gothic Lace Trim on Sidebar Right Edge */
+[data-theme="jirai"] .drawer-side .menu::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: -10px;
+  /* Hang outside the sidebar */
+  width: 10px;
+  height: 100%;
+  /* Delicate vertical lace scallop with eyelet dots */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='20'%3E%3Cpath fill='none' stroke='%23d65a85' stroke-width='1.5' d='M0,0 Q10,10 0,20'/%3E%3Ccircle cx='3' cy='10' r='1.5' fill='%23ff85a1'/%3E%3Ccircle cx='1.5' cy='5' r='1' fill='%23ff85a1'/%3E%3Ccircle cx='1.5' cy='15' r='1' fill='%23ff85a1'/%3E%3C/svg%3E");
+  background-repeat: repeat-y;
+  z-index: 100;
+  pointer-events: none;
+}
+
+/* Ribbon-style Buttons with Lace Drop */
+[data-theme="jirai"] .btn {
+  border: 1px solid #d65a85;
+  border-radius: 0.3rem;
+  /* Sharper edges fit Jirai */
+  outline: 1px solid transparent;
+  transition: all 0.2s ease-in-out;
+  background-color: #261f28;
+  color: #ff85a1;
+  position: relative;
+}
+
+[data-theme="jirai"] .btn-primary {
+  background: #d65a85;
+  color: white;
+  border: 1px solid #ff85a1;
+  /* Double box effect to look like a tailored ribbon */
+  box-shadow: inset 0 0 0 2px #d65a85, inset 0 0 0 3px #ff85a1;
+}
+
+[data-theme="jirai"] .btn-primary:hover {
+  background: #ff85a1;
+  color: white;
+  border-color: #ffffff;
+  box-shadow: inset 0 0 0 2px #ff85a1, inset 0 0 0 3px #ffffff, 0 0 10px rgba(255, 133, 161, 0.6);
+  transform: scale(1.02);
+}
+
+/* Add lace frill under standard cards */
+[data-theme="jirai"] .card::after {
+  content: '';
+  position: absolute;
+  bottom: -6px;
+  left: 5%;
+  width: 90%;
+  height: 6px;
+  /* Horizontal delicate lace scallop */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='6'%3E%3Cpath fill='none' stroke='%23d65a85' stroke-width='1.5' d='M0,0 Q10,6 20,0'/%3E%3Ccircle cx='10' cy='2.5' r='1' fill='%23ff85a1'/%3E%3Ccircle cx='4' cy='1' r='0.8' fill='%23ff85a1'/%3E%3Ccircle cx='16' cy='1' r='0.8' fill='%23ff85a1'/%3E%3C/svg%3E");
+  background-repeat: repeat-x;
+  background-position: top;
+  pointer-events: none;
+  opacity: 0.9;
+}
+
+[data-theme="jirai"] .card {
+  position: relative;
+  border: 1px solid #332936;
+  border-bottom: 2px solid #d65a85;
+  /* Weight bottom to ground the lace */
+  background-color: rgba(38, 31, 40, 0.9);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Scrollbar styling for Jirai */
+[data-theme="jirai"] ::-webkit-scrollbar {
+  width: 8px;
+}
+
+[data-theme="jirai"] ::-webkit-scrollbar-track {
+  background: #1a151b;
+}
+
+[data-theme="jirai"] ::-webkit-scrollbar-thumb {
+  background: #8c7694;
+  border-radius: 4px;
+}
+
+[data-theme="jirai"] ::-webkit-scrollbar-thumb:hover {
+  background: #d65a85;
+}
+
+/* Active links in Sidebar for Jirai */
+[data-theme="jirai"] .menu li>*:not(ul, .menu-title, details, .btn):active,
+[data-theme="jirai"] .menu li>*:not(ul, .menu-title, details, .btn).active,
+[data-theme="jirai"] .menu li>details>summary:active {
+  background-color: #332936;
+  color: #ff85a1;
+  border-left: 4px solid #ff85a1;
 }

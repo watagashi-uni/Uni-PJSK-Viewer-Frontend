@@ -2,24 +2,34 @@
 import { ref, computed, onMounted } from 'vue'
 import { useMasterStore } from '@/stores/master'
 import { useAccountStore } from '@/stores/account'
+import { useSettingsStore } from '@/stores/settings'
 import { getVersion } from '@/api/version'
 import { 
   Music, Calendar, Clock, 
   ChevronRight, Sparkles, BarChart3,
-  CreditCard, User, Gift
+  CreditCard, User, Gift, Palette
 } from 'lucide-vue-next'
 import AssetImage from '@/components/AssetImage.vue'
 
-const FRONTEND_VERSION = '2.4.8'
+const FRONTEND_VERSION = '2.4.9'
 
 const masterStore = useMasterStore()
 const accountStore = useAccountStore()
+const settingsStore = useSettingsStore()
 const assetsHost = 'https://assets.unipjsk.com'
 
 const dataVersion = ref<string>('加载中...')
 const assetVersion = ref<string>('加载中...')
 const appVersion = ref<string>('加载中...')
 const isLoading = ref(true)
+
+const themesList = [
+  { value: 'light', label: '浅色' },
+  { value: 'dark', label: '深色' },
+  { value: 'moe', label: 'Moe' },
+  { value: 'jirai', label: '地雷' },
+  { value: 'auto', label: '跟随系统' }
+]
 
 interface EventData {
   id: number
@@ -239,14 +249,36 @@ onMounted(async () => {
     <!-- 头部欢迎区与用户简影 -->
     <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-base-100 p-6 rounded-xl shadow-sm border border-base-200">
       
-      <!-- App Info -->
-      <div class="flex-1">
-        <h1 class="text-3xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-          Uni PJSK Viewer
-        </h1>
-        <p class="text-base-content/60 text-sm mt-1">
-          v{{ FRONTEND_VERSION }} • Data: {{ dataVersion }} • Asset: {{ assetVersion }}
-        </p>
+      <!-- App Info & Theme Dropdown -->
+      <div class="flex-1 flex flex-row items-center gap-2 sm:gap-4 w-full">
+        <div class="min-w-0">
+          <h1 class="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent truncate">
+            Uni PJSK Viewer
+          </h1>
+          <p class="text-base-content/60 text-xs sm:text-sm mt-1 truncate">
+            v{{ FRONTEND_VERSION }} • Data: {{ dataVersion }} • Asset: {{ assetVersion }}
+          </p>
+        </div>
+        
+        <!-- Theme Quick Selector -->
+        <div class="dropdown dropdown-end z-[100] ml-auto shrink-0">
+          <label tabindex="0" class="btn btn-sm btn-ghost gap-1 px-2">
+            <Palette class="w-4 h-4" />
+            <span>
+              {{ themesList.find(t => t.value === settingsStore.theme)?.label || '主题' }}
+            </span>
+          </label>
+          <ul tabindex="0" class="dropdown-content z-[100] menu p-2 shadow bg-base-100 rounded-box w-32">
+            <li v-for="t in themesList" :key="t.value">
+              <a 
+                :class="{ 'active': settingsStore.theme === t.value }"
+                @click="settingsStore.setTheme(t.value as any)"
+              >
+                {{ t.label }}
+              </a>
+            </li>
+          </ul>
+        </div>
       </div>
       
       <!-- User Profile Thumbnail -->
