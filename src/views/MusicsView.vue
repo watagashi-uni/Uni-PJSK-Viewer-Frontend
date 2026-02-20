@@ -521,9 +521,18 @@ watch(() => route.query.page, () => {})
                   >
                     {{ diffLabels[entry.difficulty] }} {{ entry.playLevel }}
                   </span>
-                  <span :class="entry.rank === 'AP' ? 'text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-blue-400 font-bold' : 'text-pink-400 font-bold'">
-                    {{ entry.rank }}
-                  </span>
+                  <img
+                    v-if="entry.rank === 'AP'"
+                    src="/img/icon_allPerfect.png"
+                    alt="AP"
+                    class="h-6 w-auto drop-shadow-sm ml-1"
+                  />
+                  <img
+                    v-else-if="entry.rank === 'FC'"
+                    src="/img/icon_fullCombo.png"
+                    alt="FC"
+                    class="h-6 w-auto drop-shadow-sm ml-1"
+                  />
                 </div>
               </div>
               <div class="text-sm font-mono font-bold text-primary">{{ entry.score.toFixed(1) }}</div>
@@ -565,15 +574,30 @@ watch(() => route.query.page, () => {})
                 <td v-for="d in allDifficulties" :key="d" class="text-center p-2">
                   <template v-if="musicDifficultiesMap[music.id]?.[d] !== undefined">
                     <div class="text-xs text-base-content/50">{{ musicDifficultiesMap[music.id]?.[d] }}</div>
-                    <div 
-                      v-if="musicResultsMap[music.id]?.[d]"
-                      class="font-bold px-1 rounded inline-block mt-0.5 min-w-[2rem] text-xs"
-                      :class="{
-                        'result-ap': musicResultsMap[music.id]?.[d] === 'AP',
-                        'result-fc': musicResultsMap[music.id]?.[d] === 'FC',
-                        'result-clear': musicResultsMap[music.id]?.[d] === 'C',
-                      }"
-                    >{{ musicResultsMap[music.id]?.[d] }}</div>
+                    <img
+                      v-if="musicResultsMap[music.id]?.[d] === 'AP'"
+                      src="/img/icon_allPerfect.png"
+                      alt="AP"
+                      class="h-[24px] w-auto mx-auto mt-1 drop-shadow-sm"
+                    />
+                    <img
+                      v-else-if="musicResultsMap[music.id]?.[d] === 'FC'"
+                      src="/img/icon_fullCombo.png"
+                      alt="FC"
+                      class="h-[24px] w-auto mx-auto mt-1 drop-shadow-sm"
+                    />
+                    <img
+                      v-else-if="musicResultsMap[music.id]?.[d] === 'C'"
+                      src="/img/icon_clear.png"
+                      alt="C"
+                      class="h-[24px] w-auto mx-auto mt-1 drop-shadow-sm"
+                    />
+                    <img
+                      v-else-if="hasSuiteData"
+                      src="/img/icon_notClear.png"
+                      alt="NC"
+                      class="h-[24px] w-auto mx-auto mt-1 opacity-50 drop-shadow-sm"
+                    />
                   </template>
                 </td>
               </tr>
@@ -599,17 +623,31 @@ watch(() => route.query.page, () => {})
                 <div v-for="d in allDifficulties" :key="d" class="flex flex-col items-center justify-center bg-base-200/50 rounded p-0.5">
                   <template v-if="musicDifficultiesMap[music.id]?.[d] !== undefined">
                     <span class="text-[10px] leading-none font-bold mb-0.5" :style="{ color: diffColors[d] }">{{ musicDifficultiesMap[music.id]?.[d] }}</span>
-                    <div 
-                      v-if="musicResultsMap[music.id]?.[d]"
-                      class="mt-0.5 text-[9px] font-bold px-0.5 rounded leading-none w-full text-center"
-                      :class="{
-                        'result-ap': musicResultsMap[music.id]?.[d] === 'AP',
-                        'result-fc': musicResultsMap[music.id]?.[d] === 'FC',
-                        'result-clear': musicResultsMap[music.id]?.[d] === 'C',
-                        'text-base-content/50 border border-base-content/20': !musicResultsMap[music.id]?.[d]
-                      }"
-                    >{{ musicResultsMap[music.id]?.[d] }}</div>
-                    <div v-else class="h-[13px]"></div>
+                    <img
+                      v-if="musicResultsMap[music.id]?.[d] === 'AP'"
+                      src="/img/icon_allPerfect.png"
+                      alt="AP"
+                      class="h-[14px] w-auto mt-0.5 drop-shadow-sm"
+                    />
+                    <img
+                      v-else-if="musicResultsMap[music.id]?.[d] === 'FC'"
+                      src="/img/icon_fullCombo.png"
+                      alt="FC"
+                      class="h-[14px] w-auto mt-0.5 drop-shadow-sm"
+                    />
+                    <img
+                      v-else-if="musicResultsMap[music.id]?.[d] === 'C'"
+                      src="/img/icon_clear.png"
+                      alt="C"
+                      class="h-[14px] w-auto mt-0.5 drop-shadow-sm"
+                    />
+                    <img
+                      v-else-if="hasSuiteData"
+                      src="/img/icon_notClear.png"
+                      alt="NC"
+                      class="h-[14px] w-auto mt-0.5 opacity-50 drop-shadow-sm"
+                    />
+                    <div v-else class="h-[14px] mt-0.5"></div>
                   </template>
                   <template v-else>
                      <div class="h-full w-full"></div>
@@ -665,17 +703,4 @@ watch(() => route.query.page, () => {})
 </template>
 
 <style scoped>
-.result-ap {
-  background: linear-gradient(135deg, #F06292, #64B5F6);
-  color: white;
-}
-.result-fc {
-  background-color: #F06292;
-  color: white;
-}
-.result-clear {
-  background-color: rgba(255, 255, 255, 0.15);
-  color: currentColor;
-  border: 1px solid rgba(128, 128, 128, 0.3);
-}
 </style>

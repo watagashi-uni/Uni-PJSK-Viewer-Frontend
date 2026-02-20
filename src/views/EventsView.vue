@@ -169,7 +169,7 @@ function isLeak(event: EventData): boolean {
           <AssetImage 
             :src="getBannerUrl(event.assetbundleName)" 
             :alt="event.name"
-            class="w-full h-32 object-cover"
+            class="w-full aspect-[122/52] object-cover"
           />
           
           <!-- 简单角标 (替代之前的内部遮罩) -->

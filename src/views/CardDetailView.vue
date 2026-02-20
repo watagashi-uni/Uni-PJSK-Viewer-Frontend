@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, watch, onBeforeUnmount } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useMasterStore } from '@/stores/master'
 import AssetImage from '@/components/AssetImage.vue'
+import { ChevronLeft } from 'lucide-vue-next'
 
 interface Card {
   id: number
@@ -66,6 +67,7 @@ interface Skill {
 }
 
 const route = useRoute()
+const router = useRouter()
 const masterStore = useMasterStore()
 
 const cardId = computed(() => Number(route.params.id))
@@ -277,6 +279,16 @@ onBeforeUnmount(() => {
   document.title = defaultTitle
 })
 
+// 返回上一页
+function goBack() {
+  const backState = window.history.state?.back
+  if (typeof backState === 'string' && backState.startsWith('/cards')) {
+    router.back()
+  } else {
+    router.push('/cards')
+  }
+}
+
 onMounted(loadData)
 </script>
 
@@ -289,6 +301,13 @@ onMounted(loadData)
 
     <!-- 卡片详情 -->
     <template v-else-if="card">
+      <!-- 顶部导航 -->
+      <div class="mb-4 max-w-4xl mx-auto px-4 lg:px-0">
+        <button @click="goBack" class="btn btn-ghost btn-sm gap-2 pl-0">
+          <ChevronLeft class="w-4 h-4" /> 返回列表
+        </button>
+      </div>
+
       <div class="card bg-base-100 shadow-lg max-w-4xl mx-auto animate-fade-in-up overflow-hidden">
         <div class="card-body">
           <!-- 标题区域 -->
