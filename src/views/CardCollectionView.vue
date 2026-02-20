@@ -33,7 +33,10 @@ const cards = ref<Card[]>([])
 const characters = ref<Character[]>([])
 const isLoading = ref(true)
 
-const selectedUserId = ref('')
+const selectedUserId = computed({
+  get: () => accountStore.currentUserId || '',
+  set: (val: string) => accountStore.selectAccount(val)
+})
 const selectedCharacterId = ref<number | null>(null)
 
 // Computed for user data
@@ -174,12 +177,6 @@ async function loadData() {
 }
 
 onMounted(() => {
-  if (accountStore.accounts.length > 0) {
-    selectedUserId.value = accountStore.currentUserId || accountStore.accounts[0]?.userId || ''
-  } else {
-    const last = localStorage.getItem('account_currentUserId')
-    if (last) selectedUserId.value = last
-  }
   loadData()
 })
 </script>

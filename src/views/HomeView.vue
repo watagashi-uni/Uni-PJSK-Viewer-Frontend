@@ -197,12 +197,7 @@ const leaderCard = computed(() => {
 
 const currentUserProfileData = computed(() => {
   if (!currentUserProfile.value) return null
-  try {
-    const raw = localStorage.getItem(`sekaiUserProfileData_${currentUserProfile.value.userId}`)
-    return raw ? JSON.parse(raw) : null
-  } catch {
-    return null
-  }
+  return accountStore.getProfileCache(currentUserProfile.value.userId)
 })
 
 onMounted(async () => {
@@ -255,7 +250,7 @@ onMounted(async () => {
       </div>
       
       <!-- User Profile Thumbnail -->
-      <div v-if="currentUserProfile" class="flex items-center gap-3 bg-base-200/50 p-2 pr-4 rounded-full border border-base-200 shadow-sm shrink-0">
+      <RouterLink v-if="currentUserProfile" to="/profile" class="flex items-center gap-3 bg-base-200/50 p-2 pr-4 rounded-full border border-base-200 shadow-sm shrink-0 hover:bg-base-200 transition-colors cursor-pointer">
         <div class="relative w-12 h-12 rounded-full overflow-hidden border-2 border-primary/20 shrink-0 bg-base-300">
           <AssetImage 
             v-if="leaderCard"
@@ -270,7 +265,7 @@ onMounted(async () => {
             <span class="text-primary">Lv.{{ currentUserProfileData?.user?.rank || currentUserSuite?.user?.rank || '未知' }}</span>
           </span>
         </div>
-      </div>
+      </RouterLink>
       <div v-else class="flex flex-col sm:flex-row items-center gap-3">
         <span class="text-sm text-base-content/60 text-center sm:text-left">尚未绑定账号</span>
         <RouterLink to="/profile" class="btn btn-sm btn-primary btn-outline rounded-full">去添加账号</RouterLink>
@@ -282,7 +277,7 @@ onMounted(async () => {
       <RouterLink to="/musics" class="btn btn-primary h-auto py-3 gap-2 justify-start shadow-sm hover:shadow-md border-none">
         <Music class="w-5 h-5 flex-shrink-0" /> 
         <div class="flex flex-col items-start leading-tight">
-          <span>歌曲卡片</span>
+          <span>歌曲一览</span>
           <span class="text-[10px] font-normal opacity-70">Musics</span>
         </div>
       </RouterLink>
@@ -315,7 +310,7 @@ onMounted(async () => {
       <div class="lg:col-span-2 space-y-6 min-w-0">
         <h2 class="text-xl font-bold flex items-center gap-2">
           <Sparkles class="w-5 h-5 text-primary" />
-          {{ currentEvent?.status === 'ongoing' ? '正在进行' : '最近活动' }}
+          {{ currentEvent?.status === 'ongoing' ? '当前活动' : '最近活动' }}
         </h2>
         
         <div v-if="isLoading" class="skeleton h-64 w-full rounded-xl"></div>

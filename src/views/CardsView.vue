@@ -31,7 +31,10 @@ const settingsStore = useSettingsStore()
 const accountStore = useAccountStore()
 
 const showUserCards = ref(false)
-const selectedUserId = ref('')
+const selectedUserId = computed({
+  get: () => accountStore.currentUserId || '',
+  set: (val: string) => accountStore.selectAccount(val)
+})
 
 // 计算该用户的 suite 缓存数据
 const suiteData = computed(() => {
@@ -233,13 +236,6 @@ function hasTrainedCard(rarity: string): boolean {
 }
 
 onMounted(() => {
-  if (accountStore.accounts.length > 0) {
-    selectedUserId.value = accountStore.currentUserId || accountStore.accounts[0]!.userId
-  } else {
-    const last = localStorage.getItem('account_currentUserId')
-    if (last) selectedUserId.value = last
-  }
-  
   loadData()
 })
 </script>
