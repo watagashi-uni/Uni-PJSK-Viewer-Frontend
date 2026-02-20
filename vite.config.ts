@@ -65,6 +65,8 @@ export default defineConfig({
         ],
         // 清理旧版本缓存
         cleanupOutdatedCaches: true,
+        // 排除对 /img/ 和 /api/ 等路径的 fallback 拦截
+        navigateFallbackDenylist: [/^\/img\//, /^\/api\//, /^\/cursors\//],
       },
       manifest: {
         name: 'Uni PJSK Viewer',
