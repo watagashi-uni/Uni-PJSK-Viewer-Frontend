@@ -14,8 +14,8 @@ export default defineConfig({
       registerType: 'prompt',  // 改为 prompt 模式，让用户手动点击更新
       injectRegister: 'auto',
       workbox: {
-        // 1. 移除 jpg, jpeg, png, mp3, json，只保留核心代码和图标
-        globPatterns: ['**/*.{js,css,html,ico,svg}'],
+        // 1. 取消 js/css 预缓存，只预留入口 HTML 和必要图标。其余资源按需下载
+        globPatterns: ['**/*.{html,ico,svg,webmanifest}'],
         // 2. 排除隐藏页面和特定文件的预缓存
         globIgnores: [
           '**/node_modules/**/*',
@@ -26,6 +26,21 @@ export default defineConfig({
         maximumFileSizeToCacheInBytes: 10 * 1024 * 1024,
         // 运行时缓存策略
         runtimeCaching: [
+          {
+            // JS / CSS 按需缓存：用户访问到哪个页面加载的 chunk 就缓存那个，只缓存当前需要的
+            urlPattern: /\.(?:js|css)$/i,
+            handler: 'StaleWhileRevalidate',
+            options: {
+              cacheName: 'assets-runtime-cache',
+              expiration: {
+                maxEntries: 200,
+                maxAgeSeconds: 60 * 60 * 24 * 30, // 30 天
+              },
+              cacheableResponse: {
+                statuses: [0, 200],
+              },
+            },
+          },
           {
             // 本地角色头像 (chr_ts_*.png) - 用户浏览后缓存，持久化存储
             urlPattern: /^.*\/chr_ts_.*\.png$/i,
