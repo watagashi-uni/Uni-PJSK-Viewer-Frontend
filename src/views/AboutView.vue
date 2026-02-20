@@ -149,17 +149,15 @@ import {
             </div>
             <div class="collapse-content">
               <p class="text-sm text-base-content/70 mb-2">
-                本项目使用了
-                <a 
+              <a 
                   href="https://github.com/Sekai-World/sekai-viewer" 
                   target="_blank" 
                   rel="noopener noreferrer"
                   class="link link-primary inline-flex items-center gap-1"
                 >
-                  Sekai-World/sekai-viewer
+                  GitHub 项目地址
                   <ExternalLink class="w-3 h-3" />
                 </a>
-                的开源代码，该项目采用 GPL-3.0 协议，因此本项目同样遵循 GPL-3.0 协议。
               </p>
               <p class="text-sm text-base-content/70">
                 协议全文请参阅：

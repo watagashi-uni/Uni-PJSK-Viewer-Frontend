@@ -27,6 +27,21 @@ export default defineConfig({
         // 运行时缓存策略
         runtimeCaching: [
           {
+            // 本地角色头像 (chr_ts_*.png) - 用户浏览后缓存，持久化存储
+            urlPattern: /^.*\/chr_ts_.*\.png$/i,
+            handler: 'StaleWhileRevalidate',
+            options: {
+              cacheName: 'chara-images-cache',
+              expiration: {
+                maxEntries: 150, // 足够容纳所有角色与部分变体
+                maxAgeSeconds: 60 * 60 * 24 * 30, // 30 天
+              },
+              cacheableResponse: {
+                statuses: [0, 200],
+              },
+            },
+          },
+          {
             // 外部图片资源 (assets.unipjsk.com) - 不通过 SW 缓存，交给浏览器 HTTP 缓存处理
             // 避免 opaque response 导致 404 被缓存的问题
             urlPattern: /^https:\/\/assets\.unipjsk\.com\/.*/i,
