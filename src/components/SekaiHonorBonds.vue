@@ -139,10 +139,26 @@ const levelStarsGold = computed(() => {
   return Math.max(0, props.honorLevel - 5)
 })
 
-// 为 mask ID 添加唯一性防止多实例冲突
-const maskId = computed(() => `bonds-mask-${props.honorId}-${props.sub ? 's' : 'm'}`)
-const maskLeftId = computed(() => `bonds-left-${props.honorId}-${props.sub ? 's' : 'm'}`)
-const maskRightId = computed(() => `bonds-right-${props.honorId}-${props.sub ? 's' : 'm'}`)
+// 使用 SVG <path> 直接绘制圆角矩形的左右两半，
+// 彻底避免 url(#id) 引用（Chrome 在 vue-router 下会解析失败）。
+const leftHalfPath = computed(() => {
+  const r = 40
+  const mid = halfWidth.value
+  const x = 10
+  const h = 80
+  // 左半圆角矩形: 左上圆角 → 顶边到中线 → 右边到底 → 底边到左下圆角
+  return `M ${x + r} 0 L ${mid} 0 L ${mid} ${h} L ${x + r} ${h} A ${r} ${r} 0 0 1 ${x} ${h - r} L ${x} ${r} A ${r} ${r} 0 0 1 ${x + r} 0 Z`
+})
+
+const rightHalfPath = computed(() => {
+  const r = 40
+  const mid = halfWidth.value
+  const x = 10
+  const h = 80
+  const right = x + (props.sub ? 160 : 360)
+  // 右半圆角矩形: 中线顶 → 顶边到右上圆角 → 右边到右下圆角 → 底边回中线
+  return `M ${mid} 0 L ${right - r} 0 A ${r} ${r} 0 0 1 ${right} ${r} L ${right} ${h - r} A ${r} ${r} 0 0 1 ${right - r} ${h} L ${mid} ${h} Z`
+})
 
 // ---------- Logic ----------
 async function loadHonor() {
@@ -246,106 +262,71 @@ watch(() => [props.honorId, props.honorLevel, props.bondsHonorWordId, props.bond
     :viewBox="`0 0 ${viewBoxWidth} 80`"
     class="sekai-honor-bonds"
   >
-    <!-- Masks -->
-    <defs>
-      <mask :id="maskId">
-        <rect
-          x="10" y="0"
-          height="80"
-          :width="sub ? 160 : 360"
-          :rx="40"
-          fill="white"
-        />
-      </mask>
-      <mask :id="maskLeftId">
-        <rect x="0" y="0" height="80" :width="halfWidth" fill="white" />
-      </mask>
-      <mask :id="maskRightId">
-        <rect :x="halfWidth" y="0" height="80" :width="halfWidth" fill="white" />
-      </mask>
-    </defs>
+    <!-- 圆角双色背景：用两个 <path> 直接画左右半圆角矩形，无需任何 url() 引用 -->
+    <path :d="leftHalfPath" :fill="leftColor" />
+    <path :d="rightHalfPath" :fill="rightColor" />
 
-    <!-- Inner SVG with rounded mask -->
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      :viewBox="`0 0 ${viewBoxWidth} 80`"
-      :mask="`url(#${maskId})`"
-    >
-      <!-- 左侧背景 -->
-      <rect
-        x="0" y="0"
-        height="80"
-        :width="halfWidth"
-        :fill="leftColor"
-      />
-      <!-- 右侧背景 -->
-      <rect
-        :x="halfWidth" y="0"
-        height="80"
-        :width="halfWidth"
-        :fill="rightColor"
-      />
-      <!-- 内边框 -->
-      <rect
-        x="16" y="6"
-        height="68"
-        :width="sub ? 148 : 348"
-        :rx="34"
-        stroke="white"
-        :stroke-width="8"
-        fill-opacity="0"
-      />
-      <!-- 左侧角色 -->
-      <image
-        v-if="sdLeft"
-        :href="sdLeft"
-        :x="sdLeftOffsetX"
-        :y="sdLeftOffsetY"
-        :height="sdLeftHeight"
-        :width="sdLeftWidth"
-        :mask="sub ? `url(#${maskLeftId})` : undefined"
-        @error="handleSvgImageError"
-      />
-      <!-- 右侧角色 -->
-      <image
-        v-if="sdRight"
-        :href="sdRight"
-        :x="sdRightOffsetX"
-        :y="sdRightOffsetY"
-        :height="sdRightHeight"
-        :width="sdRightWidth"
-        :mask="sub ? `url(#${maskRightId})` : undefined"
-        @error="handleSvgImageError"
-      />
-      <!-- 台词文字 -->
-      <image
-        v-if="!sub && wordImage"
-        :href="wordImage"
-        :x="wordImageOffsetX"
-        :y="wordImageOffsetY"
-        @error="handleSvgImageError"
-      />
-      <!-- 等级星星 (≤5) -->
-      <image
-        v-for="idx in levelStarsNormal"
-        :key="'star-' + idx"
-        href="/honor/icon_degreeLv.png"
-        :x="50 + (idx - 1) * 16"
-        y="64"
-        :height="sub ? 14 : 16"
-        :width="sub ? 14 : 16"
-      />
-      <!-- 等级金星 (>5) -->
-      <image
-        v-for="idx in levelStarsGold"
-        :key="'gold-' + idx"
-        href="/honor/icon_degreeLv6.png"
-        :x="50 + (idx - 1) * 16"
-        y="64"
-        :height="sub ? 14 : 16"
-        :width="sub ? 14 : 16"
-      />
-    </svg>
+    <!-- 内边框 -->
+    <rect
+      x="16" y="6"
+      height="68"
+      :width="sub ? 148 : 348"
+      :rx="34"
+      stroke="white"
+      :stroke-width="8"
+      fill-opacity="0"
+    />
+
+    <!-- 左侧角色 -->
+    <image
+      v-if="sdLeft"
+      :href="sdLeft"
+      :x="sdLeftOffsetX"
+      :y="sdLeftOffsetY"
+      :height="sdLeftHeight"
+      :width="sdLeftWidth"
+      @error="handleSvgImageError"
+    />
+    <!-- 右侧角色 -->
+    <image
+      v-if="sdRight"
+      :href="sdRight"
+      :x="sdRightOffsetX"
+      :y="sdRightOffsetY"
+      :height="sdRightHeight"
+      :width="sdRightWidth"
+      @error="handleSvgImageError"
+    />
+
+    <!-- 台词文字 -->
+    <image
+      v-if="!sub && wordImage"
+      :href="wordImage"
+      :x="wordImageOffsetX"
+      :y="wordImageOffsetY"
+      @error="handleSvgImageError"
+    />
+
+    <!-- 等级星星 (≤5) -->
+    <image
+      v-for="idx in levelStarsNormal"
+      :key="'star-' + idx"
+      href="/honor/icon_degreeLv.png"
+      :x="50 + (idx - 1) * 16"
+      y="64"
+      :height="sub ? 14 : 16"
+      :width="sub ? 14 : 16"
+    />
+    <!-- 等级金星 (>5) -->
+    <image
+      v-for="idx in levelStarsGold"
+      :key="'gold-' + idx"
+      href="/honor/icon_degreeLv6.png"
+      :x="50 + (idx - 1) * 16"
+      y="64"
+      :height="sub ? 14 : 16"
+      :width="sub ? 14 : 16"
+    />
 
     <!-- 外框 -->
     <image
