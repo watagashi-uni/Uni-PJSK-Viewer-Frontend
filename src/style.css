@@ -1,9 +1,142 @@
 @import "tailwindcss";
 @plugin "daisyui";
 
+@plugin "daisyui/theme" {
+  name: "moe";
+  default: false;
+  prefersdark: false;
+  color-scheme: "light";
+  --color-base-100: #fff5f7;
+  --color-base-200: #ffe5ec;
+  --color-base-300: #ffc2d1;
+  --color-base-content: #593d48;
+  --color-primary: #ff85a1;
+  --color-primary-content: #ffffff;
+  --color-secondary: #ffb5a7;
+  --color-secondary-content: #4f2b32;
+  --color-accent: #fec5bb;
+  --color-neutral: #fcd5ce;
+  --color-info: #f8ad9d;
+  --color-success: #d8e2dc;
+  --color-warning: #ffe6a7;
+  --color-error: #ff9b85;
+  --radius-box: 1.5rem;
+  --radius-btn: 1.9rem;
+  --radius-badge: 1.9rem;
+}
+
 /* 自定义基础样式 */
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+}
+
+/* Moe Theme UI Overrides */
+[data-theme="moe"] .drawer-side .menu {
+  background-color: #fff5f7;
+  background-image: url("data:image/svg+xml,%3Csvg width='300' height='300' viewBox='0 0 300 300' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffc2d1' fill-opacity='0.4'%3E%3Cg transform='translate(20, 20) rotate(15, 50, 50) scale(0.6)'%3E%3Cpath d='M36 29c-3.3 0-6-3.6-6-8s2.7-8 6-8 6 3.6 6 8-2.7 8-6 8zm28 0c-3.3 0-6-3.6-6-8s2.7-8 6-8 6 3.6 6 8-2.7 8-6 8zm-42 16c-3.3 0-6-2.7-6-6s2.7-6 6-6 6 2.7 6 6-2.7 6-6 6zm56 0c-3.3 0-6-2.7-6-6s2.7-6 6-6 6 2.7 6 6-2.7 6-6 6zm-28 29c-11 0-20-7.2-20-16s9-14 20-14 20 5.3 20 14-9 16-20 16z'/%3E%3C/g%3E%3Cg transform='translate(150, 60) rotate(75, 50, 50) scale(0.4)'%3E%3Cpath d='M36 29c-3.3 0-6-3.6-6-8s2.7-8 6-8 6 3.6 6 8-2.7 8-6 8zm28 0c-3.3 0-6-3.6-6-8s2.7-8 6-8 6 3.6 6 8-2.7 8-6 8zm-42 16c-3.3 0-6-2.7-6-6s2.7-6 6-6 6 2.7 6 6-2.7 6-6 6zm56 0c-3.3 0-6-2.7-6-6s2.7-6 6-6 6 2.7 6 6-2.7 6-6 6zm-28 29c-11 0-20-7.2-20-16s9-14 20-14 20 5.3 20 14-9 16-20 16z'/%3E%3C/g%3E%3Cg transform='translate(70, 180) rotate(-40, 50, 50) scale(0.7)'%3E%3Cpath d='M36 29c-3.3 0-6-3.6-6-8s2.7-8 6-8 6 3.6 6 8-2.7 8-6 8zm28 0c-3.3 0-6-3.6-6-8s2.7-8 6-8 6 3.6 6 8-2.7 8-6 8zm-42 16c-3.3 0-6-2.7-6-6s2.7-6 6-6 6 2.7 6 6-2.7 6-6 6zm56 0c-3.3 0-6-2.7-6-6s2.7-6 6-6 6 2.7 6 6-2.7 6-6 6zm-28 29c-11 0-20-7.2-20-16s9-14 20-14 20 5.3 20 14-9 16-20 16z'/%3E%3C/g%3E%3Cg transform='translate(200, 200) rotate(115, 50, 50) scale(0.5)'%3E%3Cpath d='M36 29c-3.3 0-6-3.6-6-8s2.7-8 6-8 6 3.6 6 8-2.7 8-6 8zm28 0c-3.3 0-6-3.6-6-8s2.7-8 6-8 6 3.6 6 8-2.7 8-6 8zm-42 16c-3.3 0-6-2.7-6-6s2.7-6 6-6 6 2.7 6 6-2.7 6-6 6zm56 0c-3.3 0-6-2.7-6-6s2.7-6 6-6 6 2.7 6 6-2.7 6-6 6zm-28 29c-11 0-20-7.2-20-16s9-14 20-14 20 5.3 20 14-9 16-20 16z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  background-size: 300px 300px;
+  border-right: 3px dashed #ffb5a7;
+  position: relative;
+  overflow: visible;
+}
+
+/* Cat Ears via CSS */
+[data-theme="moe"] .drawer-side .menu::before,
+[data-theme="moe"] .drawer-side .menu::after {
+  content: '';
+  position: absolute;
+  top: -20px;
+  width: 40px;
+  height: 40px;
+  background: #ffb5a7;
+  clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+  z-index: 100;
+}
+
+[data-theme="moe"] .drawer-side .menu::before {
+  left: 40px;
+  transform: rotate(-15deg);
+}
+
+[data-theme="moe"] .drawer-side .menu::after {
+  right: 40px;
+  transform: rotate(15deg);
+}
+
+/* Buttons Boing Animation */
+@keyframes boing {
+  0% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(0.9);
+  }
+
+  100% {
+    transform: scale(1.1);
+  }
+}
+
+[data-theme="moe"] .btn-primary:active {
+  animation: boing 0.3s ease;
+}
+
+[data-theme="moe"] .btn {
+  border: 2px solid transparent;
+  transition: all 0.3s ease;
+}
+
+[data-theme="moe"] .btn-primary {
+  background: linear-gradient(45deg, #ff85a1, #ffb5a7);
+  border: none;
+  color: white;
+  box-shadow: 0 4px 15px rgba(255, 133, 161, 0.4);
+}
+
+[data-theme="moe"] .btn-primary:hover {
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 6px 20px rgba(255, 133, 161, 0.6);
+}
+
+[data-theme="moe"] .card {
+  border: 2px solid #ffe5ec;
+  box-shadow: 0 8px 24px rgba(255, 181, 167, 0.15);
+}
+
+/* Scrollbar styling for Moe */
+[data-theme="moe"] ::-webkit-scrollbar {
+  width: 8px;
+}
+
+[data-theme="moe"] ::-webkit-scrollbar-track {
+  background: #fff5f7;
+}
+
+[data-theme="moe"] ::-webkit-scrollbar-thumb {
+  background: #ffb5a7;
+  border-radius: 99px;
+}
+
+[data-theme="moe"] ::-webkit-scrollbar-thumb:hover {
+  background: #ff85a1;
+}
+
+/* Custom Cursors for Moe Theme */
+[data-theme="moe"],
+[data-theme="moe"] * {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32'%3E%3Cpath d='M2,2 L2,28 L9,22 L14,31 L18,29 L13,20 L22,20 Z' fill='%23ff85a1' stroke='%23ffffff' stroke-width='2'/%3E%3C/svg%3E") 2 2, auto !important;
+}
+
+[data-theme="moe"] a,
+[data-theme="moe"] button,
+[data-theme="moe"] [role="button"],
+[data-theme="moe"] input[type="checkbox"],
+[data-theme="moe"] input[type="radio"],
+[data-theme="moe"] select,
+[data-theme="moe"] .cursor-pointer,
+[data-theme="moe"] .cursor-pointer * {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32'%3E%3Cg transform='translate(32, 0) scale(-1, 1)'%3E%3Cpath d='M4,28 L20,12' stroke='%23ffb5a7' stroke-width='3' stroke-linecap='round'/%3E%3Cpolygon points='20,4 23,10 29,11 24,15 25,22 20,18 14,21 16,15 11,10 18,10' fill='%23ff85a1' stroke='%23ffffff' stroke-width='1.5'/%3E%3C/g%3E%3C/svg%3E") 12 4, pointer !important;
 }
 
 /* 平滑滚动 */

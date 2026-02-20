@@ -539,6 +539,14 @@ watch(currentUserId, () => {
             <div class="card bg-base-100 shadow-lg">
               <div class="card-body">
                 <div class="flex items-center gap-4 mb-4">
+                  <!-- Leader Avatar based on first deck card -->
+                  <div v-if="deckCards.length > 0 && deckCards[0]?.masterCard" class="w-14 h-14 sm:w-16 sm:h-16 flex-shrink-0 shadow-md mask mask-squircle">
+                    <SekaiCard
+                      :card="deckCards[0].masterCard"
+                      :trained="deckCards[0]?.trained ?? false"
+                      :master-rank="deckCards[0]?.userCard?.masterRank || 0"
+                    />
+                  </div>
                   <div class="flex-1">
                     <h2 class="text-2xl font-bold">{{ profileData.user.name }}</h2>
                     <div class="flex items-center gap-2 mt-1">

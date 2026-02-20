@@ -195,6 +195,20 @@ const trainedCoverUrl = computed(() => {
   return `${assetsHost}/startapp/character/member/${card.value.assetbundleName}/card_after_training.jpg`
 })
 
+// 格式化发布时间（包含具体时分秒）
+function formatDate(timestamp: number): string {
+  const date = new Date(timestamp)
+  return date.toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  })
+}
+
 // 后台加载卡片类型数据（用于判断限定卡类型）
 async function loadCardTypeData() {
   isCardTypeLoading.value = true
@@ -295,6 +309,7 @@ onMounted(loadData)
               </h3>
               <div class="space-y-2 text-sm">
                 <p><span class="font-medium">卡片类型：</span>{{ cardTypeLabel }}</p>
+                <p><span class="font-medium">实装时间：</span>{{ card?.releaseAt ? formatDate(card.releaseAt) : '-' }}</p>
                 <p><span class="font-medium">技能名：</span>{{ card?.cardSkillName || '-' }}</p>
                 <p><span class="font-medium">技能效果：</span>{{ parsedDescription }}</p>
               </div>

@@ -171,6 +171,28 @@ function onLoadedMetadata() {
       audioRef.value.currentTime = music.value.fillerSec
       currentTime.value = music.value.fillerSec
     }
+
+    // 设置 Media Session API 以便在系统通知/锁屏中显示歌曲信息
+    if ('mediaSession' in navigator && music.value && currentVocal.value) {
+      navigator.mediaSession.metadata = new window.MediaMetadata({
+        title: music.value.title,
+        artist: getVocalSingers(currentVocal.value) || music.value.composer,
+        album: currentVocal.value.caption,
+        artwork: [
+          { 
+            src: coverUrl.value, 
+            sizes: '512x512', 
+            type: 'image/jpeg' 
+          }
+        ]
+      })
+
+      // 绑定媒体按键事件
+      navigator.mediaSession.setActionHandler('play', () => { togglePlay() })
+      navigator.mediaSession.setActionHandler('pause', () => { togglePlay() })
+      navigator.mediaSession.setActionHandler('seekbackward', () => { skipBackward() })
+      navigator.mediaSession.setActionHandler('seekforward', () => { skipForward() })
+    }
   }
 }
 
@@ -348,13 +370,17 @@ const coverUrl = computed(() => {
   return `${assetsHost}/startapp/music/jacket/${music.value.assetbundleName}/${music.value.assetbundleName}.png`
 })
 
-// 格式化发布时间
+// 格式化发布时间（包含具体时分秒）
 function formatDate(timestamp: number): string {
   const date = new Date(timestamp)
-  return date.toLocaleDateString('zh-CN', {
+  return date.toLocaleString('zh-CN', {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
   })
 }
 
