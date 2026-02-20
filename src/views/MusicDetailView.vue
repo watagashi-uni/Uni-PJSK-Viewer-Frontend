@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, onBeforeUnmount } from 'vue'
+import { ref, onMounted, computed, onBeforeUnmount, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
@@ -523,6 +523,20 @@ const furiganaSegments = computed(() => {
 
 const hasFurigana = computed(() => {
   return furiganaSegments.value.some(s => s.ruby)
+})
+
+// 动态设置网页标题
+const defaultTitle = 'Uni PJSK Viewer'
+watch(music, (newMusic) => {
+  if (newMusic) {
+    document.title = `${newMusic.title} - Uni PJSK Viewer`
+  } else {
+    document.title = defaultTitle
+  }
+})
+
+onBeforeUnmount(() => {
+  document.title = defaultTitle
 })
 
 onMounted(loadData)

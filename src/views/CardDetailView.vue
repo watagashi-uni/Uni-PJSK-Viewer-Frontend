@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
 import { useMasterStore } from '@/stores/master'
 import AssetImage from '@/components/AssetImage.vue'
@@ -259,6 +259,23 @@ async function loadData() {
   // 后台加载卡片类型数据（不阻塞页面渲染）
   loadCardTypeData()
 }
+
+// 动态设置网页标题
+const defaultTitle = 'Uni PJSK Viewer'
+watch([card, character], ([newCard, newChar]) => {
+  if (newCard && newChar) {
+    const charName = (newChar.firstName || '') + newChar.givenName
+    document.title = `[${newCard.prefix}] ${charName} - Uni PJSK Viewer`
+  } else if (newCard) {
+    document.title = `[${newCard.prefix}] - Uni PJSK Viewer`
+  } else {
+    document.title = defaultTitle
+  }
+})
+
+onBeforeUnmount(() => {
+  document.title = defaultTitle
+})
 
 onMounted(loadData)
 </script>
