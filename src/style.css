@@ -351,3 +351,14 @@ html {
   color: #ff85a1;
   border-left: 4px solid #ff85a1;
 }
+
+/* Fix DaisyUI range slider thumb jitter on active/focus */
+.range:focus::-webkit-slider-thumb,
+.range:active::-webkit-slider-thumb {
+  transform: translateY(-50%) !important;
+  margin-top: 0 !important;
+}
+
+.range::-webkit-slider-thumb {
+  transform: translateY(-50%) !important;
+}

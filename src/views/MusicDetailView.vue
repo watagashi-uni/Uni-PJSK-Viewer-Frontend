@@ -786,7 +786,7 @@ onMounted(loadData)
                     step="0.01"
                     :value="volume"
                     @input="onVolumeChange"
-                    class="range range-xs range-primary w-24"
+                    class="range range-xs range-primary w-24 focus:outline-none focus:ring-0"
                   />
                 </div>
               </div>
