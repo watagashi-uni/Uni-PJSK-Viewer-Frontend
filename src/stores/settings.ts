@@ -6,7 +6,7 @@ export const useSettingsStore = defineStore('settings', () => {
     const showSpoilers = ref(false)
     // 是否使用遮罩覆盖剧透内容（默认开启）
     const maskSpoilers = ref(true)
-    // 主题状态: 'light' | 'dark' | 'auto'
+    // 主题状态: 'light' | 'dark' | 'auto' | 'moe'
     const theme = ref<string>('auto')
 
     // 默认 vocal 设置: 'sekai' | 'virtual_singer'
@@ -19,6 +19,8 @@ export const useSettingsStore = defineStore('settings', () => {
             document.documentElement.setAttribute('data-theme', prefersDark ? 'dark' : 'unipjsk')
         } else if (newTheme === 'dark') {
             document.documentElement.setAttribute('data-theme', 'dark')
+        } else if (newTheme === 'moe') {
+            document.documentElement.setAttribute('data-theme', 'moe')
         } else {
             document.documentElement.setAttribute('data-theme', 'unipjsk')
         }
