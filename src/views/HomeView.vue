@@ -1,17 +1,19 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useMasterStore } from '@/stores/master'
+import { useAccountStore } from '@/stores/account'
 import { getVersion } from '@/api/version'
 import { 
   Music, Calendar, Clock, 
-  ChevronRight, Sparkles, BarChart3
+  ChevronRight, Sparkles, BarChart3,
+  CreditCard, User, Gift
 } from 'lucide-vue-next'
 import AssetImage from '@/components/AssetImage.vue'
 
-// 前端版本号 - 每次发布时更新
-const FRONTEND_VERSION = '2.4.5'
+const FRONTEND_VERSION = '2.4.7'
 
 const masterStore = useMasterStore()
+const accountStore = useAccountStore()
 const assetsHost = 'https://assets.unipjsk.com'
 
 const dataVersion = ref<string>('加载中...')
@@ -37,8 +39,20 @@ interface MusicData {
   lyricist: string
 }
 
+interface Gacha {
+  id: number
+  gachaType: string
+  name: string
+  seq: number
+  assetbundleName: string
+  gachaCeilItemId: number
+  startAt: number
+  endAt: number
+}
+
 const events = ref<EventData[]>([])
 const musics = ref<MusicData[]>([])
+const gachas = ref<Gacha[]>([])
 
 // 活动类型映射
 const eventTypeMap: Record<string, { label: string; color: string }> = {
@@ -83,6 +97,25 @@ const recentMusics = computed(() => {
   return list.slice(0, 5)
 })
 
+// 正在进行中的卡池
+const ongoingGachas = computed(() => {
+  const now = Date.now()
+  let list = gachas.value.filter(g => now >= g.startAt && now <= g.endAt)
+  list.sort((a, b) => b.startAt - a.startAt)
+  return list
+})
+
+const gachaScrollContainer = ref<HTMLElement | null>(null)
+function handleGachaScroll(e: WheelEvent) {
+  if (!gachaScrollContainer.value) return
+  // 如果是垂直滚动（传统鼠标滚轮）
+  if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+    e.preventDefault() // 阻止页面整体下滚
+    gachaScrollContainer.value.scrollLeft += e.deltaY * 1.5 // 稍微放大一点滚动速度
+  }
+  // 触控板横向滑动不阻止默认行为，保留原生惯性
+}
+
 // 格式化日期
 function formatDate(timestamp: number): string {
   return new Date(timestamp).toLocaleDateString('zh-CN', {
@@ -108,6 +141,70 @@ function getRemainingTime(event: EventData): string {
   return `剩余 ${hours}小时`
 }
 
+// 用户账号信息
+const currentUserProfile = computed(() => {
+  const userId = accountStore.currentUserId
+  if (!userId) {
+    if (accountStore.accounts.length > 0) {
+      return accountStore.accounts[0]
+    }
+    return null
+  }
+  return accountStore.accounts.find(a => a.userId === userId) || null
+})
+
+const currentUserSuite = computed(() => {
+  if (!currentUserProfile.value) return null
+  return accountStore.getSuiteCache(currentUserProfile.value.userId)
+})
+
+const leaderCard = computed(() => {
+  // 优先尝试从 profileData 读取 (更准确)
+  if (currentUserProfileData.value?.userDeck?.member1 && currentUserProfileData.value?.userCards) {
+    const cardId = currentUserProfileData.value.userDeck.member1
+    const userCardInfo = currentUserProfileData.value.userCards.find((c: any) => c.cardId === cardId)
+    // 根据特殊训练状态判断是否觉醒
+    const isTrained = userCardInfo?.specialTrainingStatus === 'done' || userCardInfo?.defaultImage === 'training'
+    
+    const masterCard = masterStore.cache['cards']?.find((c: any) => c.id === cardId)
+    if (masterCard && userCardInfo) {
+      return {
+        ...masterCard,
+        userCardInfo: {
+          ...userCardInfo,
+          defaultImage: isTrained ? 'training' : 'normal'
+        }
+      }
+    }
+  }
+
+  // 后备从 suiteCache 读取
+  if (!currentUserSuite.value?.userDecks || !currentUserSuite.value?.userCards) return null
+  const mainDeck = currentUserSuite.value.userDecks[0]
+  if (!mainDeck?.member1) return null
+  
+  const userCardInfo = currentUserSuite.value.userCards.find((c: any) => c.cardId === mainDeck.member1)
+  if (!userCardInfo) return null
+  
+  // Need to find master store card info
+  const masterCard = masterStore.cache['cards']?.find((c: any) => c.id === mainDeck.member1)
+  
+  return {
+    ...masterCard,
+    userCardInfo
+  }
+})
+
+const currentUserProfileData = computed(() => {
+  if (!currentUserProfile.value) return null
+  try {
+    const raw = localStorage.getItem(`sekaiUserProfileData_${currentUserProfile.value.userId}`)
+    return raw ? JSON.parse(raw) : null
+  } catch {
+    return null
+  }
+})
+
 onMounted(async () => {
   try {
     // 1. 确保 masterStore 已初始化（如果 App.vue 还没完成初始化）
@@ -116,10 +213,12 @@ onMounted(async () => {
     }
     
     // 2. 并行获取版本信息和 master 数据
-    const [versionRes, eventsData, musicsData] = await Promise.all([
+    const [versionRes, eventsData, musicsData, gachasData, _cardsData] = await Promise.all([
       getVersion(),
       masterStore.getMaster<EventData>('events'),
-      masterStore.getMaster<MusicData>('musics')
+      masterStore.getMaster<MusicData>('musics'),
+      masterStore.getMaster<Gacha>('gachas'),
+      masterStore.getMaster<any>('cards')
     ])
     
     // 设置版本信息
@@ -130,6 +229,7 @@ onMounted(async () => {
     // 设置数据 (events 需要倒序)
     events.value = eventsData.sort((a, b) => b.id - a.id)
     musics.value = musicsData
+    gachas.value = gachasData
   } catch (e) {
     console.error('加载首页数据失败:', e)
     dataVersion.value = '获取失败'
@@ -141,9 +241,11 @@ onMounted(async () => {
 
 <template>
   <div class="space-y-6">
-    <!-- 头部欢迎区 -->
-    <div class="flex flex-col md:flex-row justify-between items-center gap-4 bg-base-100 p-6 rounded-xl shadow-sm">
-      <div>
+    <!-- 头部欢迎区与用户简影 -->
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-base-100 p-6 rounded-xl shadow-sm border border-base-200">
+      
+      <!-- App Info -->
+      <div class="flex-1">
         <h1 class="text-3xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
           Uni PJSK Viewer
         </h1>
@@ -151,19 +253,66 @@ onMounted(async () => {
           v{{ FRONTEND_VERSION }} • Data: {{ dataVersion }} • Asset: {{ assetVersion }}
         </p>
       </div>
-      <div class="flex gap-3">
-        <RouterLink to="/musics" class="btn btn-primary btn-sm">
-          <Music class="w-4 h-4" /> 歌曲列表
-        </RouterLink>
-        <RouterLink to="/events" class="btn btn-secondary btn-sm">
-          <Calendar class="w-4 h-4" /> 活动总览
-        </RouterLink>
+      
+      <!-- User Profile Thumbnail -->
+      <div v-if="currentUserProfile" class="flex items-center gap-3 bg-base-200/50 p-2 pr-4 rounded-full border border-base-200 shadow-sm shrink-0">
+        <div class="relative w-12 h-12 rounded-full overflow-hidden border-2 border-primary/20 shrink-0 bg-base-300">
+          <AssetImage 
+            v-if="leaderCard"
+            :src="`${assetsHost}/startapp/thumbnail/chara/${leaderCard.assetbundleName}_${leaderCard.userCardInfo.defaultImage === 'training' ? 'after_training' : 'normal'}.png`"
+            class="w-full h-full object-cover"
+          />
+          <User v-else class="w-6 h-6 m-3 text-base-content/30" />
+        </div>
+        <div class="flex flex-col">
+          <span class="font-bold text-sm">{{ currentUserProfile.name }}</span>
+          <span class="text-xs text-base-content/60 font-medium">
+            <span class="text-primary">Lv.{{ currentUserProfileData?.user?.rank || currentUserSuite?.user?.rank || '未知' }}</span>
+          </span>
+        </div>
+      </div>
+      <div v-else class="flex flex-col sm:flex-row items-center gap-3">
+        <span class="text-sm text-base-content/60 text-center sm:text-left">尚未绑定账号</span>
+        <RouterLink to="/profile" class="btn btn-sm btn-primary btn-outline rounded-full">去添加账号</RouterLink>
       </div>
     </div>
+    
+    <!-- 顶部快捷入口 -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <RouterLink to="/musics" class="btn btn-primary h-auto py-3 gap-2 justify-start shadow-sm hover:shadow-md border-none">
+        <Music class="w-5 h-5 flex-shrink-0" /> 
+        <div class="flex flex-col items-start leading-tight">
+          <span>歌曲卡片</span>
+          <span class="text-[10px] font-normal opacity-70">Musics</span>
+        </div>
+      </RouterLink>
+      <RouterLink to="/cards" class="btn btn-secondary h-auto py-3 gap-2 justify-start shadow-sm hover:shadow-md border-none">
+        <CreditCard class="w-5 h-5 flex-shrink-0" />
+        <div class="flex flex-col items-start leading-tight">
+          <span>卡片一览</span>
+          <span class="text-[10px] font-normal opacity-70">Cards</span>
+        </div>
+      </RouterLink>
+      <RouterLink to="/events" class="btn btn-accent h-auto py-3 gap-2 justify-start shadow-sm hover:shadow-md border-none">
+        <Calendar class="w-5 h-5 flex-shrink-0" />
+        <div class="flex flex-col items-start leading-tight">
+          <span>活动总览</span>
+          <span class="text-[10px] font-normal opacity-70">Events</span>
+        </div>
+      </RouterLink>
+      <RouterLink to="/gachas" class="btn bg-orange-400 hover:bg-orange-500 text-white h-auto py-3 gap-2 justify-start shadow-sm hover:shadow-md border-none">
+        <Sparkles class="w-5 h-5 flex-shrink-0" />
+        <div class="flex flex-col items-start leading-tight">
+          <span>活动卡池</span>
+          <span class="text-[10px] font-normal opacity-80">Gachas</span>
+        </div>
+      </RouterLink>
+    </div>
 
+    <!-- 主体两列内容 -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <!-- 左侧：当前活动 (占 2 列) -->
-      <div class="lg:col-span-2 space-y-6">
+      <div class="lg:col-span-2 space-y-6 min-w-0">
         <h2 class="text-xl font-bold flex items-center gap-2">
           <Sparkles class="w-5 h-5 text-primary" />
           {{ currentEvent?.status === 'ongoing' ? '正在进行' : '最近活动' }}
@@ -173,83 +322,115 @@ onMounted(async () => {
         
         <div 
           v-else-if="currentEvent"
-          class="block group relative rounded-xl overflow-hidden shadow-lg hover:shadow-xl transition-all hover:-translate-y-1"
+          class="block group relative rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all border border-base-200 bg-base-100 flex flex-col xl:flex-row"
         >
-          <!-- 全卡片链接 -->
-          <RouterLink :to="`/events/${currentEvent.id}`" class="absolute inset-0 z-0 cursor-pointer"></RouterLink>
-
-          <!-- Banner 背景 -->
-          <div class="aspect-[2/1] w-full relative pointer-events-none">
-            <AssetImage 
-              :src="`${assetsHost}/startapp/home/banner/${currentEvent.assetbundleName}/${currentEvent.assetbundleName}.png`"
-              class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-            />
-            <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
+          <!-- Banner 图片侧 (左侧/顶部) -->
+          <div class="w-full xl:w-1/2 p-4 xl:p-6 xl:pr-0 flex flex-col items-center justify-start order-1 shrink-0 bg-base-100 z-10">
+            <div class="w-full max-w-[488px] overflow-hidden rounded-lg shadow-sm relative pointer-events-none">
+              <AssetImage 
+                :src="`${assetsHost}/startapp/home/banner/${currentEvent.assetbundleName}/${currentEvent.assetbundleName}.png`"
+                class="w-full aspect-[122/52] object-cover group-hover:scale-105 transition-transform duration-500"
+              />
+            </div>
+            <!-- 左下角额外板块：活动快捷入口 -->
             
-            <!-- 内容 -->
-            <div class="absolute bottom-0 left-0 right-0 p-6 text-white">
-              <div class="flex items-center justify-between mb-2">
-                <!-- Badges -->
-                <div class="flex items-center gap-2">
-                  <span 
-                    class="badge border-none"
-                    :class="eventTypeMap[currentEvent.eventType]?.color || 'badge-ghost'"
-                  >
-                    {{ eventTypeMap[currentEvent.eventType]?.label || currentEvent.eventType }}
-                  </span>
-                  <span 
-                    v-if="currentEvent.status === 'ongoing'"
-                    class="badge badge-success gap-1 border-none text-white"
-                  >
-                    <Clock class="w-3 h-3" />
-                    {{ getRemainingTime(currentEvent) }}
-                  </span>
-                  <span 
-                    v-else
-                    class="badge badge-ghost gap-1 border-none text-white/80"
-                  >
-                    {{ currentEvent.statusLabel }}
-                  </span>
-                </div>
+          </div>
 
-                <!-- 榜线按钮 (仅正在进行时显示) -->
-                <RouterLink 
-                  v-if="currentEvent.status === 'ongoing'"
-                  to="/ranking"
-                  class="btn btn-sm btn-primary z-10 pointer-events-auto gap-2 border-white/20 shadow-lg"
-                >
-                  <BarChart3 class="w-4 h-4" />
-                  查看榜线
-                </RouterLink>
-              </div>
-              
-              <h3 class="text-2xl md:text-3xl font-bold mb-2">{{ currentEvent.name }}</h3>
-              
-              <div class="flex items-center gap-4 text-white/80 text-sm">
-                <span class="flex items-center gap-1">
-                  <Calendar class="w-4 h-4" />
-                  {{ formatDate(currentEvent.startAt) }} - {{ formatDate(currentEvent.aggregateAt) }}
-                </span>
-                <span class="flex items-center gap-1">
-                  <span class="badge badge-sm badge-outline text-white/80">#{{ currentEvent.id }}</span>
-                </span>
+          <!-- 内容侧 (右侧/底部) -->
+          <div class="p-5 md:p-6 flex flex-col justify-center relative z-10 order-2 flex-1">
+            <div class="flex items-center gap-2 mb-3">
+              <span 
+                class="badge border-none"
+                :class="eventTypeMap[currentEvent.eventType]?.color || 'badge-ghost'"
+              >
+                {{ eventTypeMap[currentEvent.eventType]?.label || currentEvent.eventType }}
+              </span>
+              <span 
+                v-if="currentEvent.status === 'ongoing'"
+                class="badge badge-success gap-1 border-none text-white shadow-sm"
+              >
+                <Clock class="w-3 h-3" />
+                {{ getRemainingTime(currentEvent) }}
+              </span>
+              <span 
+                v-else
+                class="badge badge-ghost gap-1 border-none text-base-content/80 shadow-sm"
+              >
+                {{ currentEvent.statusLabel }}
+              </span>
+            </div>
+            
+            <h3 class="text-xl md:text-2xl font-bold leading-tight mb-4 group-hover:text-primary transition-colors">
+              {{ currentEvent.name }}
+            </h3>
+            
+            <div class="space-y-2 text-sm text-base-content/70">
+              <div class="flex items-center gap-2">
+                <Calendar class="w-4 h-4 opacity-50" />
+                <span>{{ formatDate(currentEvent.startAt) }} - {{ formatDate(currentEvent.aggregateAt) }}</span>
               </div>
             </div>
+
+            <!-- 榜线按钮放回由底部对齐 -->
+            <div class="mt-auto pt-4">
+              <RouterLink 
+                v-if="currentEvent.status === 'ongoing'"
+                to="/ranking"
+                class="btn btn-sm btn-primary btn-outline w-fit z-10 pointer-events-auto shadow-sm"
+              >
+                <BarChart3 class="w-4 h-4" />
+                查看榜线
+              </RouterLink>
+            </div>
           </div>
+          
+          <!-- 全卡片链接放到最后避免遮罩层级问题 -->
+          <RouterLink :to="`/events/${currentEvent.id}`" class="absolute inset-0 z-0 cursor-pointer"></RouterLink>
         </div>
         <div v-else class="text-center py-10 text-base-content/60 bg-base-100 rounded-xl">
           暂无活动信息
         </div>
+
+        <!-- 当前卡池板块 (放置在活动内容下方) -->
+        <div v-if="ongoingGachas.length > 0" class="space-y-4 pt-2">
+          <div class="flex justify-between items-end pb-2 border-b border-base-200">
+            <h2 class="text-xl font-bold flex items-center gap-2">
+              <Gift class="w-5 h-5 text-orange-500" />
+              正在进行的卡池
+            </h2>
+          </div>
+          
+          <!-- 横向滚动容器 -->
+          <div 
+            ref="gachaScrollContainer"
+            @wheel="handleGachaScroll"
+            class="flex overflow-x-auto gap-4 pb-4 w-full"
+          >
+            <RouterLink 
+              v-for="gacha in ongoingGachas" 
+              :key="gacha.id"
+              :to="`/gacha/${gacha.id}`"
+              class="shrink-0 w-[240px] md:w-[320px] aspect-[21/10] relative rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all hover:-translate-y-1 bg-base-100 group border border-base-200 pointer-events-auto cursor-pointer flex items-center justify-center p-2"
+            >
+              <AssetImage 
+                :src="`${assetsHost}/ondemand/gacha/${gacha.assetbundleName}/logo/logo.png`" 
+                :alt="gacha.name"
+                class="w-full h-full object-contain group-hover:scale-105 transition-transform"
+              />
+            </RouterLink>
+          </div>
+        </div>
+
       </div>
 
       <!-- 右侧：最新歌曲 (占 1 列) -->
       <div class="space-y-4">
-        <div class="flex justify-between items-end">
+        <div class="flex justify-between items-end pb-2 border-b border-base-200">
           <h2 class="text-xl font-bold flex items-center gap-2">
             <Music class="w-5 h-5 text-secondary" />
             最新歌曲
           </h2>
-          <RouterLink to="/musics" class="text-xs link link-hover opacity-60">
+          <RouterLink to="/musics" class="text-xs link link-hover text-secondary">
             查看更多
           </RouterLink>
         </div>
@@ -263,30 +444,43 @@ onMounted(async () => {
             v-for="music in recentMusics" 
             :key="music.id"
             :to="`/musics/${music.id}`"
-            class="flex items-center gap-3 p-3 bg-base-100 rounded-lg shadow-sm hover:shadow-md hover:bg-base-200 transition-all group"
+            class="flex items-center gap-3 p-3 bg-base-100 border border-base-200 rounded-xl shadow-sm hover:shadow-md hover:border-secondary transition-all group"
           >
             <!-- 封面 -->
             <div class="relative w-14 h-14 rounded-lg overflow-hidden flex-shrink-0 shadow-sm">
               <AssetImage 
                 :src="`${assetsHost}/startapp/music/jacket/${music.assetbundleName}/${music.assetbundleName}.png`"
-                class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
               />
             </div>
             
             <!-- 信息 -->
             <div class="flex-1 min-w-0">
-              <h4 class="font-medium truncate group-hover:text-primary transition-colors">
+              <h4 class="font-bold text-sm truncate group-hover:text-secondary transition-colors">
                 {{ music.title }}
               </h4>
-              <p class="text-xs text-base-content/60 truncate">
+              <p class="text-[10px] text-base-content/50 truncate mt-0.5 font-medium">
                 {{ music.composer }}
               </p>
             </div>
             
-            <ChevronRight class="w-4 h-4 text-base-content/30 group-hover:text-primary transition-colors" />
+            <ChevronRight class="w-4 h-4 text-base-content/30 group-hover:text-secondary group-hover:translate-x-1 transition-all" />
           </RouterLink>
         </div>
       </div>
+    </div>
+    
+    <!-- 底部功能入口 -->
+    <div class="grid grid-cols-2 md:grid-cols-3 gap-3 border-t border-base-200 pt-6">
+      <RouterLink to="/sus2img" class="btn bg-base-100 border-base-200 h-auto py-3 justify-center shadow-sm hover:shadow-md hover:border-primary">
+        谱面转图片
+      </RouterLink>
+      <RouterLink to="/deck-recommend" class="btn bg-base-100 border-base-200 h-auto py-3 justify-center shadow-sm hover:shadow-md hover:border-primary">
+        自动组队
+      </RouterLink>
+      <RouterLink to="/settings" class="btn bg-base-100 border-base-200 h-auto py-3 justify-center shadow-sm hover:shadow-md hover:border-primary">
+        系统设置
+      </RouterLink>
     </div>
   </div>
 </template>

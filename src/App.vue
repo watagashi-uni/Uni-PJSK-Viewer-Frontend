@@ -22,7 +22,7 @@ onMounted(async () => {
     caches.delete('external-images')
   }
   settingsStore.initialize()
-  accountStore.initialize()
+  await accountStore.initialize()
   await masterStore.initialize()
 })
 

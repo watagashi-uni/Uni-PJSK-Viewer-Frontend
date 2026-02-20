@@ -60,13 +60,7 @@ function getResultLabel(diff: string): string {
   return props.results[diff] || ''
 }
 
-function getResultClass(diff: string): string {
-  const r = getResultLabel(diff)
-  if (r === 'AP') return 'result-ap'
-  if (r === 'FC') return 'result-fc'
-  if (r === 'C') return 'result-clear'
-  return ''
-}
+// 取消 getResultClass 因为不再使用CSS颜色背景
 
 // 获取有效的难度列表
 const availableDifficulties = computed(() => {
@@ -144,14 +138,36 @@ const coverUrl = computed(() => {
       </div>
 
       <!-- 成绩行 -->
-      <div v-if="results" class="flex gap-1 justify-between">
+      <div v-if="results" class="flex gap-1 justify-between mt-1.5 h-[20px]">
         <div 
           v-for="diff in availableDifficulties" 
           :key="`r-${diff}`"
-          class="flex-1 flex items-center justify-center rounded min-w-[1.2rem] h-4"
-          :class="getResultClass(diff)"
+          class="flex-1 flex items-center justify-center min-w-[1.2rem]"
         >
-          <span class="text-[9px] font-bold leading-none">{{ getResultLabel(diff) }}</span>
+          <img
+            v-if="getResultLabel(diff) === 'AP'"
+            src="/img/icon_allPerfect.png"
+            alt="AP"
+            class="h-full w-auto object-contain drop-shadow-sm"
+          />
+          <img
+            v-else-if="getResultLabel(diff) === 'FC'"
+            src="/img/icon_fullCombo.png"
+            alt="FC"
+            class="h-full w-auto object-contain drop-shadow-sm"
+          />
+          <img
+            v-else-if="getResultLabel(diff) === 'C'"
+            src="/img/icon_clear.png"
+            alt="C"
+            class="h-full w-auto object-contain drop-shadow-sm"
+          />
+          <img
+            v-else
+            src="/img/icon_notClear.png"
+            alt="NC"
+            class="h-full w-auto object-contain drop-shadow-sm opacity-50"
+          />
         </div>
       </div>
     </div>
@@ -159,17 +175,4 @@ const coverUrl = computed(() => {
 </template>
 
 <style scoped>
-.result-ap {
-  background: linear-gradient(135deg, #F06292, #64B5F6);
-  color: white;
-}
-.result-fc {
-  background-color: #F06292;
-  color: white;
-}
-.result-clear {
-  background-color: rgba(255, 255, 255, 0.15);
-  color: currentColor;
-  border: 1px solid rgba(128, 128, 128, 0.3);
-}
 </style>

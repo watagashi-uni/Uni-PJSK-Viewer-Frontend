@@ -3,7 +3,8 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
-import { EyeOff } from 'lucide-vue-next'
+import { EyeOff, RefreshCw } from 'lucide-vue-next'
+import { useAccountStore } from '@/stores/account'
 import Pagination from '@/components/Pagination.vue'
 import SekaiCard from '@/components/SekaiCard.vue'
 
@@ -27,6 +28,37 @@ const route = useRoute()
 const router = useRouter()
 const masterStore = useMasterStore()
 const settingsStore = useSettingsStore()
+const accountStore = useAccountStore()
+
+const showUserCards = ref(false)
+const selectedUserId = ref('')
+
+// 计算该用户的 suite 缓存数据
+const suiteData = computed(() => {
+  if (!selectedUserId.value) return null
+  return accountStore.getSuiteCache(selectedUserId.value)
+})
+
+// 卡片拥有状态 Map: cardId -> userCard detail
+const userCardsMap = computed(() => {
+  if (!showUserCards.value || !suiteData.value?.userCards) return new Map()
+  const map = new Map<number, any>()
+  for (const c of suiteData.value.userCards) {
+    map.set(c.cardId, c)
+  }
+  return map
+})
+
+function getMasterRank(cardId: number): number {
+  if (!showUserCards.value) return 0
+  const c = userCardsMap.value.get(cardId)
+  return c ? c.masterRank : 0
+}
+
+async function refreshUserCards() {
+  if (!selectedUserId.value) return
+  await accountStore.refreshSuite(selectedUserId.value)
+}
 
 const cards = ref<Card[]>([])
 const characters = ref<Character[]>([])
@@ -51,6 +83,11 @@ const selectedRarities = computed<string[]>(() => {
     return param.split(',').filter(Boolean)
   }
   return []
+})
+
+// 只看已拥有卡片
+const filterOwnedOnly = computed<boolean>(() => {
+  return route.query.owned === '1'
 })
 
 // 稀有度列表
@@ -79,6 +116,11 @@ const filteredCards = computed(() => {
   // 过滤剧透内容
   if (!settingsStore.showSpoilers) {
     result = result.filter(c => c.releaseAt <= now)
+  }
+  
+  // 只看拥有的卡
+  if (filterOwnedOnly.value && showUserCards.value && suiteData.value?.userCards) {
+    result = result.filter(c => userCardsMap.value.has(c.id))
   }
   
   // 按角色筛选 (多选)
@@ -115,13 +157,16 @@ function isLeak(releaseAt: number): boolean {
 
 
 // 更新 URL 筛选参数
-function updateFilters(charaIds: number[], rarities: string[], page: string = '1') {
+function updateFilters(charaIds: number[], rarities: string[], owned: boolean, page: string = '1') {
   const query: Record<string, string> = { page }
   if (charaIds.length > 0) {
     query.charaIds = charaIds.join(',')
   }
   if (rarities.length > 0) {
     query.rarities = rarities.join(',')
+  }
+  if (owned) {
+    query.owned = '1'
   }
   router.push({ query })
 }
@@ -135,7 +180,7 @@ function toggleCharacter(id: number) {
   } else {
     current.push(id)
   }
-  updateFilters(current, selectedRarities.value)
+  updateFilters(current, selectedRarities.value, filterOwnedOnly.value)
 }
 
 // 切换稀有度选择
@@ -147,7 +192,12 @@ function toggleRarity(value: string) {
   } else {
     current.push(value)
   }
-  updateFilters(selectedCharaIds.value, current)
+  updateFilters(selectedCharaIds.value, current, filterOwnedOnly.value)
+}
+
+// 切换只看拥有
+function toggleOwnedOnly() {
+  updateFilters(selectedCharaIds.value, selectedRarities.value, !filterOwnedOnly.value)
 }
 
 // 加载数据
@@ -169,7 +219,7 @@ async function loadData() {
 
 // 页码变化
 function handlePageChange(page: number) {
-  updateFilters(selectedCharaIds.value, selectedRarities.value, page.toString())
+  updateFilters(selectedCharaIds.value, selectedRarities.value, filterOwnedOnly.value, page.toString())
 }
 
 // 清除筛选
@@ -182,13 +232,67 @@ function hasTrainedCard(rarity: string): boolean {
   return rarity === 'rarity_3' || rarity === 'rarity_4'
 }
 
-onMounted(loadData)
+onMounted(() => {
+  if (accountStore.accounts.length > 0) {
+    selectedUserId.value = accountStore.currentUserId || accountStore.accounts[0]!.userId
+  } else {
+    const last = localStorage.getItem('account_currentUserId')
+    if (last) selectedUserId.value = last
+  }
+  
+  loadData()
+})
 </script>
 
 <template>
-  <div>
+  <div class="pb-10">
+    <!-- 拥有状态切换区 -->
+    <div class="card bg-base-100 shadow-md mb-4 mt-2">
+      <div class="card-body p-4 flex flex-row flex-wrap items-center gap-4">
+        <label class="label cursor-pointer gap-2 p-0">
+          <input type="checkbox" class="toggle toggle-primary toggle-sm" v-model="showUserCards" />
+          <span class="label-text font-medium mt-0.5">显示拥有状态</span>
+        </label>
+        
+        <template v-if="showUserCards">
+          <div class="divider divider-horizontal mx-0"></div>
+          <label class="label cursor-pointer gap-2 p-0">
+            <input type="checkbox" class="toggle toggle-secondary toggle-sm" :checked="filterOwnedOnly" @change="toggleOwnedOnly" />
+            <span class="label-text font-medium mt-0.5">只看已拥有</span>
+          </label>
+          <div class="divider divider-horizontal mx-0"></div>
+          
+          <select
+            v-if="accountStore.accounts.length > 0"
+            v-model="selectedUserId"
+            class="select select-bordered select-sm min-w-[150px]"
+          >
+            <option v-for="acc in accountStore.accounts" :key="acc.userId" :value="acc.userId">
+              {{ acc.userId }} - {{ acc.name }}
+            </option>
+          </select>
+          <span v-else class="text-sm text-base-content/60">无绑定账号</span>
+          
+          <button
+            v-if="selectedUserId"
+            class="btn btn-sm btn-ghost gap-1"
+            :disabled="accountStore.suiteRefreshing"
+            @click="refreshUserCards"
+          >
+            <RefreshCw class="w-3.5 h-3.5" :class="{ 'animate-spin': accountStore.suiteRefreshing }" />
+            刷新数据
+          </button>
+        </template>
+        
+        <div class="divider divider-horizontal mx-0"></div>
+        <RouterLink class="btn btn-sm btn-primary" to="/card-collection">
+          图鉴状态
+        </RouterLink>
+      </div>
+    </div>
+
     <!-- 筛选面板 -->
-    <div class="collapse collapse-arrow bg-base-100 shadow-lg mb-6">
+    <div class="collapse collapse-arrow bg-base-100 shadow-sm mb-6 border border-base-200">
       <input type="checkbox" />
       <div class="collapse-title text-lg font-medium">
         筛选菜单
@@ -270,19 +374,37 @@ onMounted(loadData)
           <div class="flex gap-1 justify-center relative">
             <!-- 普通卡面 -->
             <div class="w-20 sm:w-24 flex-shrink-0" :class="{ 'mx-auto': !hasTrainedCard(card.cardRarityType) }">
-              <SekaiCard 
-                :card="card" 
-                class="transition-transform group-hover:scale-105"
-              />
+              <div class="relative aspect-square">
+                <SekaiCard 
+                  :card="card" 
+                  :master-rank="getMasterRank(card.id)"
+                  class="transition-transform group-hover:scale-105"
+                />
+                <!-- 未拥有遮罩 -->
+                <div v-if="showUserCards && !userCardsMap.has(card.id)" class="absolute inset-0 bg-black/60 pointer-events-none z-30 transition-opacity"></div>
+              </div>
+              <div v-if="showUserCards && userCardsMap.has(card.id)" class="text-[10px] text-center mt-0.5 font-bold text-primary truncate leading-[1.2]">
+                <span class="text-base-content/80">Lv.{{ userCardsMap.get(card.id).level }}</span><br/>
+                <span class="text-secondary/80">SLv.{{ userCardsMap.get(card.id).skillLevel || 1 }}</span>
+              </div>
             </div>
             
             <!-- 觉醒卡面 (3星/4星) -->
             <div v-if="hasTrainedCard(card.cardRarityType)" class="w-20 sm:w-24 flex-shrink-0">
-              <SekaiCard 
-                :card="card" 
-                :trained="true"
-                class="transition-transform group-hover:scale-105"
-              />
+              <div class="relative aspect-square">
+                <SekaiCard 
+                  :card="card" 
+                  :trained="true"
+                  :master-rank="getMasterRank(card.id)"
+                  class="transition-transform group-hover:scale-105"
+                />
+                <!-- 未拥有遮罩 -->
+                <div v-if="showUserCards && !userCardsMap.has(card.id)" class="absolute inset-0 bg-black/60 pointer-events-none z-30 transition-opacity"></div>
+              </div>
+              <div v-if="showUserCards && userCardsMap.has(card.id)" class="text-[10px] text-center mt-0.5 font-bold text-primary truncate leading-[1.2]">
+                <span class="text-base-content/80">Lv.{{ userCardsMap.get(card.id).level }}</span><br/>
+                <span class="text-secondary/80">SLv.{{ userCardsMap.get(card.id).skillLevel || 1 }}</span>
+              </div>
             </div>
           </div>
           

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, onBeforeUnmount, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
 import { 
@@ -67,6 +67,7 @@ interface OutsideCharacter {
 }
 
 const route = useRoute()
+const router = useRouter()
 const masterStore = useMasterStore()
 const settingsStore = useSettingsStore()
 
@@ -539,6 +540,16 @@ onBeforeUnmount(() => {
   document.title = defaultTitle
 })
 
+// 返回上一页
+function goBack() {
+  const backState = window.history.state?.back
+  if (typeof backState === 'string' && backState.startsWith('/musics')) {
+    router.back()
+  } else {
+    router.push('/musics')
+  }
+}
+
 onMounted(loadData)
 </script>
 
@@ -552,9 +563,9 @@ onMounted(loadData)
     <template v-else-if="music">
       <!-- 顶部导航 -->
       <div class="mb-4">
-        <RouterLink to="/musics" class="btn btn-ghost btn-sm gap-2 pl-0">
+        <button @click="goBack" class="btn btn-ghost btn-sm gap-2 pl-0">
           <ChevronLeft class="w-4 h-4" /> 返回列表
-        </RouterLink>
+        </button>
       </div>
 
       <div class="flex flex-col md:flex-row gap-8">

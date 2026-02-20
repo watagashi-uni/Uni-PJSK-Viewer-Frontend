@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { openDB } from 'idb'
 
 export interface StoredAccount {
     userId: string
@@ -10,6 +11,15 @@ export interface StoredAccount {
 
 const STORAGE_KEY = 'sekaiUserProfiles'
 const SUITE_CACHE_PREFIX = 'suiteCache_'
+const PROFILE_DATA_KEY = 'sekaiUserProfileData'
+
+const dbPromise = openDB('sekai-viewer-db', 1, {
+    upgrade(db) {
+        if (!db.objectStoreNames.contains('caches')) {
+            db.createObjectStore('caches')
+        }
+    },
+})
 
 export const useAccountStore = defineStore('account', () => {
     const accounts = ref<StoredAccount[]>([])
@@ -18,6 +28,10 @@ export const useAccountStore = defineStore('account', () => {
     // suite 刷新中状态（全局可用）
     const suiteRefreshing = ref(false)
     const profileRefreshing = ref(false)
+
+    // 内存中的缓存（UI 界面可以直接读取）
+    const suiteCaches = ref<Record<string, any>>({})
+    const profileCaches = ref<Record<string, any>>({})
 
     // 当前账号
     const currentAccount = computed(() =>
@@ -36,16 +50,49 @@ export const useAccountStore = defineStore('account', () => {
         return new Date(currentAccount.value.lastRefresh).toLocaleString('zh-CN')
     })
 
-    function initialize() {
+    async function initialize() {
         try {
             const raw = localStorage.getItem(STORAGE_KEY)
             if (raw) accounts.value = JSON.parse(raw)
         } catch { accounts.value = [] }
+
+        // 执行 LocalStorage 到 IndexedDB 的数据迁移
+        await migrateLocalStorageToIDB()
+
         const last = localStorage.getItem('account_currentUserId')
         if (last && accounts.value.some(a => a.userId === last)) {
-            currentUserId.value = last
+            await selectAccount(last)
         } else if (accounts.value.length > 0 && accounts.value[0]) {
-            currentUserId.value = accounts.value[0].userId
+            await selectAccount(accounts.value[0].userId)
+        }
+    }
+
+    async function migrateLocalStorageToIDB() {
+        try {
+            const db = await dbPromise
+            const tx = db.transaction('caches', 'readwrite')
+
+            // 迁移所有用户的 Suite 和 Profile
+            for (const acc of accounts.value) {
+                const uid = acc.userId
+
+                // 迁移 Suite
+                const suiteRaw = localStorage.getItem(`${SUITE_CACHE_PREFIX}${uid}`)
+                if (suiteRaw) {
+                    tx.store.put(JSON.parse(suiteRaw), `suite_${uid}`)
+                    localStorage.removeItem(`${SUITE_CACHE_PREFIX}${uid}`)
+                }
+
+                // 迁移 Profile
+                const profileRaw = localStorage.getItem(`${PROFILE_DATA_KEY}_${uid}`)
+                if (profileRaw) {
+                    tx.store.put(JSON.parse(profileRaw), `profile_${uid}`)
+                    localStorage.removeItem(`${PROFILE_DATA_KEY}_${uid}`)
+                }
+            }
+            await tx.done
+        } catch (e) {
+            console.error('Migration to IndexedDB failed', e)
         }
     }
 
@@ -53,9 +100,25 @@ export const useAccountStore = defineStore('account', () => {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(accounts.value))
     }
 
-    function selectAccount(userId: string) {
+    async function selectAccount(userId: string) {
         currentUserId.value = userId
         localStorage.setItem('account_currentUserId', userId)
+        await loadDataForUser(userId)
+    }
+
+    async function loadDataForUser(userId: string) {
+        if (!userId) return
+        try {
+            const db = await dbPromise
+            const [suiteData, profileData] = await Promise.all([
+                db.get('caches', `suite_${userId}`),
+                db.get('caches', `profile_${userId}`)
+            ])
+            if (suiteData) suiteCaches.value[userId] = suiteData
+            if (profileData) profileCaches.value[userId] = profileData
+        } catch (e) {
+            console.error('Failed to load user data from IDB:', e)
+        }
     }
 
     function addAccount(account: StoredAccount) {
@@ -70,11 +133,33 @@ export const useAccountStore = defineStore('account', () => {
         save()
     }
 
-    function removeAccount(userId: string) {
+    async function removeAccount(userId: string) {
         accounts.value = accounts.value.filter(a => a.userId !== userId)
-        localStorage.removeItem(`${SUITE_CACHE_PREFIX}${userId}`)
+
+        try {
+            const db = await dbPromise
+            const tx = db.transaction('caches', 'readwrite')
+            tx.store.delete(`suite_${userId}`)
+            tx.store.delete(`profile_${userId}`)
+            await tx.done
+            delete suiteCaches.value[userId]
+            delete profileCaches.value[userId]
+
+            // Clean up old localStorage fallback
+            localStorage.removeItem(`${SUITE_CACHE_PREFIX}${userId}`)
+            localStorage.removeItem(`${PROFILE_DATA_KEY}_${userId}`)
+        } catch (e) {
+            console.error('Failed to delete user caches', e)
+        }
+
         if (currentUserId.value === userId) {
-            currentUserId.value = accounts.value[0]?.userId || ''
+            const nextUserId = accounts.value[0]?.userId || ''
+            if (nextUserId) {
+                await selectAccount(nextUserId)
+            } else {
+                currentUserId.value = ''
+                localStorage.removeItem('account_currentUserId')
+            }
         }
         save()
     }
@@ -87,18 +172,29 @@ export const useAccountStore = defineStore('account', () => {
         }
     }
 
-    // ==================== Suite 缓存 ====================
+    // ==================== Caches ====================
     function getSuiteCache(userId: string): any | null {
-        try {
-            const raw = localStorage.getItem(`${SUITE_CACHE_PREFIX}${userId}`)
-            return raw ? JSON.parse(raw) : null
-        } catch { return null }
+        return suiteCaches.value[userId] || null
     }
 
-    function saveSuiteCache(userId: string, data: any) {
+    async function saveSuiteCache(userId: string, data: any) {
+        suiteCaches.value[userId] = data
         try {
-            localStorage.setItem(`${SUITE_CACHE_PREFIX}${userId}`, JSON.stringify(data))
-        } catch { /* localStorage 满了忽略 */ }
+            const db = await dbPromise
+            await db.put('caches', JSON.parse(JSON.stringify(data)), `suite_${userId}`)
+        } catch (e) { console.error('Failed to save suite to IDB', e) }
+    }
+
+    function getProfileCache(userId: string): any | null {
+        return profileCaches.value[userId] || null
+    }
+
+    async function saveProfileCache(userId: string, data: any) {
+        profileCaches.value[userId] = data
+        try {
+            const db = await dbPromise
+            await db.put('caches', JSON.parse(JSON.stringify(data)), `profile_${userId}`)
+        } catch (e) { console.error('Failed to save profile to IDB', e) }
     }
 
     // ==================== API 刷新 ====================
@@ -114,11 +210,19 @@ export const useAccountStore = defineStore('account', () => {
             }
             const data = await res.json()
             const acc = accounts.value.find(a => a.userId === userId)
+
+            // 构建 userHonorMissions
+            const masterClear = data.userMusicDifficultyClearCount?.find((d: any) => d.musicDifficultyType === 'master')
+            data.userHonorMissions = masterClear
+                ? [{ honorMissionType: 'master_full_perfect', progress: masterClear.allPerfect }]
+                : []
+
             if (acc) {
                 acc.name = data.user.name
                 acc.lastRefresh = Date.now()
                 save()
             }
+            await saveProfileCache(userId, data)
             return data
         } finally {
             profileRefreshing.value = false
@@ -138,7 +242,7 @@ export const useAccountStore = defineStore('account', () => {
             if (data.upload_time) {
                 updateUploadTime(userId, data.upload_time)
             }
-            saveSuiteCache(userId, data)
+            await saveSuiteCache(userId, data)
             return data
         } finally {
             suiteRefreshing.value = false
@@ -159,8 +263,11 @@ export const useAccountStore = defineStore('account', () => {
         addAccount,
         removeAccount,
         updateUploadTime,
+        saveProfileCache,
+        getProfileCache,
         getSuiteCache,
         saveSuiteCache,
+        loadDataForUser,
         refreshProfile,
         refreshSuite,
     }

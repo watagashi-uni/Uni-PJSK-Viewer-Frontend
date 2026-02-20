@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useMasterStore } from '@/stores/master'
 import { useAccountStore } from '@/stores/account'
+import AssetImage from '@/components/AssetImage.vue'
 import SekaiCard from '@/components/SekaiCard.vue'
 import SekaiProfileHonor from '@/components/SekaiProfileHonor.vue'
 import {
@@ -11,6 +12,7 @@ import {
 
 const masterStore = useMasterStore()
 const accountStore = useAccountStore()
+const assetsHost = 'https://assets.unipjsk.com'
 
 
 
@@ -84,9 +86,6 @@ interface GameCharacterUnit {
   gameCharacterId: number
   unit: string
 }
-
-const PROFILE_DATA_KEY = 'sekaiUserProfileData'
-
 const accounts = computed(() => accountStore.accounts)
 const currentUserId = computed({
   get: () => accountStore.currentUserId,
@@ -160,27 +159,12 @@ function saveAccounts() {
 
 function loadProfileData() {
   if (!currentUserId.value) { profileData.value = null; return }
-  try {
-    const raw = localStorage.getItem(`${PROFILE_DATA_KEY}_${currentUserId.value}`)
-    if (raw) profileData.value = JSON.parse(raw)
-    else profileData.value = null
-  } catch { profileData.value = null }
-}
-
-function saveProfileData() {
-  if (!currentUserId.value || !profileData.value) return
-  localStorage.setItem(`${PROFILE_DATA_KEY}_${currentUserId.value}`, JSON.stringify(profileData.value))
+  profileData.value = accountStore.getProfileCache(currentUserId.value)
 }
 
 async function fetchProfile(userId: string): Promise<ProfileData> {
-  const url = `https://api.unipjsk.com/api/user/%7Buser_id%7D/${userId}/profile`
-  const res = await fetch(url)
-  if (!res.ok) {
-    if (res.status === 404) throw new Error('用户不存在')
-    if (res.status === 403) throw new Error('该用户未公开Profile')
-    throw new Error(`请求失败: ${res.status}`)
-  }
-  return await res.json()
+  const data = await accountStore.refreshProfile(userId)
+  return data
 }
 
 async function addAccount() {
@@ -192,16 +176,9 @@ async function addAccount() {
   errorMsg.value = ''
   try {
     const data = await fetchProfile(uid)
-    // 构建 userHonorMissions（从 master AP 数获取 progress）
-    const masterClear = data.userMusicDifficultyClearCount?.find(d => d.musicDifficultyType === 'master')
-    data.userHonorMissions = masterClear
-      ? [{ honorMissionType: 'master_full_perfect', progress: masterClear.allPerfect }]
-      : []
-
-    profileData.value = data
     accountStore.addAccount({ userId: uid, name: data.user.name, lastRefresh: Date.now() })
+    profileData.value = data
     currentUserId.value = uid
-    saveProfileData()
     newUserIdInput.value = ''
   } catch (e: any) {
     errorMsg.value = e.message || '获取数据失败'
@@ -216,14 +193,7 @@ async function refreshProfile() {
   errorMsg.value = ''
   try {
     const data = await fetchProfile(currentUserId.value)
-    const masterClear = data.userMusicDifficultyClearCount?.find(d => d.musicDifficultyType === 'master')
-    data.userHonorMissions = masterClear
-      ? [{ honorMissionType: 'master_full_perfect', progress: masterClear.allPerfect }]
-      : []
-
     profileData.value = data
-    accountStore.addAccount({ userId: currentUserId.value, name: data.user.name, lastRefresh: Date.now() })
-    saveProfileData()
   } catch (e: any) {
     errorMsg.value = e.message || '刷新失败'
   } finally {
@@ -239,17 +209,16 @@ function switchAccount(userId: string) {
 
 function deleteAccount(userId: string) {
   accountStore.removeAccount(userId)
-  localStorage.removeItem(`${PROFILE_DATA_KEY}_${userId}`)
   loadProfileData()
 }
 
 function exportAccounts() {
   const exportData: Record<string, any> = {}
   for (const acc of accounts.value) {
-    const raw = localStorage.getItem(`${PROFILE_DATA_KEY}_${acc.userId}`)
+    const raw = accountStore.getProfileCache(acc.userId)
     exportData[acc.userId] = {
       account: acc,
-      profile: raw ? JSON.parse(raw) : null,
+      profile: raw ? raw : null,
     }
   }
   const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
@@ -273,10 +242,10 @@ function importAccounts() {
       const data = JSON.parse(text)
       for (const [userId, entry] of Object.entries(data) as [string, any][]) {
         if (!accounts.value.some(a => a.userId === userId)) {
-          accounts.value.push(entry.account)
+          accountStore.addAccount(entry.account)
         }
         if (entry.profile) {
-          localStorage.setItem(`${PROFILE_DATA_KEY}_${userId}`, JSON.stringify(entry.profile))
+          await accountStore.saveProfileCache(userId, entry.profile)
         }
       }
       saveAccounts()
@@ -540,11 +509,10 @@ watch(currentUserId, () => {
               <div class="card-body">
                 <div class="flex items-center gap-4 mb-4">
                   <!-- Leader Avatar based on first deck card -->
-                  <div v-if="deckCards.length > 0 && deckCards[0]?.masterCard" class="w-14 h-14 sm:w-16 sm:h-16 flex-shrink-0 shadow-md mask mask-squircle">
-                    <SekaiCard
-                      :card="deckCards[0].masterCard"
-                      :trained="deckCards[0]?.trained ?? false"
-                      :master-rank="deckCards[0]?.userCard?.masterRank || 0"
+                  <div v-if="deckCards.length > 0 && deckCards[0]?.masterCard" class="w-14 h-14 sm:w-16 sm:h-16 flex-shrink-0 shadow-sm rounded-full overflow-hidden border-2 border-primary/20 bg-base-200">
+                    <AssetImage
+                      :src="`${assetsHost}/startapp/thumbnail/chara/${deckCards[0].masterCard.assetbundleName}_${deckCards[0]?.trained ? 'after_training' : 'normal'}.png`"
+                      class="w-full h-full object-cover"
                     />
                   </div>
                   <div class="flex-1">

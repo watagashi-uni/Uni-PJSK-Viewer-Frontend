@@ -39,6 +39,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '卡片详情' },
     },
     {
+        path: '/card-collection',
+        name: 'CardCollection',
+        component: () => import('@/views/CardCollectionView.vue'),
+        meta: { title: '图鉴状态' },
+    },
+    {
         path: '/events',
         name: 'Events',
         component: () => import('@/views/EventsView.vue'),
