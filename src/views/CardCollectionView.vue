@@ -182,7 +182,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="max-w-6xl mx-auto space-y-6 pb-10">
+  <div class="max-w-6xl mx-auto space-y-6 pb-24 sm:pb-10">
     <div class="flex items-center gap-3">
       <button @click="router.back()" class="btn btn-ghost btn-sm px-2">
         ← 返回
@@ -230,8 +230,8 @@ onMounted(() => {
       <div class="flex flex-col lg:flex-row gap-6">
         
         <!-- Sidebar: Character Selector -->
-        <div class="w-full lg:w-64 shrink-0">
-          <div class="card bg-base-100 shadow-lg sticky top-20">
+        <div class="w-full lg:w-64 shrink-0 z-40 relative">
+          <div class="card bg-base-100 shadow-lg lg:sticky lg:top-20 z-40">
             <div class="card-body p-4 max-h-[70vh] overflow-y-auto custom-scrollbar">
               <h3 class="font-bold text-lg mb-3">选择角色</h3>
               <div class="flex flex-wrap gap-1">
