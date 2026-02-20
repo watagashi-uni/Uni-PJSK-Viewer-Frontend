@@ -15,6 +15,7 @@ const themes = [
   { value: 'light', label: '浅色' },
   { value: 'dark', label: '深色' },
   { value: 'moe', label: 'Moe' },
+  { value: 'jirai', label: '地雷' },
   { value: 'auto', label: '跟随系统' },
 ]
 
@@ -121,7 +122,7 @@ async function handleClearTranslationCache() {
               :key="theme.value"
               class="btn btn-sm"
               :class="settingsStore.theme === theme.value ? 'btn-primary' : 'btn-ghost'"
-              @click="settingsStore.setTheme(theme.value as 'light' | 'dark' | 'auto' | 'moe')"
+              @click="settingsStore.setTheme(theme.value as 'light' | 'dark' | 'auto' | 'moe' | 'jirai')"
             >
               {{ theme.label }}
             </button>

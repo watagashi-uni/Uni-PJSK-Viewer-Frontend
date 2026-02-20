@@ -46,6 +46,7 @@ export default {
                     "error-content": "#ffffff",
                 },
             },
+            "jirai",
             "light",
             "dark",
         ],
