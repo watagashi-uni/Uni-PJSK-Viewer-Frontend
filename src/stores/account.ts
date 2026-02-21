@@ -59,11 +59,15 @@ export const useAccountStore = defineStore('account', () => {
         // 执行 LocalStorage 到 IndexedDB 的数据迁移
         await migrateLocalStorageToIDB()
 
+        // 加载所有账号的缓存数据
+        await Promise.all(accounts.value.map(a => loadDataForUser(a.userId)))
+
         const last = localStorage.getItem('account_currentUserId')
         if (last && accounts.value.some(a => a.userId === last)) {
-            await selectAccount(last)
+            currentUserId.value = last
         } else if (accounts.value.length > 0 && accounts.value[0]) {
-            await selectAccount(accounts.value[0].userId)
+            currentUserId.value = accounts.value[0].userId
+            localStorage.setItem('account_currentUserId', accounts.value[0].userId)
         }
     }
 

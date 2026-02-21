@@ -4,11 +4,12 @@ import { useRoute, useRouter } from 'vue-router'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
 import { useAccountStore } from '@/stores/account'
-import { Search, ArrowUpDown, Languages, Trophy, List, LayoutGrid, RefreshCw, User } from 'lucide-vue-next'
+import { Search, ArrowUpDown, Languages, Trophy, List, LayoutGrid, RefreshCw } from 'lucide-vue-next'
 import MusicCard from '@/components/MusicCard.vue'
 import Pagination from '@/components/Pagination.vue'
 import AssetImage from '@/components/AssetImage.vue'
 import { toRomaji } from '@/utils/kanaToRomaji'
+import AccountSelector from '@/components/AccountSelector.vue'
 
 interface Music {
   id: number
@@ -414,10 +415,11 @@ watch(() => route.query.page, () => {})
     <!-- 第二行：成绩筛选 + 视图切换 + suite 刷新 -->
     <div v-if="accountStore.currentUserId" class="flex flex-wrap items-center gap-2 mb-4 bg-base-100 p-2 rounded-lg shadow-sm">
       <!-- 账号信息 -->
-      <div v-if="accountStore.currentAccount" class="flex items-center gap-2 mr-2">
-        <User class="w-4 h-4 text-primary" />
-        <span class="text-sm font-bold">{{ accountStore.currentAccount.name }}</span>
-        <span class="text-xs text-base-content/50">({{ accountStore.currentUserId }})</span>
+      <div v-if="accountStore.currentAccount" class="mr-2 min-w-[150px] max-w-[220px]">
+        <AccountSelector
+          :model-value="accountStore.currentUserId"
+          @update:model-value="accountStore.selectAccount"
+        />
       </div>
 
       <!-- Suite 刷新 -->

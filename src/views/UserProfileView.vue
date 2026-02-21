@@ -5,9 +5,9 @@ import { useAccountStore } from '@/stores/account'
 import AssetImage from '@/components/AssetImage.vue'
 import SekaiCard from '@/components/SekaiCard.vue'
 import SekaiProfileHonor from '@/components/SekaiProfileHonor.vue'
+import AccountSelector from '@/components/AccountSelector.vue'
 import {
-  User, Plus, Trash2, Download, Upload, RefreshCw, Eye, EyeOff,
-  Trophy, Star, Zap, Music
+  User, Eye, EyeOff, Download, Upload, Plus, Trash2, RefreshCw, Star, Zap
 } from 'lucide-vue-next'
 
 const masterStore = useMasterStore()
@@ -87,10 +87,7 @@ interface GameCharacterUnit {
   unit: string
 }
 const accounts = computed(() => accountStore.accounts)
-const currentUserId = computed({
-  get: () => accountStore.currentUserId,
-  set: (v) => accountStore.selectAccount(v)
-})
+const currentUserId = computed(() => accountStore.currentUserId)
 const profileData = ref<ProfileData | null>(null)
 const isLoading = ref(false)
 const isInitLoading = ref(true)
@@ -178,7 +175,7 @@ async function addAccount() {
     const data = await fetchProfile(uid)
     accountStore.addAccount({ userId: uid, name: data.user.name, lastRefresh: Date.now() })
     profileData.value = data
-    currentUserId.value = uid
+    await accountStore.selectAccount(uid)
     newUserIdInput.value = ''
   } catch (e: any) {
     errorMsg.value = e.message || '获取数据失败'
@@ -201,8 +198,8 @@ async function refreshProfile() {
   }
 }
 
-function switchAccount(userId: string) {
-  currentUserId.value = userId
+async function switchAccount(userId: string) {
+  await accountStore.selectAccount(userId)
   loadProfileData()
   showUserId.value = false
 }
@@ -250,7 +247,7 @@ function importAccounts() {
       }
       saveAccounts()
       if (!currentUserId.value && accounts.value.length > 0) {
-        currentUserId.value = accounts.value[0]!.userId
+        await accountStore.selectAccount(accounts.value[0]!.userId)
         loadProfileData()
       }
     } catch {
@@ -390,14 +387,20 @@ onMounted(async () => {
 
   loadAccounts()
   if (accounts.value.length > 0) {
-    currentUserId.value = accounts.value[0]!.userId
+    await accountStore.selectAccount(accounts.value[0]!.userId)
     loadProfileData()
   }
   isInitLoading.value = false
 })
 
-watch(currentUserId, () => {
+watch(currentUserId, async (newId) => {
+  if (!newId) {
+    profileData.value = null
+    return
+  }
   showUserId.value = false
+  await accountStore.loadDataForUser(newId)
+  loadProfileData()
 })
 </script>
 
@@ -415,7 +418,7 @@ watch(currentUserId, () => {
 
     <template v-else>
       <!-- ==================== 账号管理 ==================== -->
-      <div class="card bg-base-100 shadow-lg">
+      <div class="card bg-base-100 shadow-lg overflow-visible relative z-50">
         <div class="card-body space-y-4">
           <!-- 添加账号 -->
           <div class="flex flex-wrap gap-2 items-end">
@@ -442,15 +445,13 @@ watch(currentUserId, () => {
 
           <!-- 已添加的账号列表 -->
           <div v-if="accounts.length > 0" class="flex flex-wrap gap-2 items-center">
-            <select
-              :value="currentUserId"
-              @change="switchAccount(($event.target as HTMLSelectElement).value)"
-              class="select select-bordered select-sm"
-            >
-              <option v-for="acc in accounts" :key="acc.userId" :value="acc.userId">
-                {{ acc.userId }} - {{ acc.name }}
-              </option>
-            </select>
+            <div class="min-w-[200px] max-w-[280px]">
+              <AccountSelector
+                :model-value="currentUserId"
+                @update:model-value="switchAccount"
+                :show-id="true"
+              />
+            </div>
             <!-- 刷新 -->
             <button
               v-if="currentUserId"
@@ -501,7 +502,7 @@ watch(currentUserId, () => {
 
       <!-- ==================== Profile 展示 ==================== -->
       <template v-if="profileData">
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="grid grid-cols-1 min-[1150px]:grid-cols-2 gap-6">
           <!-- ========== 左侧：用户信息 ========== -->
           <div class="space-y-6">
             <!-- 用户基本信息 -->
@@ -515,43 +516,43 @@ watch(currentUserId, () => {
                       class="w-full h-full object-cover"
                     />
                   </div>
-                  <div class="flex-1">
-                    <h2 class="text-2xl font-bold">{{ profileData.user.name }}</h2>
-                    <div class="flex items-center gap-2 mt-1">
-                      <span class="badge badge-primary">等级 {{ profileData.user.rank }}</span>
+                  <div class="flex-1 min-w-0">
+                    <h2 class="text-2xl font-bold truncate">{{ profileData.user.name }}</h2>
+                    <div class="flex items-center gap-2 mt-1 flex-nowrap">
+                      <span class="badge badge-primary flex-shrink-0">等级 {{ profileData.user.rank }}</span>
                       <button
-                        class="btn btn-xs btn-ghost gap-1"
+                        class="btn btn-xs btn-ghost gap-1 min-w-0 flex-shrink"
                         @click="showUserId = !showUserId"
                       >
-                        <Eye v-if="showUserId" class="w-3 h-3" />
-                        <EyeOff v-else class="w-3 h-3" />
-                        id:{{ showUserId ? profileData.user.userId : '保密' }}
+                        <Eye v-if="showUserId" class="w-3 h-3 flex-shrink-0" />
+                        <EyeOff v-else class="w-3 h-3 flex-shrink-0" />
+                        <span class="truncate">id:{{ showUserId ? profileData.user.userId : '保密' }}</span>
                       </button>
                     </div>
                   </div>
                 </div>
 
                 <!-- 称号 (3-in-a-row with placeholders) -->
-                <div class="flex items-center gap-1 h-8 mb-4">
+                <div class="flex items-center gap-1 h-10 sm:h-12 mb-4 max-w-full">
                   <template v-for="i in 3" :key="i">
-                    <div v-if="getHonor(i)" class="h-full">
+                    <div v-if="getHonor(i)" class="h-full shrink min-w-0">
                       <SekaiProfileHonor
                         :data="getHonor(i)!"
                         :user-honor-missions="profileData.userHonorMissions"
-                        class="h-full w-auto block"
+                        class="h-full w-auto max-w-full block"
                       />
                     </div>
-                    <div v-else class="h-full">
+                    <div v-else class="h-full shrink min-w-0">
                       <img
                         v-if="i === 1"
                         src="/honor/frame_degree_m_1.png"
-                        class="h-full w-auto opacity-50"
+                        class="h-full w-auto max-w-full opacity-50"
                         alt="empty-slot-main"
                       />
                       <img
                         v-else
                         src="/honor/frame_degree_s_1.png"
-                        class="h-full w-auto opacity-50"
+                        class="h-full w-auto max-w-full opacity-50"
                         alt="empty-slot-sub"
                       />
                     </div>

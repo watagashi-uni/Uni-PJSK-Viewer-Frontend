@@ -7,6 +7,7 @@ import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
 import { useAccountStore } from '@/stores/account'
 import { Music, Image, BarChart3, Info, Settings, Calendar, Gift, Share2, Zap, User, RefreshCw, Github } from 'lucide-vue-next'
+import AccountSelector from '@/components/AccountSelector.vue'
 
 const route = useRoute()
 const masterStore = useMasterStore()
@@ -137,18 +138,12 @@ async function handleSuiteRefresh() {
         <div class="divider my-1"></div>
 
         <!-- 账号管理 -->
-        <li class="menu-title text-xs">账号</li>
-        <li v-if="accountStore.accounts.length > 0" class="px-2">
-          <select
-            :value="accountStore.currentUserId"
-            @change="accountStore.selectAccount(($event.target as HTMLSelectElement).value)"
-            class="select select-bordered select-sm w-full"
-          >
-            <option value="">未选择</option>
-            <option v-for="acc in accountStore.accounts" :key="acc.userId" :value="acc.userId">
-              {{ acc.userId }} - {{ acc.name }}
-            </option>
-          </select>
+        <li class="menu-title text-xs mt-2">账号</li>
+        <li v-if="accountStore.accounts.length > 0" class="px-2 mb-1 [&>*]:!bg-transparent [&>*:hover]:!bg-transparent">
+          <AccountSelector
+            :model-value="accountStore.currentUserId"
+            @update:model-value="accountStore.selectAccount"
+          />
         </li>
         <li v-else class="px-2">
           <span class="text-xs text-base-content/40 p-0 hover:bg-transparent cursor-default">

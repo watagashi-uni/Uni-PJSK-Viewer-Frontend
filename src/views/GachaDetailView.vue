@@ -30,6 +30,10 @@ interface Gacha {
   gachaBehaviors: GachaBehavior[]
   gachaCardRarityRates: GachaCardRarityRate[]
   gachaDetails: GachaDetail[]
+  gachaInformation?: {
+    summary: string
+    description: string
+  }
   gachaPickups?: GachaPickup[]
 }
 
@@ -88,9 +92,27 @@ const settingsStore = useSettingsStore()
 const gacha = ref<Gacha | null>(null)
 const cards = ref<Card[]>([])
 const isLoading = ref(true)
-const currentImageTab = ref(0)
-const hasBg = ref(false)
+type BgType = 'chr' | 'normal_n' | 'normal_single' | 'none'
+
 const hasBanner = ref(false)
+const bgType = ref<BgType>('none')
+const currentBgIndex = ref(1)
+const maxValidBgIndex = ref(1)
+const hasNextBg = ref(false)
+const isCheckingNext = ref(false)
+
+const currentBgUrl = computed(() => {
+  if (!gacha.value) return ''
+  const baseDir = `${assetsHost}/ondemand/gacha/${gacha.value.assetbundleName}/screen/texture`
+  if (bgType.value === 'chr') {
+    return `${baseDir}/bg_chr_gacha${gacha.value.id}_${currentBgIndex.value}.png`
+  } else if (bgType.value === 'normal_n') {
+    return `${baseDir}/bg_gacha${gacha.value.id}_${currentBgIndex.value}.png`
+  } else if (bgType.value === 'normal_single') {
+    return `${baseDir}/bg_gacha${gacha.value.id}.png`
+  }
+  return ''
+})
 
 // 模拟抽卡状态
 const simulationResults = ref<SimulationResult[]>([])
@@ -111,23 +133,12 @@ const logoUrl = computed(() => {
   return `${assetsHost}/ondemand/gacha/${gacha.value.assetbundleName}/logo/logo.png`
 })
 
-const bgUrl = computed(() => {
-  if (!gacha.value) return ''
-  return `${assetsHost}/ondemand/gacha/${gacha.value.assetbundleName}/screen/texture/bg_gacha${gacha.value.id}_1.png`
-})
-
 const bannerUrl = computed(() => {
   if (!gacha.value) return ''
   return `${assetsHost}/startapp/home/banner/banner_gacha${gacha.value.id}/banner_gacha${gacha.value.id}.png`
 })
 
-// 图片标签页配置
-const imageTabs = computed(() => {
-  const tabs = [{ key: 'logo', label: 'Logo', url: logoUrl.value }]
-  if (hasBg.value) tabs.push({ key: 'bg', label: '背景', url: bgUrl.value })
-  if (hasBanner.value) tabs.push({ key: 'banner', label: 'Banner', url: bannerUrl.value })
-  return tabs
-})
+
 
 // 剧透判断
 const isLeak = computed(() => {
@@ -140,21 +151,77 @@ const shouldHideContent = computed(() => {
   return !settingsStore.showSpoilers
 })
 
-// 检测图片是否可用
-function checkImageAvailability() {
+async function checkUrlHead(url: string): Promise<boolean> {
+  try {
+    const res = await fetch(url, { method: 'HEAD' })
+    return res.ok || res.status === 200
+  } catch {
+    return false
+  }
+}
+
+async function checkNextBg() {
+  if (bgType.value === 'none' || bgType.value === 'normal_single') {
+    hasNextBg.value = false
+    return
+  }
+  
+  if (currentBgIndex.value < maxValidBgIndex.value) {
+    hasNextBg.value = true
+    return
+  }
+  
   if (!gacha.value) return
   
-  // 检查背景
-  const bgImg = new Image()
-  bgImg.onload = () => { hasBg.value = true }
-  bgImg.onerror = () => { hasBg.value = false }
-  bgImg.src = bgUrl.value
+  isCheckingNext.value = true
+  const baseDir = `${assetsHost}/ondemand/gacha/${gacha.value.assetbundleName}/screen/texture`
+  const nextIndex = currentBgIndex.value + 1
+  const nextUrl = bgType.value === 'chr' 
+    ? `${baseDir}/bg_chr_gacha${gacha.value.id}_${nextIndex}.png`
+    : `${baseDir}/bg_gacha${gacha.value.id}_${nextIndex}.png`
+    
+  const exists = await checkUrlHead(nextUrl)
+  hasNextBg.value = exists
+  if (exists) {
+    maxValidBgIndex.value = Math.max(maxValidBgIndex.value, nextIndex)
+  }
+  isCheckingNext.value = false
+}
+
+async function goNextBg() {
+  if ((!hasNextBg.value && currentBgIndex.value >= maxValidBgIndex.value) || isCheckingNext.value) return
+  currentBgIndex.value++
+  await checkNextBg()
+}
+
+function goPrevBg() {
+  if (currentBgIndex.value <= 1) return
+  currentBgIndex.value--
+  checkNextBg()
+}
+
+// 检测图片是否可用
+async function checkImageAvailability() {
+  if (!gacha.value) return
   
-  // 检查 banner
-  const bannerImg = new Image()
-  bannerImg.onload = () => { hasBanner.value = true }
-  bannerImg.onerror = () => { hasBanner.value = false }
-  bannerImg.src = bannerUrl.value
+  hasBanner.value = await checkUrlHead(bannerUrl.value)
+
+  bgType.value = 'none'
+  currentBgIndex.value = 1
+  maxValidBgIndex.value = 1
+  hasNextBg.value = false
+
+  const baseDir = `${assetsHost}/ondemand/gacha/${gacha.value.assetbundleName}/screen/texture`
+  
+  if (await checkUrlHead(`${baseDir}/bg_chr_gacha${gacha.value.id}_1.png`)) {
+    bgType.value = 'chr'
+  } else if (await checkUrlHead(`${baseDir}/bg_gacha${gacha.value.id}_1.png`)) {
+    bgType.value = 'normal_n'
+  } else if (await checkUrlHead(`${baseDir}/bg_gacha${gacha.value.id}.png`)) {
+    bgType.value = 'normal_single'
+  }
+
+  await checkNextBg()
 }
 
 // 本期卡牌 (Pickup) - 使用 gachaPickups 数组
@@ -343,7 +410,9 @@ function getCostDisplay(behavior: GachaBehavior): string {
 
 async function loadData() {
   isLoading.value = true
-  hasBg.value = false
+  bgType.value = 'none'
+  currentBgIndex.value = 1
+  maxValidBgIndex.value = 1
   hasBanner.value = false
   try {
     const [gachasData, cardsData] = await Promise.all([
@@ -411,7 +480,16 @@ watch(() => route.params.id, loadData)
             <span class="badge badge-lg">#{{ gacha.id }}</span>
           </div>
           
-          <h1 class="text-2xl font-bold mb-4">{{ gacha.name }}</h1>
+          <div class="flex items-start justify-between mb-4">
+            <h1 class="text-2xl font-bold">{{ gacha.name }}</h1>
+            <button 
+              v-if="gacha.gachaInformation?.summary || gacha.gachaInformation?.description"
+              class="btn btn-outline btn-sm font-normal"
+              onclick="info_modal.showModal()"
+            >
+              卡池介绍（日文）
+            </button>
+          </div>
 
           <!-- 时间信息 -->
           <div class="flex flex-wrap gap-6 text-sm mb-4">
@@ -446,25 +524,70 @@ watch(() => route.params.id, loadData)
         </div>
       </div>
 
-      <!-- 图片展示 -->
-      <div class="card bg-base-100 shadow-lg overflow-hidden">
-        <figure class="relative">
+      <!-- Logo和Banner展示 -->
+      <div v-if="logoUrl || hasBanner" class="card bg-base-100 shadow-lg">
+        <div class="card-body p-3 sm:p-5">
+          <h2 class="text-base font-medium mb-1 opacity-80">
+            展示图
+          </h2>
+          <div class="flex flex-row flex-wrap justify-center items-end gap-6">
+            <div v-if="logoUrl" class="flex flex-col items-center gap-1">
+              <span class="text-[10px] font-bold opacity-40 uppercase tracking-wider">Logo</span>
+              <AssetImage 
+                :src="logoUrl" 
+                alt="Logo"
+                class="h-20 sm:h-28 object-contain"
+              />
+            </div>
+            
+            <div v-if="hasBanner" class="flex flex-col items-center gap-1">
+              <span class="text-[10px] font-bold opacity-40 uppercase tracking-wider">Banner</span>
+              <AssetImage 
+                :src="bannerUrl" 
+                alt="Banner"
+                class="h-20 sm:h-24 object-contain rounded-lg shadow-sm"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 背景展示 -->
+      <div v-if="bgType !== 'none'" class="card bg-base-100 shadow-lg overflow-hidden">
+        <div class="px-5 pt-3 pb-2 border-b border-base-200">
+          <h2 class="text-base font-medium opacity-80">
+            卡池背景
+          </h2>
+        </div>
+        <figure class="relative bg-base-300">
           <AssetImage 
-            :src="imageTabs[currentImageTab]?.url || logoUrl" 
-            :alt="gacha.name"
-            class="w-full object-contain max-h-[400px]"
+            :src="currentBgUrl" 
+            :alt="gacha.name + ' 背景'"
+            class="w-full object-cover max-h-[600px]"
           />
         </figure>
-        <div class="card-body py-3">
-          <div class="flex gap-2">
+        
+        <div v-if="bgType === 'chr' || bgType === 'normal_n'" class="card-body py-3 border-t border-base-200">
+          <div class="flex items-center justify-between">
             <button 
-              v-for="(tab, idx) in imageTabs"
-              :key="tab.key"
-              class="btn btn-sm"
-              :class="currentImageTab === idx ? 'btn-primary' : 'btn-ghost'"
-              @click="currentImageTab = idx"
+              class="btn btn-sm sm:btn-md"
+              :class="{ 'btn-disabled': currentBgIndex <= 1 }"
+              :disabled="currentBgIndex <= 1"
+              @click="goPrevBg"
             >
-              {{ tab.label }}
+              <ChevronLeft class="w-5 h-5 mr-1" /> 上一张
+            </button>
+            <span class="text-sm font-medium opacity-70">
+              第 {{ currentBgIndex }} 张
+            </span>
+            <button 
+              class="btn btn-sm sm:btn-md"
+              :class="{ 'btn-disabled': (!hasNextBg && currentBgIndex >= maxValidBgIndex) || isCheckingNext }"
+              :disabled="(!hasNextBg && currentBgIndex >= maxValidBgIndex) || isCheckingNext"
+              @click="goNextBg"
+            >
+              {{ isCheckingNext ? '检查中...' : '下一张' }}
+              <ChevronLeft class="w-5 h-5 ml-1 inline-block rotate-180" />
             </button>
           </div>
         </div>
@@ -590,5 +713,29 @@ watch(() => route.params.id, loadData)
       <Gift class="w-16 h-16 mx-auto mb-4 opacity-30" />
       <p>未找到该卡池</p>
     </div>
+
+    <!-- 详情 Modal -->
+    <dialog id="info_modal" class="modal modal-bottom sm:modal-middle">
+      <div v-if="gacha?.gachaInformation" class="modal-box">
+        <h3 class="font-bold text-lg mb-4">卡池详情</h3>
+        <div class="space-y-4 text-sm whitespace-pre-wrap leading-relaxed">
+          <div v-if="gacha.gachaInformation.summary">
+            {{ gacha.gachaInformation.summary }}
+          </div>
+          <div v-if="gacha.gachaInformation.summary && gacha.gachaInformation.description" class="divider my-1"></div>
+          <div v-if="gacha.gachaInformation.description">
+            {{ gacha.gachaInformation.description }}
+          </div>
+        </div>
+        <div class="modal-action">
+          <form method="dialog">
+            <button class="btn">关闭</button>
+          </form>
+        </div>
+      </div>
+      <form method="dialog" class="modal-backdrop">
+        <button>close</button>
+      </form>
+    </dialog>
   </div>
 </template>

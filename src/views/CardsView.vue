@@ -7,6 +7,7 @@ import { EyeOff, RefreshCw } from 'lucide-vue-next'
 import { useAccountStore } from '@/stores/account'
 import Pagination from '@/components/Pagination.vue'
 import SekaiCard from '@/components/SekaiCard.vue'
+import AccountSelector from '@/components/AccountSelector.vue'
 
 interface Card {
   id: number
@@ -258,15 +259,9 @@ onMounted(() => {
           </label>
           <div class="divider divider-horizontal mx-0"></div>
           
-          <select
-            v-if="accountStore.accounts.length > 0"
-            v-model="selectedUserId"
-            class="select select-bordered select-sm min-w-[150px]"
-          >
-            <option v-for="acc in accountStore.accounts" :key="acc.userId" :value="acc.userId">
-              {{ acc.userId }} - {{ acc.name }}
-            </option>
-          </select>
+          <div v-if="accountStore.accounts.length > 0" class="min-w-[150px] max-w-[220px]">
+            <AccountSelector v-model="selectedUserId" />
+          </div>
           <span v-else class="text-sm text-base-content/60">无绑定账号</span>
           
           <button
