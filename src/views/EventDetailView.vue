@@ -469,12 +469,14 @@ watch(() => route.params.id, loadData)
             
             <button 
               class="btn btn-circle btn-sm absolute left-2 top-1/2 -translate-y-1/2"
+              style="position: absolute;"
               @click="prevImage"
             >
               <ChevronLeft class="w-4 h-4" />
             </button>
             <button 
               class="btn btn-circle btn-sm absolute right-2 top-1/2 -translate-y-1/2"
+              style="position: absolute;"
               @click="nextImage"
             >
               <ChevronRight class="w-4 h-4" />

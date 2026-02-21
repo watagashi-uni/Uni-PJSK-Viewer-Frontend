@@ -7,6 +7,7 @@ import { useSettingsStore } from '@/stores/settings'
 import { RefreshCw, BookOpen, AlertTriangle } from 'lucide-vue-next'
 import confetti from 'canvas-confetti'
 import SekaiCard from '@/components/SekaiCard.vue'
+import AccountSelector from '@/components/AccountSelector.vue'
 
 interface Card {
   id: number
@@ -197,15 +198,9 @@ onMounted(() => {
     <div class="card bg-base-100 shadow-md">
       <div class="card-body p-4 flex flex-col sm:flex-row flex-wrap items-center gap-4">
         <label class="font-medium text-sm text-base-content/70">账号</label>
-        <select
-          v-if="accountStore.accounts.length > 0"
-          v-model="selectedUserId"
-          class="select select-bordered select-sm min-w-[200px]"
-        >
-          <option v-for="acc in accountStore.accounts" :key="acc.userId" :value="acc.userId">
-            {{ acc.userId }} - {{ acc.name }}
-          </option>
-        </select>
+        <div v-if="accountStore.accounts.length > 0" class="min-w-[200px] w-auto">
+          <AccountSelector v-model="selectedUserId" />
+        </div>
         <span v-else class="text-sm text-error flex items-center gap-1">
           <AlertTriangle class="w-4 h-4"/> 无绑定账号，请前往个人信息页面添加。
         </span>
@@ -230,8 +225,8 @@ onMounted(() => {
       <div class="flex flex-col lg:flex-row gap-6">
         
         <!-- Sidebar: Character Selector -->
-        <div class="w-full lg:w-64 shrink-0 z-40 relative">
-          <div class="card bg-base-100 shadow-lg lg:sticky lg:top-20 z-40">
+        <div class="w-full lg:w-64 shrink-0 relative">
+          <div class="card bg-base-100 shadow-lg lg:sticky lg:top-20">
             <div class="card-body p-4 max-h-[70vh] overflow-y-auto custom-scrollbar">
               <h3 class="font-bold text-lg mb-3">选择角色</h3>
               <div class="flex flex-wrap gap-1">

@@ -287,6 +287,11 @@ html {
   transform: scale(1.02);
 }
 
+/* Sidebar wobble fix */
+[data-theme="jirai"] .drawer-side .btn:hover {
+  transform: none;
+}
+
 /* Remove harsh borders and shadows from header/ghost buttons */
 [data-theme="jirai"] .btn-ghost {
   border-color: transparent;
