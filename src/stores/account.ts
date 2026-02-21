@@ -266,6 +266,31 @@ export const useAccountStore = defineStore('account', () => {
     async function refreshSuite(userId: string) {
         suiteRefreshing.value = true
         try {
+            const oauthStore = useOAuthStore()
+
+            // 已有该账号 token 时，优先走 OAuth 受保护接口，避免先请求 public API
+            if (oauthStore.hasTokenForUser(userId)) {
+                try {
+                    const oauthData = await oauthStore.fetchGameData('jp', 'suite', userId)
+                    if (oauthData.upload_time) {
+                        updateUploadTime(userId, oauthData.upload_time)
+                    }
+                    await saveSuiteCache(userId, oauthData)
+                    return oauthData
+                } catch (e: any) {
+                    if (e?.status === 401 || e?.status === 403) {
+                        oauthStore.clearTokensForUser(userId)
+                        const fallbackData = await fetchSuiteByOAuth(userId)
+                        if (fallbackData.upload_time) {
+                            updateUploadTime(userId, fallbackData.upload_time)
+                        }
+                        await saveSuiteCache(userId, fallbackData)
+                        return fallbackData
+                    }
+                    throw e
+                }
+            }
+
             const resp = await fetch(`https://suite-api.haruki.seiunx.com/public/jp/suite/${userId}`)
             if (!resp.ok) {
                 if (resp.status === 404) throw new Error('用户未上传数据')

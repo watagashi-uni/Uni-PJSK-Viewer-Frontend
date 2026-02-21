@@ -1,6 +1,5 @@
 import type { DataProvider, MusicMeta } from 'sekai-calculator'
 import apiClient from '@/api/client'
-import axios from 'axios'
 
 /**
  * Worker 端代理 DataProvider
@@ -61,7 +60,16 @@ export class WorkerProxyDataProvider implements DataProvider {
 
     async getUserDataAll(): Promise<Record<string, any>> {
         if (!this.userId) throw new Error('未指定用户ID')
-        const res = await axios.get(`https://suite-api.haruki.seiunx.com/public/jp/suite/${this.userId}`)
-        return res.data
+        return new Promise<Record<string, any>>((resolve, reject) => {
+            const requestId = `req_${++this.requestIdCounter}`
+            this.pendingRequests.set(requestId, { resolve, reject })
+
+            // 由主线程读取 accountStore 缓存，避免 Worker 侧重复直连 public API
+            this.postMessage({
+                type: 'requestUserData',
+                requestId,
+                userId: this.userId,
+            })
+        })
     }
 }

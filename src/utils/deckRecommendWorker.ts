@@ -10,8 +10,8 @@ let globalDataProvider: WorkerProxyDataProvider | null = null
 addEventListener('message', (event: MessageEvent) => {
     const data = event.data
 
-    // 1. 处理 Master 数据响应
-    if (data.type === 'responseMaster') {
+    // 1. 处理主线程返回的数据响应
+    if (data.type === 'responseMaster' || data.type === 'responseUserData') {
         if (globalDataProvider) {
             globalDataProvider.handleResponse(data.requestId, data.data, data.error)
         }

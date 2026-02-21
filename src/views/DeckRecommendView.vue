@@ -328,8 +328,16 @@ async function handleCalculate() {
   // 自动刷新 suite 数据
   try {
     await accountStore.refreshSuite(uid)
-  } catch {
-    // suite 刷新失败不影响组卡
+  } catch (e: any) {
+    const msg = String(e?.message || e || '')
+    // 已跳转 OAuth 授权流程，当前计算中止，等待授权完成后重试
+    if (msg.includes('正在跳转 OAuth 授权页面')) {
+      calculating.value = false
+      return
+    }
+    errorMsg.value = msg || '刷新玩家数据失败'
+    calculating.value = false
+    return
   }
 
   workerRef = new Worker(
@@ -363,11 +371,34 @@ async function handleCalculate() {
       return
     }
 
+    // 1.5 处理用户数据请求 (Main Thread -> Worker)
+    if (data.type === 'requestUserData') {
+      try {
+        const uidForWorker = String(data.userId || uid)
+        const suiteData = accountStore.getSuiteCache(uidForWorker)
+        if (!suiteData) {
+          throw new Error('玩家数据未上传到指定地点')
+        }
+        workerRef?.postMessage({
+          type: 'responseUserData',
+          requestId: data.requestId,
+          data: JSON.parse(JSON.stringify(suiteData))
+        })
+      } catch (e: any) {
+        workerRef?.postMessage({
+          type: 'responseUserData',
+          requestId: data.requestId,
+          error: e.message || String(e)
+        })
+      }
+      return
+    }
+
     // 2. 处理计算结果
     if (data.type === 'error') {
       const s = String(data.error)
       if (s.includes('404')) errorMsg.value = '玩家数据未上传到指定地点'
-      else if (s.includes('403')) errorMsg.value = '玩家数据上传时未选择「公开API读取」'
+      else if (s.includes('403')) errorMsg.value = '当前账号未授权读取数据，请先完成 OAuth 授权后再试'
       else errorMsg.value = s
       recommend.value = null
       calculating.value = false
