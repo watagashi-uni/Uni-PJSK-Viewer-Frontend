@@ -303,7 +303,7 @@ onMounted(loadData)
     <template v-else-if="card">
       <!-- 顶部导航 -->
       <div class="mb-4 max-w-4xl mx-auto px-4 lg:px-0">
-        <button @click="goBack" class="btn btn-ghost btn-sm gap-2 pl-0">
+        <button class="btn btn-ghost btn-sm gap-2 pl-0" @click="goBack">
           <ChevronLeft class="w-4 h-4" /> 返回列表
         </button>
       </div>
@@ -387,11 +387,11 @@ onMounted(loadData)
                 target="_blank"
                 class="block rounded-xl overflow-hidden shadow-lg hover:-translate-y-1 hover:shadow-xl transition-all duration-300 min-w-0 flex-shrink"
               >
-              <AssetImage 
-                :src="coverUrl"
-                :alt="card.prefix"
-                class="max-h-[300px] md:max-h-[400px] w-auto max-w-full object-contain"
-              />
+                <AssetImage 
+                  :src="coverUrl"
+                  :alt="card.prefix"
+                  class="max-h-[300px] md:max-h-[400px] w-auto max-w-full object-contain"
+                />
               </a>
               
               <!-- 普通立绘 (cutout) -->

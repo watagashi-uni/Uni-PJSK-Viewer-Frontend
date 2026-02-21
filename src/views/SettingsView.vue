@@ -79,9 +79,9 @@ async function handleClearTranslationCache() {
           <div class="form-control">
             <label class="label cursor-pointer justify-start gap-4">
               <input 
+                v-model="settingsStore.showSpoilers" 
                 type="checkbox" 
-                class="toggle toggle-primary" 
-                v-model="settingsStore.showSpoilers"
+                class="toggle toggle-primary"
               />
               <div>
                 <span class="label-text font-medium">显示剧透内容</span>
@@ -94,9 +94,9 @@ async function handleClearTranslationCache() {
           <div class="form-control">
             <label class="label cursor-pointer justify-start gap-4">
               <input 
+                v-model="settingsStore.maskSpoilers" 
                 type="checkbox" 
-                class="toggle toggle-primary" 
-                v-model="settingsStore.maskSpoilers"
+                class="toggle toggle-primary"
                 :disabled="!settingsStore.showSpoilers"
               />
               <div :class="{ 'opacity-50': !settingsStore.showSpoilers }">

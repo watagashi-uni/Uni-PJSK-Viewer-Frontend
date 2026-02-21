@@ -75,7 +75,7 @@ async function upload() {
     } else {
       errorMsg.value = data.message || '上传失败'
     }
-  } catch (e) {
+  } catch {
     errorMsg.value = '网络错误，请重试'
   } finally {
     isUploading.value = false
@@ -111,7 +111,6 @@ async function copyUrl() {
     <!-- 上传表单 -->
     <div class="card bg-base-100 shadow-lg">
       <div class="card-body gap-4">
-        
         <!-- SUS 文件 -->
         <div class="form-control">
           <label class="label">

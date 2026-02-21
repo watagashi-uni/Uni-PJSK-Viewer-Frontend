@@ -407,7 +407,7 @@ function initCanvas() {
 function doContainsRareItem(reward: any, isSuperRare = false): boolean {
     let compareList: Record<string, number[]> = isSuperRare ? SUPER_RARE_ITEM : RARE_ITEM
     for (const category in reward) {
-        if (reward.hasOwnProperty(category) && compareList.hasOwnProperty(category)) {
+        if (Object.prototype.hasOwnProperty.call(reward, category) && Object.prototype.hasOwnProperty.call(compareList, category)) {
             for (const itemId of Object.keys(reward[category])) {
                if (compareList[category]?.includes(parseInt(itemId))) {
                    return true
@@ -513,7 +513,7 @@ function drawPoints() {
             }
             
             // Display reward popup centered on the dot
-            createRewardPopup(rewardToShow, displayX, displayY, displayX, displayY, containsRareItem, reverseXY)
+            createRewardPopup(rewardToShow, displayX, displayY, displayX, displayY, containsRareItem)
         } else {
              ctx.fillStyle = 'black'
              ctx.font = '12px Arial'
@@ -524,7 +524,7 @@ function drawPoints() {
     adjustItemListPositions()
 }
 
-function createRewardPopup(reward: any, x: number, y: number, anchorX: number, anchorY: number, ifContainRareItem: boolean, _reverseXY: boolean) {
+function createRewardPopup(reward: any, x: number, y: number, anchorX: number, anchorY: number, ifContainRareItem: boolean) {
     if (!popupContainerRef.value) return
     
     const itemList = document.createElement('div')
@@ -540,7 +540,7 @@ function createRewardPopup(reward: any, x: number, y: number, anchorX: number, a
     itemList.style.top = `${y}px`
     itemList.style.transform = 'translate(-50%, -50%)'
     
-    if (ifContainRareItem || reward.hasOwnProperty("mysekai_music_record")) {
+    if (ifContainRareItem || Object.prototype.hasOwnProperty.call(reward, "mysekai_music_record")) {
         if (doContainsRareItem(reward, true)) {
             itemList.style.backgroundColor = 'rgba(220, 38, 38, 0.6)'
             itemList.style.borderColor = 'rgba(254, 202, 202, 0.5)'
@@ -554,9 +554,9 @@ function createRewardPopup(reward: any, x: number, y: number, anchorX: number, a
     const allItems: { texture: string, quantity: number, isRecord?: boolean, isRare?: boolean }[] = []
 
     for (const category in reward) {
-        if (!reward.hasOwnProperty(category)) continue
+        if (!Object.prototype.hasOwnProperty.call(reward, category)) continue
         for (const itemIdStr in reward[category]) {
-            if (!reward[category].hasOwnProperty(itemIdStr)) continue
+            if (!Object.prototype.hasOwnProperty.call(reward[category], itemIdStr)) continue
             
             const quantity = reward[category][itemIdStr]
             const texture = ITEM_TEXTURES[category]?.[itemIdStr] || ''
@@ -843,99 +843,98 @@ onMounted(() => {
     <div class="card bg-base-100 shadow-lg">
       <div class="card-body">
         <div class="flex flex-wrap gap-4 items-center mb-4">
-             <!-- Account Selection -->
-             <div v-if="uploadTimeStr" class="badge badge-lg gap-2" :class="isDataStale ? 'badge-warning' : 'badge-ghost'">
-                 更新时间: {{ uploadTimeStr }}
-                 <span v-if="isDataStale" class="text-xs font-bold">(数据已过期)</span>
-             </div>
-             <select
-               v-if="accounts.length > 0"
-               v-model="currentUserId"
-               class="select select-bordered select-sm w-full max-w-xs"
-             >
-               <option disabled value="">选择账号</option>
-               <option v-for="acc in accounts" :key="acc.userId" :value="acc.userId">
-                 {{ acc.userId }} - {{ acc.name }}
-               </option>
-             </select>
-             <div v-else class="text-sm text-error">
-                请先在个人信息页面添加账号
-             </div>
+          <!-- Account Selection -->
+          <div v-if="uploadTimeStr" class="badge badge-lg gap-2" :class="isDataStale ? 'badge-warning' : 'badge-ghost'">
+            更新时间: {{ uploadTimeStr }}
+            <span v-if="isDataStale" class="text-xs font-bold">(数据已过期)</span>
+          </div>
+          <select
+            v-if="accounts.length > 0"
+            v-model="currentUserId"
+            class="select select-bordered select-sm w-full max-w-xs"
+          >
+            <option disabled value="">选择账号</option>
+            <option v-for="acc in accounts" :key="acc.userId" :value="acc.userId">
+              {{ acc.userId }} - {{ acc.name }}
+            </option>
+          </select>
+          <div v-else class="text-sm text-error">
+            请先在个人信息页面添加账号
+          </div>
 
-             <!-- Fetch Button -->
-             <button 
-                class="btn btn-primary btn-sm" 
-                :disabled="!currentUserId || isLoading"
-                @click="fetchUserData"
-             >
-                <span v-if="isLoading" class="loading loading-spinner loading-xs"></span>
-                获取数据
-             </button>
+          <!-- Fetch Button -->
+          <button 
+            class="btn btn-primary btn-sm" 
+            :disabled="!currentUserId || isLoading"
+            @click="fetchUserData"
+          >
+            <span v-if="isLoading" class="loading loading-spinner loading-xs"></span>
+            获取数据
+          </button>
              
-             <!-- Error Message -->
-             <span v-if="errorMsg" class="text-error text-sm">{{ errorMsg }}</span>
+          <!-- Error Message -->
+          <span v-if="errorMsg" class="text-error text-sm">{{ errorMsg }}</span>
         </div>
         
         <div class="flex flex-wrap gap-4 items-center">
-            <!-- Scene Selection -->
-            <label class="form-control w-full max-w-xs">
-              <div class="label">
-                <span class="label-text">选择场景</span>
-              </div>
-              <select v-model="selectedSceneKey" class="select select-bordered select-sm">
-                <option v-for="(scene, key) in SCENES" :key="key" :value="key">
-                  {{ scene.name }}
-                </option>
-              </select>
-            </label>
+          <!-- Scene Selection -->
+          <label class="form-control w-full max-w-xs">
+            <div class="label">
+              <span class="label-text">选择场景</span>
+            </div>
+            <select v-model="selectedSceneKey" class="select select-bordered select-sm">
+              <option v-for="(scene, key) in SCENES" :key="key" :value="key">
+                {{ scene.name }}
+              </option>
+            </select>
+          </label>
         </div>
       </div>
     </div>
 
-     <!-- Resource Filter Legend -->
-     <div class="card bg-base-100 shadow-lg" v-if="resourceStats.length > 0">
-         <div class="card-body p-4">
-             <h3 class="text-sm font-bold mb-2">资源筛选 <span v-if="isFilterActive">({{ visibleResources.size }}/{{ resourceStats.length }})</span><span v-else class="text-xs opacity-50">点击图标筛选</span></h3>
-             <div class="flex flex-wrap gap-2">
-                 <div 
-                    v-for="item in resourceStats" 
-                    :key="item.id"
-                    class="flex items-center gap-1 px-2 py-1 rounded-full border cursor-pointer select-none transition-all duration-200"
-                    :class="[
-                        visibleResources.has(item.id) 
-                            ? (item.isSuperRare ? 'bg-red-500/20 border-red-500' : (item.isRare ? 'bg-blue-500/20 border-blue-500' : 'bg-base-200 border-base-300')) 
-                            : (isFilterActive ? 'bg-transparent border-transparent opacity-40 grayscale' : (item.isSuperRare ? 'bg-red-500/10 border-red-500/30' : (item.isRare ? 'bg-blue-500/10 border-blue-500/30' : 'bg-base-200 border-base-300')))
-                    ]"
-                    @click="toggleResource(item.id)"
-                 >
-                     <img :src="item.texture" class="w-4 h-4 object-contain" />
-                     <span class="text-xs font-bold">{{ item.count }}</span>
-                 </div>
-             </div>
-         </div>
-     </div>
-
-     <!-- Visualization Area -->
-    <div class="card bg-base-100 shadow-lg overflow-hidden">
-        <div class="card-body p-0 relative w-full overflow-x-auto">
-             <!-- Container -->
-             <div class="relative inline-block w-full min-w-[800px]">
-                 <img 
-                    ref="imageRef"
-                    :src="selectedScene.imagePath" 
-                    class="block w-full h-auto"
-                    @load="initCanvas"
-                 />
-                 <canvas 
-                    ref="canvasRef"
-                    class="absolute top-0 left-0 w-full h-full pointer-events-none"
-                 ></canvas>
-                 <!-- Popup container -->
-                 <div ref="popupContainerRef" class="absolute top-0 left-0 w-full h-full pointer-events-none"></div>
-             </div>
+    <!-- Resource Filter Legend -->
+    <div v-if="resourceStats.length > 0" class="card bg-base-100 shadow-lg">
+      <div class="card-body p-4">
+        <h3 class="text-sm font-bold mb-2">资源筛选 <span v-if="isFilterActive">({{ visibleResources.size }}/{{ resourceStats.length }})</span><span v-else class="text-xs opacity-50">点击图标筛选</span></h3>
+        <div class="flex flex-wrap gap-2">
+          <div 
+            v-for="item in resourceStats" 
+            :key="item.id"
+            class="flex items-center gap-1 px-2 py-1 rounded-full border cursor-pointer select-none transition-all duration-200"
+            :class="[
+              visibleResources.has(item.id) 
+                ? (item.isSuperRare ? 'bg-red-500/20 border-red-500' : (item.isRare ? 'bg-blue-500/20 border-blue-500' : 'bg-base-200 border-base-300')) 
+                : (isFilterActive ? 'bg-transparent border-transparent opacity-40 grayscale' : (item.isSuperRare ? 'bg-red-500/10 border-red-500/30' : (item.isRare ? 'bg-blue-500/10 border-blue-500/30' : 'bg-base-200 border-base-300')))
+            ]"
+            @click="toggleResource(item.id)"
+          >
+            <img :src="item.texture" class="w-4 h-4 object-contain" />
+            <span class="text-xs font-bold">{{ item.count }}</span>
+          </div>
         </div>
+      </div>
     </div>
-    
+
+    <!-- Visualization Area -->
+    <div class="card bg-base-100 shadow-lg overflow-hidden">
+      <div class="card-body p-0 relative w-full overflow-x-auto">
+        <!-- Container -->
+        <div class="relative inline-block w-full min-w-[800px]">
+          <img 
+            ref="imageRef"
+            :src="selectedScene.imagePath" 
+            class="block w-full h-auto"
+            @load="initCanvas"
+          />
+          <canvas 
+            ref="canvasRef"
+            class="absolute top-0 left-0 w-full h-full pointer-events-none"
+          ></canvas>
+          <!-- Popup container -->
+          <div ref="popupContainerRef" class="absolute top-0 left-0 w-full h-full pointer-events-none"></div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 

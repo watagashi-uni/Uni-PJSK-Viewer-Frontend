@@ -50,8 +50,8 @@ function downloadImage() {
     <div class="flex-shrink-0 bg-[#252541] p-3 flex justify-between items-center gap-4 shadow-lg">
       <div class="flex items-center gap-4">
         <button 
-          @click="goBack" 
-          class="px-3 py-1.5 bg-gray-600 hover:bg-gray-500 text-white rounded-lg text-sm font-medium transition-colors"
+          class="px-3 py-1.5 bg-gray-600 hover:bg-gray-500 text-white rounded-lg text-sm font-medium transition-colors" 
+          @click="goBack"
         >
           ← 返回
         </button>
@@ -73,8 +73,8 @@ function downloadImage() {
       </div>
       
       <button 
-        @click="downloadImage" 
-        class="px-4 py-1.5 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-1"
+        class="px-4 py-1.5 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-1" 
+        @click="downloadImage"
       >
         📥 <span class="hidden sm:inline">下载</span>
       </button>

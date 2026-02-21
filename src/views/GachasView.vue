@@ -115,8 +115,8 @@ onMounted(async () => {
             <label class="input input-bordered flex items-center gap-2">
               <Search class="w-4 h-4 opacity-50" />
               <input 
-                type="text" 
-                v-model="searchQuery"
+                v-model="searchQuery" 
+                type="text"
                 placeholder="搜索卡池名称..." 
                 class="grow"
               />
@@ -164,7 +164,7 @@ onMounted(async () => {
             <!-- 简单角标 -->
             <div class="absolute top-2 right-2 flex gap-1">
               <span v-if="isLeak(gacha)" class="badge badge-warning badge-sm gap-1 font-bold shadow-md">
-                 <EyeOff class="w-3 h-3" /> 即将开始
+                <EyeOff class="w-3 h-3" /> 即将开始
               </span>
               <span 
                 v-else

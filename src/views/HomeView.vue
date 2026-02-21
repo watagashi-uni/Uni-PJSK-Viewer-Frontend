@@ -226,7 +226,7 @@ onMounted(async () => {
     }
     
     // 2. 并行获取版本信息和 master 数据
-    const [versionRes, eventsData, musicsData, gachasData, _cardsData] = await Promise.all([
+    const [versionRes, eventsData, musicsData, gachasData] = await Promise.all([
       getVersion(),
       masterStore.getMaster<EventData>('events'),
       masterStore.getMaster<MusicData>('musics'),
@@ -256,7 +256,6 @@ onMounted(async () => {
   <div class="space-y-6">
     <!-- 头部欢迎区与用户简影 -->
     <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-base-100 p-6 rounded-xl shadow-sm">
-      
       <!-- App Info & Theme Dropdown -->
       <div class="flex-1 flex flex-row items-center gap-2 sm:gap-4 w-full">
         <div class="min-w-0">
@@ -369,7 +368,6 @@ onMounted(async () => {
               />
             </div>
             <!-- 左下角额外板块：活动快捷入口 -->
-            
           </div>
 
           <!-- 内容侧 (右侧/底部) -->
@@ -412,15 +410,14 @@ onMounted(async () => {
               <RouterLink 
                 v-if="currentEvent.status === 'ongoing'"
                 to="/ranking"
-                @click.stop
                 class="btn btn-sm btn-primary btn-outline w-fit z-20 relative pointer-events-auto shadow-sm"
+                @click.stop
               >
                 <BarChart3 class="w-4 h-4" />
                 查看榜线
               </RouterLink>
             </div>
           </div>
-          
         </RouterLink>
         <div v-else class="text-center py-10 text-base-content/60 bg-base-100 rounded-xl">
           暂无活动信息
@@ -438,8 +435,8 @@ onMounted(async () => {
           <!-- 横向滚动容器 -->
           <div 
             ref="gachaScrollContainer"
-            @wheel="handleGachaScroll"
             class="flex overflow-x-auto gap-4 pb-4 w-full"
+            @wheel="handleGachaScroll"
           >
             <RouterLink 
               v-for="gacha in ongoingGachas" 
@@ -455,7 +452,6 @@ onMounted(async () => {
             </RouterLink>
           </div>
         </div>
-
       </div>
 
       <!-- 右侧：最新歌曲 (占 1 列) -->

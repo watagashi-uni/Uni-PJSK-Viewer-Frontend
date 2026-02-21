@@ -565,11 +565,11 @@ const rarityList = [
                     <tr v-for="rarity in rarityList" :key="rarity.type">
                       <td class="font-medium">{{ rarity.name }}</td>
                       <template v-if="cardConfig[rarity.type]">
-                        <td class="text-center"><input type="checkbox" class="checkbox checkbox-sm" v-model="cardConfig[rarity.type]!.disable" /></td>
-                        <td class="text-center"><input type="checkbox" class="checkbox checkbox-sm" v-model="cardConfig[rarity.type]!.rankMax" /></td>
-                        <td class="text-center"><input type="checkbox" class="checkbox checkbox-sm" v-model="cardConfig[rarity.type]!.episodeRead" /></td>
-                        <td class="text-center"><input type="checkbox" class="checkbox checkbox-sm" v-model="cardConfig[rarity.type]!.masterMax" /></td>
-                        <td class="text-center"><input type="checkbox" class="checkbox checkbox-sm" v-model="cardConfig[rarity.type]!.skillMax" /></td>
+                        <td class="text-center"><input v-model="cardConfig[rarity.type]!.disable" type="checkbox" class="checkbox checkbox-sm" /></td>
+                        <td class="text-center"><input v-model="cardConfig[rarity.type]!.rankMax" type="checkbox" class="checkbox checkbox-sm" /></td>
+                        <td class="text-center"><input v-model="cardConfig[rarity.type]!.episodeRead" type="checkbox" class="checkbox checkbox-sm" /></td>
+                        <td class="text-center"><input v-model="cardConfig[rarity.type]!.masterMax" type="checkbox" class="checkbox checkbox-sm" /></td>
+                        <td class="text-center"><input v-model="cardConfig[rarity.type]!.skillMax" type="checkbox" class="checkbox checkbox-sm" /></td>
                       </template>
                     </tr>
                   </tbody>

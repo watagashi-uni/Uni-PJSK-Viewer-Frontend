@@ -43,7 +43,6 @@ function dismissUpdate() {
   <Teleport to="body">
     <!-- Toast 容器 (底部右侧) -->
     <div class="fixed bottom-4 right-4 z-50 flex flex-col gap-3 max-w-sm">
-      
       <!-- PWA 更新提示 Toast -->
       <Transition name="slide-up">
         <div 
@@ -81,7 +80,6 @@ function dismissUpdate() {
           </div>
         </div>
       </Transition>
-      
     </div>
   </Teleport>
 </template>
