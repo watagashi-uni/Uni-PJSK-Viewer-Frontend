@@ -117,6 +117,12 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/MySekaiView.vue'),
         meta: { title: 'MySekai 透视' },
     },
+    {
+        path: '/oauth2/callback/code',
+        name: 'OAuthCallback',
+        component: () => import('@/views/OAuthCallbackView.vue'),
+        meta: { title: 'OAuth 授权回调', fullscreen: true },
+    },
     // 兼容旧路由
     {
         path: '/deck-recommend',

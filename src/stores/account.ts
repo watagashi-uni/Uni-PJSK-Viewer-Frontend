@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { openDB } from 'idb'
+import { useOAuthStore } from '@/stores/oauth'
 
 export interface StoredAccount {
     userId: string
@@ -12,6 +13,34 @@ export interface StoredAccount {
 const STORAGE_KEY = 'sekaiUserProfiles'
 const SUITE_CACHE_PREFIX = 'suiteCache_'
 const PROFILE_DATA_KEY = 'sekaiUserProfileData'
+
+function buildOAuthPromptText() {
+    return '你没有勾选公开访问，需要 OAuth 授权本站访问游戏数据。是否现在去授权？'
+}
+
+async function fetchSuiteByOAuth(userId: string): Promise<any> {
+    const oauthStore = useOAuthStore()
+    const returnTo = `${window.location.pathname}${window.location.search}${window.location.hash}`
+
+    if (oauthStore.hasToken) {
+        try {
+            return await oauthStore.fetchGameData('jp', 'suite', userId)
+        } catch (e: any) {
+            if (e?.status === 401 || e?.status === 403) {
+                oauthStore.clearTokens()
+            } else {
+                throw e
+            }
+        }
+    }
+
+    const shouldAuthorize = window.confirm(buildOAuthPromptText())
+    if (!shouldAuthorize) {
+        throw new Error('未完成 OAuth 授权，无法读取 Suite 数据')
+    }
+    await oauthStore.startAuthorization(returnTo)
+    throw new Error('正在跳转 OAuth 授权页面...')
+}
 
 const dbPromise = openDB('sekai-viewer-db', 1, {
     upgrade(db) {
@@ -239,7 +268,14 @@ export const useAccountStore = defineStore('account', () => {
             const resp = await fetch(`https://suite-api.haruki.seiunx.com/public/jp/suite/${userId}`)
             if (!resp.ok) {
                 if (resp.status === 404) throw new Error('用户未上传数据')
-                if (resp.status === 403) throw new Error('用户未勾选公开访问')
+                if (resp.status === 403) {
+                    const data = await fetchSuiteByOAuth(userId)
+                    if (data.upload_time) {
+                        updateUploadTime(userId, data.upload_time)
+                    }
+                    await saveSuiteCache(userId, data)
+                    return data
+                }
                 throw new Error(`HTTP ${resp.status}`)
             }
             const data = await resp.json()

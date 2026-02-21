@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useAccountStore } from '@/stores/account'
+import { useOAuthStore } from '@/stores/oauth'
 // ==================== Constants & Configuration ====================
 
 const SCENES: Record<string, any> = {
@@ -233,6 +234,7 @@ function parseMySekaiData(data: any): Record<string, ProcessedPoint[]> {
 // ==================== Vue Logic ====================
 
 const accountStore = useAccountStore()
+const oauthStore = useOAuthStore()
 const accounts = computed(() => accountStore.accounts)
 const currentUserId = computed({
   get: () => accountStore.currentUserId,
@@ -358,6 +360,40 @@ async function fetchUserData() {
     const url = `https://suite-api.haruki.seiunx.com/public/jp/mysekai/${currentUserId.value}`
     const res = await fetch(url)
     if (!res.ok) {
+      if (res.status === 404) {
+        throw new Error('用户未上传 MySekai 数据')
+      }
+      if (res.status === 403) {
+        let oauthData: any = null
+        const returnTo = `${window.location.pathname}${window.location.search}${window.location.hash}`
+
+        if (oauthStore.hasToken) {
+          try {
+            oauthData = await oauthStore.fetchGameData('jp', 'mysekai', currentUserId.value)
+          } catch (e: any) {
+            if (e?.status === 401 || e?.status === 403) {
+              oauthStore.clearTokens()
+            } else {
+              throw e
+            }
+          }
+        }
+
+        if (!oauthData) {
+          const shouldAuthorize = window.confirm('你没有勾选公开访问，需要 OAuth 授权本站访问游戏数据。是否现在去授权？')
+          if (!shouldAuthorize) {
+            throw new Error('未完成 OAuth 授权，无法读取 MySekai 数据')
+          }
+          await oauthStore.startAuthorization(returnTo)
+          throw new Error('正在跳转 OAuth 授权页面...')
+        }
+
+        if (oauthData.upload_time) {
+          uploadTime.value = oauthData.upload_time
+        }
+        parsedData.value = parseMySekaiData(oauthData)
+        return
+      }
       throw new Error(`API请求失败: ${res.status}`)
     }
     const json = await res.json()
