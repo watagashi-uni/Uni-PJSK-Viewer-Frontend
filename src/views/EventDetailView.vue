@@ -610,41 +610,41 @@ watch(() => route.params.id, loadData)
       </div>
     </div>
 
-      <!-- 排名牌子 -->
-      <div v-if="rankingHonors.length > 0" class="card bg-base-100 shadow-lg mt-6">
-        <div class="card-body">
-          <h3 class="text-lg font-medium mb-3 flex items-center gap-2">
-            <Trophy class="w-5 h-5" />
-            牌子奖励
-          </h3>
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            <div 
-              v-for="honor in rankingHonors" 
-              :key="honor.id"
-              class="group relative rounded-2xl bg-base-200/40 border border-base-200 hover:bg-base-200 hover:-translate-y-1 hover:shadow-md transition-all duration-300 overflow-hidden"
-            >
-              <!-- 排名标签 -->
-              <div class="absolute top-0 left-0 bg-primary/90 backdrop-blur text-primary-content font-black italic px-4 py-1 rounded-br-2xl text-sm shadow-sm z-10 flex items-center gap-1">
-                <span class="opacity-80 text-xs">TOP</span>
-                <span>{{ honor.rankString }}</span>
-              </div>
+    <!-- 排名牌子 -->
+    <div v-if="rankingHonors.length > 0" class="card bg-base-100 shadow-lg mt-6">
+      <div class="card-body">
+        <h3 class="text-lg font-medium mb-3 flex items-center gap-2">
+          <Trophy class="w-5 h-5" />
+          牌子奖励
+        </h3>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <div 
+            v-for="honor in rankingHonors" 
+            :key="honor.id"
+            class="group relative rounded-2xl bg-base-200/40 border border-base-200 hover:bg-base-200 hover:-translate-y-1 hover:shadow-md transition-all duration-300 overflow-hidden"
+          >
+            <!-- 排名标签 -->
+            <div class="absolute top-0 left-0 bg-primary/90 backdrop-blur text-primary-content font-black italic px-4 py-1 rounded-br-2xl text-sm shadow-sm z-10 flex items-center gap-1">
+              <span class="opacity-80 text-xs">TOP</span>
+              <span>{{ honor.rankString }}</span>
+            </div>
               
-              <!-- 背景装饰图（可选，增加层次感） -->
-              <div class="absolute inset-0 bg-gradient-to-br from-base-100/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+            <!-- 背景装饰图（可选，增加层次感） -->
+            <div class="absolute inset-0 bg-gradient-to-br from-base-100/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
 
-              <!-- 牌子图片容器 -->
-              <div class="relative py-8 px-4 flex justify-center items-center h-full w-full">
-                <div class="w-full max-w-[280px] drop-shadow-sm group-hover:drop-shadow-md group-hover:scale-105 transition-all duration-300">
-                  <SekaiHonor 
-                    :honorId="honor.honorId" 
-                    :honorLevel="honor.honorLevel"
-                    main
-                  />
-                </div>
+            <!-- 牌子图片容器 -->
+            <div class="relative py-8 px-4 flex justify-center items-center h-full w-full">
+              <div class="w-full max-w-[280px] drop-shadow-sm group-hover:drop-shadow-md group-hover:scale-105 transition-all duration-300">
+                <SekaiHonor 
+                  :honor-id="honor.honorId" 
+                  :honor-level="honor.honorLevel"
+                  main
+                />
               </div>
             </div>
           </div>
         </div>
       </div>
     </div>
+  </div>
 </template>

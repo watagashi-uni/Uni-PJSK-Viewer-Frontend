@@ -33,7 +33,7 @@ onMounted(() => {
     try {
       const parsed = JSON.parse(saved)
       Object.assign(form.value, parsed)
-    } catch (e) {
+    } catch {
       // ignore parse error
     }
   }
@@ -147,7 +147,7 @@ function downloadResult() {
 
     <div class="card bg-base-100 shadow-lg animate-fade-in-up">
       <div class="card-body">
-        <form @submit.prevent="handleSubmit" class="space-y-6">
+        <form class="space-y-6" @submit.prevent="handleSubmit">
           <!-- SUS 内容和 rebase -->
           <div class="grid md:grid-cols-2 gap-4">
             <div class="form-control w-full">
@@ -256,11 +256,11 @@ function downloadResult() {
               </label>
               <div class="flex gap-4">
                 <label class="label cursor-pointer gap-2">
-                  <input type="radio" v-model="form.format" value="svg" class="radio radio-primary" />
+                  <input v-model="form.format" type="radio" value="svg" class="radio radio-primary" />
                   <span class="label-text">SVG (快速)</span>
                 </label>
                 <label class="label cursor-pointer gap-2">
-                  <input type="radio" v-model="form.format" value="png" class="radio radio-primary" />
+                  <input v-model="form.format" type="radio" value="png" class="radio radio-primary" />
                   <span class="label-text">PNG (需要约10秒)</span>
                 </label>
               </div>
@@ -271,11 +271,11 @@ function downloadResult() {
               </label>
               <div class="flex gap-4">
                 <label class="label cursor-pointer gap-2">
-                  <input type="radio" v-model="form.skin" value="custom01" class="radio radio-primary" />
+                  <input v-model="form.skin" type="radio" value="custom01" class="radio radio-primary" />
                   <span class="label-text">默认</span>
                 </label>
                 <label class="label cursor-pointer gap-2">
-                  <input type="radio" v-model="form.skin" value="custom02" class="radio radio-primary" />
+                  <input v-model="form.skin" type="radio" value="custom02" class="radio radio-primary" />
                   <span class="label-text">3周年新增</span>
                 </label>
               </div>
@@ -328,16 +328,16 @@ function downloadResult() {
               <div class="flex gap-2 flex-wrap justify-center">
                 <!-- 打开预览 -->
                 <button 
-                  @click="openInNewTab"
                   class="btn btn-sm btn-primary"
+                  @click="openInNewTab"
                 >
                   <ExternalLink class="w-4 h-4" />
                   打开预览
                 </button>
                 <!-- 下载 -->
                 <button 
-                  @click="downloadResult"
                   class="btn btn-sm btn-success"
+                  @click="downloadResult"
                 >
                   <Download class="w-4 h-4" />
                   下载

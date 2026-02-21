@@ -563,13 +563,12 @@ onMounted(loadData)
     <template v-else-if="music">
       <!-- 顶部导航 -->
       <div class="mb-4">
-        <button @click="goBack" class="btn btn-ghost btn-sm gap-2 pl-0">
+        <button class="btn btn-ghost btn-sm gap-2 pl-0" @click="goBack">
           <ChevronLeft class="w-4 h-4" /> 返回列表
         </button>
       </div>
 
       <div class="flex flex-col md:flex-row gap-8">
-        
         <!-- 左侧：封面与基本信息 -->
         <div class="md:w-1/3 flex flex-col items-center">
           <!-- 封面 -->
@@ -616,26 +615,26 @@ onMounted(loadData)
           </div>
           
           <div class="mt-6 w-full space-y-3 px-4">
-             <div class="flex justify-between items-center text-sm border-b border-base-200 pb-2">
-               <span class="text-base-content/60">作词</span>
-               <span class="font-medium truncate max-w-[70%] select-all">{{ music.lyricist }}</span>
-             </div>
-             <div class="flex justify-between items-center text-sm border-b border-base-200 pb-2">
-               <span class="text-base-content/60">作曲</span>
-               <span class="font-medium truncate max-w-[70%] select-all">{{ music.composer }}</span>
-             </div>
-             <div class="flex justify-between items-center text-sm border-b border-base-200 pb-2">
-               <span class="text-base-content/60">编曲</span>
-               <span class="font-medium truncate max-w-[70%] select-all">{{ music.arranger }}</span>
-             </div>
-             <div class="flex justify-between items-center text-sm border-b border-base-200 pb-2">
-               <span class="text-base-content/60">发布日期</span>
-               <span class="font-medium">{{ formatDate(music.publishedAt) }}</span>
-             </div>
-             <div class="flex justify-between items-center text-sm border-b border-base-200 pb-2">
-               <span class="text-base-content/60">ID</span>
-               <span class="font-medium font-mono">#{{ music.id }}</span>
-             </div>
+            <div class="flex justify-between items-center text-sm border-b border-base-200 pb-2">
+              <span class="text-base-content/60">作词</span>
+              <span class="font-medium truncate max-w-[70%] select-all">{{ music.lyricist }}</span>
+            </div>
+            <div class="flex justify-between items-center text-sm border-b border-base-200 pb-2">
+              <span class="text-base-content/60">作曲</span>
+              <span class="font-medium truncate max-w-[70%] select-all">{{ music.composer }}</span>
+            </div>
+            <div class="flex justify-between items-center text-sm border-b border-base-200 pb-2">
+              <span class="text-base-content/60">编曲</span>
+              <span class="font-medium truncate max-w-[70%] select-all">{{ music.arranger }}</span>
+            </div>
+            <div class="flex justify-between items-center text-sm border-b border-base-200 pb-2">
+              <span class="text-base-content/60">发布日期</span>
+              <span class="font-medium">{{ formatDate(music.publishedAt) }}</span>
+            </div>
+            <div class="flex justify-between items-center text-sm border-b border-base-200 pb-2">
+              <span class="text-base-content/60">ID</span>
+              <span class="font-medium font-mono">#{{ music.id }}</span>
+            </div>
           </div>
 
           <!-- 关联活动 -->
@@ -666,7 +665,6 @@ onMounted(loadData)
 
         <!-- 右侧：音频与谱面 -->
         <div class="md:w-2/3 space-y-8">
-          
           <!-- 自定义音频播放器 -->
           <div class="custom-player-card relative overflow-hidden rounded-2xl shadow-xl border border-white/10">
             <!-- 背景渐变 -->
@@ -677,12 +675,12 @@ onMounted(loadData)
             <audio 
               ref="audioRef"
               :src="currentAudioUrl"
+              preload="metadata"
               @play="onPlay"
               @pause="onPause"
               @timeupdate="onTimeUpdate"
               @loadedmetadata="onLoadedMetadata"
               @ended="onEnded"
-              preload="metadata"
             ></audio>
             
             <div class="relative z-10 p-5">
@@ -700,9 +698,9 @@ onMounted(loadData)
                   </span>
                   <!-- 下载按钮 -->
                   <button 
-                    @click="downloadAudio"
                     class="btn btn-ghost btn-sm gap-1.5 hover:bg-base-200/50"
                     :disabled="!currentVocal"
+                    @click="downloadAudio"
                   >
                     <Download class="w-4 h-4" />
                     <span class="hidden sm:inline">下载</span>
@@ -745,26 +743,26 @@ onMounted(loadData)
                   <!-- 播放控制按钮组 -->
                   <div class="flex items-center gap-2">
                     <button 
-                      @click="skipBackward"
                       class="btn btn-ghost btn-sm btn-circle hover:bg-base-200/50"
                       title="后退10秒"
+                      @click="skipBackward"
                     >
                       <SkipBack class="w-4 h-4" />
                     </button>
                     
                     <button 
-                      @click="togglePlay"
                       class="btn btn-primary btn-circle w-11 h-11 shadow-lg hover:shadow-xl hover:scale-105 transition-all"
                       :disabled="!isAudioLoaded"
+                      @click="togglePlay"
                     >
                       <Pause v-if="isPlaying" class="w-5 h-5" />
                       <Play v-else class="w-5 h-5 ml-0.5" />
                     </button>
                     
                     <button 
-                      @click="skipForward"
                       class="btn btn-ghost btn-sm btn-circle hover:bg-base-200/50"
                       title="前进10秒"
+                      @click="skipForward"
                     >
                       <SkipForward class="w-4 h-4" />
                     </button>
@@ -775,7 +773,7 @@ onMounted(loadData)
 
                 <!-- 音量控制 -->
                 <div class="flex items-center gap-2 pt-2">
-                  <button @click="toggleMute" class="btn btn-ghost btn-xs btn-circle">
+                  <button class="btn btn-ghost btn-xs btn-circle" @click="toggleMute">
                     <VolumeX v-if="isMuted || volume === 0" class="w-4 h-4 text-base-content/60" />
                     <Volume2 v-else class="w-4 h-4 text-base-content/60" />
                   </button>
@@ -785,8 +783,8 @@ onMounted(loadData)
                     max="1" 
                     step="0.01"
                     :value="volume"
-                    @input="onVolumeChange"
                     class="range range-xs range-primary w-24 focus:outline-none focus:ring-0"
+                    @input="onVolumeChange"
                   />
                 </div>
               </div>
@@ -798,11 +796,11 @@ onMounted(loadData)
                   <button
                     v-for="(vocal, index) in vocals"
                     :key="vocal.id"
-                    @click="selectVocal(index)"
                     class="w-full text-left p-3 rounded-xl transition-all flex items-start gap-3"
                     :class="currentVocalIndex === index 
                       ? 'bg-primary/15 ring-1 ring-primary/30' 
                       : 'bg-base-200/30 hover:bg-base-200/60'"
+                    @click="selectVocal(index)"
                   >
                     <!-- 播放指示器 -->
                     <div class="shrink-0 mt-0.5">
@@ -861,31 +859,31 @@ onMounted(loadData)
 
                 <!-- 按钮组 -->
                 <div class="w-full space-y-2 mt-auto">
-                   <!-- 预览 (External SVG) -->
-                   <a 
-                     :href="`${chartHost}/${music.id}/${diff.musicDifficulty}.svg`" 
-                     target="_blank"
-                     class="btn btn-sm btn-block btn-ghost btn-outline h-9 min-h-0 font-normal hover:bg-base-200 whitespace-nowrap"
-                   >
-                     <Eye class="w-4 h-4 shrink-0" /> 谱面预览
-                   </a>
+                  <!-- 预览 (External SVG) -->
+                  <a 
+                    :href="`${chartHost}/${music.id}/${diff.musicDifficulty}.svg`" 
+                    target="_blank"
+                    class="btn btn-sm btn-block btn-ghost btn-outline h-9 min-h-0 font-normal hover:bg-base-200 whitespace-nowrap"
+                  >
+                    <Eye class="w-4 h-4 shrink-0" /> 谱面预览
+                  </a>
                    
-                   <!-- 谱面播放预览 -->
-                   <button 
-                     v-if="chartPreviewHost"
-                     @click="openChartPreview(diff.musicDifficulty)"
-                     class="btn btn-sm btn-block btn-ghost btn-outline h-9 min-h-0 font-normal hover:bg-base-200 whitespace-nowrap"
-                   >
-                     <PlayCircle class="w-4 h-4 shrink-0" /> 谱面播放
-                   </button>
+                  <!-- 谱面播放预览 -->
+                  <button 
+                    v-if="chartPreviewHost"
+                    class="btn btn-sm btn-block btn-ghost btn-outline h-9 min-h-0 font-normal hover:bg-base-200 whitespace-nowrap"
+                    @click="openChartPreview(diff.musicDifficulty)"
+                  >
+                    <PlayCircle class="w-4 h-4 shrink-0" /> 谱面播放
+                  </button>
                    
-                   <!-- 下载文件 (.sus) -->
-                   <button 
-                     @click="forceDownload(diff.musicDifficulty)"
-                     class="btn btn-sm btn-block btn-ghost btn-outline h-9 min-h-0 font-normal hover:bg-base-200 whitespace-nowrap"
-                   >
-                     <Download class="w-4 h-4 shrink-0" /> 谱面下载
-                   </button>
+                  <!-- 下载文件 (.sus) -->
+                  <button 
+                    class="btn btn-sm btn-block btn-ghost btn-outline h-9 min-h-0 font-normal hover:bg-base-200 whitespace-nowrap"
+                    @click="forceDownload(diff.musicDifficulty)"
+                  >
+                    <Download class="w-4 h-4 shrink-0" /> 谱面下载
+                  </button>
                 </div>
               </div>
             </div>
@@ -901,7 +899,6 @@ onMounted(loadData)
               使用这首歌自动组队
             </RouterLink>
           </div>
-
         </div>
       </div>
     </template>

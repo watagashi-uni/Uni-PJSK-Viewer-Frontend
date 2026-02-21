@@ -206,8 +206,8 @@ function getHonor(honors: any[], seq: number) {
       <div class="mt-4 flex justify-center md:mt-0 md:absolute md:right-6 md:top-1/2 md:-translate-y-1/2">
         <button 
           class="btn btn-primary btn-sm gap-2" 
-          @click="refreshData" 
-          :disabled="isLoading"
+          :disabled="isLoading" 
+          @click="refreshData"
         >
           <RefreshCw class="w-4 h-4" :class="{ 'animate-spin': isLoading }" />
           刷新

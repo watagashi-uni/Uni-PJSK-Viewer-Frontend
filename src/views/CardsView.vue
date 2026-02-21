@@ -247,7 +247,7 @@ onMounted(() => {
     <div class="card bg-base-100 shadow-md mb-4 mt-2">
       <div class="card-body p-4 flex flex-row flex-wrap items-center gap-4">
         <label class="label cursor-pointer gap-2 p-0">
-          <input type="checkbox" class="toggle toggle-primary toggle-sm" v-model="showUserCards" />
+          <input v-model="showUserCards" type="checkbox" class="toggle toggle-primary toggle-sm" />
           <span class="label-text font-medium mt-0.5">显示拥有状态</span>
         </label>
         
@@ -345,7 +345,6 @@ onMounted(() => {
       >
         <!-- 卡片背景框 -->
         <div class="bg-base-100 rounded-xl p-3 shadow-md border border-base-200 hover:shadow-lg hover:border-primary/30 transition-all relative overflow-hidden">
-        
           <!-- 全卡片遮罩 (仅在开启遮罩模式下显示，Hover时消失) -->
           <div 
             v-if="isLeak(card.releaseAt) && settingsStore.maskSpoilers" 
@@ -358,7 +357,7 @@ onMounted(() => {
 
           <!-- 简单角标 (替代之前的内部遮罩) -->
           <div v-if="isLeak(card.releaseAt)" class="absolute top-1 right-1 z-40 badge badge-warning badge-xs gap-0.5">
-             剧透
+            剧透
           </div>
 
           <!-- 统一大小的卡片容器 -->
@@ -375,7 +374,7 @@ onMounted(() => {
                 <div v-if="showUserCards && !userCardsMap.has(card.id)" class="absolute inset-0 bg-black/60 pointer-events-none z-30 transition-opacity"></div>
               </div>
               <div v-if="showUserCards && userCardsMap.has(card.id)" class="text-[10px] text-center mt-0.5 font-bold text-primary truncate leading-[1.2]">
-                <span class="text-base-content/80">Lv.{{ userCardsMap.get(card.id).level }}</span><br/>
+                <span class="text-base-content/80">Lv.{{ userCardsMap.get(card.id).level }}</span><br />
                 <span class="text-secondary/80">SLv.{{ userCardsMap.get(card.id).skillLevel || 1 }}</span>
               </div>
             </div>
@@ -393,7 +392,7 @@ onMounted(() => {
                 <div v-if="showUserCards && !userCardsMap.has(card.id)" class="absolute inset-0 bg-black/60 pointer-events-none z-30 transition-opacity"></div>
               </div>
               <div v-if="showUserCards && userCardsMap.has(card.id)" class="text-[10px] text-center mt-0.5 font-bold text-primary truncate leading-[1.2]">
-                <span class="text-base-content/80">Lv.{{ userCardsMap.get(card.id).level }}</span><br/>
+                <span class="text-base-content/80">Lv.{{ userCardsMap.get(card.id).level }}</span><br />
                 <span class="text-secondary/80">SLv.{{ userCardsMap.get(card.id).skillLevel || 1 }}</span>
               </div>
             </div>

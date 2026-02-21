@@ -49,7 +49,9 @@ const props = withDefaults(defineProps<{
   userHonorMissions?: Array<{ honorMissionType: string; progress: number }>
   progress?: number
 }>(), {
-  sub: false
+  sub: false,
+  userHonorMissions: () => [],
+  progress: 0
 })
 
 // ---------- Constants ----------

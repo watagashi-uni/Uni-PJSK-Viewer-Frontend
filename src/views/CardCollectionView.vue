@@ -185,7 +185,7 @@ onMounted(() => {
 <template>
   <div class="max-w-6xl mx-auto space-y-6 pb-24 sm:pb-10">
     <div class="flex items-center gap-3">
-      <button @click="router.back()" class="btn btn-ghost btn-sm px-2">
+      <button class="btn btn-ghost btn-sm px-2" @click="router.back()">
         ← 返回
       </button>
       <h1 class="text-3xl font-bold flex items-center gap-3">
@@ -202,7 +202,7 @@ onMounted(() => {
           <AccountSelector v-model="selectedUserId" />
         </div>
         <span v-else class="text-sm text-error flex items-center gap-1">
-          <AlertTriangle class="w-4 h-4"/> 无绑定账号，请前往个人信息页面添加。
+          <AlertTriangle class="w-4 h-4" /> 无绑定账号，请前往个人信息页面添加。
         </span>
         
         <button
@@ -223,7 +223,6 @@ onMounted(() => {
 
     <template v-else>
       <div class="flex flex-col lg:flex-row gap-6">
-        
         <!-- Sidebar: Character Selector -->
         <div class="w-full lg:w-64 shrink-0 relative">
           <div class="card bg-base-100 shadow-lg lg:sticky lg:top-20">
@@ -233,9 +232,9 @@ onMounted(() => {
                 <button
                   v-for="chara in characters"
                   :key="chara.id"
-                  @click="selectedCharacterId = chara.id"
                   class="btn btn-sm h-auto p-1"
                   :class="selectedCharacterId === chara.id ? 'btn-primary shadow-sm' : 'btn-ghost'"
+                  @click="selectedCharacterId = chara.id"
                 >
                   <img :src="`/chr_ts_90_${chara.id}.png`" class="w-8 h-8 rounded-full" :alt="chara.givenName" />
                 </button>
@@ -246,7 +245,6 @@ onMounted(() => {
 
         <!-- Main Content: Collection Status -->
         <div class="flex-1 space-y-6">
-          
           <!-- Progress Card -->
           <div class="card bg-base-100 shadow-lg border-t-4 border-secondary overflow-hidden relative">
             <div v-if="isFullCollection" class="absolute inset-0 bg-gradient-to-r from-secondary/10 to-primary/10 pointer-events-none"></div>
@@ -310,14 +308,13 @@ onMounted(() => {
                   </div>
                   <!-- Card Level Overlay (if owned) -->
                   <div v-if="userCardsMap.has(card.id)" class="text-[8px] sm:text-[10px] text-center mt-0.5 font-bold text-primary leading-[1.1]">
-                    <span class="text-base-content/80">Lv.{{ userCardsMap.get(card.id)?.level }}</span><br/>
+                    <span class="text-base-content/80">Lv.{{ userCardsMap.get(card.id)?.level }}</span><br />
                     <span class="text-secondary/80">SLv.{{ userCardsMap.get(card.id)?.skillLevel || 1 }}</span>
                   </div>
                 </div>
               </div>
             </template>
           </div>
-
         </div>
       </div>
     </template>

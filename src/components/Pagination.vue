@@ -95,8 +95,8 @@ function goToPage(page: number) {
     <!-- 跳转输入框 -->
     <form 
       v-if="totalPages > 1"
-      @submit.prevent="goToPage(Number(($event.target as HTMLFormElement).page.value))"
       class="flex items-center gap-2"
+      @submit.prevent="goToPage(Number(($event.target as HTMLFormElement).page.value))"
     >
       <input 
         type="number"

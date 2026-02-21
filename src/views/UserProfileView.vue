@@ -448,8 +448,8 @@ watch(currentUserId, async (newId) => {
             <div class="min-w-[200px] max-w-[280px]">
               <AccountSelector
                 :model-value="currentUserId"
-                @update:model-value="switchAccount"
                 :show-id="true"
+                @update:model-value="switchAccount"
               />
             </div>
             <!-- 刷新 -->
@@ -495,7 +495,7 @@ watch(currentUserId, async (newId) => {
           <!-- 上次刷新时间 -->
           <p v-if="lastRefreshText" class="text-xs text-base-content/50">
             上次刷新: {{ lastRefreshText }}
-            <template v-if="suiteUploadTimeText"> | Suite数据更新: {{ suiteUploadTimeText }}</template>
+            <template v-if="suiteUploadTimeText"> | Suite数据更新: {{ suiteUploadTimeText }}</template>
           </p>
         </div>
       </div>

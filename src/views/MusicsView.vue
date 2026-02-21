@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
 import { useAccountStore } from '@/stores/account'
-import { Search, ArrowUpDown, Languages, Trophy, List, LayoutGrid, RefreshCw } from 'lucide-vue-next'
+import { Search, ArrowUpDown, Languages, Trophy, List, LayoutGrid, RefreshCw, Layers } from 'lucide-vue-next'
 import MusicCard from '@/components/MusicCard.vue'
 import Pagination from '@/components/Pagination.vue'
 import AssetImage from '@/components/AssetImage.vue'
@@ -55,7 +55,7 @@ const sortOrder = ref<'asc' | 'desc'>('desc')
 const selectedDiffType = ref<string>('master')
 
 // 视图模式
-const viewMode = ref<'grid' | 'list' | 'b30'>('grid')
+const viewMode = ref<'grid' | 'list' | 'b30' | 'level'>('grid')
 
 // 成绩数据（从缓存加载，不自动刷新）
 const musicResultsMap = ref<Record<number, Record<string, string>>>({})
@@ -149,6 +149,66 @@ const b30List = computed<B30Entry[]>(() => {
 })
 
 const b30Total = computed(() => b30List.value.reduce((sum, e) => sum + e.score, 0))
+
+// 定数表整体进度
+const levelStats = computed(() => {
+  if (!hasSuiteData.value) return null
+  const diffMap = musicDifficultiesMap.value
+  const diff = selectedDiffType.value
+  let ap = 0, fc = 0, clear = 0, total = 0
+  
+  for (const music of musics.value) {
+    if (!settingsStore.showSpoilers && music.publishedAt > now) continue
+    if (diffMap[music.id]?.[diff] !== undefined) {
+      total++
+      const rank = musicResultsMap.value[music.id]?.[diff]
+      if (rank === 'AP') { ap++; fc++; clear++ }
+      else if (rank === 'FC') { fc++; clear++ }
+      else if (rank === 'C') { clear++ }
+    }
+  }
+  return { ap, fc, clear, total }
+})
+
+// 定数表分组数据
+const levelGroupedMusics = computed(() => {
+  const diffMap = musicDifficultiesMap.value
+  const diff = selectedDiffType.value
+  const groups: Record<number, { musics: typeof musics.value, stats: { ap: number, fc: number, clear: number, total: number } }> = {}
+  
+  for (const music of filteredMusics.value) {
+    const level = diffMap[music.id]?.[diff]
+    if (level === undefined) continue
+    
+    if (!groups[level]) {
+      groups[level] = { musics: [], stats: { ap: 0, fc: 0, clear: 0, total: 0 } }
+    }
+    groups[level].musics.push(music)
+    
+    groups[level].stats.total++
+    const rank = musicResultsMap.value[music.id]?.[diff]
+    if (rank === 'AP') {
+      groups[level].stats.ap++
+      groups[level].stats.fc++
+      groups[level].stats.clear++
+    } else if (rank === 'FC') {
+      groups[level].stats.fc++
+      groups[level].stats.clear++
+    } else if (rank === 'C') {
+      groups[level].stats.clear++
+    }
+  }
+  
+  const sortedLevels = Object.keys(groups).map(Number).sort((a, b) => b - a)
+  
+  return sortedLevels.map(level => {
+    return {
+      level,
+      musics: groups[level]?.musics,
+      stats: groups[level]?.stats
+    }
+  })
+})
 
 // 分页 (Grid视图)
 const pageSize = 30
@@ -286,10 +346,9 @@ function getMusicTitle(musicId: number): string {
   return musics.value.find(m => m.id === musicId)?.title || `#${musicId}`
 }
 
-function getMusicCoverUrl(musicId: number): string {
-  const m = musics.value.find(m => m.id === musicId)
-  if (!m) return ''
-  return `${assetsHost}/startapp/music/jacket/${m.assetbundleName}/${m.assetbundleName}.png`
+function getMusicThumbnailUrl(musicId: number): string {
+  const paddedId = musicId.toString().padStart(3, '0')
+  return `${assetsHost}/startapp/thumbnail/music_jacket/jacket_s_${paddedId}.png`
 }
 
 const diffColors: Record<string, string> = {
@@ -388,7 +447,7 @@ watch(() => route.query.page, () => {})
         </div>
 
         <select 
-          v-if="sortKey === 'level'"
+          v-if="sortKey === 'level' || viewMode === 'level'"
           v-model="selectedDiffType"
           class="select select-bordered select-sm shrink-0 w-auto max-w-[100px]"
         >
@@ -470,8 +529,11 @@ watch(() => route.query.page, () => {})
         <button class="join-item btn btn-sm" :class="viewMode === 'list' ? 'btn-primary' : 'btn-ghost'" @click="viewMode = 'list'">
           <List class="w-4 h-4" />
         </button>
-        <button class="join-item btn btn-sm" :class="viewMode === 'b30' ? 'btn-primary' : 'btn-ghost'" @click="viewMode = 'b30'">
+        <button class="join-item btn btn-sm" :class="viewMode === 'b30' ? 'btn-primary' : 'btn-ghost'" title="Best 30" @click="viewMode = 'b30'">
           <Trophy class="w-4 h-4" />
+        </button>
+        <button class="join-item btn btn-sm" :class="viewMode === 'level' ? 'btn-primary' : 'btn-ghost'" title="定数表" @click="viewMode = 'level'">
+          <Layers class="w-4 h-4" />
         </button>
       </div>
     </div>
@@ -510,7 +572,7 @@ watch(() => route.query.page, () => {})
             >
               <span class="text-xs font-bold text-base-content/40 w-6 text-right">#{{ idx + 1 }}</span>
               <AssetImage 
-                :src="getMusicCoverUrl(entry.musicId)" 
+                :src="getMusicThumbnailUrl(entry.musicId)" 
                 :alt="getMusicTitle(entry.musicId)"
                 class="w-10 h-10 rounded object-cover flex-shrink-0"
               />
@@ -543,6 +605,90 @@ watch(() => route.query.page, () => {})
         </template>
       </div>
 
+      <!-- 定数表视图 -->
+      <div v-else-if="viewMode === 'level'" class="animate-fade-in-up">
+        <!-- 总体进度条 -->
+        <div v-if="hasSuiteData && levelStats" class="flex flex-wrap gap-4 items-center bg-base-100 p-3 mb-4 rounded-lg shadow-sm border border-base-200/50">
+          <div class="font-bold border-r border-base-200 pr-4 drop-shadow-sm flex items-center gap-1 text-base sm:text-lg" :style="{ color: diffColors[selectedDiffType] }">
+            {{ diffLabels[selectedDiffType] }} 的完成度
+          </div>
+          <div class="flex items-center gap-1">
+            <img src="/img/icon_clear.png" class="h-4 sm:h-5 drop-shadow-sm" title="Clear" /> 
+            <span>{{ levelStats.clear }} / {{ levelStats.total }}</span>
+          </div>
+          <div class="flex gap-4 text-sm font-bold opacity-90">
+            <div class="flex items-center gap-1">
+              <img src="/img/icon_allPerfect.png" class="h-4 sm:h-5 drop-shadow-sm" title="AP" /> 
+              <span>{{ levelStats.ap }} / {{ levelStats.total }}</span>
+            </div>
+            <div class="flex items-center gap-1">
+              <img src="/img/icon_fullCombo.png" class="h-4 sm:h-5 drop-shadow-sm" title="FC" /> 
+              <span>{{ levelStats.fc }} / {{ levelStats.total }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="levelGroupedMusics.length === 0" class="text-center py-20 text-base-content/50">
+          没有找到数据
+        </div>
+
+        <div v-for="group in levelGroupedMusics" :key="group.level" class="mb-5">
+          <!-- 组标题（定数和进度） -->
+          <div class="flex items-center gap-3 mb-2 px-1">
+            <div
+              class="px-3 py-0.5 rounded-full text-white font-black text-xl shadow-sm tracking-tighter"
+              :style="{ backgroundColor: diffColors[selectedDiffType] }"
+            >
+              {{ group.level.toFixed(1) }}
+            </div>
+            <div v-if="hasSuiteData" class="flex gap-3 text-xs font-bold px-3 py-1 rounded-full shadow-sm bg-base-100 border border-base-200/50">
+              <span class="flex items-center gap-1 text-base-content/80">
+                ALL <span class="text-base-content">{{ group.stats?.total || 0 }}</span>
+              </span>
+              <span class="flex items-center gap-1 text-[#88DDFF]" title="Clear">
+                <img src="/img/icon_clear.png" class="h-3.5" /> {{ group.stats?.clear || 0 }}
+              </span>
+              <span class="flex items-center gap-1 text-[#FF8EE6]" title="AP">
+                <img src="/img/icon_allPerfect.png" class="h-3.5" /> {{ group.stats?.ap || 0 }}
+              </span>
+              <span class="flex items-center gap-1 text-[#FF66AA]" title="FC">
+                <img src="/img/icon_fullCombo.png" class="h-3.5" /> {{ group.stats?.fc || 0 }}
+              </span>
+            </div>
+          </div>
+          <!-- 封面墙 -->
+          <div class="flex flex-wrap gap-1.5 sm:gap-2 bg-base-100 p-2 sm:p-3 rounded-xl shadow-sm border border-base-200/50">
+            <RouterLink v-for="music in group.musics" :key="music.id" :to="`/musics/${music.id}`" class="relative group block shrink-0">
+              <AssetImage 
+                :src="getMusicThumbnailUrl(music.id)" 
+                :alt="music.title"
+                class="w-14 h-14 sm:w-[3.25rem] sm:h-[3.25rem] lg:w-[3.75rem] lg:h-[3.75rem] rounded shadow-sm group-hover:scale-105 transition-transform object-cover"
+              />
+              <img
+                v-if="musicResultsMap[music.id]?.[selectedDiffType] === 'AP'"
+                src="/img/icon_allPerfect.png"
+                class="absolute -bottom-1 -right-1 w-5 sm:w-5 h-auto drop-shadow-md"
+              />
+              <img
+                v-else-if="musicResultsMap[music.id]?.[selectedDiffType] === 'FC'"
+                src="/img/icon_fullCombo.png"
+                class="absolute -bottom-1 -right-1 w-5 sm:w-5 h-auto drop-shadow-md"
+              />
+              <img
+                v-else-if="musicResultsMap[music.id]?.[selectedDiffType] === 'C'"
+                src="/img/icon_clear.png"
+                class="absolute -bottom-1 -right-1 w-5 sm:w-5 h-auto drop-shadow-md"
+              />
+              <img
+                v-else-if="hasSuiteData"
+                src="/img/icon_notClear.png"
+                class="absolute -bottom-1 -right-1 w-5 sm:w-5 h-auto opacity-80 drop-shadow-md"
+              />
+            </RouterLink>
+          </div>
+        </div>
+      </div>
+
       <!-- 列表视图 -->
       <div v-else-if="viewMode === 'list'">
         <!-- Desktop Table View -->
@@ -552,9 +698,12 @@ watch(() => route.query.page, () => {})
               <tr>
                 <th class="w-16"></th>
                 <th>曲名</th>
-                <th v-for="d in allDifficulties" :key="d" class="text-center w-20 lg:w-24"
+                <th
+                  v-for="d in allDifficulties" :key="d" class="text-center w-20 lg:w-24"
                   :style="{ color: diffColors[d] }"
-                >{{ diffLabels[d] }}</th>
+                >
+                  {{ diffLabels[d] }}
+                </th>
               </tr>
             </thead>
 
@@ -562,7 +711,7 @@ watch(() => route.query.page, () => {})
               <tr v-for="music in displayedMusics" :key="music.id" class="hover text-sm">
                 <td class="p-2">
                   <AssetImage 
-                    :src="`${assetsHost}/startapp/music/jacket/${music.assetbundleName}/${music.assetbundleName}.png`" 
+                    :src="getMusicThumbnailUrl(music.id)" 
                     :alt="music.title"
                     class="w-12 h-12 rounded object-cover"
                   />
@@ -611,7 +760,7 @@ watch(() => route.query.page, () => {})
         <div class="block sm:hidden space-y-2">
           <div v-for="music in displayedMusics" :key="music.id" class="bg-base-100 p-2 rounded-lg flex gap-3 shadow-sm">
             <AssetImage 
-              :src="`${assetsHost}/startapp/music/jacket/${music.assetbundleName}/${music.assetbundleName}.png`" 
+              :src="getMusicThumbnailUrl(music.id)" 
               :alt="music.title"
               class="w-16 h-16 rounded object-cover shrink-0"
             />
@@ -652,7 +801,7 @@ watch(() => route.query.page, () => {})
                     <div v-else class="h-[14px] mt-0.5"></div>
                   </template>
                   <template v-else>
-                     <div class="h-full w-full"></div>
+                    <div class="h-full w-full"></div>
                   </template>
                 </div>
               </div>
@@ -673,8 +822,8 @@ watch(() => route.query.page, () => {})
         <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
           <MusicCard
             v-for="music in paginatedMusics"
-            :key="music.id"
             :id="music.id"
+            :key="music.id"
             :title="music.title"
             :translation="getTranslation(music.id)"
             :composer="music.composer"

@@ -149,7 +149,7 @@ import {
             </div>
             <div class="collapse-content">
               <p class="text-sm text-base-content/70 mb-2">
-              <a 
+                <a 
                   href="https://github.com/Sekai-World/sekai-viewer" 
                   target="_blank" 
                   rel="noopener noreferrer"

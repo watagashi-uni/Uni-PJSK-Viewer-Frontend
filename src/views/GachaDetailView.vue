@@ -630,13 +630,13 @@ watch(() => route.params.id, loadData)
             <button
               v-for="behavior in gacha.gachaBehaviors.filter(b => b.spinCount > 0)"
               :key="behavior.id"
-              @click="doGacha(behavior)"
               class="btn btn-primary btn-sm"
+              @click="doGacha(behavior)"
             >
               {{ getBehaviorLabel(behavior) }}
               <span class="badge badge-ghost badge-sm">{{ getCostDisplay(behavior) }}</span>
             </button>
-            <button @click="resetStats" class="btn btn-outline btn-error btn-sm">
+            <button class="btn btn-outline btn-error btn-sm" @click="resetStats">
               <RotateCcw class="w-4 h-4" />
               重置
             </button>
