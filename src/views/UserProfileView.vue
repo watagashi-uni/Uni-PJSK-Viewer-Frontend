@@ -7,7 +7,7 @@ import SekaiCard from '@/components/SekaiCard.vue'
 import SekaiProfileHonor from '@/components/SekaiProfileHonor.vue'
 import AccountSelector from '@/components/AccountSelector.vue'
 import {
-  User, Eye, EyeOff, Download, Upload, Plus, Trash2, RefreshCw, Star, Zap
+  User, Eye, EyeOff, Download, Upload, Plus, Trash2, RefreshCw, Star, Zap, Trophy, Music
 } from 'lucide-vue-next'
 
 const masterStore = useMasterStore()
