@@ -6,10 +6,11 @@ type GameDataType = 'suite' | 'mysekai'
 interface PendingAuthState {
     state: string
     codeVerifier: string
+    targetUserId: string
     returnTo: string
 }
 
-interface StoredOAuthTokens {
+interface StoredOAuthToken {
     accessToken: string
     refreshToken: string
     scope: string
@@ -52,44 +53,44 @@ async function parseJsonSafe(res: Response): Promise<any> {
 }
 
 export const useOAuthStore = defineStore('oauth', () => {
-    const accessToken = ref('')
-    const refreshToken = ref('')
-    const scope = ref('')
-    const expiresAt = ref<number | null>(null)
+    const tokensByUserId = ref<Record<string, StoredOAuthToken>>({})
 
-    const hasToken = computed(() => Boolean(accessToken.value || refreshToken.value))
+    const hasToken = computed(() => Object.keys(tokensByUserId.value).length > 0)
     const clientId = computed(() => (import.meta.env.VITE_TOOLBOX_OAUTH_CLIENT_ID || '').trim())
 
     function saveTokensToStorage() {
-        const value: StoredOAuthTokens = {
-            accessToken: accessToken.value,
-            refreshToken: refreshToken.value,
-            scope: scope.value,
-            expiresAt: expiresAt.value,
-        }
-        localStorage.setItem(TOKEN_STORAGE_KEY, JSON.stringify(value))
+        localStorage.setItem(TOKEN_STORAGE_KEY, JSON.stringify(tokensByUserId.value))
     }
 
     function initialize() {
         try {
             const raw = localStorage.getItem(TOKEN_STORAGE_KEY)
             if (!raw) return
-            const parsed = JSON.parse(raw) as StoredOAuthTokens
-            accessToken.value = parsed.accessToken || ''
-            refreshToken.value = parsed.refreshToken || ''
-            scope.value = parsed.scope || ''
-            expiresAt.value = typeof parsed.expiresAt === 'number' ? parsed.expiresAt : null
+            const parsed = JSON.parse(raw) as Record<string, StoredOAuthToken> | StoredOAuthToken
+            if (parsed && typeof parsed === 'object' && 'accessToken' in parsed) {
+                // 兼容旧版单 token 存储：暂时挂到 unknown 桶
+                tokensByUserId.value = { unknown: parsed as StoredOAuthToken }
+            } else {
+                tokensByUserId.value = parsed || {}
+            }
         } catch {
             clearTokens()
         }
     }
 
     function clearTokens() {
-        accessToken.value = ''
-        refreshToken.value = ''
-        scope.value = ''
-        expiresAt.value = null
+        tokensByUserId.value = {}
         localStorage.removeItem(TOKEN_STORAGE_KEY)
+    }
+
+    function clearTokensForUser(userId: string) {
+        if (!tokensByUserId.value[userId]) return
+        delete tokensByUserId.value[userId]
+        saveTokensToStorage()
+    }
+
+    function hasTokenForUser(userId: string): boolean {
+        return Boolean(tokensByUserId.value[userId])
     }
 
     function getRedirectUri() {
@@ -120,20 +121,25 @@ export const useOAuthStore = defineStore('oauth', () => {
         }
     }
 
-    function saveTokenPayload(payload: any) {
-        accessToken.value = String(payload.access_token || '')
-        refreshToken.value = String(payload.refresh_token || '')
-        scope.value = String(payload.scope || '')
-        if (typeof payload.expires_in === 'number') {
-            expiresAt.value = Date.now() + payload.expires_in * 1000
-        } else {
-            expiresAt.value = null
+    function saveTokenPayload(userId: string, payload: any) {
+        const next: StoredOAuthToken = {
+            accessToken: String(payload.access_token || ''),
+            refreshToken: String(payload.refresh_token || ''),
+            scope: String(payload.scope || ''),
+            expiresAt: null,
         }
+        if (typeof payload.expires_in === 'number') {
+            next.expiresAt = Date.now() + payload.expires_in * 1000
+        }
+        tokensByUserId.value[userId] = next
         saveTokensToStorage()
     }
 
-    async function startAuthorization(returnTo?: string) {
+    async function startAuthorization(targetUserId: string, returnTo?: string) {
         ensureClientId()
+        if (!targetUserId) {
+            throw new Error('缺少目标游戏 ID，无法发起授权')
+        }
 
         const state = randomBase64Url(24)
         const codeVerifier = randomBase64Url(32)
@@ -142,6 +148,7 @@ export const useOAuthStore = defineStore('oauth', () => {
         const pending: PendingAuthState = {
             state,
             codeVerifier,
+            targetUserId,
             returnTo: returnTo || `${window.location.pathname}${window.location.search}${window.location.hash}`,
         }
         savePendingAuth(pending)
@@ -150,7 +157,7 @@ export const useOAuthStore = defineStore('oauth', () => {
         authUrl.searchParams.set('response_type', 'code')
         authUrl.searchParams.set('client_id', clientId.value)
         authUrl.searchParams.set('redirect_uri', getRedirectUri())
-        authUrl.searchParams.set('scope', 'game-data:read')
+        authUrl.searchParams.set('scope', 'user:read bindings:read game-data:read')
         authUrl.searchParams.set('state', state)
         authUrl.searchParams.set('code_challenge', codeChallenge)
         authUrl.searchParams.set('code_challenge_method', 'S256')
@@ -206,21 +213,22 @@ export const useOAuthStore = defineStore('oauth', () => {
             throw createOAuthError(desc, res.status, payload?.error)
         }
 
-        saveTokenPayload(payload)
+        saveTokenPayload(pending.targetUserId, payload)
         clearPendingAuth()
         return pending.returnTo || '/'
     }
 
-    async function refreshAccessToken() {
+    async function refreshAccessToken(userId: string) {
         ensureClientId()
-        if (!refreshToken.value) {
+        const tokenData = tokensByUserId.value[userId]
+        if (!tokenData?.refreshToken) {
             throw createOAuthError('未找到 refresh_token，请重新授权')
         }
 
         const body = new URLSearchParams()
         body.set('grant_type', 'refresh_token')
         body.set('client_id', clientId.value)
-        body.set('refresh_token', refreshToken.value)
+        body.set('refresh_token', tokenData.refreshToken)
 
         const tokenUrl = `${TOOLBOX_BASE_URL}/api/oauth2/token`
         const res = await fetch(tokenUrl, {
@@ -231,27 +239,29 @@ export const useOAuthStore = defineStore('oauth', () => {
         const payload = await parseJsonSafe(res)
         if (!res.ok) {
             const desc = payload?.error_description || payload?.message || `刷新 Token 失败 (${res.status})`
-            clearTokens()
+            clearTokensForUser(userId)
             throw createOAuthError(desc, res.status, payload?.error)
         }
-        saveTokenPayload(payload)
+        saveTokenPayload(userId, payload)
     }
 
-    async function getValidAccessToken(): Promise<string> {
-        const token = accessToken.value
-        const exp = expiresAt.value
+    async function getValidAccessToken(userId: string): Promise<string> {
+        const tokenData = tokensByUserId.value[userId]
+        const token = tokenData?.accessToken || ''
+        const exp = tokenData?.expiresAt ?? null
         const shouldRefresh = !token || (exp !== null && Date.now() >= exp - 30_000)
         if (shouldRefresh) {
-            await refreshAccessToken()
+            await refreshAccessToken(userId)
         }
-        if (!accessToken.value) {
+        const latest = tokensByUserId.value[userId]?.accessToken || ''
+        if (!latest) {
             throw createOAuthError('未获取到 access_token，请重新授权')
         }
-        return accessToken.value
+        return latest
     }
 
     async function fetchGameData(server: string, dataType: GameDataType, userId: string): Promise<any> {
-        const token = await getValidAccessToken()
+        const token = await getValidAccessToken(userId)
         const url = `${TOOLBOX_BASE_URL}/api/oauth2/game-data/${encodeURIComponent(server)}/${encodeURIComponent(dataType)}/${encodeURIComponent(userId)}`
         const res = await fetch(url, {
             headers: {
@@ -268,8 +278,10 @@ export const useOAuthStore = defineStore('oauth', () => {
 
     return {
         hasToken,
+        hasTokenForUser,
         initialize,
         clearTokens,
+        clearTokensForUser,
         startAuthorization,
         handleAuthorizationCallback,
         fetchGameData,

@@ -22,12 +22,12 @@ async function fetchSuiteByOAuth(userId: string): Promise<any> {
     const oauthStore = useOAuthStore()
     const returnTo = `${window.location.pathname}${window.location.search}${window.location.hash}`
 
-    if (oauthStore.hasToken) {
+    if (oauthStore.hasTokenForUser(userId)) {
         try {
             return await oauthStore.fetchGameData('jp', 'suite', userId)
         } catch (e: any) {
             if (e?.status === 401 || e?.status === 403) {
-                oauthStore.clearTokens()
+                oauthStore.clearTokensForUser(userId)
             } else {
                 throw e
             }
@@ -38,7 +38,7 @@ async function fetchSuiteByOAuth(userId: string): Promise<any> {
     if (!shouldAuthorize) {
         throw new Error('未完成 OAuth 授权，无法读取 Suite 数据')
     }
-    await oauthStore.startAuthorization(returnTo)
+    await oauthStore.startAuthorization(userId, returnTo)
     throw new Error('正在跳转 OAuth 授权页面...')
 }
 
