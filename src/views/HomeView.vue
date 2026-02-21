@@ -7,7 +7,8 @@ import { getVersion } from '@/api/version'
 import { 
   Music, Calendar, Clock, 
   ChevronRight, Sparkles, BarChart3,
-  CreditCard, User, Gift, Palette
+  CreditCard, User, Gift, Palette,
+  Image, Zap, Settings
 } from 'lucide-vue-next'
 import AssetImage from '@/components/AssetImage.vue'
 
@@ -313,28 +314,28 @@ onMounted(async () => {
     
     <!-- 顶部快捷入口 -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-      <RouterLink to="/musics" class="btn btn-primary h-auto py-3 gap-2 justify-start shadow-sm hover:shadow-md border-none">
+      <RouterLink to="/musics" class="btn btn-ghost bg-primary/10 text-primary hover:bg-primary/20 h-auto py-3 gap-2 justify-start shadow-sm border-none">
         <Music class="w-5 h-5 flex-shrink-0" /> 
         <div class="flex flex-col items-start leading-tight">
           <span>歌曲一览</span>
           <span class="text-[10px] font-normal opacity-70">Musics</span>
         </div>
       </RouterLink>
-      <RouterLink to="/cards" class="btn btn-secondary h-auto py-3 gap-2 justify-start shadow-sm hover:shadow-md border-none">
+      <RouterLink to="/cards" class="btn btn-ghost bg-secondary/10 text-secondary hover:bg-secondary/20 h-auto py-3 gap-2 justify-start shadow-sm border-none">
         <CreditCard class="w-5 h-5 flex-shrink-0" />
         <div class="flex flex-col items-start leading-tight">
           <span>卡片一览</span>
           <span class="text-[10px] font-normal opacity-70">Cards</span>
         </div>
       </RouterLink>
-      <RouterLink to="/events" class="btn btn-accent h-auto py-3 gap-2 justify-start shadow-sm hover:shadow-md border-none">
+      <RouterLink to="/events" class="btn btn-ghost bg-accent/10 text-accent hover:bg-accent/20 h-auto py-3 gap-2 justify-start shadow-sm border-none">
         <Calendar class="w-5 h-5 flex-shrink-0" />
         <div class="flex flex-col items-start leading-tight">
           <span>活动总览</span>
           <span class="text-[10px] font-normal opacity-70">Events</span>
         </div>
       </RouterLink>
-      <RouterLink to="/gachas" class="btn bg-orange-400 hover:bg-orange-500 text-white h-auto py-3 gap-2 justify-start shadow-sm hover:shadow-md border-none">
+      <RouterLink to="/gachas" class="btn btn-ghost bg-orange-500/10 text-orange-600 dark:text-orange-400 hover:bg-orange-500/20 h-auto py-3 gap-2 justify-start shadow-sm border-none">
         <Sparkles class="w-5 h-5 flex-shrink-0" />
         <div class="flex flex-col items-start leading-tight">
           <span>活动卡池</span>
@@ -506,13 +507,16 @@ onMounted(async () => {
     
     <!-- 底部功能入口 -->
     <div class="grid grid-cols-2 md:grid-cols-3 gap-3 border-t border-base-200 pt-6">
-      <RouterLink to="/sus2img" class="btn bg-base-100 border-base-200 h-auto py-3 justify-center shadow-sm hover:shadow-md hover:border-primary">
+      <RouterLink to="/sus2img" class="btn bg-base-100 border-base-200 h-auto py-3 justify-center shadow-sm hover:shadow-md hover:border-primary font-normal">
+        <Image class="w-4 h-4 mr-1 opacity-70" />
         谱面转图片
       </RouterLink>
-      <RouterLink to="/deck-recommend" class="btn bg-base-100 border-base-200 h-auto py-3 justify-center shadow-sm hover:shadow-md hover:border-primary">
+      <RouterLink to="/deck-recommend" class="btn bg-base-100 border-base-200 h-auto py-3 justify-center shadow-sm hover:shadow-md hover:border-primary font-normal">
+        <Zap class="w-4 h-4 mr-1 opacity-70" />
         自动组队
       </RouterLink>
-      <RouterLink to="/settings" class="btn bg-base-100 border-base-200 h-auto py-3 justify-center shadow-sm hover:shadow-md hover:border-primary">
+      <RouterLink to="/settings" class="btn bg-base-100 border-base-200 h-auto py-3 justify-center shadow-sm hover:shadow-md hover:border-primary font-normal">
+        <Settings class="w-4 h-4 mr-1 opacity-70" />
         系统设置
       </RouterLink>
     </div>

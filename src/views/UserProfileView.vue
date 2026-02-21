@@ -418,7 +418,7 @@ watch(currentUserId, async (newId) => {
 
     <template v-else>
       <!-- ==================== 账号管理 ==================== -->
-      <div class="card bg-base-100 shadow-lg overflow-visible relative z-50">
+      <div class="card bg-base-100 shadow-lg overflow-visible relative z-30">
         <div class="card-body space-y-4">
           <!-- 添加账号 -->
           <div class="flex flex-wrap gap-2 items-end">
