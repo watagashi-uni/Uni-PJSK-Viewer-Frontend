@@ -3,7 +3,8 @@ import { ref, onMounted, computed, watch, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useMasterStore } from '@/stores/master'
 import AssetImage from '@/components/AssetImage.vue'
-import { ChevronLeft } from 'lucide-vue-next'
+import SekaiCard from '@/components/SekaiCard.vue'
+import { ChevronLeft, ScrollText, Zap } from 'lucide-vue-next'
 
 interface Card {
   id: number
@@ -14,8 +15,13 @@ interface Card {
   assetbundleName: string
   releaseAt: number
   skillId: number
+  specialTrainingSkillId?: number
   cardSkillName: string
-  cardParameters: { cardParameterType: string; power: number }[]
+  specialTrainingSkillName?: string
+  cardParameters: any
+  specialTrainingPower1BonusFixed: number
+  specialTrainingPower2BonusFixed: number
+  specialTrainingPower3BonusFixed: number
 }
 
 interface ResourceBoxDetail {
@@ -45,6 +51,7 @@ interface Character {
 }
 
 interface SkillEffectDetail {
+  level: number
   activateEffectDuration?: number
   activateEffectValue: number
 }
@@ -55,8 +62,10 @@ interface SkillEnhance {
 
 interface SkillEffect {
   id: number
+  activateCharacterRank?: number
+  activateUnitCount?: number
   skillEffectDetails: SkillEffectDetail[]
-  skillEnhance: SkillEnhance
+  skillEnhance?: SkillEnhance
 }
 
 interface Skill {
@@ -74,37 +83,55 @@ const cardId = computed(() => Number(route.params.id))
 const card = ref<Card | null>(null)
 const character = ref<Character | null>(null)
 const skill = ref<Skill | null>(null)
+const trainedSkill = ref<Skill | null>(null)
 const resourceBoxes = ref<ResourceBox[]>([])
 const gachaCeilExchangeSummaries = ref<GachaCeilExchangeSummary[]>([])
 const isLoading = ref(true)
-const isCardTypeLoading = ref(true) // 卡片类型加载状态
+const isCardTypeLoading = ref(true)
 const showNormalCutout = ref(true)
 const showTrainedCutout = ref(true)
 
-// 卡片限定类型: false=普通, 'limited'=普限, 'fes'=fes限
 const limitType = ref<false | 'limited' | 'fes'>(false)
 
 const assetsHost = 'https://assets.unipjsk.com'
 
-// 稀有度星星数量
-const starCount = computed(() => {
-  if (!card.value) return 0
-  const map: Record<string, number> = {
-    rarity_1: 1,
-    rarity_2: 2,
-    rarity_3: 3,
-    rarity_4: 4,
-    rarity_birthday: 1,
-  }
-  return map[card.value.cardRarityType] || 0
-})
+// Sliders states
+const skillLevel = ref(1)
+const maxSkillLevel = ref(1)
 
-// 是否为觉醒卡
-const hasTraining = computed(() => {
+const charaRank = ref(1)
+const maxCharaRank = ref(1)
+
+// Removed computed side-effects and replaced with separate reactive states
+const charaRankNecessaryNormal = ref(false)
+const unitCountNecessaryNormal = ref(false)
+const charaRankNecessaryTrained = ref(false)
+const unitCountNecessaryTrained = ref(false)
+
+const unitCount = ref(2)
+const unitCountMax = ref(4)
+const cardLevel = ref(1)
+const maxNormalLevel = ref(1)
+const maxTrainedLevel = ref(1)
+const masterRank = ref(0)
+const cardEpisodes = ref<any[]>([])
+
+const masterRankRewards = [0, 50, 100, 150, 200]
+const cardRarityTypeToRarity: Record<string, number> = {
+  rarity_1: 0,
+  rarity_2: 1,
+  rarity_3: 2,
+  rarity_4: 3,
+  rarity_birthday: 4
+}
+
+
+
+
+const isTrainingType = computed(() => {
   return card.value?.cardRarityType === 'rarity_3' || card.value?.cardRarityType === 'rarity_4'
 })
 
-// 根据cardId找到对应的resourceBoxId
 function findResourceBoxIdByCardId(cardId: number): number | null {
   for (const box of resourceBoxes.value) {
     if (box.resourceBoxPurpose === 'gacha_ceil_exchange') {
@@ -118,7 +145,6 @@ function findResourceBoxIdByCardId(cardId: number): number | null {
   return null
 }
 
-// 判断卡片限定类型
 function getCardLimitType(cardId: number): false | 'limited' | 'fes' {
   const resourceBoxId = findResourceBoxIdByCardId(cardId)
   if (!resourceBoxId) return false
@@ -146,46 +172,192 @@ const cardTypeLabel = computed(() => {
   return '普通卡'
 })
 
-// 综合力
+const getPowerElement = (paramType: string) => {
+  if (!card.value) return 0
+  let baseObj = card.value.cardParameters
+  if (!baseObj) return 0
+  let p = 0
+  if (Array.isArray(baseObj)) {
+    p = baseObj.find((elem: any) => elem.cardParameterType === paramType && elem.cardLevel === cardLevel.value)?.power || 0
+  } else {
+      if(baseObj[paramType] && baseObj[paramType][cardLevel.value - 1]) {
+          p = baseObj[paramType][cardLevel.value - 1]
+      }
+  }
+  let trainingBonus = 0
+  if (cardLevel.value > maxNormalLevel.value) {
+    if (paramType === 'param1') trainingBonus = card.value.specialTrainingPower1BonusFixed || 0
+    if (paramType === 'param2') trainingBonus = card.value.specialTrainingPower2BonusFixed || 0
+    if (paramType === 'param3') trainingBonus = card.value.specialTrainingPower3BonusFixed || 0
+  }
+  let episodeBonus = 0
+  if (cardEpisodes.value[0]) {
+    if (paramType === 'param1') episodeBonus += cardEpisodes.value[0].power1BonusFixed || 0
+    if (paramType === 'param2') episodeBonus += cardEpisodes.value[0].power2BonusFixed || 0
+    if (paramType === 'param3') episodeBonus += cardEpisodes.value[0].power3BonusFixed || 0
+  }
+  if (cardEpisodes.value[1]) {
+    if (paramType === 'param1') episodeBonus += cardEpisodes.value[1].power1BonusFixed || 0
+    if (paramType === 'param2') episodeBonus += cardEpisodes.value[1].power2BonusFixed || 0
+    if (paramType === 'param3') episodeBonus += cardEpisodes.value[1].power3BonusFixed || 0
+  }
+  let masterBonus = masterRank.value * (masterRankRewards[cardRarityTypeToRarity[card.value.cardRarityType] || 0] || 0)
+  return p + trainingBonus + episodeBonus + masterBonus
+}
+
 const totalPower = computed(() => {
-  if (!card.value?.cardParameters) return { perf: 0, tech: 0, stam: 0, total: 0 }
-  const perf = card.value.cardParameters.find(p => p.cardParameterType === 'param1')?.power || 0
-  const tech = card.value.cardParameters.find(p => p.cardParameterType === 'param2')?.power || 0
-  const stam = card.value.cardParameters.find(p => p.cardParameterType === 'param3')?.power || 0
+  const perf = getPowerElement("param1")
+  const tech = getPowerElement("param2")
+  const stam = getPowerElement("param3")
   return { perf, tech, stam, total: perf + tech + stam }
 })
 
-// 解析技能描述
-const parsedDescription = computed(() => {
-  if (!skill.value) return '-'
+// Unified parse skill function to avoid mutating reactive vars in computed
+const parseSkill = (skillObj: Skill | null, isTrained: boolean) => {
+  if (!skillObj) return '-'
   
-  let description = skill.value.description
-  const placeholderRegex = /\{\{(\d+);([^}]+)\}\}/g
-  
-  return description.replace(placeholderRegex, (match, idStr, type) => {
-    const id = parseInt(idStr)
-    const effect = skill.value?.skillEffects.find(e => e.id === id)
-    
-    if (!effect) return match
-    
-    const details = effect.skillEffectDetails
-    let values: (string | number)[] = []
-    
-    if (type === 'd') {
-      values = details.map(d => d.activateEffectDuration || 0)
-    } else if (type === 'e') {
-      values = [effect.skillEnhance.activateEffectValue]
-    } else if (type === 'm') {
-      values = details.map(d => d.activateEffectValue + 5 * effect.skillEnhance.activateEffectValue)
-    } else {
-      values = details.map(d => d.activateEffectValue)
+  const skillInfo = skillObj.description
+  const singleRegExp = /\{\{(\d+);(\w+)\}\}/g
+  const doubleRegExp = /\{\{(\d+),(\d+);(\w+)\}\}/g
+
+  let newSkillInfo = String(skillInfo)
+  let _charaRankNecessary = false
+  let _unitCountNecessary = false
+
+  newSkillInfo = newSkillInfo.replace(singleRegExp, (match, p1, p2) => {
+    const effect = skillObj.skillEffects.find(elem => elem.id === Number(p1))
+    if (effect) {
+      const detail = effect.skillEffectDetails.find(d => d.level === skillLevel.value)
+      if (detail) {
+        switch (p2) {
+          case 'd':
+            return String(detail.activateEffectDuration || 0)
+          case 'v':
+            return String(detail.activateEffectValue)
+          case 'e':
+            if (effect.skillEnhance?.activateEffectValue)
+              return String(effect.skillEnhance.activateEffectValue)
+            break
+          case 'm':
+            if (effect.skillEnhance?.activateEffectValue)
+              return String(effect.skillEnhance.activateEffectValue * 5 + detail.activateEffectValue)
+            break
+        }
+      }
+    } else if (p2 === 'c' && character.value) {
+      return (character.value.firstName || '') + character.value.givenName
     }
-    
-    // 如果所有值相同，只显示一个
-    const uniqueValues = Array.from(new Set(values))
-    return uniqueValues.join('/')
+    return match
   })
-})
+
+  newSkillInfo = newSkillInfo.replace(doubleRegExp, (match, p1, p2, p3) => {
+    switch (p3) {
+      case 'r': {
+        _charaRankNecessary = true
+        const minRank = skillObj.skillEffects.find(elem => elem.id === Number(p1))?.activateCharacterRank
+        const maxRank = skillObj.skillEffects.find(elem => elem.id === Number(p2))?.activateCharacterRank
+        if (minRank && maxRank) {
+          const currentEffect = skillObj.skillEffects.find(elem =>
+            charaRank.value > maxRank
+              ? elem.activateCharacterRank === maxRank
+              : elem.activateCharacterRank === charaRank.value || elem.activateCharacterRank === charaRank.value - 1
+          )
+          if (currentEffect) {
+            const detail = currentEffect.skillEffectDetails.find(d => d.level === skillLevel.value)
+            return String(detail?.activateEffectValue || 0)
+          } else if (charaRank.value < minRank) {
+            return '# 角色等级不足 #'
+          } else {
+            return '0'
+          }
+        }
+        break
+      }
+      case 's': {
+        _charaRankNecessary = true
+        const baseSkillEffect = skillObj.skillEffects.find(elem => elem.id === Number(p1))
+        const minRank = skillObj.skillEffects.find(elem => elem.id === Number(p1) + 1)?.activateCharacterRank
+        const maxRank = skillObj.skillEffects.find(elem => elem.id === Number(p2))?.activateCharacterRank
+        if (minRank && maxRank) {
+          const currentEffect = skillObj.skillEffects.find(elem =>
+            charaRank.value > maxRank
+              ? elem.activateCharacterRank === maxRank
+              : elem.activateCharacterRank === charaRank.value || Math.floor((charaRank.value-1)/2)*2+1 === elem.activateCharacterRank
+          )
+          if (baseSkillEffect && currentEffect) {
+            const baseDetail = baseSkillEffect.skillEffectDetails.find(d => d.level === skillLevel.value)
+            const currentDetail = currentEffect.skillEffectDetails.find(d => d.level === skillLevel.value)
+            return String((baseDetail?.activateEffectValue || 0) + (currentDetail?.activateEffectValue || 0))
+          } else if (charaRank.value < minRank) {
+            return '# 角色等级不足 #'
+          } else {
+            return '0'
+          }
+        }
+        break
+      }
+      case 'v': {
+        const baseSkillEffect = skillObj.skillEffects.find(elem => elem.id === Number(p1))
+        const maxRank = skillObj.skillEffects.find(elem => elem.id === Number(p2))?.activateCharacterRank
+        if (maxRank) {
+          const currentEffect = skillObj.skillEffects.find(elem => elem.activateCharacterRank === maxRank)
+          if (baseSkillEffect && currentEffect) {
+            const baseDetail = baseSkillEffect.skillEffectDetails.find(d => d.level === skillLevel.value)
+            const currentDetail = currentEffect.skillEffectDetails.find(d => d.level === skillLevel.value)
+            return String((baseDetail?.activateEffectValue || 0) + (currentDetail?.activateEffectValue || 0))
+          }
+        }
+        break
+      }
+      case 'u': {
+        _unitCountNecessary = true
+        if (unitCount.value > 0) {
+          const baseSkillEffect = skillObj.skillEffects.find(elem => elem.id === Number(p1))
+          const unitSkillEffect = skillObj.skillEffects.find(elem => elem.activateUnitCount === unitCount.value)
+          if (baseSkillEffect && unitSkillEffect) {
+            const baseDetail = baseSkillEffect.skillEffectDetails.find(d => d.level === skillLevel.value)
+            const currentDetail = unitSkillEffect.skillEffectDetails.find(d => d.level === skillLevel.value)
+            return String((baseDetail?.activateEffectValue || 0) + (currentDetail?.activateEffectValue || 0))
+          }
+        } else {
+            const baseSkillEffect = skillObj.skillEffects.find(elem => elem.id === Number(p1));
+            if (baseSkillEffect) {
+                const baseDetail = baseSkillEffect.skillEffectDetails.find(d => d.level === skillLevel.value);
+                return String(baseDetail?.activateEffectValue || 0);
+            }
+        }
+        break
+      }
+      case 'o': {
+        const baseSkillEffect = skillObj.skillEffects.find(elem => elem.id === Number(p1))
+        const enhanceSkillEffect = skillObj.skillEffects.find(elem => elem.id === Number(p2))
+        if (baseSkillEffect && enhanceSkillEffect) {
+          const baseDetail = baseSkillEffect.skillEffectDetails.find(d => d.level === skillLevel.value)
+          const currentDetail = enhanceSkillEffect.skillEffectDetails.find(d => d.level === skillLevel.value)
+          return String((baseDetail?.activateEffectValue || 0) + (currentDetail?.activateEffectValue || 0))
+        }
+        break
+      }
+    }
+    return match
+  })
+  if (isTrained) {
+    charaRankNecessaryTrained.value = _charaRankNecessary
+    unitCountNecessaryTrained.value = _unitCountNecessary
+  } else {
+    charaRankNecessaryNormal.value = _charaRankNecessary
+    unitCountNecessaryNormal.value = _unitCountNecessary
+  }
+
+  return newSkillInfo
+}
+
+const parsedDescription = computed(() => parseSkill(skill.value, false))
+const parsedTrainedDescription = computed(() => parseSkill(trainedSkill.value, true))
+
+// Show sliders if normal OR trained skill needs it
+const showCharaRankSlider = computed(() => charaRankNecessaryNormal.value || charaRankNecessaryTrained.value)
+const showUnitCountSlider = computed(() => unitCountNecessaryNormal.value || unitCountNecessaryTrained.value)
 
 const coverUrl = computed(() => {
   if (!card.value) return ''
@@ -197,7 +369,6 @@ const trainedCoverUrl = computed(() => {
   return `${assetsHost}/startapp/character/member/${card.value.assetbundleName}/card_after_training.jpg`
 })
 
-// 格式化发布时间（包含具体时分秒）
 function formatDate(timestamp: number): string {
   const date = new Date(timestamp)
   return date.toLocaleString('zh-CN', {
@@ -211,7 +382,6 @@ function formatDate(timestamp: number): string {
   })
 }
 
-// 后台加载卡片类型数据（用于判断限定卡类型）
 async function loadCardTypeData() {
   isCardTypeLoading.value = true
   try {
@@ -222,7 +392,6 @@ async function loadCardTypeData() {
     resourceBoxes.value = resourceBoxesData
     gachaCeilExchangeSummaries.value = gachaCeilExchangeSummariesData
     
-    // 计算当前卡片的限定类型
     if (card.value) {
       limitType.value = getCardLimitType(card.value.id)
     }
@@ -233,17 +402,18 @@ async function loadCardTypeData() {
   }
 }
 
-// 加载基本数据
 async function loadData() {
   isLoading.value = true
   showNormalCutout.value = true
   showTrainedCutout.value = true
   try {
-    // 先加载基本数据（快速渲染）
-    const [cardsData, charactersData, skillsData] = await Promise.all([
+    const [cardsData, charactersData, skillsData, raritiesData, charaRanksData, cardEpisodesData] = await Promise.all([
       masterStore.getMaster<Card>('cards'),
       masterStore.getMaster<Character>('gameCharacters'),
       masterStore.getMaster<Skill>('skills'),
+      masterStore.getMaster<any>('cardRarities'),
+      masterStore.getMaster<any>('characterRanks'),
+      masterStore.getMaster<any>('cardEpisodes'),
     ])
     
     card.value = cardsData.find(c => c.id === cardId.value) || null
@@ -251,18 +421,36 @@ async function loadData() {
     if (card.value) {
       character.value = charactersData.find(c => c.id === card.value!.characterId) || null
       skill.value = skillsData.find(s => s.id === card.value!.skillId) || null
+      
+      if (card.value.specialTrainingSkillId) {
+          trainedSkill.value = skillsData.find(s => s.id === card.value!.specialTrainingSkillId!) || null
+      }
+      
+      const rarityInfo = raritiesData.find((r: any) => r.cardRarityType === card.value!.cardRarityType)
+      if (rarityInfo) {
+        maxNormalLevel.value = rarityInfo.maxLevel
+        maxTrainedLevel.value = rarityInfo.trainingMaxLevel || rarityInfo.maxLevel
+        cardLevel.value = maxTrainedLevel.value
+        maxSkillLevel.value = skill.value?.skillEffects[0]?.skillEffectDetails[skill.value.skillEffects[0].skillEffectDetails.length - 1]?.level || rarityInfo.maxSkillLevel || 1
+        skillLevel.value = maxSkillLevel.value
+      }
+
+      const ranks = charaRanksData.filter((c: any) => c.characterId === card.value!.characterId)
+      maxCharaRank.value = ranks.length > 0 ? Math.max(...ranks.map((r: any) => r.characterRank)) : 1
+      charaRank.value = maxCharaRank.value
+
+      cardEpisodes.value = cardEpisodesData.filter((e: any) => e.cardId === card.value!.id)
     }
   } catch (error) {
     console.error('加载卡片详情失败:', error)
   } finally {
     isLoading.value = false
   }
+  // Initialize parsing correctly with Watcher effect to avoid computed side effects
   
-  // 后台加载卡片类型数据（不阻塞页面渲染）
   loadCardTypeData()
 }
 
-// 动态设置网页标题
 const defaultTitle = 'Uni PJSK Viewer'
 watch([card, character], ([newCard, newChar]) => {
   if (newCard && newChar) {
@@ -279,7 +467,6 @@ onBeforeUnmount(() => {
   document.title = defaultTitle
 })
 
-// 返回上一页
 function goBack() {
   const backState = window.history.state?.back
   if (typeof backState === 'string' && backState.startsWith('/cards')) {
@@ -302,7 +489,7 @@ onMounted(loadData)
     <!-- 卡片详情 -->
     <template v-else-if="card">
       <!-- 顶部导航 -->
-      <div class="mb-4 max-w-4xl mx-auto px-4 lg:px-0">
+      <div class="mb-4 max-w-4xl mx-auto px-4 lg:px-0 flex justify-between">
         <button class="btn btn-ghost btn-sm gap-2 pl-0" @click="goBack">
           <ChevronLeft class="w-4 h-4" /> 返回列表
         </button>
@@ -311,7 +498,7 @@ onMounted(loadData)
       <div class="card bg-base-100 shadow-lg max-w-4xl mx-auto animate-fade-in-up overflow-hidden">
         <div class="card-body">
           <!-- 标题区域 -->
-          <div class="text-center mb-6 pb-4 border-b border-base-200">
+          <div class="text-center pb-4 mb-4">
             <h1 class="text-2xl font-bold flex items-center justify-center gap-3">
               <img 
                 :src="`/newcard/attr_icon_${card.attr}.png`" 
@@ -321,125 +508,182 @@ onMounted(loadData)
               />
               {{ card.prefix }}
             </h1>
-            <p class="text-lg text-base-content/70 mt-1">
+            <p class="text-lg text-base-content/70 mt-1 mb-4 border-b border-base-200 pb-4">
               {{ character ? (character.firstName || '') + character.givenName : '' }}
             </p>
             
-            <!-- 星级 -->
-            <div class="flex justify-center gap-1 mt-3">
-              <template v-if="card.cardRarityType === 'rarity_birthday'">
-                🎂
-              </template>
-              <template v-else>
-                <span v-for="i in starCount" :key="i" class="text-yellow-400 text-xl">⭐</span>
-              </template>
+            <div class="flex justify-center gap-6 mt-4 opacity-90">
+              <div class="w-20 hover:-translate-y-1 hover:shadow-xl transition-all duration-300 rounded-lg overflow-hidden shrink-0 mt-2">
+                <SekaiCard :card="card" :trained="false" />
+              </div>
+              <div v-if="isTrainingType" class="w-20 hover:-translate-y-1 hover:shadow-xl transition-all duration-300 rounded-lg overflow-hidden shrink-0 mt-2">
+                <SekaiCard :card="card" :trained="true" />
+              </div>
             </div>
           </div>
+
+
 
           <!-- 信息区域 -->
           <div class="grid md:grid-cols-2 gap-6">
             <!-- 卡片信息 -->
             <div class="bg-base-200 rounded-xl p-5">
               <h3 class="font-semibold text-primary mb-4 flex items-center gap-2">
-                📝 卡片信息
+                <ScrollText class="w-5 h-5 text-primary" /> 技能信息
               </h3>
-              <div class="space-y-2 text-sm">
-                <p><span class="font-medium">卡片类型：</span>{{ cardTypeLabel }}</p>
-                <p><span class="font-medium">实装时间：</span>{{ card?.releaseAt ? formatDate(card.releaseAt) : '-' }}</p>
-                <p><span class="font-medium">技能名：</span>{{ card?.cardSkillName || '-' }}</p>
-                <p><span class="font-medium">技能效果：</span>{{ parsedDescription }}</p>
+              <!-- 技能滑块 -->
+              <div class="space-y-4 mb-6">
+                <div class="flex items-center">
+                  <span class="w-24 text-sm font-medium">技能等级</span>
+                  <input v-model.number="skillLevel" type="range" :min="1" :max="maxSkillLevel" class="range range-xs range-primary flex-1" />
+                  <span class="ml-2 w-8 text-sm">{{ skillLevel }}</span>
+                </div>
+                <div v-if="showCharaRankSlider" class="flex items-center">
+                  <span class="w-24 text-sm font-medium">角色等级</span>
+                  <input v-model.number="charaRank" type="range" :min="1" :max="maxCharaRank" class="range range-xs range-primary flex-1" />
+                  <span class="ml-2 w-8 text-sm">{{ charaRank }}</span>
+                </div>
+                <div v-if="showUnitCountSlider" class="flex items-center">
+                  <span class="w-24 text-sm font-medium">同队人数</span>
+                  <input v-model.number="unitCount" type="range" :min="0" :max="unitCountMax" class="range range-xs range-primary flex-1" />
+                  <span class="ml-2 w-8 text-sm">{{ unitCount }}</span>
+                </div>
+              </div>
+
+
+
+              <!-- 普通技能 -->
+              <div class="space-y-2 text-sm border-t border-base-300 pt-4 mt-4">
+                <p><span class="font-medium">技能名{{ !!card?.specialTrainingSkillId ? ' (特训前)' : '' }}：</span>{{ card?.cardSkillName || '-' }}</p>
+                <div class="flex mt-1">
+                  <span class="font-medium whitespace-nowrap">技能效果{{ !!card?.specialTrainingSkillId ? ' (特训前)' : '' }}：</span>
+                  <span>{{ parsedDescription }}</span>
+                </div>
+              </div>
+
+              <!-- 特训技能 -->
+              <div v-if="!!card?.specialTrainingSkillId" class="space-y-2 text-sm border-t border-base-300 pt-4 mt-4">
+                <p><span class="font-medium">技能名 (特训后)：</span>{{ card?.specialTrainingSkillName || '-' }}</p>
+                <div class="flex mt-1">
+                  <span class="font-medium whitespace-nowrap">技能效果 (特训后)：</span>
+                  <span>{{ parsedTrainedDescription }}</span>
+                </div>
+              </div>
+
+              <!-- 卡片类型 & 实装时间 -->
+              <div class="space-y-2 text-sm border-t border-base-300 pt-4 mt-4 text-base-content/80">
+                <p><span class="font-medium text-base-content">卡片类型：</span>{{ cardTypeLabel }}</p>
+                <p><span class="font-medium text-base-content">实装时间：</span>{{ card?.releaseAt ? formatDate(card.releaseAt) : '-' }}</p>
               </div>
             </div>
             
             <!-- 能力值 -->
             <div class="bg-base-200 rounded-xl p-5">
               <h3 class="font-semibold text-primary mb-4 flex items-center gap-2">
-                ⚡ 能力值
+                <Zap class="w-5 h-5 text-primary" /> 综合力
               </h3>
-              <p class="text-xs text-base-content/60 mb-3">满级 已特训 未突破 未看剧情的值</p>
-              <div class="flex flex-wrap gap-3">
-                <div class="bg-base-100 rounded-lg p-3 text-center min-w-20">
+              <!-- 综合力滑块 -->
+              <div class="space-y-6 mb-6">
+                <div class="flex items-center">
+                  <span class="w-24 text-sm font-medium">卡牌等级</span>
+                  <input v-model.number="cardLevel" type="range" :min="1" :max="maxTrainedLevel" class="range range-xs range-secondary flex-1" />
+                  <span class="ml-2 w-8 text-sm">{{ cardLevel }}</span>
+                </div>
+                <div class="flex items-center">
+                  <span class="w-24 text-sm font-medium">Master Rank</span>
+                  <input v-model.number="masterRank" type="range" :min="0" :max="5" class="range range-xs range-secondary flex-1" />
+                  <span class="ml-2 w-8 text-sm">{{ masterRank }}</span>
+                </div>
+              </div>
+
+              <div class="flex flex-nowrap gap-3 mt-4 border-t border-base-300 pt-4">
+                <div class="bg-base-100 rounded-lg p-3 text-center flex-1">
                   <div class="text-xs text-base-content/60">Performance</div>
                   <div class="text-lg font-bold text-primary">{{ totalPower.perf }}</div>
                 </div>
-                <div class="bg-base-100 rounded-lg p-3 text-center min-w-20">
+                <div class="bg-base-100 rounded-lg p-3 text-center flex-1">
                   <div class="text-xs text-base-content/60">Technique</div>
                   <div class="text-lg font-bold text-primary">{{ totalPower.tech }}</div>
                 </div>
-                <div class="bg-base-100 rounded-lg p-3 text-center min-w-20">
+                <div class="bg-base-100 rounded-lg p-3 text-center flex-1">
                   <div class="text-xs text-base-content/60">Stamina</div>
                   <div class="text-lg font-bold text-primary">{{ totalPower.stam }}</div>
                 </div>
-                <div class="bg-gradient-to-br from-primary to-success text-white rounded-lg p-3 text-center min-w-20">
-                  <div class="text-xs opacity-90">综合力</div>
-                  <div class="text-lg font-bold">{{ totalPower.total }}</div>
-                </div>
               </div>
+              <div class="bg-gradient-to-br from-primary to-success text-white rounded-lg p-3 text-center mt-3 shadow-md" style="width: 100%">
+                <div class="text-xs opacity-90">总综合力</div>
+                <div class="text-xl font-bold">{{ totalPower.total }}</div>
+              </div>
+              <p class="text-xs text-base-content/60 mt-3 flex items-center gap-1 justify-center">注：前篇和后篇看完的值</p>
             </div>
           </div>
 
           <!-- 卡面图片 -->
           <div class="mt-8 space-y-8">
-            <!-- 普通卡面 + 立绘 -->
-            <div class="flex justify-center items-end gap-4 flex-wrap md:flex-nowrap">
-              <a 
-                :href="coverUrl.replace('.jpg', '.png')" 
-                target="_blank"
-                class="block rounded-xl overflow-hidden shadow-lg hover:-translate-y-1 hover:shadow-xl transition-all duration-300 min-w-0 flex-shrink"
-              >
-                <AssetImage 
-                  :src="coverUrl"
-                  :alt="card.prefix"
-                  class="max-h-[300px] md:max-h-[400px] w-auto max-w-full object-contain"
-                />
-              </a>
-              
-              <!-- 普通立绘 (cutout) -->
-              <a 
-                v-if="showNormalCutout"
-                :href="`${assetsHost}/startapp/character/member_cutout_trm/${card.assetbundleName}/normal.png`" 
-                target="_blank"
-                class="block rounded-xl overflow-hidden shadow-lg hover:-translate-y-1 hover:shadow-xl transition-all duration-300 min-w-0 flex-shrink"
-              >
-                <AssetImage 
-                  :src="`${assetsHost}/startapp/character/member_cutout_trm/${card.assetbundleName}/normal.png`"
-                  alt="立绘"
-                  class="max-h-[300px] md:max-h-[400px] w-auto max-w-full object-contain"
-                  no-fallback
-                  @failed="showNormalCutout = false"
-                />
-              </a>
+            <!-- 普通卡面 + 头像 -->
+            <div class="flex justify-center items-center gap-4 flex-wrap flex-col">
+              <div class="flex justify-center items-end gap-4 max-w-full">
+                <a 
+                  :href="coverUrl.replace('.jpg', '.png')" 
+                  target="_blank"
+                  class="block rounded-xl overflow-hidden shadow-lg hover:-translate-y-1 hover:shadow-xl transition-all duration-300 min-w-0 flex-shrink"
+                >
+                  <AssetImage 
+                    :src="coverUrl"
+                    :alt="card.prefix"
+                    class="max-h-[300px] md:max-h-[400px] w-auto max-w-full object-contain"
+                  />
+                </a>
+                  
+                <!-- 普通立绘 (cutout) -->
+                <a 
+                  v-if="showNormalCutout"
+                  :href="`${assetsHost}/startapp/character/member_cutout_trm/${card.assetbundleName}/normal.png`" 
+                  target="_blank"
+                  class="block rounded-xl overflow-hidden shadow-lg hover:-translate-y-1 hover:shadow-xl transition-all duration-300 min-w-0 flex-shrink"
+                >
+                  <AssetImage 
+                    :src="`${assetsHost}/startapp/character/member_cutout_trm/${card.assetbundleName}/normal.png`"
+                    alt="立绘"
+                    class="max-h-[300px] md:max-h-[400px] w-auto max-w-full object-contain"
+                    no-fallback
+                    @failed="showNormalCutout = false"
+                  />
+                </a>
+              </div>
             </div>
             
             <!-- 觉醒卡面 + 立绘 -->
-            <div v-if="hasTraining" class="flex justify-center items-end gap-4 flex-wrap md:flex-nowrap">
-              <a 
-                :href="trainedCoverUrl.replace('.jpg', '.png')" 
-                target="_blank"
-                class="block rounded-xl overflow-hidden shadow-lg hover:-translate-y-1 hover:shadow-xl transition-all duration-300 min-w-0 flex-shrink"
-              >
-                <AssetImage 
-                  :src="trainedCoverUrl"
-                  :alt="card.prefix + ' (觉醒)'"
-                  class="max-h-[300px] md:max-h-[400px] w-auto max-w-full object-contain"
-                />
-              </a>
-              
-              <!-- 觉醒立绘 (cutout) -->
-              <a 
-                v-if="showTrainedCutout"
-                :href="`${assetsHost}/startapp/character/member_cutout_trm/${card.assetbundleName}/after_training.png`" 
-                target="_blank"
-                class="block rounded-xl overflow-hidden shadow-lg hover:-translate-y-1 hover:shadow-xl transition-all duration-300 min-w-0 flex-shrink"
-              >
-                <AssetImage 
-                  :src="`${assetsHost}/startapp/character/member_cutout_trm/${card.assetbundleName}/after_training.png`"
-                  alt="觉醒立绘"
-                  class="max-h-[300px] md:max-h-[400px] w-auto max-w-full object-contain"
-                  no-fallback
-                  @failed="showTrainedCutout = false"
-                />
-              </a>
+            <div v-if="isTrainingType" class="flex justify-center items-center gap-4 flex-wrap flex-col border-t border-base-200 pt-8">
+              <div class="flex justify-center items-end gap-4 max-w-full">
+                <a 
+                  :href="trainedCoverUrl.replace('.jpg', '.png')" 
+                  target="_blank"
+                  class="block rounded-xl overflow-hidden shadow-lg hover:-translate-y-1 hover:shadow-xl transition-all duration-300 min-w-0 flex-shrink"
+                >
+                  <AssetImage 
+                    :src="trainedCoverUrl"
+                    :alt="card.prefix + ' (觉醒)'"
+                    class="max-h-[300px] md:max-h-[400px] w-auto max-w-full object-contain"
+                  />
+                </a>
+                  
+                <!-- 觉醒立绘 (cutout) -->
+                <a 
+                  v-if="showTrainedCutout"
+                  :href="`${assetsHost}/startapp/character/member_cutout_trm/${card.assetbundleName}/after_training.png`" 
+                  target="_blank"
+                  class="block rounded-xl overflow-hidden shadow-lg hover:-translate-y-1 hover:shadow-xl transition-all duration-300 min-w-0 flex-shrink"
+                >
+                  <AssetImage 
+                    :src="`${assetsHost}/startapp/character/member_cutout_trm/${card.assetbundleName}/after_training.png`"
+                    alt="觉醒立绘"
+                    class="max-h-[300px] md:max-h-[400px] w-auto max-w-full object-contain"
+                    no-fallback
+                    @failed="showTrainedCutout = false"
+                  />
+                </a>
+              </div>
             </div>
           </div>
         </div>
