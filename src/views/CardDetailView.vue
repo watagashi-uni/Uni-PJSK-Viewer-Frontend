@@ -254,19 +254,17 @@ const parseSkill = (skillObj: Skill | null, isTrained: boolean) => {
     switch (p3) {
       case 'r': {
         _charaRankNecessary = true
-        const minRank = skillObj.skillEffects.find(elem => elem.id === Number(p1))?.activateCharacterRank
-        const maxRank = skillObj.skillEffects.find(elem => elem.id === Number(p2))?.activateCharacterRank
-        if (minRank && maxRank) {
-          const currentEffect = skillObj.skillEffects.find(elem =>
-            charaRank.value > maxRank
-              ? elem.activateCharacterRank === maxRank
-              : elem.activateCharacterRank === charaRank.value || elem.activateCharacterRank === charaRank.value - 1
-          )
-          if (currentEffect) {
-            const detail = currentEffect.skillEffectDetails.find(d => d.level === skillLevel.value)
-            return String(detail?.activateEffectValue || 0)
-          } else if (charaRank.value < minRank) {
+        const effectsInRange = skillObj.skillEffects.filter(elem => elem.id >= Number(p1) && elem.id <= Number(p2))
+        const minRank = effectsInRange[0]?.activateCharacterRank
+        if (minRank) {
+          if (charaRank.value < minRank) {
             return '# 角色等级不足 #'
+          }
+          const targetEffect = [...effectsInRange].reverse().find(elem => elem.activateCharacterRank != null && elem.activateCharacterRank <= charaRank.value)
+          
+          if (targetEffect) {
+            const detail = targetEffect.skillEffectDetails.find(d => d.level === skillLevel.value)
+            return String(detail?.activateEffectValue || 0)
           } else {
             return '0'
           }
@@ -276,20 +274,22 @@ const parseSkill = (skillObj: Skill | null, isTrained: boolean) => {
       case 's': {
         _charaRankNecessary = true
         const baseSkillEffect = skillObj.skillEffects.find(elem => elem.id === Number(p1))
-        const minRank = skillObj.skillEffects.find(elem => elem.id === Number(p1) + 1)?.activateCharacterRank
-        const maxRank = skillObj.skillEffects.find(elem => elem.id === Number(p2))?.activateCharacterRank
-        if (minRank && maxRank) {
-          const currentEffect = skillObj.skillEffects.find(elem =>
-            charaRank.value > maxRank
-              ? elem.activateCharacterRank === maxRank
-              : elem.activateCharacterRank === charaRank.value || Math.floor((charaRank.value-1)/2)*2+1 === elem.activateCharacterRank
-          )
-          if (baseSkillEffect && currentEffect) {
-            const baseDetail = baseSkillEffect.skillEffectDetails.find(d => d.level === skillLevel.value)
-            const currentDetail = currentEffect.skillEffectDetails.find(d => d.level === skillLevel.value)
-            return String((baseDetail?.activateEffectValue || 0) + (currentDetail?.activateEffectValue || 0))
-          } else if (charaRank.value < minRank) {
+        const effectsInRange = skillObj.skillEffects.filter(elem => elem.id > Number(p1) && elem.id <= Number(p2))
+        const minRank = effectsInRange[0]?.activateCharacterRank
+        
+        if (minRank) {
+          if (charaRank.value < minRank) {
             return '# 角色等级不足 #'
+          }
+          const targetEffect = [...effectsInRange].reverse().find(elem => elem.activateCharacterRank != null && elem.activateCharacterRank <= charaRank.value)
+          
+          if (baseSkillEffect && targetEffect) {
+            const baseDetail = baseSkillEffect.skillEffectDetails.find(d => d.level === skillLevel.value)
+            const currentDetail = targetEffect.skillEffectDetails.find(d => d.level === skillLevel.value)
+            return String((baseDetail?.activateEffectValue || 0) + (currentDetail?.activateEffectValue || 0))
+          } else if (baseSkillEffect) {
+            const baseDetail = baseSkillEffect.skillEffectDetails.find(d => d.level === skillLevel.value)
+            return String(baseDetail?.activateEffectValue || 0)
           } else {
             return '0'
           }
