@@ -8,6 +8,7 @@ const router = useRouter()
 const oauthStore = useOAuthStore()
 
 const loading = ref(true)
+const successMsg = ref('')
 const errorMsg = ref('')
 
 onMounted(async () => {
@@ -25,7 +26,12 @@ onMounted(async () => {
       error,
       errorDescription,
     })
-    await router.replace(returnTo || '/')
+    successMsg.value = '授权成功，正在返回页面...'
+    loading.value = false
+    window.setTimeout(() => {
+      router.replace(returnTo || '/')
+    }, 900)
+    return
   } catch (e: any) {
     errorMsg.value = e?.message || 'OAuth 回调处理失败'
   } finally {
@@ -51,6 +57,13 @@ onMounted(async () => {
         <div class="card-actions justify-end">
           <button class="btn btn-primary btn-sm" @click="router.replace('/')">返回首页</button>
         </div>
+      </div>
+    </div>
+
+    <div v-else-if="successMsg" class="card bg-base-100 shadow-lg">
+      <div class="card-body items-center text-center gap-3">
+        <h2 class="text-xl font-semibold text-success">授权成功</h2>
+        <p class="text-sm text-base-content/70">{{ successMsg }}</p>
       </div>
     </div>
   </div>
