@@ -7,7 +7,7 @@ import SekaiCard from '@/components/SekaiCard.vue'
 import SekaiProfileHonor from '@/components/SekaiProfileHonor.vue'
 import AccountSelector from '@/components/AccountSelector.vue'
 import {
-  User, Eye, EyeOff, Download, Upload, Plus, Trash2, RefreshCw, Star, Zap, Trophy, Music
+  User, Eye, EyeOff, Download, Upload, Plus, Trash2, RefreshCw, Star, Zap, Trophy, Music, CircleHelp
 } from 'lucide-vue-next'
 
 const masterStore = useMasterStore()
@@ -95,6 +95,7 @@ const errorMsg = ref('')
 const newUserIdInput = ref('')
 const showUserId = ref(true)
 const characterTab = ref<'rank' | 'stage'>('rank')
+const infoModalRef = ref<HTMLDialogElement | null>(null)
 
 // Master data
 const allCards = ref<CardInfo[]>([])
@@ -207,6 +208,10 @@ async function switchAccount(userId: string) {
 function deleteAccount(userId: string) {
   accountStore.removeAccount(userId)
   loadProfileData()
+}
+
+function openAccountInfoModal() {
+  infoModalRef.value?.showModal()
 }
 
 function exportAccounts() {
@@ -490,6 +495,10 @@ watch(currentUserId, async (newId) => {
               <Upload class="w-3.5 h-3.5" />
               导入
             </button>
+            <button class="btn btn-sm btn-ghost gap-1" @click="openAccountInfoModal">
+              <CircleHelp class="w-3.5 h-3.5" />
+              账号信息说明
+            </button>
           </div>
 
           <!-- 上次刷新时间 -->
@@ -499,6 +508,56 @@ watch(currentUserId, async (newId) => {
           </p>
         </div>
       </div>
+
+      <dialog ref="infoModalRef" class="modal modal-bottom sm:modal-middle">
+        <div class="modal-box max-w-3xl">
+          <h3 class="text-lg font-semibold mb-3">账号信息说明</h3>
+          <div class="space-y-3">
+            <p class="text-sm text-base-content/70">当前仅支持日服 ID。</p>
+            <div class="grid gap-3 sm:grid-cols-2">
+              <div class="rounded-xl border border-info/30 bg-info/10 p-4 space-y-2">
+                <p class="text-sm font-medium text-info">公开基础数据（无需上传）</p>
+                <p class="text-sm text-base-content/75">
+                  添加账号后即可查看公开基础数据，例如卡组、角色等级、AP/FC 数量等。
+                </p>
+              </div>
+              <div class="rounded-xl border border-base-300/70 bg-base-100/80 p-4 space-y-2">
+                <p class="text-sm font-medium">Suite 详细数据（需上传）</p>
+                <p class="text-sm text-base-content/70">
+                  更详细数据（如完整打歌成绩、卡牌持有等）需要先上传到
+                  <a
+                    href="https://haruki.seiunx.com/upload-data"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="link link-primary font-medium"
+                  >
+                    Haruki工具箱
+                  </a>
+                  。
+                </p>
+              </div>
+            </div>
+            <div class="grid gap-3 sm:grid-cols-2">
+              <div class="rounded-xl border border-success/30 bg-success/10 p-4">
+                <p class="text-sm font-medium text-success">已勾选公开访问</p>
+                <p class="text-sm text-base-content/75 mt-1">可直接刷新 Suite，但你的详细数据会对任何人可读取。</p>
+              </div>
+              <div class="rounded-xl border border-warning/30 bg-warning/10 p-4">
+                <p class="text-sm font-medium text-warning">未勾选公开访问</p>
+                <p class="text-sm text-base-content/75 mt-1">刷新时走 OAuth 授权，仅当前浏览器可访问，安全性更高。</p>
+              </div>
+            </div>
+          </div>
+          <div class="modal-action">
+            <form method="dialog">
+              <button class="btn btn-primary btn-sm">我知道了</button>
+            </form>
+          </div>
+        </div>
+        <form method="dialog" class="modal-backdrop">
+          <button>close</button>
+        </form>
+      </dialog>
 
       <!-- ==================== Profile 展示 ==================== -->
       <template v-if="profileData">
@@ -780,10 +839,58 @@ watch(currentUserId, async (newId) => {
       </template>
 
       <!-- 无数据提示 -->
-      <div v-else-if="accounts.length === 0" class="text-center py-20 text-base-content/60">
-        <User class="w-16 h-16 mx-auto mb-4 opacity-30" />
-        <p class="text-lg">还没有添加账号</p>
-        <p class="text-sm">输入用户ID添加你的第一个账号</p>
+      <div v-else-if="accounts.length === 0" class="py-8">
+        <div class="card bg-gradient-to-br from-base-100 to-base-200 shadow-xl border border-primary/20 overflow-hidden">
+          <div class="card-body space-y-5">
+            <div class="flex items-start sm:items-center justify-between gap-3 flex-col sm:flex-row">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center">
+                  <User class="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <h3 class="text-lg font-semibold">还没有添加账号</h3>
+                  <p class="text-xs text-base-content/60">先添加账号，再按需同步 Suite 详细数据</p>
+                </div>
+              </div>
+              <span class="badge badge-primary badge-outline">仅支持日服 ID</span>
+            </div>
+
+            <div class="grid gap-3 sm:grid-cols-2">
+              <div class="rounded-xl border border-info/30 bg-info/10 p-4 space-y-2">
+                <p class="text-sm font-medium text-info">公开基础数据（无需上传）</p>
+                <p class="text-sm text-base-content/75">
+                  添加账号后即可查看公开基础数据，例如卡组、角色等级、AP/FC 数量等。
+                </p>
+              </div>
+              <div class="rounded-xl border border-base-300/70 bg-base-100/80 p-4 space-y-2">
+                <p class="text-sm font-medium">Suite 详细数据（需上传）</p>
+                <p class="text-sm text-base-content/70">
+                  更详细数据（如完整打歌成绩、卡牌持有等）需要先上传到
+                  <a
+                    href="https://haruki.seiunx.com/upload-data"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="link link-primary font-medium"
+                  >
+                    Haruki工具箱
+                  </a>
+                  。
+                </p>
+              </div>
+            </div>
+
+            <div class="grid gap-3 sm:grid-cols-2">
+              <div class="rounded-xl border border-success/30 bg-success/10 p-4">
+                <p class="text-sm font-medium text-success">已勾选公开访问</p>
+                <p class="text-sm text-base-content/75 mt-1">可直接刷新 Suite，但你的详细数据会对任何人可读取。</p>
+              </div>
+              <div class="rounded-xl border border-warning/30 bg-warning/10 p-4">
+                <p class="text-sm font-medium text-warning">未勾选公开访问</p>
+                <p class="text-sm text-base-content/75 mt-1">刷新时走 OAuth 授权，仅当前浏览器可访问，安全性更高。</p>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </template>
   </div>
