@@ -367,12 +367,12 @@ async function fetchUserData() {
         let oauthData: any = null
         const returnTo = `${window.location.pathname}${window.location.search}${window.location.hash}`
 
-        if (oauthStore.hasToken) {
+        if (oauthStore.hasTokenForUser(currentUserId.value)) {
           try {
             oauthData = await oauthStore.fetchGameData('jp', 'mysekai', currentUserId.value)
           } catch (e: any) {
             if (e?.status === 401 || e?.status === 403) {
-              oauthStore.clearTokens()
+              oauthStore.clearTokensForUser(currentUserId.value)
             } else {
               throw e
             }
@@ -384,7 +384,7 @@ async function fetchUserData() {
           if (!shouldAuthorize) {
             throw new Error('未完成 OAuth 授权，无法读取 MySekai 数据')
           }
-          await oauthStore.startAuthorization(returnTo)
+          await oauthStore.startAuthorization(currentUserId.value, returnTo)
           throw new Error('正在跳转 OAuth 授权页面...')
         }
 
