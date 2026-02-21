@@ -157,8 +157,8 @@ const levelStats = computed(() => {
   const diff = selectedDiffType.value
   let ap = 0, fc = 0, clear = 0, total = 0
   
-  for (const music of musics.value) {
-    if (!settingsStore.showSpoilers && music.publishedAt > now) continue
+  for (const music of filteredMusics.value) {
+    if (music.publishedAt > now) continue
     if (diffMap[music.id]?.[diff] !== undefined) {
       total++
       const rank = musicResultsMap.value[music.id]?.[diff]
@@ -177,6 +177,7 @@ const levelGroupedMusics = computed(() => {
   const groups: Record<number, { musics: typeof musics.value, stats: { ap: number, fc: number, clear: number, total: number } }> = {}
   
   for (const music of filteredMusics.value) {
+    if (music.publishedAt > now) continue
     const level = diffMap[music.id]?.[diff]
     if (level === undefined) continue
     
@@ -639,7 +640,7 @@ watch(() => route.query.page, () => {})
               class="px-3 py-0.5 rounded-full text-white font-black text-xl shadow-sm tracking-tighter"
               :style="{ backgroundColor: diffColors[selectedDiffType] }"
             >
-              {{ group.level.toFixed(1) }}
+              {{ group.level.toFixed(0) }}
             </div>
             <div v-if="hasSuiteData" class="flex gap-3 text-xs font-bold px-3 py-1 rounded-full shadow-sm bg-base-100 border border-base-200/50">
               <span class="flex items-center gap-1 text-base-content/80">
