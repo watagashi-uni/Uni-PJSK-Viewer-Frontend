@@ -168,6 +168,7 @@ export const useAccountStore = defineStore('account', () => {
 
     async function removeAccount(userId: string) {
         accounts.value = accounts.value.filter(a => a.userId !== userId)
+        useOAuthStore().clearTokensForUser(userId)
 
         try {
             const db = await dbPromise
