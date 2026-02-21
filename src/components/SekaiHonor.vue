@@ -229,7 +229,7 @@ function buildRankImage(h: HonorInfo, group?: HonorGroup) {
   if (isLiveMaster.value) {
     // Live Master 强制使用 scroll.png
     degreeRankImage.value = `${assetsHost}/startapp/honor/${abn}/scroll.png` // Main/Sub 都是 scroll.png
-  } else if (group?.honorType === 'event') {
+  } else if (group?.honorType === 'event' && group.backgroundAssetbundleName) {
     degreeRankImage.value = `${assetsHost}/startapp/honor/${abn}/rank_${suffix}.png`
   } else if (group?.honorType === 'rank_match') {
     degreeRankImage.value = `${assetsHost}/startapp/rank_live/honor/${abn}/${suffix}.png`
