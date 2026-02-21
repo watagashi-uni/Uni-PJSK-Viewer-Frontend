@@ -6,6 +6,7 @@ import ToastContainer from '@/components/ToastContainer.vue'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
 import { useAccountStore } from '@/stores/account'
+import { useOAuthStore } from '@/stores/oauth'
 import { Music, Image, BarChart3, Info, Settings, Calendar, Gift, Share2, Zap, User, RefreshCw, Github } from 'lucide-vue-next'
 import AccountSelector from '@/components/AccountSelector.vue'
 
@@ -13,6 +14,7 @@ const route = useRoute()
 const masterStore = useMasterStore()
 const settingsStore = useSettingsStore()
 const accountStore = useAccountStore()
+const oauthStore = useOAuthStore()
 
 const refreshError = ref('')
 
@@ -23,6 +25,7 @@ onMounted(async () => {
     caches.delete('external-images')
   }
   settingsStore.initialize()
+  oauthStore.initialize()
   await accountStore.initialize()
   await masterStore.initialize()
 })
