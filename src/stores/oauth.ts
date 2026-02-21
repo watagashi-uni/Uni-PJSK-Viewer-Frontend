@@ -157,7 +157,7 @@ export const useOAuthStore = defineStore('oauth', () => {
         authUrl.searchParams.set('response_type', 'code')
         authUrl.searchParams.set('client_id', clientId.value)
         authUrl.searchParams.set('redirect_uri', getRedirectUri())
-        authUrl.searchParams.set('scope', 'user:read bindings:read game-data:read')
+        authUrl.searchParams.set('scope', 'game-data:read')
         authUrl.searchParams.set('state', state)
         authUrl.searchParams.set('code_challenge', codeChallenge)
         authUrl.searchParams.set('code_challenge_method', 'S256')
