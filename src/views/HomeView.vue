@@ -268,14 +268,14 @@ onMounted(async () => {
         </div>
         
         <!-- Theme Quick Selector -->
-        <div class="dropdown dropdown-end z-[100] ml-auto shrink-0">
+        <div class="dropdown dropdown-end z-20 ml-auto shrink-0">
           <label tabindex="0" class="btn btn-sm btn-ghost gap-1 px-2">
             <Palette class="w-4 h-4" />
             <span>
               {{ themesList.find(t => t.value === settingsStore.theme)?.label || '主题' }}
             </span>
           </label>
-          <ul tabindex="0" class="dropdown-content z-[100] menu p-2 shadow bg-base-100 rounded-box w-32">
+          <ul tabindex="0" class="dropdown-content z-20 menu p-2 shadow bg-base-100 rounded-box w-32">
             <li v-for="t in themesList" :key="t.value">
               <a 
                 :class="{ 'active': settingsStore.theme === t.value }"
