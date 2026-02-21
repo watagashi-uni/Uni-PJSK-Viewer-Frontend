@@ -8,7 +8,7 @@ import {
   Music, Calendar, Clock, 
   ChevronRight, Sparkles, BarChart3,
   CreditCard, User, Gift, Palette,
-  Image, Zap, Settings
+  ExternalLink, Link
 } from 'lucide-vue-next'
 import AssetImage from '@/components/AssetImage.vue'
 
@@ -314,32 +314,32 @@ onMounted(async () => {
     
     <!-- 顶部快捷入口 -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-      <RouterLink to="/musics" class="btn btn-ghost bg-primary/10 text-primary hover:bg-primary/20 h-auto py-3 gap-2 justify-start shadow-sm border-none">
-        <Music class="w-5 h-5 flex-shrink-0" /> 
+      <RouterLink to="/musics" class="btn bg-base-100 border-base-200 hover:border-primary hover:bg-base-200 h-auto py-3 gap-2 justify-start shadow-sm hover:shadow-md transition-all">
+        <Music class="w-5 h-5 flex-shrink-0 text-primary" /> 
         <div class="flex flex-col items-start leading-tight">
-          <span>歌曲一览</span>
-          <span class="text-[10px] font-normal opacity-70">Musics</span>
+          <span class="font-bold text-base-content">歌曲一览</span>
+          <span class="text-[10px] font-normal text-base-content/60">Musics</span>
         </div>
       </RouterLink>
-      <RouterLink to="/cards" class="btn btn-ghost bg-secondary/10 text-secondary hover:bg-secondary/20 h-auto py-3 gap-2 justify-start shadow-sm border-none">
-        <CreditCard class="w-5 h-5 flex-shrink-0" />
+      <RouterLink to="/cards" class="btn bg-base-100 border-base-200 hover:border-secondary hover:bg-base-200 h-auto py-3 gap-2 justify-start shadow-sm hover:shadow-md transition-all">
+        <CreditCard class="w-5 h-5 flex-shrink-0 text-secondary" />
         <div class="flex flex-col items-start leading-tight">
-          <span>卡片一览</span>
-          <span class="text-[10px] font-normal opacity-70">Cards</span>
+          <span class="font-bold text-base-content">卡片一览</span>
+          <span class="text-[10px] font-normal text-base-content/60">Cards</span>
         </div>
       </RouterLink>
-      <RouterLink to="/events" class="btn btn-ghost bg-accent/10 text-accent hover:bg-accent/20 h-auto py-3 gap-2 justify-start shadow-sm border-none">
-        <Calendar class="w-5 h-5 flex-shrink-0" />
+      <RouterLink to="/events" class="btn bg-base-100 border-base-200 hover:border-accent hover:bg-base-200 h-auto py-3 gap-2 justify-start shadow-sm hover:shadow-md transition-all">
+        <Calendar class="w-5 h-5 flex-shrink-0 text-accent" />
         <div class="flex flex-col items-start leading-tight">
-          <span>活动总览</span>
-          <span class="text-[10px] font-normal opacity-70">Events</span>
+          <span class="font-bold text-base-content">活动总览</span>
+          <span class="text-[10px] font-normal text-base-content/60">Events</span>
         </div>
       </RouterLink>
-      <RouterLink to="/gachas" class="btn btn-ghost bg-orange-500/10 text-orange-600 dark:text-orange-400 hover:bg-orange-500/20 h-auto py-3 gap-2 justify-start shadow-sm border-none">
-        <Sparkles class="w-5 h-5 flex-shrink-0" />
+      <RouterLink to="/gachas" class="btn bg-base-100 border-base-200 hover:border-orange-500 hover:bg-base-200 h-auto py-3 gap-2 justify-start shadow-sm hover:shadow-md transition-all">
+        <Sparkles class="w-5 h-5 flex-shrink-0 text-orange-500" />
         <div class="flex flex-col items-start leading-tight">
-          <span>活动卡池</span>
-          <span class="text-[10px] font-normal opacity-80">Gachas</span>
+          <span class="font-bold text-base-content">活动卡池</span>
+          <span class="text-[10px] font-normal text-base-content/60">Gachas</span>
         </div>
       </RouterLink>
     </div>
@@ -505,20 +505,52 @@ onMounted(async () => {
       </div>
     </div>
     
-    <!-- 底部功能入口 -->
-    <div class="grid grid-cols-2 md:grid-cols-3 gap-3 border-t border-base-200 pt-6">
-      <RouterLink to="/sus2img" class="btn bg-base-100 border-base-200 h-auto py-3 justify-center shadow-sm hover:shadow-md hover:border-primary font-normal">
-        <Image class="w-4 h-4 mr-1 opacity-70" />
-        谱面转图片
-      </RouterLink>
-      <RouterLink to="/deck-recommend" class="btn bg-base-100 border-base-200 h-auto py-3 justify-center shadow-sm hover:shadow-md hover:border-primary font-normal">
-        <Zap class="w-4 h-4 mr-1 opacity-70" />
-        自动组队
-      </RouterLink>
-      <RouterLink to="/settings" class="btn bg-base-100 border-base-200 h-auto py-3 justify-center shadow-sm hover:shadow-md hover:border-primary font-normal">
-        <Settings class="w-4 h-4 mr-1 opacity-70" />
-        系统设置
-      </RouterLink>
+    <!-- 友情链接 -->
+    <div class="space-y-4 border-t border-base-200 pt-6">
+      <h2 class="text-lg font-bold flex items-center gap-2 text-base-content/80 px-1">
+        <Link class="w-4 h-4 opacity-70" />
+        友情链接
+      </h2>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <a 
+          href="https://pjsk.moe" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          class="flex items-center justify-between p-4 bg-base-100 border border-base-200 rounded-xl shadow-sm hover:shadow-md hover:border-primary/50 transition-all group"
+        >
+          <div class="flex flex-col">
+            <span class="font-bold text-base-content group-hover:text-primary transition-colors">MoeSekai</span>
+            <span class="text-xs text-base-content/50 mt-0.5">多功能 PJSK Viewer</span>
+          </div>
+          <ExternalLink class="w-4 h-4 text-base-content/30 group-hover:text-primary group-hover:-translate-y-0.5 group-hover:translate-x-0.5 transition-all" />
+        </a>
+        
+        <a 
+          href="https://haruki.seiunx.com" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          class="flex items-center justify-between p-4 bg-base-100 border border-base-200 rounded-xl shadow-sm hover:shadow-md hover:border-secondary/50 transition-all group"
+        >
+          <div class="flex flex-col">
+            <span class="font-bold text-base-content group-hover:text-secondary transition-colors">Haruki 工具箱</span>
+            <span class="text-xs text-base-content/50 mt-0.5">上传抓包数据</span>
+          </div>
+          <ExternalLink class="w-4 h-4 text-base-content/30 group-hover:text-secondary group-hover:-translate-y-0.5 group-hover:translate-x-0.5 transition-all" />
+        </a>
+
+        <a 
+          href="https://3-3.dev" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          class="flex items-center justify-between p-4 bg-base-100 border border-base-200 rounded-xl shadow-sm hover:shadow-md hover:border-accent/50 transition-all group"
+        >
+          <div class="flex flex-col">
+            <span class="font-bold text-base-content group-hover:text-accent transition-colors">33 Kit</span>
+            <span class="text-xs text-base-content/50 mt-0.5">在线组卡 / 活动预测</span>
+          </div>
+          <ExternalLink class="w-4 h-4 text-base-content/30 group-hover:text-accent group-hover:-translate-y-0.5 group-hover:translate-x-0.5 transition-all" />
+        </a>
+      </div>
     </div>
   </div>
 </template>
