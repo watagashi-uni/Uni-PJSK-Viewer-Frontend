@@ -81,7 +81,7 @@ const characters = ref<Character[]>([])
 const outsideCharacters = ref<OutsideCharacter[]>([])
 const isLoading = ref(true)
 
-const assetsHost = 'https://assets.unipjsk.com'
+const assetsHost = computed(() => settingsStore.assetsHost)
 const chartHost = 'https://charts-new.unipjsk.com/moe/svg'
 const chartPreviewHost = import.meta.env.VITE_CHART_PREVIEW_URL || ''
 
@@ -106,7 +106,7 @@ const currentVocal = computed(() => vocals.value[currentVocalIndex.value] || nul
 // 音频URL
 const currentAudioUrl = computed(() => {
   if (!currentVocal.value) return ''
-  return `${assetsHost}/ondemand/music/long/${currentVocal.value.assetbundleName}/${currentVocal.value.assetbundleName}.mp3`
+  return `${assetsHost.value}/ondemand/music/long/${currentVocal.value.assetbundleName}/${currentVocal.value.assetbundleName}.mp3`
 })
 
 // 进度百分比
@@ -368,7 +368,7 @@ const difficultyLabels: Record<string, string> = {
 // 封面图片 URL (startapp)
 const coverUrl = computed(() => {
   if (!music.value) return ''
-  return `${assetsHost}/startapp/music/jacket/${music.value.assetbundleName}/${music.value.assetbundleName}.png`
+  return `${assetsHost.value}/startapp/music/jacket/${music.value.assetbundleName}/${music.value.assetbundleName}.png`
 })
 
 // 格式化发布时间（包含具体时分秒）
@@ -388,7 +388,7 @@ function formatDate(timestamp: number): string {
 // 获取下载链接
 function getDownloadUrl(difficulty: string): string {
   const paddedId = String(musicId.value).padStart(4, '0')
-  return `${assetsHost}/startapp/music/music_score/${paddedId}_01/${difficulty}`
+  return `${assetsHost.value}/startapp/music/music_score/${paddedId}_01/${difficulty}`
 }
 
 // 强制下载文件（添加 .sus 后缀）
@@ -956,4 +956,3 @@ onMounted(loadData)
   background: oklch(var(--bc) / 0.3);
 }
 </style>
-

@@ -76,7 +76,8 @@ const coverUrl = computed(() => {
 <template>
   <RouterLink 
     :to="`/musics/${id}`"
-    class="card bg-base-100 shadow-sm hover:shadow-md transition-all hover:-translate-y-1 overflow-hidden group relative"
+    class="card bg-base-100 shadow-sm overflow-hidden group relative"
+    :class="results ? 'hover:border-primary/30 border border-transparent transition-colors' : 'hover:shadow-md transition-all hover:-translate-y-1'"
   >
     <!-- 全卡片遮罩 (仅在开启遮罩模式下显示，Hover时消失) -->
     <div v-if="isLeak && settingsStore.maskSpoilers" class="absolute inset-0 z-50 bg-base-100/95 backdrop-blur-sm flex flex-col items-center justify-center text-center p-4 transition-opacity duration-300 group-hover:opacity-0 pointer-events-none">
@@ -89,7 +90,8 @@ const coverUrl = computed(() => {
       <AssetImage 
         :src="coverUrl" 
         :alt="title"
-        class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+        class="w-full h-full object-cover"
+        :class="results ? '' : 'group-hover:scale-105 transition-transform duration-300'"
       />
       <!-- 简单角标 (替代之前的内部遮罩) -->
       <div v-if="isLeak" class="absolute top-2 right-2 badge badge-warning shadow-md z-20">
@@ -175,4 +177,7 @@ const coverUrl = computed(() => {
 </template>
 
 <style scoped>
+.card {
+  contain: layout style paint;
+}
 </style>

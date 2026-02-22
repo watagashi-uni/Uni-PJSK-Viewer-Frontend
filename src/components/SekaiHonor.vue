@@ -7,6 +7,7 @@
  */
 import { ref, watch, computed, onMounted } from 'vue'
 import { useMasterStore } from '@/stores/master'
+import { useSettingsStore } from '@/stores/settings'
 import { handleSvgImageError } from '@/utils/imageRetry'
 
 // ---------- Types ----------
@@ -55,7 +56,8 @@ const props = withDefaults(defineProps<{
 })
 
 // ---------- Constants ----------
-const assetsHost = 'https://assets.unipjsk.com'
+const settingsStore = useSettingsStore()
+const assetsHost = computed(() => settingsStore.assetsHost)
 
 const degreeFrameMap: Record<string, string> = {
   low: '/honor/frame_degree_m_1.png',
@@ -192,11 +194,11 @@ async function loadHonor() {
 function buildDegreeImage(_h: HonorInfo, group?: HonorGroup) {
   const suffix = props.sub ? 'sub' : 'main'
   if (group?.honorType === 'rank_match' && group.backgroundAssetbundleName) {
-    degreeImage.value = `${assetsHost}/startapp/rank_live/honor/${group.backgroundAssetbundleName}/degree_${suffix}.png`
+    degreeImage.value = `${assetsHost.value}/startapp/rank_live/honor/${group.backgroundAssetbundleName}/degree_${suffix}.png`
   } else if (group?.backgroundAssetbundleName) {
-    degreeImage.value = `${assetsHost}/startapp/honor/${group.backgroundAssetbundleName}/degree_${suffix}.png`
+    degreeImage.value = `${assetsHost.value}/startapp/honor/${group.backgroundAssetbundleName}/degree_${suffix}.png`
   } else if (effectiveAssetbundleName.value) {
-    degreeImage.value = `${assetsHost}/startapp/honor/${effectiveAssetbundleName.value}/degree_${suffix}.png`
+    degreeImage.value = `${assetsHost.value}/startapp/honor/${effectiveAssetbundleName.value}/degree_${suffix}.png`
   }
 }
 
@@ -211,11 +213,11 @@ function buildFrameImage(h: HonorInfo, group?: HonorGroup) {
 
   if (group?.frameName) {
     if (rarity === 'highest') {
-      degreeFrameImage.value = `${assetsHost}/startapp/honor_frame/${group.frameName}/frame_degree_${suffix}_4.png`
+      degreeFrameImage.value = `${assetsHost.value}/startapp/honor_frame/${group.frameName}/frame_degree_${suffix}_4.png`
     } else if (rarity === 'high') {
-      degreeFrameImage.value = `${assetsHost}/startapp/honor_frame/${group.frameName}/frame_degree_${suffix}_3.png`
+      degreeFrameImage.value = `${assetsHost.value}/startapp/honor_frame/${group.frameName}/frame_degree_${suffix}_3.png`
     } else if (group.honorType === 'birthday' && rarity === 'middle') {
-      degreeFrameImage.value = `${assetsHost}/startapp/honor_frame/${group.frameName}/frame_degree_${suffix}_2.png`
+      degreeFrameImage.value = `${assetsHost.value}/startapp/honor_frame/${group.frameName}/frame_degree_${suffix}_2.png`
     } else {
       degreeFrameImage.value = props.sub ? (degreeFrameSubMap[rarity] ?? '') : (degreeFrameMap[rarity] ?? '')
     }
@@ -230,14 +232,14 @@ function buildRankImage(h: HonorInfo, group?: HonorGroup) {
   
   if (isLiveMaster.value) {
     // Live Master 强制使用 scroll.png
-    degreeRankImage.value = `${assetsHost}/startapp/honor/${abn}/scroll.png` // Main/Sub 都是 scroll.png
+    degreeRankImage.value = `${assetsHost.value}/startapp/honor/${abn}/scroll.png` // Main/Sub 都是 scroll.png
   } else if (group?.honorType === 'event' && group.backgroundAssetbundleName) {
-    degreeRankImage.value = `${assetsHost}/startapp/honor/${abn}/rank_${suffix}.png`
+    degreeRankImage.value = `${assetsHost.value}/startapp/honor/${abn}/rank_${suffix}.png`
   } else if (group?.honorType === 'rank_match') {
-    degreeRankImage.value = `${assetsHost}/startapp/rank_live/honor/${abn}/${suffix}.png`
+    degreeRankImage.value = `${assetsHost.value}/startapp/rank_live/honor/${abn}/${suffix}.png`
   } else if (h.honorMissionType) {
     // 可能是旧逻辑 fallback
-    degreeRankImage.value = `${assetsHost}/startapp/honor/${abn}/scroll.png`
+    degreeRankImage.value = `${assetsHost.value}/startapp/honor/${abn}/scroll.png`
   }
 }
 
@@ -245,7 +247,7 @@ function buildLevelIcon(h: HonorInfo, group?: HonorGroup) {
   if (group?.honorType === 'birthday' && h.honorRarity && group.frameName) {
     const rarityList = ['low', 'middle', 'high', 'highest']
     const rarityIndex = rarityList.indexOf(h.honorRarity) + 1
-    degreeLevelIcon.value = `${assetsHost}/startapp/honor_frame/${group.frameName}/frame_degree_level_${rarityIndex}.png`
+    degreeLevelIcon.value = `${assetsHost.value}/startapp/honor_frame/${group.frameName}/frame_degree_level_${rarityIndex}.png`
   } else {
     degreeLevelIcon.value = '/honor/icon_degreeLv.png'
   }

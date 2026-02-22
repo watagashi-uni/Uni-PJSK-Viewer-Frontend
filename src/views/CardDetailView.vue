@@ -2,6 +2,7 @@
 import { ref, onMounted, computed, watch, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useMasterStore } from '@/stores/master'
+import { useSettingsStore } from '@/stores/settings'
 import AssetImage from '@/components/AssetImage.vue'
 import SekaiCard from '@/components/SekaiCard.vue'
 import { ChevronLeft, ScrollText, Zap } from 'lucide-vue-next'
@@ -78,6 +79,7 @@ interface Skill {
 const route = useRoute()
 const router = useRouter()
 const masterStore = useMasterStore()
+const settingsStore = useSettingsStore()
 
 const cardId = computed(() => Number(route.params.id))
 const card = ref<Card | null>(null)
@@ -93,7 +95,7 @@ const showTrainedCutout = ref(true)
 
 const limitType = ref<false | 'limited' | 'fes'>(false)
 
-const assetsHost = 'https://assets.unipjsk.com'
+const assetsHost = computed(() => settingsStore.assetsHost)
 
 // Sliders states
 const skillLevel = ref(1)
@@ -361,12 +363,12 @@ const showUnitCountSlider = computed(() => unitCountNecessaryNormal.value || uni
 
 const coverUrl = computed(() => {
   if (!card.value) return ''
-  return `${assetsHost}/startapp/character/member/${card.value.assetbundleName}/card_normal.jpg`
+  return `${assetsHost.value}/startapp/character/member/${card.value.assetbundleName}/card_normal.jpg`
 })
 
 const trainedCoverUrl = computed(() => {
   if (!card.value) return ''
-  return `${assetsHost}/startapp/character/member/${card.value.assetbundleName}/card_after_training.jpg`
+  return `${assetsHost.value}/startapp/character/member/${card.value.assetbundleName}/card_after_training.jpg`
 })
 
 function formatDate(timestamp: number): string {

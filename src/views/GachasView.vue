@@ -26,7 +26,7 @@ const sortOrder = ref<'desc' | 'asc'>('desc')
 const currentPage = ref(1)
 const itemsPerPage = 12
 
-const assetsHost = 'https://assets.unipjsk.com'
+const assetsHost = computed(() => settingsStore.assetsHost)
 
 // 筛选和排序
 const filteredGachas = computed(() => {
@@ -60,7 +60,7 @@ watch([searchQuery, sortOrder], () => {
 })
 
 function getLogoUrl(gacha: Gacha): string {
-  return `${assetsHost}/ondemand/gacha/${gacha.assetbundleName}/logo/logo.png`
+  return `${assetsHost.value}/ondemand/gacha/${gacha.assetbundleName}/logo/logo.png`
 }
 
 function formatDate(timestamp: number): string {

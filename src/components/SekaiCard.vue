@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useSettingsStore } from '@/stores/settings'
 import { handleSvgImageError } from '@/utils/imageRetry'
 
 interface Card {
@@ -39,7 +40,8 @@ const props = defineProps<{
 }>()
 
 // 资源基础路径
-const assetsHost = 'https://assets.unipjsk.com'
+const settingsStore = useSettingsStore()
+const assetsHost = computed(() => settingsStore.assetsHost)
 
 // 稀有度映射
 const rarityMap: Record<string, number> = {
@@ -61,7 +63,7 @@ const isTrainingType = computed(() => {
 // 卡面 URL
 const cardImageUrl = computed(() => {
   const suffix = props.trained ? 'after_training' : 'normal'
-  return `${assetsHost}/startapp/thumbnail/chara/${props.card.assetbundleName}_${suffix}.png`
+  return `${assetsHost.value}/startapp/thumbnail/chara/${props.card.assetbundleName}_${suffix}.png`
 })
 
 // 边框 URL

@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { useMasterStore } from '@/stores/master'
+import { useAccountStore } from '@/stores/account'
 import { ref, onMounted } from 'vue'
-import { Download, RefreshCw, X } from 'lucide-vue-next'
+import { Download, RefreshCw, X, CheckCircle2 } from 'lucide-vue-next'
 
 const masterStore = useMasterStore()
+const accountStore = useAccountStore()
 
 // PWA 更新状态
 const needRefresh = ref(false)
@@ -41,6 +43,21 @@ function dismissUpdate() {
 
 <template>
   <Teleport to="body">
+    <!-- Suite 刷新来源 Toast（上方居中） -->
+    <div class="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-[min(92vw,24rem)]">
+      <Transition name="slide-up">
+        <div
+          v-if="accountStore.suiteRefreshToastMessage"
+          class="alert shadow-2xl bg-base-100 border border-success/40"
+        >
+          <CheckCircle2 class="w-5 h-5 text-success" />
+          <div>
+            <h3 class="font-bold text-sm">{{ accountStore.suiteRefreshToastMessage }}</h3>
+          </div>
+        </div>
+      </Transition>
+    </div>
+
     <!-- Toast 容器 (底部右侧) -->
     <div class="fixed bottom-4 right-4 z-50 flex flex-col gap-3 max-w-sm">
       <!-- PWA 更新提示 Toast -->
@@ -80,6 +97,7 @@ function dismissUpdate() {
           </div>
         </div>
       </Transition>
+
     </div>
   </Teleport>
 </template>

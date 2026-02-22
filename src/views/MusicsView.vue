@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch, toRef, onUnmounted, nextTick } from 'vue'
+import { ref, shallowRef, computed, onMounted, watch, toRef, onUnmounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
@@ -46,7 +46,11 @@ const musicDifficulties = ref<MusicDifficulty[]>([])
 const translations = toRef(masterStore, 'translations')
 const isLoading = ref(true)
 
-const assetsHost = 'https://assets.unipjsk.com'
+const assetsHost = computed(() => settingsStore.assetsHost)
+
+// 稳定的空引用，避免在模版中使用 || {} / || [] 每次渲染都创建新对象导致子组件重渲染
+const EMPTY_OBJ: Record<string, any> = Object.freeze({})
+const EMPTY_ARR: string[] = Object.freeze([]) as unknown as string[]
 
 // 状态
 const searchText = ref('')
@@ -58,12 +62,24 @@ const selectedDiffType = ref<string>('master')
 const viewMode = ref<'grid' | 'list' | 'b30' | 'level'>('grid')
 
 // 成绩数据（从缓存加载，不自动刷新）
-const musicResultsMap = ref<Record<number, Record<string, string>>>({})
-const hasSuiteData = ref(false)
+// Suite 成绩数据量很大，使用 shallowRef 避免深层响应式代理导致卡顿
+const musicResultsMap = shallowRef<Record<number, Record<string, string>>>({})
+const showUserResults = ref(false)
+const isDataLoaded = ref(false)
+const hasSuiteData = computed(() => showUserResults.value && isDataLoaded.value)
 
 // 成绩筛选
 const resultFilter = ref<'all' | 'no_fc' | 'no_ap'>('all')
 const filterDifficulty = ref<string>('master')
+
+// 定数表展开状态
+const expandedLevels = ref<Set<number>>(new Set())
+function toggleLevel(level: number) {
+  const s = new Set(expandedLevels.value)
+  if (s.has(level)) s.delete(level)
+  else s.add(level)
+  expandedLevels.value = s
+}
 
 // 错误信息
 const refreshError = ref('')
@@ -73,16 +89,16 @@ function loadFromCache() {
   const uid = accountStore.currentUserId
   if (!uid) {
     musicResultsMap.value = {}
-    hasSuiteData.value = false
+    isDataLoaded.value = false
     return
   }
   const cached = accountStore.getSuiteCache(uid)
   if (cached) {
     parseSuiteData(cached)
-    hasSuiteData.value = true
+    isDataLoaded.value = true
   } else {
     musicResultsMap.value = {}
-    hasSuiteData.value = false
+    isDataLoaded.value = false
   }
 }
 
@@ -94,7 +110,7 @@ async function handleSuiteRefresh() {
   try {
     const data = await accountStore.refreshSuite(uid)
     parseSuiteData(data)
-    hasSuiteData.value = true
+    isDataLoaded.value = true
   } catch (e: any) {
     refreshError.value = e.message
   }
@@ -116,6 +132,7 @@ function parseSuiteData(data: any) {
       entry[diff] = rank
     }
   }
+  // 使用不可变替换触发更新，减少深层追踪成本
   musicResultsMap.value = results
 }
 
@@ -132,8 +149,9 @@ const b30List = computed<B30Entry[]>(() => {
   if (!hasSuiteData.value) return []
   const entries: B30Entry[] = []
   const diffMap = musicDifficultiesMap.value
+  const resultsMap = musicResultsMap.value
 
-  for (const [musicIdStr, diffResults] of Object.entries(musicResultsMap.value)) {
+  for (const [musicIdStr, diffResults] of Object.entries(resultsMap)) {
     const musicId = Number(musicIdStr)
     for (const [diff, rank] of Object.entries(diffResults)) {
       if (rank !== 'AP' && rank !== 'FC') continue
@@ -155,13 +173,14 @@ const levelStats = computed(() => {
   if (!hasSuiteData.value) return null
   const diffMap = musicDifficultiesMap.value
   const diff = selectedDiffType.value
+  const resultsMap = musicResultsMap.value
   let ap = 0, fc = 0, clear = 0, total = 0
   
   for (const music of filteredMusics.value) {
     if (music.publishedAt > now) continue
     if (diffMap[music.id]?.[diff] !== undefined) {
       total++
-      const rank = musicResultsMap.value[music.id]?.[diff]
+      const rank = resultsMap[music.id]?.[diff]
       if (rank === 'AP') { ap++; fc++; clear++ }
       else if (rank === 'FC') { fc++; clear++ }
       else if (rank === 'C') { clear++ }
@@ -174,6 +193,7 @@ const levelStats = computed(() => {
 const levelGroupedMusics = computed(() => {
   const diffMap = musicDifficultiesMap.value
   const diff = selectedDiffType.value
+  const resultsMap = musicResultsMap.value
   const groups: Record<number, { musics: typeof musics.value, stats: { ap: number, fc: number, clear: number, total: number } }> = {}
   
   for (const music of filteredMusics.value) {
@@ -187,7 +207,7 @@ const levelGroupedMusics = computed(() => {
     groups[level].musics.push(music)
     
     groups[level].stats.total++
-    const rank = musicResultsMap.value[music.id]?.[diff]
+    const rank = resultsMap[music.id]?.[diff]
     if (rank === 'AP') {
       groups[level].stats.ap++
       groups[level].stats.fc++
@@ -216,9 +236,10 @@ const pageSize = 30
 const currentPage = computed(() => Number(route.query.page) || 1)
 
 // 无限滚动 (List视图)
-const displayedCount = ref(50)
+const displayedCount = ref(30)
 const loadMoreTrigger = ref<HTMLElement | null>(null)
 let observer: IntersectionObserver | null = null
+const enableHeavyAnimation = computed(() => !hasSuiteData.value)
 
 const displayedMusics = computed(() => {
   return filteredMusics.value.slice(0, displayedCount.value)
@@ -228,7 +249,7 @@ function setupObserver() {
   if (observer) observer.disconnect()
   observer = new IntersectionObserver((entries) => {
     if (entries[0]?.isIntersecting && displayedCount.value < filteredMusics.value.length) {
-      displayedCount.value += 50
+      displayedCount.value += 30
     }
   }, { rootMargin: '200px' })
   
@@ -252,6 +273,7 @@ const now = Date.now()
 // 过滤和排序
 const filteredMusics = computed(() => {
   let result = [...musics.value]
+  const resultsMap = musicResultsMap.value
 
   if (!settingsStore.showSpoilers) {
     result = result.filter(m => m.publishedAt <= now)
@@ -271,7 +293,7 @@ const filteredMusics = computed(() => {
   if (hasSuiteData.value && resultFilter.value !== 'all') {
     const diff = filterDifficulty.value
     result = result.filter(m => {
-      const rank = musicResultsMap.value[m.id]?.[diff] || ''
+      const rank = resultsMap[m.id]?.[diff] || ''
       if (resultFilter.value === 'no_fc') return rank !== 'AP' && rank !== 'FC'
       if (resultFilter.value === 'no_ap') return rank !== 'AP'
       return true
@@ -309,11 +331,13 @@ async function loadData() {
   try {
     const [musicData, diffData] = await Promise.all([
       masterStore.getMaster<Music>('musics'),
-      masterStore.getMaster<MusicDifficulty>('musicDifficulties'),
-      masterStore.getTranslations()
+      masterStore.getMaster<MusicDifficulty>('musicDifficulties')
     ])
     musics.value = musicData
     musicDifficulties.value = diffData
+    
+    // 背景加载翻译，不阻塞主列表渲染
+    masterStore.getTranslations().catch(e => console.error('加载翻译失败:', e))
   } catch (error) {
     console.error('加载歌曲数据失败:', error)
   } finally {
@@ -349,7 +373,7 @@ function getMusicTitle(musicId: number): string {
 
 function getMusicThumbnailUrl(musicId: number): string {
   const paddedId = musicId.toString().padStart(3, '0')
-  return `${assetsHost}/startapp/thumbnail/music_jacket/jacket_s_${paddedId}.png`
+  return `${assetsHost.value}/startapp/thumbnail/music_jacket/jacket_s_${paddedId}.png`
 }
 
 const diffColors: Record<string, string> = {
@@ -376,7 +400,7 @@ onUnmounted(() => {
 
 // 监听过滤/排序变化 -> 重置显示数量
 watch([searchText, sortKey, sortOrder, resultFilter, filterDifficulty], () => {
-  displayedCount.value = 50
+  displayedCount.value = 30
   window.scrollTo({ top: 0, behavior: 'auto' })
 })
 
@@ -473,30 +497,41 @@ watch(() => route.query.page, () => {})
     </div>
 
     <!-- 第二行：成绩筛选 + 视图切换 + suite 刷新 -->
-    <div v-if="accountStore.currentUserId" class="flex flex-wrap items-center gap-2 mb-4 bg-base-100 p-2 rounded-lg shadow-sm">
-      <!-- 账号信息 -->
-      <div v-if="accountStore.currentAccount" class="mr-2 min-w-[150px] max-w-[220px]">
-        <AccountSelector
-          :model-value="accountStore.currentUserId"
-          @update:model-value="accountStore.selectAccount"
-        />
-      </div>
+    <div class="flex flex-wrap items-center gap-2 mb-4 bg-base-100 p-2 rounded-lg shadow-sm">
+      <label class="label cursor-pointer gap-2 p-0 mr-2">
+        <input v-model="showUserResults" type="checkbox" class="toggle toggle-primary toggle-sm" />
+        <span class="label-text font-medium mt-0.5">显示成绩数据</span>
+      </label>
 
-      <!-- Suite 刷新 -->
-      <button
-        class="btn btn-sm btn-ghost gap-1"
-        :disabled="accountStore.suiteRefreshing"
-        @click="handleSuiteRefresh"
-      >
-        <RefreshCw class="w-3.5 h-3.5" :class="{ 'animate-spin': accountStore.suiteRefreshing }" />
-        刷新
-      </button>
-      <span v-if="accountStore.uploadTimeText" class="text-xs text-base-content/50 hidden sm:inline">
-        {{ accountStore.uploadTimeText }}
-      </span>
+      <template v-if="showUserResults">
+        <div class="divider divider-horizontal mx-0"></div>
+        
+        <!-- 账号信息 -->
+        <div v-if="accountStore.accounts.length > 0" class="min-w-[150px] max-w-[220px]">
+          <AccountSelector
+            :model-value="accountStore.currentUserId"
+            @update:model-value="accountStore.selectAccount"
+          />
+        </div>
+        <span v-else class="text-sm text-base-content/60">无绑定账号</span>
 
-      <!-- 错误提示 -->
-      <span v-if="refreshError" class="text-xs text-error">{{ refreshError }}</span>
+        <!-- Suite 刷新 -->
+        <button
+          v-if="accountStore.currentUserId"
+          class="btn btn-sm btn-ghost gap-1"
+          :disabled="accountStore.suiteRefreshing"
+          @click="handleSuiteRefresh"
+        >
+          <RefreshCw class="w-3.5 h-3.5" :class="{ 'animate-spin': accountStore.suiteRefreshing }" />
+          刷新
+        </button>
+        <span v-if="accountStore.uploadTimeText && accountStore.currentUserId" class="text-xs text-base-content/50 hidden sm:inline">
+          {{ accountStore.uploadTimeText }}
+        </span>
+
+        <!-- 错误提示 -->
+        <span v-if="refreshError" class="text-xs text-error">{{ refreshError }}</span>
+      </template>
 
       <div class="flex-1"></div>
 
@@ -607,7 +642,7 @@ watch(() => route.query.page, () => {})
       </div>
 
       <!-- 定数表视图 -->
-      <div v-else-if="viewMode === 'level'" class="animate-fade-in-up">
+      <div v-else-if="viewMode === 'level'" :class="{ 'animate-fade-in-up': enableHeavyAnimation }">
         <!-- 总体进度条 -->
         <div v-if="hasSuiteData && levelStats" class="flex flex-wrap gap-4 items-center bg-base-100 p-3 mb-4 rounded-lg shadow-sm border border-base-200/50">
           <div class="font-bold border-r border-base-200 pr-4 drop-shadow-sm flex items-center gap-1 text-base sm:text-lg" :style="{ color: diffColors[selectedDiffType] }">
@@ -633,15 +668,24 @@ watch(() => route.query.page, () => {})
           没有找到数据
         </div>
 
-        <div v-for="group in levelGroupedMusics" :key="group.level" class="mb-5">
-          <!-- 组标题（定数和进度） -->
-          <div class="flex items-center gap-3 mb-2 px-1">
+        <!-- 折叠全部 -->
+        <div class="flex gap-2 mb-3">
+          <button class="btn btn-xs btn-ghost" @click="expandedLevels = new Set()">全部折叠</button>
+        </div>
+
+        <div v-for="group in levelGroupedMusics" :key="group.level" class="mb-3">
+          <!-- 组标题（可点击展开/折叠） -->
+          <div 
+            class="flex items-center gap-3 px-1 py-1.5 cursor-pointer select-none rounded-lg hover:bg-base-200/50 transition-colors"
+            @click="toggleLevel(group.level)"
+          >
             <div
               class="px-3 py-0.5 rounded-full text-white font-black text-xl shadow-sm tracking-tighter"
               :style="{ backgroundColor: diffColors[selectedDiffType] }"
             >
               {{ group.level.toFixed(0) }}
             </div>
+            <span class="text-xs text-base-content/50">{{ group.musics?.length || 0 }}首</span>
             <div v-if="hasSuiteData" class="flex gap-3 text-xs font-bold px-3 py-1 rounded-full shadow-sm bg-base-100 border border-base-200/50">
               <span class="flex items-center gap-1 text-base-content/80">
                 ALL <span class="text-base-content">{{ group.stats?.total || 0 }}</span>
@@ -656,9 +700,10 @@ watch(() => route.query.page, () => {})
                 <img src="/img/icon_fullCombo.png" class="h-3.5" /> {{ group.stats?.fc || 0 }}
               </span>
             </div>
+            <span class="ml-auto text-xs text-base-content/30">{{ expandedLevels.has(group.level) ? '▲' : '▼' }}</span>
           </div>
-          <!-- 封面墙 -->
-          <div class="flex flex-wrap gap-1.5 sm:gap-2 bg-base-100 p-2 sm:p-3 rounded-xl shadow-sm border border-base-200/50">
+          <!-- 封面墙（仅展开时渲染） -->
+          <div v-if="expandedLevels.has(group.level)" class="flex flex-wrap gap-1.5 sm:gap-2 bg-base-100 p-2 sm:p-3 rounded-xl shadow-sm border border-base-200/50 mt-1.5">
             <RouterLink v-for="music in group.musics" :key="music.id" :to="`/musics/${music.id}`" class="relative group block shrink-0">
               <AssetImage 
                 :src="getMusicThumbnailUrl(music.id)" 
@@ -759,7 +804,7 @@ watch(() => route.query.page, () => {})
 
         <!-- Mobile List View -->
         <div class="block sm:hidden space-y-2">
-          <div v-for="music in displayedMusics" :key="music.id" class="bg-base-100 p-2 rounded-lg flex gap-3 shadow-sm">
+          <div v-for="music in displayedMusics" :key="music.id" class="bg-base-100 p-2 rounded-lg flex gap-3 shadow-sm cv-auto-row">
             <AssetImage 
               :src="getMusicThumbnailUrl(music.id)" 
               :alt="music.title"
@@ -829,12 +874,13 @@ watch(() => route.query.page, () => {})
             :translation="getTranslation(music.id)"
             :composer="music.composer"
             :assetbundle-name="music.assetbundleName"
-            :difficulties="musicDifficultiesMap[music.id] || {}"
+            :difficulties="musicDifficultiesMap[music.id] || EMPTY_OBJ"
             :is-leak="isLeak(music.publishedAt)"
             :assets-host="assetsHost"
-            :categories="music.categories || []"
-            :results="hasSuiteData ? (musicResultsMap[music.id] || {}) : undefined"
-            class="animate-fade-in-up"
+            :categories="music.categories || EMPTY_ARR"
+            :results="hasSuiteData ? (musicResultsMap[music.id] || EMPTY_OBJ) : undefined"
+            :class="{ 'animate-fade-in-up': enableHeavyAnimation }"
+            class="cv-auto-card"
           />
         </div>
 
@@ -855,4 +901,18 @@ watch(() => route.query.page, () => {})
 </template>
 
 <style scoped>
+.cv-auto-card {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 320px;
+}
+
+.cv-auto-row {
+  content-visibility: auto;
+  contain-intrinsic-size: 96px;
+}
+
+.cv-auto-level {
+  content-visibility: auto;
+  contain-intrinsic-size: 360px;
+}
 </style>

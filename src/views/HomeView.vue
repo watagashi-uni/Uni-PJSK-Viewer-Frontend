@@ -12,12 +12,12 @@ import {
 } from 'lucide-vue-next'
 import AssetImage from '@/components/AssetImage.vue'
 
-const FRONTEND_VERSION = '2.5.2'
+const FRONTEND_VERSION = '2.5.3'
 
 const masterStore = useMasterStore()
 const accountStore = useAccountStore()
 const settingsStore = useSettingsStore()
-const assetsHost = 'https://assets.unipjsk.com'
+const assetsHost = computed(() => settingsStore.assetsHost)
 
 const dataVersion = ref<string>('加载中...')
 const assetVersion = ref<string>('加载中...')
