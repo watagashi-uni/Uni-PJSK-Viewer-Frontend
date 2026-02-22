@@ -81,126 +81,126 @@ async function handleSuiteRefresh() {
           <li class="mb-4 relative">
             <RouterLink to="/" class="text-2xl font-bold text-primary px-2 hover:bg-transparent pr-12">
               Uni PJSK
-            <span class="text-base-content/60 text-sm font-normal">Viewer</span>
-          </RouterLink>
-          <a 
-            href="https://github.com/watagashi-uni/Uni-PJSK-Viewer-Frontend" 
-            target="_blank" 
-            class="absolute right-2 top-1/2 -translate-y-1/2 p-2 hover:bg-base-200 rounded-full transition-colors z-10"
-            title="GitHub 仓库"
-          >
-            <Github class="w-5 h-5 text-base-content/60 hover:text-base-content" />
-          </a>
-        </li>
-
-        <li>
-          <RouterLink to="/musics" active-class="active">
-            <Music class="w-5 h-5" /> 歌曲列表
-          </RouterLink>
-        </li>
-        <li>
-          <RouterLink to="/cards" active-class="active">
-            <Image class="w-5 h-5" /> 卡片查询
-          </RouterLink>
-        </li>
-        <li>
-          <RouterLink to="/events" active-class="active">
-            <Calendar class="w-5 h-5" /> 活动
-          </RouterLink>
-        </li>
-        <li>
-          <RouterLink to="/ranking" active-class="active">
-            <BarChart3 class="w-5 h-5" /> 实时榜线
-          </RouterLink>
-        </li>
-        <li>
-          <RouterLink to="/gachas" active-class="active">
-            <Gift class="w-5 h-5" /> 卡池
-          </RouterLink>
-        </li>
-        <li>
-          <RouterLink to="/sus2img" active-class="active">
-            <BarChart3 class="w-5 h-5" /> 谱面转图片
-          </RouterLink>
-        </li>
-        <li>
-          <RouterLink to="/chart-share" active-class="active">
-            <Share2 class="w-5 h-5" /> 谱面分享
-          </RouterLink>
-        </li>
-        <li>
-          <RouterLink to="/deck-recommend" active-class="active">
-            <Zap class="w-5 h-5" /> 自动组队
-          </RouterLink>
-        </li>
-        <li>
-          <RouterLink to="/profile" active-class="active">
-            <User class="w-5 h-5" /> 个人信息
-          </RouterLink>
-        </li>
-
-        <div class="divider my-1"></div>
-
-        <!-- 账号管理 -->
-        <li class="menu-title text-xs mt-2">账号</li>
-        <li v-if="accountStore.accounts.length > 0" class="px-2 mb-1 [&>*]:!bg-transparent [&>*:hover]:!bg-transparent">
-          <AccountSelector
-            :model-value="accountStore.currentUserId"
-            @update:model-value="accountStore.selectAccount"
-          />
-        </li>
-        <li v-else class="px-2">
-          <span class="text-xs text-base-content/40 p-0 hover:bg-transparent cursor-default">
-            在个人信息页添加账号
-          </span>
-        </li>
-        <li v-if="accountStore.currentUserId" class="px-2">
-          <div class="flex gap-1 p-0 hover:bg-transparent">
-            <button
-              class="btn btn-xs btn-ghost flex-1 gap-1"
-              :disabled="accountStore.profileRefreshing"
-              @click="handleProfileRefresh"
+              <span class="text-base-content/60 text-sm font-normal">Viewer</span>
+            </RouterLink>
+            <a 
+              href="https://github.com/watagashi-uni/Uni-PJSK-Viewer-Frontend" 
+              target="_blank" 
+              class="absolute right-2 top-1/2 -translate-y-1/2 p-2 hover:bg-base-200 rounded-full transition-colors z-10"
+              title="GitHub 仓库"
             >
-              <RefreshCw class="w-3 h-3" :class="{ 'animate-spin': accountStore.profileRefreshing }" />
-              Profile
-            </button>
-            <button
-              class="btn btn-xs btn-ghost flex-1 gap-1"
-              :disabled="accountStore.suiteRefreshing"
-              @click="handleSuiteRefresh"
-            >
-              <RefreshCw class="w-3 h-3" :class="{ 'animate-spin': accountStore.suiteRefreshing }" />
-              Suite
-            </button>
-          </div>
-        </li>
-        <li v-if="accountStore.currentUserId && (accountStore.lastRefreshText || accountStore.uploadTimeText)" class="px-2">
-          <div class="flex flex-col gap-0 p-0 hover:bg-transparent cursor-default">
-            <span v-if="accountStore.lastRefreshText" class="text-[10px] text-base-content/40">
-              Profile: {{ accountStore.lastRefreshText }}
-            </span>
-            <span v-if="accountStore.uploadTimeText" class="text-[10px] text-base-content/40">
-              Suite数据: {{ accountStore.uploadTimeText }}
-            </span>
-          </div>
-        </li>
-        <li v-if="refreshError" class="px-2">
-          <span class="text-[10px] text-error p-0 hover:bg-transparent">{{ refreshError }}</span>
-        </li>
+              <Github class="w-5 h-5 text-base-content/60 hover:text-base-content" />
+            </a>
+          </li>
 
-        <div class="divider my-1"></div>
+          <li>
+            <RouterLink to="/musics" active-class="active">
+              <Music class="w-5 h-5" /> 歌曲列表
+            </RouterLink>
+          </li>
+          <li>
+            <RouterLink to="/cards" active-class="active">
+              <Image class="w-5 h-5" /> 卡片查询
+            </RouterLink>
+          </li>
+          <li>
+            <RouterLink to="/events" active-class="active">
+              <Calendar class="w-5 h-5" /> 活动
+            </RouterLink>
+          </li>
+          <li>
+            <RouterLink to="/ranking" active-class="active">
+              <BarChart3 class="w-5 h-5" /> 实时榜线
+            </RouterLink>
+          </li>
+          <li>
+            <RouterLink to="/gachas" active-class="active">
+              <Gift class="w-5 h-5" /> 卡池
+            </RouterLink>
+          </li>
+          <li>
+            <RouterLink to="/sus2img" active-class="active">
+              <BarChart3 class="w-5 h-5" /> 谱面转图片
+            </RouterLink>
+          </li>
+          <li>
+            <RouterLink to="/chart-share" active-class="active">
+              <Share2 class="w-5 h-5" /> 谱面分享
+            </RouterLink>
+          </li>
+          <li>
+            <RouterLink to="/deck-recommend" active-class="active">
+              <Zap class="w-5 h-5" /> 自动组队
+            </RouterLink>
+          </li>
+          <li>
+            <RouterLink to="/profile" active-class="active">
+              <User class="w-5 h-5" /> 个人信息
+            </RouterLink>
+          </li>
+
+          <div class="divider my-1"></div>
+
+          <!-- 账号管理 -->
+          <li class="menu-title text-xs mt-2">账号</li>
+          <li v-if="accountStore.accounts.length > 0" class="px-2 mb-1 [&>*]:!bg-transparent [&>*:hover]:!bg-transparent">
+            <AccountSelector
+              :model-value="accountStore.currentUserId"
+              @update:model-value="accountStore.selectAccount"
+            />
+          </li>
+          <li v-else class="px-2">
+            <span class="text-xs text-base-content/40 p-0 hover:bg-transparent cursor-default">
+              在个人信息页添加账号
+            </span>
+          </li>
+          <li v-if="accountStore.currentUserId" class="px-2">
+            <div class="flex gap-1 p-0 hover:bg-transparent">
+              <button
+                class="btn btn-xs btn-ghost flex-1 gap-1"
+                :disabled="accountStore.profileRefreshing"
+                @click="handleProfileRefresh"
+              >
+                <RefreshCw class="w-3 h-3" :class="{ 'animate-spin': accountStore.profileRefreshing }" />
+                Profile
+              </button>
+              <button
+                class="btn btn-xs btn-ghost flex-1 gap-1"
+                :disabled="accountStore.suiteRefreshing"
+                @click="handleSuiteRefresh"
+              >
+                <RefreshCw class="w-3 h-3" :class="{ 'animate-spin': accountStore.suiteRefreshing }" />
+                Suite
+              </button>
+            </div>
+          </li>
+          <li v-if="accountStore.currentUserId && (accountStore.lastRefreshText || accountStore.uploadTimeText)" class="px-2">
+            <div class="flex flex-col gap-0 p-0 hover:bg-transparent cursor-default">
+              <span v-if="accountStore.lastRefreshText" class="text-[10px] text-base-content/40">
+                Profile: {{ accountStore.lastRefreshText }}
+              </span>
+              <span v-if="accountStore.uploadTimeText" class="text-[10px] text-base-content/40">
+                Suite数据: {{ accountStore.uploadTimeText }}
+              </span>
+            </div>
+          </li>
+          <li v-if="refreshError" class="px-2">
+            <span class="text-[10px] text-error p-0 hover:bg-transparent">{{ refreshError }}</span>
+          </li>
+
+          <div class="divider my-1"></div>
         
-        <li>
-          <RouterLink to="/about" active-class="active">
-            <Info class="w-5 h-5" /> 关于项目
-          </RouterLink>
-        </li>
-        <li>
-          <RouterLink to="/settings" active-class="active">
-            <Settings class="w-5 h-5" /> 设置
-          </RouterLink>
-        </li>
-      </ul>
+          <li>
+            <RouterLink to="/about" active-class="active">
+              <Info class="w-5 h-5" /> 关于项目
+            </RouterLink>
+          </li>
+          <li>
+            <RouterLink to="/settings" active-class="active">
+              <Settings class="w-5 h-5" /> 设置
+            </RouterLink>
+          </li>
+        </ul>
       </div>
     </div>
     

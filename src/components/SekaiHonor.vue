@@ -52,7 +52,7 @@ const props = withDefaults(defineProps<{
 }>(), {
   sub: false,
   userHonorMissions: () => [],
-  progress: 0
+  progress: undefined
 })
 
 // ---------- Constants ----------

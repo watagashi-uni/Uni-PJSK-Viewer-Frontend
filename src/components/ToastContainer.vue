@@ -97,7 +97,6 @@ function dismissUpdate() {
           </div>
         </div>
       </Transition>
-
     </div>
   </Teleport>
 </template>
