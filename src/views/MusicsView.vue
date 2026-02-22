@@ -373,7 +373,8 @@ function getMusicTitle(musicId: number): string {
 
 function getMusicThumbnailUrl(musicId: number): string {
   const paddedId = musicId.toString().padStart(3, '0')
-  return `${assetsHost.value}/startapp/thumbnail/music_jacket/jacket_s_${paddedId}.png`
+  const host = viewMode.value === 'level' ? 'https://assets.unipjsk.com' : assetsHost.value
+  return `${host}/startapp/thumbnail/music_jacket/jacket_s_${paddedId}.png`
 }
 
 const diffColors: Record<string, string> = {

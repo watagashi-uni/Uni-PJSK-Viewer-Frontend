@@ -54,7 +54,7 @@ body {
 }
 
 /* Moe Theme UI Overrides */
-[data-theme="moe"] .drawer-side .menu {
+[data-theme="moe"] .drawer-side .sidebar-wrapper {
   background-color: #fff5f7;
   background-image: url("data:image/svg+xml,%3Csvg width='300' height='300' viewBox='0 0 300 300' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffc2d1' fill-opacity='0.4'%3E%3Cg transform='translate(20, 20) rotate(15, 50, 50) scale(0.6)'%3E%3Cpath d='M36 29c-3.3 0-6-3.6-6-8s2.7-8 6-8 6 3.6 6 8-2.7 8-6 8zm28 0c-3.3 0-6-3.6-6-8s2.7-8 6-8 6 3.6 6 8-2.7 8-6 8zm-42 16c-3.3 0-6-2.7-6-6s2.7-6 6-6 6 2.7 6 6-2.7 6-6 6zm56 0c-3.3 0-6-2.7-6-6s2.7-6 6-6 6 2.7 6 6-2.7 6-6 6zm-28 29c-11 0-20-7.2-20-16s9-14 20-14 20 5.3 20 14-9 16-20 16z'/%3E%3C/g%3E%3Cg transform='translate(150, 60) rotate(75, 50, 50) scale(0.4)'%3E%3Cpath d='M36 29c-3.3 0-6-3.6-6-8s2.7-8 6-8 6 3.6 6 8-2.7 8-6 8zm28 0c-3.3 0-6-3.6-6-8s2.7-8 6-8 6 3.6 6 8-2.7 8-6 8zm-42 16c-3.3 0-6-2.7-6-6s2.7-6 6-6 6 2.7 6 6-2.7 6-6 6zm56 0c-3.3 0-6-2.7-6-6s2.7-6 6-6 6 2.7 6 6-2.7 6-6 6zm-28 29c-11 0-20-7.2-20-16s9-14 20-14 20 5.3 20 14-9 16-20 16z'/%3E%3C/g%3E%3Cg transform='translate(70, 180) rotate(-40, 50, 50) scale(0.7)'%3E%3Cpath d='M36 29c-3.3 0-6-3.6-6-8s2.7-8 6-8 6 3.6 6 8-2.7 8-6 8zm28 0c-3.3 0-6-3.6-6-8s2.7-8 6-8 6 3.6 6 8-2.7 8-6 8zm-42 16c-3.3 0-6-2.7-6-6s2.7-6 6-6 6 2.7 6 6-2.7 6-6 6zm56 0c-3.3 0-6-2.7-6-6s2.7-6 6-6 6 2.7 6 6-2.7 6-6 6zm-28 29c-11 0-20-7.2-20-16s9-14 20-14 20 5.3 20 14-9 16-20 16z'/%3E%3C/g%3E%3Cg transform='translate(200, 200) rotate(115, 50, 50) scale(0.5)'%3E%3Cpath d='M36 29c-3.3 0-6-3.6-6-8s2.7-8 6-8 6 3.6 6 8-2.7 8-6 8zm28 0c-3.3 0-6-3.6-6-8s2.7-8 6-8 6 3.6 6 8-2.7 8-6 8zm-42 16c-3.3 0-6-2.7-6-6s2.7-6 6-6 6 2.7 6 6-2.7 6-6 6zm56 0c-3.3 0-6-2.7-6-6s2.7-6 6-6 6 2.7 6 6-2.7 6-6 6zm-28 29c-11 0-20-7.2-20-16s9-14 20-14 20 5.3 20 14-9 16-20 16z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
   background-size: 300px 300px;
@@ -64,8 +64,8 @@ body {
 }
 
 /* Cat Ears via CSS */
-[data-theme="moe"] .drawer-side .menu::before,
-[data-theme="moe"] .drawer-side .menu::after {
+[data-theme="moe"] .drawer-side .sidebar-wrapper::before,
+[data-theme="moe"] .drawer-side .sidebar-wrapper::after {
   content: '';
   position: absolute;
   top: -20px;
@@ -76,12 +76,12 @@ body {
   z-index: 100;
 }
 
-[data-theme="moe"] .drawer-side .menu::before {
+[data-theme="moe"] .drawer-side .sidebar-wrapper::before {
   left: 40px;
   transform: rotate(-15deg);
 }
 
-[data-theme="moe"] .drawer-side .menu::after {
+[data-theme="moe"] .drawer-side .sidebar-wrapper::after {
   right: 40px;
   transform: rotate(15deg);
 }
@@ -268,7 +268,7 @@ html {
 /* Jirai Theme UI Overrides */
 /* ========================================================== */
 
-[data-theme="jirai"] .drawer-side .menu {
+[data-theme="jirai"] .drawer-side .sidebar-wrapper {
   background-color: #1a151b;
   /* Dark cross checker pattern */
   background-image: linear-gradient(45deg, #1e1820 25%, transparent 25%, transparent 75%, #1e1820 75%, #1e1820), linear-gradient(45deg, #1e1820 25%, transparent 25%, transparent 75%, #1e1820 75%, #1e1820);
@@ -280,7 +280,7 @@ html {
 }
 
 /* Vertical Gothic Lace Trim on Sidebar Right Edge */
-[data-theme="jirai"] .drawer-side .menu::after {
+[data-theme="jirai"] .drawer-side .sidebar-wrapper::after {
   content: '';
   position: absolute;
   top: 0;

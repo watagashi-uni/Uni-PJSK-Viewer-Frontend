@@ -76,10 +76,11 @@ async function handleSuiteRefresh() {
     <!-- Sidebar -->
     <div class="drawer-side z-50 overflow-hidden">
       <label for="my-drawer-2" aria-label="close sidebar" class="drawer-overlay"></label>
-      <ul class="menu p-4 w-80 h-full overflow-y-auto overflow-x-hidden overscroll-y-contain flex flex-col flex-nowrap bg-base-100 text-base-content shadow-xl gap-2">
-        <li class="mb-4 relative">
-          <RouterLink to="/" class="text-2xl font-bold text-primary px-2 hover:bg-transparent pr-12">
-            Uni PJSK
+      <div class="sidebar-wrapper w-80 h-full relative z-10">
+        <ul class="menu p-4 w-full h-full overflow-y-auto overflow-x-hidden overscroll-y-contain flex flex-col flex-nowrap bg-base-100 text-base-content shadow-xl gap-2">
+          <li class="mb-4 relative">
+            <RouterLink to="/" class="text-2xl font-bold text-primary px-2 hover:bg-transparent pr-12">
+              Uni PJSK
             <span class="text-base-content/60 text-sm font-normal">Viewer</span>
           </RouterLink>
           <a 
@@ -200,6 +201,7 @@ async function handleSuiteRefresh() {
           </RouterLink>
         </li>
       </ul>
+      </div>
     </div>
     
     <ToastContainer />
