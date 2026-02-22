@@ -24,7 +24,7 @@ const searchQuery = ref('')
 const selectedType = ref<string>('')
 const isLoading = ref(true)
 
-const assetsHost = 'https://assets.unipjsk.com'
+const assetsHost = computed(() => settingsStore.assetsHost)
 
 // 活动类型映射
 const eventTypeMap: Record<string, { label: string; color: string }> = {
@@ -72,7 +72,7 @@ function formatDate(timestamp: number): string {
 
 // 获取 banner 图片 URL
 function getBannerUrl(assetbundleName: string): string {
-  return `${assetsHost}/startapp/home/banner/${assetbundleName}/${assetbundleName}.png`
+  return `${assetsHost.value}/startapp/home/banner/${assetbundleName}/${assetbundleName}.png`
 }
 
 onMounted(async () => {

@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useAccountStore } from '@/stores/account'
 import { useMasterStore } from '@/stores/master'
+import { useSettingsStore } from '@/stores/settings'
 import AssetImage from '@/components/AssetImage.vue'
 import { User, ChevronDown } from 'lucide-vue-next'
 
@@ -20,7 +21,8 @@ const emit = defineEmits<{
 
 const accountStore = useAccountStore()
 const masterStore = useMasterStore()
-const assetsHost = 'https://assets.unipjsk.com'
+const settingsStore = useSettingsStore()
+const assetsHost = computed(() => settingsStore.assetsHost)
 
 const isOpen = ref(false)
 const containerRef = ref<HTMLElement | null>(null)

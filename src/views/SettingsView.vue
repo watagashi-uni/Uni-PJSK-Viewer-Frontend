@@ -24,6 +24,11 @@ const vocalOptions = [
   { value: 'virtual_singer', label: 'Virtual Singer 版' },
 ]
 
+const assetsHostOptions = [
+  { value: settingsStore.ASSETS_HOST_CN, label: '国内源', desc: 'https://assets-direct.unipjsk.com/' },
+  { value: settingsStore.ASSETS_HOST_GLOBAL, label: '海外源', desc: 'https://assets.unipjsk.com/' },
+]
+
 
 
 async function handleClearCache() {
@@ -151,6 +156,32 @@ async function handleClearTranslationCache() {
               </button>
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- 资源源站 -->
+      <div class="card bg-base-100 shadow-lg">
+        <div class="card-body">
+          <h2 class="card-title text-lg mb-4">
+            <Database class="w-5 h-5" />
+            资源源站
+          </h2>
+
+          <div class="flex flex-wrap gap-2">
+            <button
+              v-for="option in assetsHostOptions"
+              :key="option.value"
+              class="btn btn-sm"
+              :class="settingsStore.assetsHost === option.value ? 'btn-primary' : 'btn-ghost'"
+              @click="settingsStore.setAssetsHost(option.value)"
+            >
+              {{ option.label }}
+            </button>
+          </div>
+          <div class="mb-2"></div>
+          <p class="text-xs text-base-content/50">
+            国内源：适合大陆地区访问 ｜ 海外源：Cloudflare CDN，适合海外地区访问
+          </p>
         </div>
       </div>
 

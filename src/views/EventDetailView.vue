@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useMasterStore } from '@/stores/master'
+import { useSettingsStore } from '@/stores/settings'
 import { 
   Calendar, Clock, Trophy, Music, CreditCard, 
   Sparkles, ChevronLeft, ChevronRight, BarChart3 
@@ -12,8 +13,9 @@ import SekaiHonor from '@/components/SekaiHonor.vue'
 
 const route = useRoute()
 const masterStore = useMasterStore()
+const settingsStore = useSettingsStore()
 
-const assetsHost = 'https://assets.unipjsk.com'
+const assetsHost = computed(() => settingsStore.assetsHost)
 
 interface EventData {
   id: number
@@ -160,10 +162,10 @@ const eventImages = computed(() => {
   if (!event.value) return []
   const assetName = event.value.assetbundleName
   return [
-    { label: 'Logo', url: `${assetsHost}/ondemand/event/${assetName}/logo/logo.png` },
-    { label: '背景', url: `${assetsHost}/ondemand/event/${assetName}/screen/bg.png` },
-    { label: '角色', url: `${assetsHost}/ondemand/event/${assetName}/screen/character.png` },
-    { label: 'Banner', url: `${assetsHost}/startapp/home/banner/${assetName}/${assetName}.png` },
+    { label: 'Logo', url: `${assetsHost.value}/ondemand/event/${assetName}/logo/logo.png` },
+    { label: '背景', url: `${assetsHost.value}/ondemand/event/${assetName}/screen/bg.png` },
+    { label: '角色', url: `${assetsHost.value}/ondemand/event/${assetName}/screen/character.png` },
+    { label: 'Banner', url: `${assetsHost.value}/startapp/home/banner/${assetName}/${assetName}.png` },
   ]
 })
 

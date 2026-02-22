@@ -63,6 +63,10 @@ export default defineConfig({
             handler: 'NetworkOnly',
           },
           {
+            urlPattern: /^https:\/\/assets-direct\.unipjsk\.com\/.*/i,
+            handler: 'NetworkOnly',
+          },
+          {
             // 翻译 API - 使用 NetworkFirst，确保刷新时拿到最新数据
             urlPattern: /^https:\/\/viewer-api\.unipjsk\.com\/api\/translations\/.*/i,
             handler: 'NetworkFirst',

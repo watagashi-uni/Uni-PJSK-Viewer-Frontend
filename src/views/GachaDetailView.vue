@@ -103,7 +103,7 @@ const isCheckingNext = ref(false)
 
 const currentBgUrl = computed(() => {
   if (!gacha.value) return ''
-  const baseDir = `${assetsHost}/ondemand/gacha/${gacha.value.assetbundleName}/screen/texture`
+  const baseDir = `${assetsHost.value}/ondemand/gacha/${gacha.value.assetbundleName}/screen/texture`
   if (bgType.value === 'chr') {
     return `${baseDir}/bg_chr_gacha${gacha.value.id}_${currentBgIndex.value}.png`
   } else if (bgType.value === 'normal_n') {
@@ -124,18 +124,18 @@ const simulationStats = ref<SimulationStats>({
   rarityCount: {}
 })
 
-const assetsHost = 'https://assets.unipjsk.com'
+const assetsHost = computed(() => settingsStore.assetsHost)
 
 const gachaId = computed(() => Number(route.params.id))
 
 const logoUrl = computed(() => {
   if (!gacha.value) return ''
-  return `${assetsHost}/ondemand/gacha/${gacha.value.assetbundleName}/logo/logo.png`
+  return `${assetsHost.value}/ondemand/gacha/${gacha.value.assetbundleName}/logo/logo.png`
 })
 
 const bannerUrl = computed(() => {
   if (!gacha.value) return ''
-  return `${assetsHost}/startapp/home/banner/banner_gacha${gacha.value.id}/banner_gacha${gacha.value.id}.png`
+  return `${assetsHost.value}/startapp/home/banner/banner_gacha${gacha.value.id}/banner_gacha${gacha.value.id}.png`
 })
 
 
@@ -174,7 +174,7 @@ async function checkNextBg() {
   if (!gacha.value) return
   
   isCheckingNext.value = true
-  const baseDir = `${assetsHost}/ondemand/gacha/${gacha.value.assetbundleName}/screen/texture`
+  const baseDir = `${assetsHost.value}/ondemand/gacha/${gacha.value.assetbundleName}/screen/texture`
   const nextIndex = currentBgIndex.value + 1
   const nextUrl = bgType.value === 'chr' 
     ? `${baseDir}/bg_chr_gacha${gacha.value.id}_${nextIndex}.png`
@@ -211,7 +211,7 @@ async function checkImageAvailability() {
   maxValidBgIndex.value = 1
   hasNextBg.value = false
 
-  const baseDir = `${assetsHost}/ondemand/gacha/${gacha.value.assetbundleName}/screen/texture`
+  const baseDir = `${assetsHost.value}/ondemand/gacha/${gacha.value.assetbundleName}/screen/texture`
   
   if (await checkUrlHead(`${baseDir}/bg_chr_gacha${gacha.value.id}_1.png`)) {
     bgType.value = 'chr'

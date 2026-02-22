@@ -2,6 +2,10 @@ import { defineStore } from 'pinia'
 import { ref, watch } from 'vue'
 
 export const useSettingsStore = defineStore('settings', () => {
+    const ASSETS_HOST_CN = 'https://assets-direct.unipjsk.com'
+    const ASSETS_HOST_GLOBAL = 'https://assets.unipjsk.com'
+    const allowedAssetsHosts = new Set([ASSETS_HOST_CN, ASSETS_HOST_GLOBAL])
+
     // 状态
     const showSpoilers = ref(false)
     // 是否使用遮罩覆盖剧透内容（默认开启）
@@ -11,6 +15,8 @@ export const useSettingsStore = defineStore('settings', () => {
 
     // 默认 vocal 设置: 'sekai' | 'virtual_singer'
     const defaultVocal = ref<string>('sekai')
+    // 资源域名（默认国内源）
+    const assetsHost = ref<string>(ASSETS_HOST_CN)
 
     // 应用主题
     function applyTheme(newTheme: string) {
@@ -39,6 +45,10 @@ export const useSettingsStore = defineStore('settings', () => {
         defaultVocal.value = vocal
     }
 
+    function setAssetsHost(host: string) {
+        assetsHost.value = allowedAssetsHosts.has(host) ? host : ASSETS_HOST_CN
+    }
+
     // 初始化：从 localStorage 恢复状态
     function initialize(): void {
         const saved = localStorage.getItem('settings_showSpoilers')
@@ -62,6 +72,13 @@ export const useSettingsStore = defineStore('settings', () => {
         const savedDefaultVocal = localStorage.getItem('settings_defaultVocal')
         if (savedDefaultVocal) {
             defaultVocal.value = savedDefaultVocal
+        }
+
+        const savedAssetsHost = localStorage.getItem('settings_assetsHost')
+        if (savedAssetsHost && allowedAssetsHosts.has(savedAssetsHost)) {
+            assetsHost.value = savedAssetsHost
+        } else {
+            assetsHost.value = ASSETS_HOST_CN
         }
 
         // 监听系统主题变化
@@ -98,15 +115,23 @@ export const useSettingsStore = defineStore('settings', () => {
         localStorage.setItem('settings_defaultVocal', value)
     })
 
+    watch(assetsHost, (value) => {
+        localStorage.setItem('settings_assetsHost', value)
+    })
+
     return {
+        ASSETS_HOST_CN,
+        ASSETS_HOST_GLOBAL,
         showSpoilers,
         maskSpoilers,
         theme,
         defaultVocal,
+        assetsHost,
         initialize,
         toggleSpoilers,
         toggleMaskSpoilers,
         setTheme,
         setDefaultVocal,
+        setAssetsHost,
     }
 })

@@ -7,6 +7,7 @@
  */
 import { ref, watch, computed, onMounted } from 'vue'
 import { useMasterStore } from '@/stores/master'
+import { useSettingsStore } from '@/stores/settings'
 import { getRemoteImageSize } from '@/utils/imageRetry'
 import { handleSvgImageError } from '@/utils/imageRetry'
 
@@ -59,7 +60,8 @@ const props = withDefaults(defineProps<{
 })
 
 // ---------- Constants ----------
-const assetsHost = 'https://assets.unipjsk.com'
+const settingsStore = useSettingsStore()
+const assetsHost = computed(() => settingsStore.assetsHost)
 
 const degreeFrameMap: Record<string, string> = {
   low: '/honor/frame_degree_m_1.png',
@@ -187,7 +189,7 @@ async function loadHonor() {
   if (props.bondsHonorWordId) {
     const word = bondsHonorWords.find(w => w.id === props.bondsHonorWordId)
     if (word) {
-      const url = `${assetsHost}/startapp/bonds_honor/word/${word.assetbundleName}_01.png`
+      const url = `${assetsHost.value}/startapp/bonds_honor/word/${word.assetbundleName}_01.png`
       wordImage.value = url
       try {
         const size = await getRemoteImageSize(url)
@@ -206,8 +208,8 @@ async function loadHonor() {
     const rightCharaId = props.bondsHonorViewType === 'normal'
       ? chara2.gameCharacterId : chara1.gameCharacterId
 
-    const leftUrl = `${assetsHost}/startapp/bonds_honor/character/chr_sd_${String(leftCharaId).padStart(2, '0')}_01.png`
-    const rightUrl = `${assetsHost}/startapp/bonds_honor/character/chr_sd_${String(rightCharaId).padStart(2, '0')}_01.png`
+    const leftUrl = `${assetsHost.value}/startapp/bonds_honor/character/chr_sd_${String(leftCharaId).padStart(2, '0')}_01.png`
+    const rightUrl = `${assetsHost.value}/startapp/bonds_honor/character/chr_sd_${String(rightCharaId).padStart(2, '0')}_01.png`
 
     sdLeft.value = leftUrl
     sdRight.value = rightUrl

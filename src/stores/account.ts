@@ -57,6 +57,8 @@ export const useAccountStore = defineStore('account', () => {
     // suite 刷新中状态（全局可用）
     const suiteRefreshing = ref(false)
     const profileRefreshing = ref(false)
+    const suiteRefreshToastMessage = ref('')
+    let suiteRefreshToastTimer: number | null = null
 
     // 内存中的缓存（UI 界面可以直接读取）
     const suiteCaches = ref<Record<string, any>>({})
@@ -267,6 +269,18 @@ export const useAccountStore = defineStore('account', () => {
         suiteRefreshing.value = true
         try {
             const oauthStore = useOAuthStore()
+            const setSuiteRefreshToast = (source: 'public' | 'oauth') => {
+                suiteRefreshToastMessage.value = source === 'public'
+                    ? '已通过公开API更新'
+                    : '已通过oauth认证更新'
+                if (suiteRefreshToastTimer !== null) {
+                    window.clearTimeout(suiteRefreshToastTimer)
+                }
+                suiteRefreshToastTimer = window.setTimeout(() => {
+                    suiteRefreshToastMessage.value = ''
+                    suiteRefreshToastTimer = null
+                }, 3000)
+            }
 
             // 已有该账号 token 时，优先走 OAuth 受保护接口，避免先请求 public API
             if (oauthStore.hasTokenForUser(userId)) {
@@ -276,6 +290,7 @@ export const useAccountStore = defineStore('account', () => {
                         updateUploadTime(userId, oauthData.upload_time)
                     }
                     await saveSuiteCache(userId, oauthData)
+                    setSuiteRefreshToast('oauth')
                     return oauthData
                 } catch (e: any) {
                     if (e?.status === 401 || e?.status === 403) {
@@ -285,6 +300,7 @@ export const useAccountStore = defineStore('account', () => {
                             updateUploadTime(userId, fallbackData.upload_time)
                         }
                         await saveSuiteCache(userId, fallbackData)
+                        setSuiteRefreshToast('oauth')
                         return fallbackData
                     }
                     throw e
@@ -300,6 +316,7 @@ export const useAccountStore = defineStore('account', () => {
                         updateUploadTime(userId, data.upload_time)
                     }
                     await saveSuiteCache(userId, data)
+                    setSuiteRefreshToast('oauth')
                     return data
                 }
                 throw new Error(`HTTP ${resp.status}`)
@@ -309,6 +326,7 @@ export const useAccountStore = defineStore('account', () => {
                 updateUploadTime(userId, data.upload_time)
             }
             await saveSuiteCache(userId, data)
+            setSuiteRefreshToast('public')
             return data
         } finally {
             suiteRefreshing.value = false
@@ -323,6 +341,7 @@ export const useAccountStore = defineStore('account', () => {
         lastRefreshText,
         suiteRefreshing,
         profileRefreshing,
+        suiteRefreshToastMessage,
         initialize,
         save,
         selectAccount,

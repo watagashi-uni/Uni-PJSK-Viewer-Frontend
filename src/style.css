@@ -127,6 +127,42 @@ body {
   box-shadow: 0 8px 24px rgba(255, 181, 167, 0.15);
 }
 
+/* Theme-consistent alert styles for Moe */
+[data-theme="moe"] .alert.alert-warning {
+  background: linear-gradient(135deg, #fff6e5 0%, #ffe9c2 100%);
+  border: 2px solid #ffc46b;
+  color: #7a4a00;
+  box-shadow: 0 10px 26px rgba(245, 158, 11, 0.18);
+}
+
+[data-theme="moe"] .alert.alert-success {
+  background: linear-gradient(135deg, #ebfff7 0%, #d5f7e9 100%);
+  border: 2px solid #56cf9f;
+  color: #0f5b40;
+  box-shadow: 0 10px 26px rgba(16, 185, 129, 0.18);
+}
+
+[data-theme="moe"] .alert.alert-error {
+  background: linear-gradient(135deg, #fff0f4 0%, #ffdbe5 100%);
+  border: 2px solid #ff8fad;
+  color: #8a1f45;
+  box-shadow: 0 10px 26px rgba(225, 29, 72, 0.18);
+}
+
+[data-theme="moe"] .alert.alert-info {
+  background: linear-gradient(135deg, #eef7ff 0%, #daeeff 100%);
+  border: 2px solid #7fc8ff;
+  color: #1f4f85;
+  box-shadow: 0 10px 26px rgba(14, 165, 233, 0.18);
+}
+
+[data-theme="moe"] .alert.alert-warning :is(h1, h2, h3, h4, p, span),
+[data-theme="moe"] .alert.alert-success :is(h1, h2, h3, h4, p, span),
+[data-theme="moe"] .alert.alert-error :is(h1, h2, h3, h4, p, span),
+[data-theme="moe"] .alert.alert-info :is(h1, h2, h3, h4, p, span) {
+  color: inherit;
+}
+
 /* Scrollbar styling for Moe */
 [data-theme="moe"] ::-webkit-scrollbar {
   width: 8px;
@@ -328,6 +364,46 @@ html {
   background-color: rgba(38, 31, 40, 0.9);
   backdrop-filter: blur(8px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Theme-consistent alert styles for Jirai */
+[data-theme="jirai"] .alert.alert-warning {
+  background: linear-gradient(135deg, rgba(92, 64, 27, 0.72) 0%, rgba(122, 84, 30, 0.62) 100%);
+  border: 1px solid #e2a34a;
+  border-left: 4px solid #f4bc63;
+  color: #ffe2b8;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.32);
+}
+
+[data-theme="jirai"] .alert.alert-success {
+  background: linear-gradient(135deg, rgba(19, 65, 52, 0.78) 0%, rgba(26, 95, 75, 0.64) 100%);
+  border: 1px solid #4dbf94;
+  border-left: 4px solid #65d2aa;
+  color: #cafbe7;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.32);
+}
+
+[data-theme="jirai"] .alert.alert-error {
+  background: linear-gradient(135deg, rgba(101, 28, 49, 0.82) 0%, rgba(126, 35, 62, 0.66) 100%);
+  border: 1px solid #ff6e9c;
+  border-left: 4px solid #ff8ab1;
+  color: #ffd5e3;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.34);
+}
+
+[data-theme="jirai"] .alert.alert-info {
+  background: linear-gradient(135deg, rgba(28, 56, 84, 0.8) 0%, rgba(31, 70, 102, 0.66) 100%);
+  border: 1px solid #66b7ff;
+  border-left: 4px solid #8dcbff;
+  color: #d8eeff;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.34);
+}
+
+[data-theme="jirai"] .alert.alert-warning :is(h1, h2, h3, h4, p, span),
+[data-theme="jirai"] .alert.alert-success :is(h1, h2, h3, h4, p, span),
+[data-theme="jirai"] .alert.alert-error :is(h1, h2, h3, h4, p, span),
+[data-theme="jirai"] .alert.alert-info :is(h1, h2, h3, h4, p, span) {
+  color: inherit;
 }
 
 /* Scrollbar styling for Jirai */

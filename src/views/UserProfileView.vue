@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useMasterStore } from '@/stores/master'
 import { useAccountStore } from '@/stores/account'
+import { useSettingsStore } from '@/stores/settings'
 import AssetImage from '@/components/AssetImage.vue'
 import SekaiCard from '@/components/SekaiCard.vue'
 import SekaiProfileHonor from '@/components/SekaiProfileHonor.vue'
@@ -12,7 +13,8 @@ import {
 
 const masterStore = useMasterStore()
 const accountStore = useAccountStore()
-const assetsHost = 'https://assets.unipjsk.com'
+const settingsStore = useSettingsStore()
+const assetsHost = computed(() => settingsStore.assetsHost)
 
 
 
