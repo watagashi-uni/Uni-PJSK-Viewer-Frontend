@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, onBeforeUnmount, watch } from 'vue'
+import { ref, onMounted, computed, onBeforeUnmount } from 'vue'
+import { useSeoMeta, useHead } from '@unhead/vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
@@ -434,11 +435,13 @@ function openChartPreview(difficulty: string) {
 async function loadData() {
   isLoading.value = true
   try {
+    // 异步拉取翻译数据，不阻塞主数据渲染
+    masterStore.getTranslations().catch(e => console.error('加载翻译失败:', e))
+
     const [
       musicsData, 
       difficultiesData, 
       vocalsData, 
-      ,  // translations loaded into store directly
       eventsData,
       eventMusicsData,
       charactersData,
@@ -447,7 +450,6 @@ async function loadData() {
       masterStore.getMaster<Music>('musics'),
       masterStore.getMaster<MusicDifficulty>('musicDifficulties'),
       masterStore.getMaster<MusicVocal>('musicVocals'),
-      masterStore.getTranslations(),
       masterStore.getMaster<EventData>('events'),
       masterStore.getMaster<EventMusic>('eventMusics'),
       masterStore.getMaster<Character>('gameCharacters'),
@@ -528,16 +530,48 @@ const hasFurigana = computed(() => {
 
 // 动态设置网页标题
 const defaultTitle = 'Uni PJSK Viewer'
-watch(music, (newMusic) => {
-  if (newMusic) {
-    document.title = `${newMusic.title} - Uni PJSK Viewer`
-  } else {
-    document.title = defaultTitle
+
+const pageTitle = computed(() => {
+  if (music.value) {
+    return `${music.value.title} - Uni PJSK Viewer`
   }
+  return defaultTitle
 })
 
-onBeforeUnmount(() => {
-  document.title = defaultTitle
+const pageDescription = computed(() => {
+  if (music.value) {
+    return `世界计划（PJSK / Project SEKAI）歌曲「${music.value.title}」。作词：${music.value.lyricist}，作曲：${music.value.composer}。查看该曲目的不同演唱版本试听、谱面预览及相关活动信息。`
+  }
+  return '查看世界计划（PJSK / Project SEKAI）的歌曲详细数据及试听资源。'
+})
+
+const pageImage = computed(() => {
+  if (music.value) {
+    return `${assetsHost.value}/startapp/music/jacket/${music.value.assetbundleName}/${music.value.assetbundleName}.png`
+  }
+  return ''
+})
+
+useSeoMeta({
+  title: pageTitle,
+  description: pageDescription,
+  ogTitle: pageTitle,
+  ogDescription: pageDescription,
+  ogImage: pageImage,
+  twitterCard: 'summary_large_image',
+})
+
+const pageKeywords = computed(() => {
+  if (music.value) {
+    return `世界计划, PJSK, Project SEKAI, ${music.value.title}, ${music.value.lyricist}, ${music.value.composer}, 试听, 谱面预览, 初音未来`
+  }
+  return '世界计划, PJSK, Project SEKAI, 歌曲, 试听, 谱面'
+})
+
+useHead({
+  meta: [
+    { name: 'keywords', content: pageKeywords }
+  ]
 })
 
 // 返回上一页

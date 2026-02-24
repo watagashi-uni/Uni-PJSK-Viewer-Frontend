@@ -10,6 +10,7 @@
     "lint": "eslint . --fix"
   },
   "dependencies": {
+    "@unhead/vue": "^2.1.4",
     "axios": "^1.13.2",
     "canvas-confetti": "^1.9.4",
     "idb": "^8.0.3",

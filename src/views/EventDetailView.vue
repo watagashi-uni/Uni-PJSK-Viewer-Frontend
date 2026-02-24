@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
+import { useSeoMeta, useHead } from '@unhead/vue'
 import { useRoute } from 'vue-router'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
@@ -353,6 +354,54 @@ async function loadData() {
     isLoading.value = false
   }
 }
+
+const defaultTitle = 'Uni PJSK Viewer'
+
+const pageTitle = computed(() => {
+  if (event.value) {
+    return `${event.value.name} - Uni PJSK Viewer`
+  }
+  return defaultTitle
+})
+
+const pageDescription = computed(() => {
+  if (event.value) {
+    const typeLabel = eventTypeMap[event.value.eventType]?.label || event.value.eventType
+    return `世界计划(PJSK / Project SEKAI)活动「${event.value.name}」。活动类型：${typeLabel}。查看活动详细信息、当期加成卡牌、活动歌曲及奖励牌子等数据。`
+  }
+  return '查看世界计划(PJSK / Project SEKAI)的活动详细数据。'
+})
+
+const pageImage = computed(() => {
+  if (eventImages.value.length > 0) {
+    const banner = eventImages.value.find((img: any) => img.label === 'Banner')
+    return banner ? banner.url : eventImages.value[0]?.url || ''
+  }
+  return ''
+})
+
+useSeoMeta({
+  title: pageTitle,
+  description: pageDescription,
+  ogTitle: pageTitle,
+  ogDescription: pageDescription,
+  ogImage: pageImage,
+  twitterCard: 'summary_large_image',
+})
+
+const pageKeywords = computed(() => {
+  if (event.value) {
+    const typeLabel = eventTypeMap[event.value.eventType]?.label || event.value.eventType
+    return `世界计划, PJSK, Project SEKAI, ${event.value.name}, ${typeLabel}, 活动详情, 奖励牌子, 初音未来`
+  }
+  return '世界计划, PJSK, Project SEKAI, 游戏活动, 数据'
+})
+
+useHead({
+  meta: [
+    { name: 'keywords', content: pageKeywords }
+  ]
+})
 
 onMounted(loadData)
 
