@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, watch } from 'vue'
+import apiClient from '@/api/client'
 
 export const useSettingsStore = defineStore('settings', () => {
     const ASSETS_HOST_CN = 'https://assets-direct.unipjsk.com'
@@ -85,7 +86,17 @@ export const useSettingsStore = defineStore('settings', () => {
             if (savedAssetsHost && allowedAssetsHosts.has(savedAssetsHost)) {
                 assetsHost.value = savedAssetsHost
             } else {
-                assetsHost.value = ASSETS_HOST_CN
+                assetsHost.value = ASSETS_HOST_CN // 默认设为国内，再发请求验证
+                apiClient.get('/api/location')
+                    .then(res => {
+                        const hostToSet = res.data.isChina ? ASSETS_HOST_CN : ASSETS_HOST_GLOBAL;
+                        assetsHost.value = hostToSet;
+                        localStorage.setItem('settings_assetsHost', hostToSet);
+                    })
+                    .catch(err => {
+                        console.error('Failed to detect location:', err);
+                        localStorage.setItem('settings_assetsHost', ASSETS_HOST_CN);
+                    })
             }
         }
 
