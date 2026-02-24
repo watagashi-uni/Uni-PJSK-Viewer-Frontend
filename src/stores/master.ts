@@ -103,7 +103,10 @@ export const useMasterStore = defineStore('master', () => {
 
             // 3.2 从服务器获取
             if (!version.value) {
-                throw new Error('Version not initialized. Call initialize() first.')
+                await initialize()
+                if (!version.value) {
+                    throw new Error('Version not initialized. Call initialize() first.')
+                }
             }
 
             isLoading.value = true

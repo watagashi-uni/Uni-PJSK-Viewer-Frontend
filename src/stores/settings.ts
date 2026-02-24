@@ -74,11 +74,19 @@ export const useSettingsStore = defineStore('settings', () => {
             defaultVocal.value = savedDefaultVocal
         }
 
-        const savedAssetsHost = localStorage.getItem('settings_assetsHost')
-        if (savedAssetsHost && allowedAssetsHosts.has(savedAssetsHost)) {
-            assetsHost.value = savedAssetsHost
+        // 检测是否为爬虫
+        const isCrawler = /bot|googlebot|crawler|spider|robot|crawling|bingbot|yandex|duckduckbot|slurp|baiduspider/i.test(navigator.userAgent || '');
+
+        if (isCrawler) {
+            console.log('Crawler detected, forcing global asset host.');
+            assetsHost.value = ASSETS_HOST_GLOBAL;
         } else {
-            assetsHost.value = ASSETS_HOST_CN
+            const savedAssetsHost = localStorage.getItem('settings_assetsHost')
+            if (savedAssetsHost && allowedAssetsHosts.has(savedAssetsHost)) {
+                assetsHost.value = savedAssetsHost
+            } else {
+                assetsHost.value = ASSETS_HOST_CN
+            }
         }
 
         // 监听系统主题变化

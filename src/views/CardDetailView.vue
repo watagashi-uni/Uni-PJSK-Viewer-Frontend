@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, watch, onBeforeUnmount } from 'vue'
+import { ref, onMounted, computed } from 'vue'
+import { useSeoMeta, useHead } from '@unhead/vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
@@ -454,19 +455,57 @@ async function loadData() {
 }
 
 const defaultTitle = 'Uni PJSK Viewer'
-watch([card, character], ([newCard, newChar]) => {
-  if (newCard && newChar) {
-    const charName = (newChar.firstName || '') + newChar.givenName
-    document.title = `[${newCard.prefix}] ${charName} - Uni PJSK Viewer`
-  } else if (newCard) {
-    document.title = `[${newCard.prefix}] - Uni PJSK Viewer`
-  } else {
-    document.title = defaultTitle
+
+const pageTitle = computed(() => {
+  if (card.value && character.value) {
+    const charName = (character.value.firstName || '') + character.value.givenName
+    return `[${card.value.prefix}] ${charName} - Uni PJSK Viewer`
+  } else if (card.value) {
+    return `[${card.value.prefix}] - Uni PJSK Viewer`
   }
+  return defaultTitle
 })
 
-onBeforeUnmount(() => {
-  document.title = defaultTitle
+const pageDescription = computed(() => {
+  if (card.value && character.value) {
+    let rarityLabel = card.value.cardRarityType.replace('rarity_', '')
+    if (rarityLabel === 'birthday') rarityLabel = '生日限定'
+    else rarityLabel = rarityLabel + '星'
+
+    const charName = (character.value.firstName || '') + character.value.givenName
+    return `世界计划（PJSK / Project SEKAI）卡牌 [${card.value.prefix}] ${charName}。稀有度：${rarityLabel}。此页面提供详细的满级属性、技能和卡面插画资源。`
+  }
+  return '查看世界计划（PJSK / Project SEKAI）的卡牌详细数据，包括插画和技能等。'
+})
+
+const pageImage = computed(() => {
+  if (card.value) {
+    return `${assetsHost.value}/startapp/character/member/${card.value.assetbundleName}/card_normal.jpg`
+  }
+  return ''
+})
+
+useSeoMeta({
+  title: pageTitle,
+  description: pageDescription,
+  ogTitle: pageTitle,
+  ogDescription: pageDescription,
+  ogImage: pageImage,
+  twitterCard: 'summary_large_image',
+})
+
+const pageKeywords = computed(() => {
+  if (card.value && character.value) {
+    const charName = (character.value.firstName || '') + character.value.givenName
+    return `世界计划, PJSK, Project SEKAI, ${charName}, ${card.value.prefix}, 卡面插画, 属性技能, 初音未来`
+  }
+  return '世界计划, PJSK, Project SEKAI, 游戏卡牌, 资源'
+})
+
+useHead({
+  meta: [
+    { name: 'keywords', content: pageKeywords }
+  ]
 })
 
 function goBack() {
