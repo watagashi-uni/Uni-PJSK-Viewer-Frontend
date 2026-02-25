@@ -83,6 +83,7 @@ async function handleSubmit() {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
+      timeout: 100000,
     })
 
     const result = response.data
