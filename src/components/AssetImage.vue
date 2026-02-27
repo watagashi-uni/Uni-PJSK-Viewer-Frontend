@@ -43,6 +43,7 @@ function handleError(e: Event) {
     :src="src"
     :alt="alt"
     :loading="lazy ? 'lazy' : 'eager'"
+    :crossorigin="src.startsWith('http') ? 'anonymous' : undefined"
     @error="handleError"
   />
 </template>

@@ -9,9 +9,11 @@ import { User, ChevronDown } from 'lucide-vue-next'
 const props = withDefaults(defineProps<{
   modelValue?: string
   showId?: boolean
+  readonly?: boolean
 }>(), {
   modelValue: '',
-  showId: false
+  showId: false,
+  readonly: false
 })
 
 const emit = defineEmits<{
@@ -93,8 +95,9 @@ onUnmounted(() => document.removeEventListener('click', onClickOutside))
   <div ref="containerRef" class="relative w-full">
     <!-- Trigger Button -->
     <div
-      class="flex items-center justify-between w-full px-2 py-1.5 rounded-lg cursor-pointer bg-base-100 hover:bg-base-200 transition-colors"
-      @click.stop="toggle"
+      class="flex items-center justify-between w-full px-2 py-1.5 rounded-lg transition-colors"
+      :class="readonly ? '' : 'cursor-pointer bg-base-100 hover:bg-base-200'"
+      @click.stop="readonly ? undefined : toggle()"
     >
       <template v-if="currentAccount">
         <div class="flex items-center gap-2 min-w-0 flex-1">
@@ -114,7 +117,7 @@ onUnmounted(() => document.removeEventListener('click', onClickOutside))
             </span>
           </div>
         </div>
-        <ChevronDown class="w-4 h-4 opacity-50 shrink-0 ml-1 transition-transform" :class="{ 'rotate-180': isOpen }" />
+        <ChevronDown v-if="!readonly" class="w-4 h-4 opacity-50 shrink-0 ml-1 transition-transform" :class="{ 'rotate-180': isOpen }" />
       </template>
       <template v-else>
         <div class="flex items-center gap-2 min-w-0">
@@ -123,7 +126,7 @@ onUnmounted(() => document.removeEventListener('click', onClickOutside))
           </div>
           <span class="text-sm font-medium">选择账号</span>
         </div>
-        <ChevronDown class="w-4 h-4 opacity-50 shrink-0 ml-1" />
+        <ChevronDown v-if="!readonly" class="w-4 h-4 opacity-50 shrink-0 ml-1" />
       </template>
     </div>
     
