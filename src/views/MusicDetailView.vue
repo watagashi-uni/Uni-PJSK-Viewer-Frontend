@@ -666,8 +666,11 @@ const isExpired = computed(() => {
           </div>
 
             <div class="text-center mt-6 w-full flex flex-col items-center">
-              <div v-if="isLimitedTime" class="badge badge-warning text-warning-content font-bold shadow-sm mb-2">
-                期间限定 ({{ formatDate(currentLimitedData!.startAt) }} - {{ formatDate(currentLimitedData!.endAt) }})
+              <div v-if="isLimitedTime" class="badge badge-warning text-warning-content font-bold shadow-sm mb-2 h-auto py-1.5 px-3 flex flex-col text-center whitespace-normal leading-tight">
+                <span>期间限定</span>
+                <span class="text-[10px] sm:text-[11px] font-normal opacity-90 mt-0.5">
+                  {{ formatDate(currentLimitedData!.startAt) }} - {{ formatDate(currentLimitedData!.endAt) }}
+                </span>
               </div>
               <div v-else-if="isExpired" class="badge bg-base-300 text-base-content/60 font-bold border-none mb-2">已过期</div>
               
