@@ -4,7 +4,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
 import { useAccountStore } from '@/stores/account'
-import { Search, ArrowUpDown, Languages, Trophy, List, LayoutGrid, RefreshCw, Layers, Github } from 'lucide-vue-next'
+import { Search, ArrowUpDown, Languages, Trophy, List, LayoutGrid, RefreshCw, Layers, Github, Camera, Loader2 } from 'lucide-vue-next'
+import { toPng } from 'html-to-image'
 import MusicCard from '@/components/MusicCard.vue'
 import Pagination from '@/components/Pagination.vue'
 import AssetImage from '@/components/AssetImage.vue'
@@ -95,6 +96,55 @@ function toggleLevel(level: number) {
 
 // 错误信息
 const refreshError = ref('')
+
+// 截图功能
+const isGeneratingImage = ref(false)
+const b30CaptureRef = ref<HTMLElement | null>(null)
+
+async function captureB30() {
+  if (!b30CaptureRef.value || isGeneratingImage.value) return
+  isGeneratingImage.value = true
+  try {
+    // 确保此时离屏元素已经完成渲染更新
+    await nextTick()
+    
+    // 获取容器的真实解析后背景色（应对 oklch CSS 变量）
+    let bgColor = window.getComputedStyle(b30CaptureRef.value).backgroundColor
+    if (!bgColor || bgColor === 'rgba(0, 0, 0, 0)' || bgColor === 'transparent') {
+      const theme = document.documentElement.getAttribute('data-theme')
+      bgColor = theme === 'dark' ? '#1d232a' : '#ffffff'
+    }
+
+    const dataUrl = await toPng(b30CaptureRef.value, {
+      backgroundColor: bgColor,
+      pixelRatio: 2, // 保证清晰度
+      // 避免 Safari 中极个别图片因跨域/报错导致整个绘图抛错
+      imagePlaceholder: 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs='
+    })
+    
+    // 生成带时间的文件名
+    const dateStr = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
+    let playerName = 'player'
+    if (accountStore.currentUserId) {
+      const acc = accountStore.accounts.find(a => a.userId === accountStore.currentUserId)
+      if (acc && acc.name) playerName = acc.name
+    }
+    
+    const link = document.createElement('a')
+    link.download = `sekai_b30_${playerName}_${dateStr}.png`
+    link.href = dataUrl
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  } catch (err) {
+    console.error('生成 B30 截图失败:', err)
+    alert('截图生成失败，请稍后重试。')
+  } finally {
+    isGeneratingImage.value = false
+  }
+}
+
+const siteUrl = computed(() => window.location.origin)
 
 // 从缓存加载成绩（不调用 API）
 function loadFromCache() {
@@ -652,7 +702,17 @@ watch(() => route.query.page, () => {})
               <div class="badge badge-lg badge-primary">Rating {{ b30Rating.toFixed(2) }}</div>
             </div>
             
-            <div class="flex items-center gap-3 text-sm">
+            <div class="flex flex-wrap items-center gap-3 text-sm">
+              <button 
+                class="btn btn-sm btn-outline gap-1" 
+                :disabled="isGeneratingImage || b30List.length === 0"
+                @click="captureB30"
+              >
+                <Loader2 v-if="isGeneratingImage" class="w-4 h-4 animate-spin" />
+                <Camera v-else class="w-4 h-4" />
+                保存成图
+              </button>
+              
               <label class="cursor-pointer label p-0 gap-2">
                 <span class="label-text">民间定数</span>
                 <input type="checkbox" v-model="usePjskb30" class="toggle toggle-primary toggle-sm" />
@@ -977,6 +1037,93 @@ watch(() => route.query.page, () => {})
       </template>
     </template>
   </div>
+
+  <!-- 离屏渲染容器：专用于产生 3 列的 B30 截图 -->
+  <div v-if="hasSuiteData && b30List.length > 0" class="fixed left-[-9999px] top-0 pointer-events-none" aria-hidden="true">
+    <div 
+      ref="b30CaptureRef" 
+      class="w-[1120px] bg-base-100 p-8 text-base-content flex flex-col gap-6 font-sans antialiased"
+      style="contain: none;"
+    >
+    <!-- 顶部：玩家信息与总览 -->
+    <div class="flex justify-between items-end border-b border-base-200 pb-4">
+      <div class="flex flex-col gap-1 justify-end">
+        <h1 class="text-3xl font-black flex items-center gap-3">
+          <Trophy class="w-8 h-8 text-warning" />
+          Best 30
+        </h1>
+        <div class="mt-4 w-64 -mx-2 origin-left scale-[1.3] pl-2 pb-1">
+          <AccountSelector
+            :model-value="accountStore.currentUserId"
+            :show-id="false"
+            :readonly="true"
+          />
+        </div>
+      </div>
+      <div class="flex flex-col items-end gap-2">
+        <div class="badge badge-primary badge-lg text-lg py-4 px-6 font-bold shadow-sm">
+          Rating {{ b30Rating.toFixed(3) }}
+        </div>
+        <div class="text-sm font-medium text-base-content/60">
+          生成时间: {{ new Date().toLocaleString() }}
+        </div>
+      </div>
+    </div>
+
+    <!-- 中部：3 列网格排版 -->
+    <div class="grid grid-cols-3 gap-3">
+      <div 
+        v-for="(entry, idx) in b30List" 
+        :key="`cap-${entry.musicId}-${entry.difficulty}`"
+        class="flex items-center gap-3 p-3 rounded-xl bg-base-200/40 border border-base-200/80"
+      >
+        <div class="text-sm font-black text-base-content/30 w-6 text-right shrink-0">#{{ idx + 1 }}</div>
+        <AssetImage 
+          :src="getMusicThumbnailUrl(entry.musicId)" 
+          :alt="getMusicTitle(entry.musicId)"
+          class="w-14 h-14 rounded-lg object-cover flex-shrink-0 shadow-sm"
+          :lazy="false"
+        />
+        <div class="flex-1 min-w-0 flex flex-col justify-center">
+          <div class="text-base font-bold truncate leading-tight mb-1" :title="getMusicTitle(entry.musicId)">
+            {{ getMusicTitle(entry.musicId) }}
+          </div>
+          <div class="flex items-center gap-2">
+            <span 
+              class="px-2 py-0.5 rounded text-xs font-bold leading-none"
+              :style="{ backgroundColor: diffColors[entry.difficulty], color: ['easy','normal','hard'].includes(entry.difficulty) ? 'black' : 'white' }"
+            >
+              {{ diffLabels[entry.difficulty] }} {{ entry.playLevel.toFixed(1) }}
+            </span>
+            <span
+              v-if="entry.rank === 'AP'"
+              class="px-2 py-0.5 rounded text-xs font-extrabold tracking-wide text-white leading-none shadow-sm"
+              style="background: linear-gradient(135deg, #a855f7, #7c3aed);"
+            >AP</span>
+            <span
+              v-else-if="entry.rank === 'FC'"
+              class="px-2 py-0.5 rounded text-xs font-extrabold tracking-wide text-white leading-none shadow-sm"
+              style="background: linear-gradient(135deg, #E04A4A, #9a3412);"
+            >FC</span>
+          </div>
+        </div>
+        <div class="text-lg font-mono font-black text-primary pr-2 shrink-0">{{ entry.score.toFixed(2) }}</div>
+      </div>
+    </div>
+
+    <!-- 底部：网站信息声明 -->
+    <div class="flex justify-between items-center border-t border-base-200 pt-4 text-sm text-base-content/50 font-medium">
+      <div class="flex items-center gap-2">
+        <span class="font-bold text-base-content/70">Uni PJSK Viewer</span>
+        <span>•</span>
+        <span>{{ siteUrl }}</span>
+      </div>
+      <div>
+        定数来源: {{ usePjskb30 ? 'auburnsummer/pjskb30 (民间定数)' : '官方定数' }}
+      </div>
+    </div>
+  </div>
+</div>
 </template>
 
 <style scoped>
