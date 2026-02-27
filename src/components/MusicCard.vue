@@ -12,6 +12,8 @@ const props = defineProps<{
   title: string
   translation?: string
   isLeak?: boolean
+  isLimitedTime?: boolean
+  isExpired?: boolean
   assetsHost: string
   composer: string
   assetbundleName: string
@@ -96,6 +98,12 @@ const coverUrl = computed(() => {
       <!-- 简单角标 (替代之前的内部遮罩) -->
       <div v-if="isLeak" class="absolute top-2 right-2 badge badge-warning shadow-md z-20">
         剧透
+      </div>
+      <div v-if="isLimitedTime" class="absolute top-2 left-2 badge badge-warning text-warning-content font-bold shadow-md z-20">
+        期间限定
+      </div>
+      <div v-else-if="isExpired" class="absolute top-2 left-2 badge border-none bg-base-300 text-base-content/60 font-bold shadow-md z-20">
+        已过期
       </div>
       <!-- 类别图标 -->
       <div v-if="matchedIcons.length" class="absolute bottom-1.5 left-1.5 flex gap-1 z-20">

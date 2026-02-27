@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
 import { useAccountStore } from '@/stores/account'
-import { Search, ArrowUpDown, Languages, Trophy, List, LayoutGrid, RefreshCw, Layers } from 'lucide-vue-next'
+import { Search, ArrowUpDown, Languages, Trophy, List, LayoutGrid, RefreshCw, Layers, Github } from 'lucide-vue-next'
 import MusicCard from '@/components/MusicCard.vue'
 import Pagination from '@/components/Pagination.vue'
 import AssetImage from '@/components/AssetImage.vue'
@@ -22,9 +22,18 @@ interface Music {
 }
 
 interface MusicDifficulty {
+  id: number
   musicId: number
   musicDifficulty: string
   playLevel: number
+  totalNoteCount: number
+}
+
+interface LimitedTimeMusic {
+  id: number
+  musicId: number
+  startAt: number
+  endAt: number
 }
 
 interface UserMusicResult {
@@ -43,6 +52,9 @@ const accountStore = useAccountStore()
 
 const musics = ref<Music[]>([])
 const musicDifficulties = ref<MusicDifficulty[]>([])
+const limitedMusics = ref<LimitedTimeMusic[]>([])
+const pjskb30Map = ref<Map<string, number>>(new Map())
+const usePjskb30 = ref(true)
 const translations = toRef(masterStore, 'translations')
 const isLoading = ref(true)
 
@@ -150,15 +162,19 @@ const b30List = computed<B30Entry[]>(() => {
   const entries: B30Entry[] = []
   const diffMap = musicDifficultiesMap.value
   const resultsMap = musicResultsMap.value
+  const b30Map = pjskb30Map.value
 
   for (const [musicIdStr, diffResults] of Object.entries(resultsMap)) {
     const musicId = Number(musicIdStr)
+    if (isExpired(musicId)) continue
     for (const [diff, rank] of Object.entries(diffResults)) {
       if (rank !== 'AP' && rank !== 'FC') continue
-      const level = diffMap[musicId]?.[diff]
-      if (level === undefined) continue
-      const score = rank === 'AP' ? level + 1.5 : level
-      entries.push({ musicId, difficulty: diff, rank, playLevel: level, score })
+      const intLevel = diffMap[musicId]?.[diff]
+      if (intLevel === undefined) continue
+      // 是否使用 pjskb30 精准小数定数
+      const constant = usePjskb30.value ? (b30Map.get(`${musicId}-${diff}`) ?? intLevel) : intLevel
+      const score = rank === 'AP' ? constant + 1.5 : constant
+      entries.push({ musicId, difficulty: diff, rank, playLevel: constant, score })
     }
   }
 
@@ -166,7 +182,10 @@ const b30List = computed<B30Entry[]>(() => {
   return entries.slice(0, 30)
 })
 
-const b30Total = computed(() => b30List.value.reduce((sum, e) => sum + e.score, 0))
+const b30Rating = computed(() => {
+  const total = b30List.value.reduce((sum, e) => sum + e.score, 0)
+  return b30List.value.length > 0 ? total / 30 : 0
+})
 
 // 定数表整体进度
 const levelStats = computed(() => {
@@ -177,7 +196,7 @@ const levelStats = computed(() => {
   let ap = 0, fc = 0, clear = 0, total = 0
   
   for (const music of filteredMusics.value) {
-    if (music.publishedAt > now) continue
+    if (music.publishedAt > now || isExpired(music.id)) continue
     if (diffMap[music.id]?.[diff] !== undefined) {
       total++
       const rank = resultsMap[music.id]?.[diff]
@@ -197,7 +216,7 @@ const levelGroupedMusics = computed(() => {
   const groups: Record<number, { musics: typeof musics.value, stats: { ap: number, fc: number, clear: number, total: number } }> = {}
   
   for (const music of filteredMusics.value) {
-    if (music.publishedAt > now) continue
+    if (music.publishedAt > now || isExpired(music.id)) continue
     const level = diffMap[music.id]?.[diff]
     if (level === undefined) continue
     
@@ -276,7 +295,7 @@ const filteredMusics = computed(() => {
   const resultsMap = musicResultsMap.value
 
   if (!settingsStore.showSpoilers) {
-    result = result.filter(m => m.publishedAt <= now)
+    result = result.filter(m => m.publishedAt <= now && !isExpired(m.id))
   }
 
   if (searchText.value) {
@@ -326,18 +345,38 @@ const paginatedMusics = computed(() => {
   return filteredMusics.value.slice(start, start + pageSize)
 })
 
+async function loadPjskb30() {
+  try {
+    const resp = await fetch((import.meta.env.VITE_API_BASE_URL || '') + '/api/pjskb30')
+    if (!resp.ok) return
+    const text = await resp.text()
+    const map = new Map<string, number>()
+    for (const line of text.split('\n')) {
+      if (!line) continue
+      const [id, diff, val] = line.split('\t')
+      if (id && diff && val) map.set(`${id}-${diff}`, parseFloat(val))
+    }
+    pjskb30Map.value = map
+  } catch (e) {
+    console.error('加载 pjskb30 定数失败:', e)
+  }
+}
+
 async function loadData() {
   isLoading.value = true
   try {
-    const [musicData, diffData] = await Promise.all([
+    const [musicData, diffData, limitedData] = await Promise.all([
       masterStore.getMaster<Music>('musics'),
-      masterStore.getMaster<MusicDifficulty>('musicDifficulties')
+      masterStore.getMaster<MusicDifficulty>('musicDifficulties'),
+      masterStore.getMaster<LimitedTimeMusic>('limitedTimeMusics')
     ])
     musics.value = musicData
     musicDifficulties.value = diffData
+    limitedMusics.value = limitedData
     
-    // 背景加载翻译，不阻塞主列表渲染
+    // 背景加载翻译和 pjskb30 定数，不阻塞主列表渲染
     masterStore.getTranslations().catch(e => console.error('加载翻译失败:', e))
+    loadPjskb30()
   } catch (error) {
     console.error('加载歌曲数据失败:', error)
   } finally {
@@ -375,6 +414,18 @@ function getMusicThumbnailUrl(musicId: number): string {
   const paddedId = musicId.toString().padStart(3, '0')
   const host = viewMode.value === 'level' ? 'https://assets.unipjsk.com' : assetsHost.value
   return `${host}/startapp/thumbnail/music_jacket/jacket_s_${paddedId}.png`
+}
+
+function isLimitedTime(musicId: number): boolean {
+  const limited = limitedMusics.value.find(lm => lm.musicId === musicId)
+  if (!limited) return false
+  return now >= limited.startAt && now < limited.endAt
+}
+
+function isExpired(musicId: number): boolean {
+  const limited = limitedMusics.value.find(lm => lm.musicId === musicId)
+  if (!limited) return false
+  return now >= limited.endAt
 }
 
 const diffColors: Record<string, string> = {
@@ -583,18 +634,33 @@ watch(() => route.query.page, () => {})
     <template v-else>
       <!-- B30 视图 -->
       <div v-if="viewMode === 'b30'" class="mb-6">
-        <div v-if="!hasSuiteData" class="text-center py-20 text-base-content/60">
+        <div v-if="!showUserResults" class="text-center py-20 text-base-content/60">
+          <p class="mb-2">请先打开“显示成绩数据”开关</p>
+        </div>
+        <div v-else-if="!hasSuiteData" class="text-center py-20 text-base-content/60">
           <p class="mb-2">暂无成绩数据</p>
           <button class="btn btn-primary btn-sm" @click="handleSuiteRefresh">
             刷新 Suite 数据
           </button>
         </div>
         <template v-else>
-          <div class="flex items-center gap-3 mb-4">
-            <h2 class="text-xl font-bold flex items-center gap-2">
-              <Trophy class="w-5 h-5 text-warning" /> Best 30
-            </h2>
-            <div class="badge badge-lg badge-primary">总分 {{ b30Total.toFixed(1) }}</div>
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+            <div class="flex items-center gap-3">
+              <h2 class="text-xl font-bold flex items-center gap-2">
+                <Trophy class="w-5 h-5 text-warning" /> Best 30
+              </h2>
+              <div class="badge badge-lg badge-primary">Rating {{ b30Rating.toFixed(2) }}</div>
+            </div>
+            
+            <div class="flex items-center gap-3 text-sm">
+              <label class="cursor-pointer label p-0 gap-2">
+                <span class="label-text">民间定数</span>
+                <input type="checkbox" v-model="usePjskb30" class="toggle toggle-primary toggle-sm" />
+              </label>
+              <div class="text-xs text-base-content/40 border-l border-base-300 pl-3 leading-tight flex items-center gap-1">
+                定数来源 <a href="https://github.com/auburnsummer/pjskb30" target="_blank" rel="noopener noreferrer" class="link link-hover flex items-center gap-1"><Github class="w-3 h-3" />pjskb30</a>
+              </div>
+            </div>
           </div>
 
           <div v-if="b30List.length === 0" class="text-center py-10 text-base-content/50">
@@ -620,20 +686,18 @@ watch(() => route.query.page, () => {})
                     class="px-1.5 py-0.5 rounded text-[10px] font-bold"
                     :style="{ backgroundColor: diffColors[entry.difficulty], color: ['easy','normal','hard'].includes(entry.difficulty) ? 'black' : 'white' }"
                   >
-                    {{ diffLabels[entry.difficulty] }} {{ entry.playLevel }}
+                    {{ diffLabels[entry.difficulty] }} {{ entry.playLevel.toFixed(1) }}
                   </span>
-                  <img
+                  <span
                     v-if="entry.rank === 'AP'"
-                    src="/img/icon_allPerfect.png"
-                    alt="AP"
-                    class="h-6 w-auto drop-shadow-sm ml-1"
-                  />
-                  <img
+                    class="px-1.5 py-0.5 rounded text-[10px] font-extrabold tracking-wide text-white"
+                    style="background: linear-gradient(135deg, #a855f7, #7c3aed); text-shadow: 0 1px 2px rgba(0,0,0,.25)"
+                  >AP</span>
+                  <span
                     v-else-if="entry.rank === 'FC'"
-                    src="/img/icon_fullCombo.png"
-                    alt="FC"
-                    class="h-6 w-auto drop-shadow-sm ml-1"
-                  />
+                    class="px-1.5 py-0.5 rounded text-[10px] font-extrabold tracking-wide text-white"
+                    style="background: linear-gradient(135deg, #E04A4A, #9a3412); text-shadow: 0 1px 2px rgba(0,0,0,.25)"
+                  >FC</span>
                 </div>
               </div>
               <div class="text-sm font-mono font-bold text-primary">{{ entry.score.toFixed(1) }}</div>
@@ -645,7 +709,7 @@ watch(() => route.query.page, () => {})
       <!-- 定数表视图 -->
       <div v-else-if="viewMode === 'level'" :class="{ 'animate-fade-in-up': enableHeavyAnimation }">
         <!-- 总体进度条 -->
-        <div v-if="hasSuiteData && levelStats" class="flex flex-wrap gap-4 items-center bg-base-100 p-3 mb-4 rounded-lg shadow-sm border border-base-200/50">
+        <div v-if="showUserResults && hasSuiteData && levelStats" class="flex flex-wrap gap-4 items-center bg-base-100 p-3 mb-4 rounded-lg shadow-sm border border-base-200/50">
           <div class="font-bold border-r border-base-200 pr-4 drop-shadow-sm flex items-center gap-1 text-base sm:text-lg" :style="{ color: diffColors[selectedDiffType] }">
             {{ diffLabels[selectedDiffType] }} 的完成度
           </div>
@@ -687,7 +751,7 @@ watch(() => route.query.page, () => {})
               {{ group.level.toFixed(0) }}
             </div>
             <span class="text-xs text-base-content/50">{{ group.musics?.length || 0 }}首</span>
-            <div v-if="hasSuiteData" class="flex gap-3 text-xs font-bold px-3 py-1 rounded-full shadow-sm bg-base-100 border border-base-200/50">
+            <div v-if="showUserResults && hasSuiteData" class="flex gap-3 text-xs font-bold px-3 py-1 rounded-full shadow-sm bg-base-100 border border-base-200/50">
               <span class="flex items-center gap-1 text-base-content/80">
                 ALL <span class="text-base-content">{{ group.stats?.total || 0 }}</span>
               </span>
@@ -711,26 +775,28 @@ watch(() => route.query.page, () => {})
                 :alt="music.title"
                 class="w-14 h-14 sm:w-[3.25rem] sm:h-[3.25rem] lg:w-[3.75rem] lg:h-[3.75rem] rounded shadow-sm group-hover:scale-105 transition-transform object-cover"
               />
-              <img
-                v-if="musicResultsMap[music.id]?.[selectedDiffType] === 'AP'"
-                src="/img/icon_allPerfect.png"
-                class="absolute -bottom-1 -right-1 w-5 sm:w-5 h-auto drop-shadow-md"
-              />
-              <img
-                v-else-if="musicResultsMap[music.id]?.[selectedDiffType] === 'FC'"
-                src="/img/icon_fullCombo.png"
-                class="absolute -bottom-1 -right-1 w-5 sm:w-5 h-auto drop-shadow-md"
-              />
-              <img
-                v-else-if="musicResultsMap[music.id]?.[selectedDiffType] === 'C'"
-                src="/img/icon_clear.png"
-                class="absolute -bottom-1 -right-1 w-5 sm:w-5 h-auto drop-shadow-md"
-              />
-              <img
-                v-else-if="hasSuiteData"
-                src="/img/icon_notClear.png"
-                class="absolute -bottom-1 -right-1 w-5 sm:w-5 h-auto opacity-80 drop-shadow-md"
-              />
+              <template v-if="showUserResults">
+                <img
+                  v-if="musicResultsMap[music.id]?.[selectedDiffType] === 'AP'"
+                  src="/img/icon_allPerfect.png"
+                  class="absolute -bottom-1 -right-1 w-5 sm:w-5 h-auto drop-shadow-md"
+                />
+                <img
+                  v-else-if="musicResultsMap[music.id]?.[selectedDiffType] === 'FC'"
+                  src="/img/icon_fullCombo.png"
+                  class="absolute -bottom-1 -right-1 w-5 sm:w-5 h-auto drop-shadow-md"
+                />
+                <img
+                  v-else-if="musicResultsMap[music.id]?.[selectedDiffType] === 'C'"
+                  src="/img/icon_clear.png"
+                  class="absolute -bottom-1 -right-1 w-5 sm:w-5 h-auto drop-shadow-md"
+                />
+                <img
+                  v-else-if="hasSuiteData"
+                  src="/img/icon_notClear.png"
+                  class="absolute -bottom-1 -right-1 w-5 sm:w-5 h-auto opacity-80 drop-shadow-md"
+                />
+              </template>
             </RouterLink>
           </div>
         </div>
@@ -768,34 +834,42 @@ watch(() => route.query.page, () => {})
                     <div class="font-medium truncate max-w-[200px] lg:max-w-[400px]">{{ music.title }}</div>
                     <div v-if="getTranslation(music.id)" class="text-xs text-base-content/50 truncate max-w-[200px] lg:max-w-[400px]">{{ getTranslation(music.id) }}</div>
                   </RouterLink>
+                  <div class="flex items-center gap-1 mt-1">
+                    <div v-if="isLeak(music.publishedAt)" class="badge badge-sm badge-error text-error-content font-bold shadow-sm whitespace-nowrap">LEAK (#)</div>
+                    <div v-else class="badge badge-sm badge-ghost text-base-content/60 font-bold shadow-sm whitespace-nowrap">#{{ music.id }}</div>
+                    <div v-if="isLimitedTime(music.id)" class="badge badge-sm badge-warning text-warning-content font-bold shadow-sm whitespace-nowrap">期间限定</div>
+                    <div v-else-if="isExpired(music.id)" class="badge badge-sm bg-base-300 text-base-content/60 font-bold border-none whitespace-nowrap">已过期</div>
+                  </div>
                 </td>
                 <td v-for="d in allDifficulties" :key="d" class="text-center p-2">
                   <template v-if="musicDifficultiesMap[music.id]?.[d] !== undefined">
                     <div class="text-xs text-base-content/50">{{ musicDifficultiesMap[music.id]?.[d] }}</div>
-                    <img
-                      v-if="musicResultsMap[music.id]?.[d] === 'AP'"
-                      src="/img/icon_allPerfect.png"
-                      alt="AP"
-                      class="h-[24px] w-auto mx-auto mt-1 drop-shadow-sm"
-                    />
-                    <img
-                      v-else-if="musicResultsMap[music.id]?.[d] === 'FC'"
-                      src="/img/icon_fullCombo.png"
-                      alt="FC"
-                      class="h-[24px] w-auto mx-auto mt-1 drop-shadow-sm"
-                    />
-                    <img
-                      v-else-if="musicResultsMap[music.id]?.[d] === 'C'"
-                      src="/img/icon_clear.png"
-                      alt="C"
-                      class="h-[24px] w-auto mx-auto mt-1 drop-shadow-sm"
-                    />
-                    <img
-                      v-else-if="hasSuiteData"
-                      src="/img/icon_notClear.png"
-                      alt="NC"
-                      class="h-[24px] w-auto mx-auto mt-1 opacity-50 drop-shadow-sm"
-                    />
+                    <template v-if="showUserResults">
+                      <img
+                        v-if="musicResultsMap[music.id]?.[d] === 'AP'"
+                        src="/img/icon_allPerfect.png"
+                        alt="AP"
+                        class="h-[24px] w-auto mx-auto mt-1 drop-shadow-sm"
+                      />
+                      <img
+                        v-else-if="musicResultsMap[music.id]?.[d] === 'FC'"
+                        src="/img/icon_fullCombo.png"
+                        alt="FC"
+                        class="h-[24px] w-auto mx-auto mt-1 drop-shadow-sm"
+                      />
+                      <img
+                        v-else-if="musicResultsMap[music.id]?.[d] === 'C'"
+                        src="/img/icon_clear.png"
+                        alt="C"
+                        class="h-[24px] w-auto mx-auto mt-1 drop-shadow-sm"
+                      />
+                      <img
+                        v-else-if="hasSuiteData"
+                        src="/img/icon_notClear.png"
+                        alt="NC"
+                        class="h-[24px] w-auto mx-auto mt-1 opacity-50 drop-shadow-sm"
+                      />
+                    </template>
                   </template>
                 </td>
               </tr>
@@ -821,31 +895,33 @@ watch(() => route.query.page, () => {})
                 <div v-for="d in allDifficulties" :key="d" class="flex flex-col items-center justify-center bg-base-200/50 rounded p-0.5">
                   <template v-if="musicDifficultiesMap[music.id]?.[d] !== undefined">
                     <span class="text-[10px] leading-none font-bold mb-0.5" :style="{ color: diffColors[d] }">{{ musicDifficultiesMap[music.id]?.[d] }}</span>
-                    <img
-                      v-if="musicResultsMap[music.id]?.[d] === 'AP'"
-                      src="/img/icon_allPerfect.png"
-                      alt="AP"
-                      class="h-[14px] w-auto mt-0.5 drop-shadow-sm"
-                    />
-                    <img
-                      v-else-if="musicResultsMap[music.id]?.[d] === 'FC'"
-                      src="/img/icon_fullCombo.png"
-                      alt="FC"
-                      class="h-[14px] w-auto mt-0.5 drop-shadow-sm"
-                    />
-                    <img
-                      v-else-if="musicResultsMap[music.id]?.[d] === 'C'"
-                      src="/img/icon_clear.png"
-                      alt="C"
-                      class="h-[14px] w-auto mt-0.5 drop-shadow-sm"
-                    />
-                    <img
-                      v-else-if="hasSuiteData"
-                      src="/img/icon_notClear.png"
-                      alt="NC"
-                      class="h-[14px] w-auto mt-0.5 opacity-50 drop-shadow-sm"
-                    />
-                    <div v-else class="h-[14px] mt-0.5"></div>
+                    <template v-if="showUserResults">
+                      <img
+                        v-if="musicResultsMap[music.id]?.[d] === 'AP'"
+                        src="/img/icon_allPerfect.png"
+                        alt="AP"
+                        class="h-[14px] w-auto mt-0.5 drop-shadow-sm"
+                      />
+                      <img
+                        v-else-if="musicResultsMap[music.id]?.[d] === 'FC'"
+                        src="/img/icon_fullCombo.png"
+                        alt="FC"
+                        class="h-[14px] w-auto mt-0.5 drop-shadow-sm"
+                      />
+                      <img
+                        v-else-if="musicResultsMap[music.id]?.[d] === 'C'"
+                        src="/img/icon_clear.png"
+                        alt="C"
+                        class="h-[14px] w-auto mt-0.5 drop-shadow-sm"
+                      />
+                      <img
+                        v-else-if="hasSuiteData"
+                        src="/img/icon_notClear.png"
+                        alt="NC"
+                        class="h-[14px] w-auto mt-0.5 opacity-50 drop-shadow-sm"
+                      />
+                      <div v-else class="h-[14px] mt-0.5"></div>
+                    </template>
                   </template>
                   <template v-else>
                     <div class="h-full w-full"></div>
@@ -877,9 +953,11 @@ watch(() => route.query.page, () => {})
             :assetbundle-name="music.assetbundleName"
             :difficulties="musicDifficultiesMap[music.id] || EMPTY_OBJ"
             :is-leak="isLeak(music.publishedAt)"
+            :is-limited-time="isLimitedTime(music.id)"
+            :is-expired="isExpired(music.id)"
             :assets-host="assetsHost"
             :categories="music.categories || EMPTY_ARR"
-            :results="hasSuiteData ? (musicResultsMap[music.id] || EMPTY_OBJ) : undefined"
+            :results="hasSuiteData && showUserResults ? (musicResultsMap[music.id] || EMPTY_OBJ) : undefined"
             :class="{ 'animate-fade-in-up': enableHeavyAnimation }"
             class="cv-auto-card"
           />

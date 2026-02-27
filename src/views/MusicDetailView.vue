@@ -67,6 +67,13 @@ interface OutsideCharacter {
   name: string
 }
 
+interface LimitedTimeMusic {
+  id: number
+  musicId: number
+  startAt: number
+  endAt: number
+}
+
 const route = useRoute()
 const router = useRouter()
 const masterStore = useMasterStore()
@@ -80,6 +87,7 @@ const translation = computed(() => masterStore.translations[musicId.value] || ''
 const relatedEvent = ref<EventData | null>(null)
 const characters = ref<Character[]>([])
 const outsideCharacters = ref<OutsideCharacter[]>([])
+const limitedMusics = ref<LimitedTimeMusic[]>([])
 const isLoading = ref(true)
 
 const assetsHost = computed(() => settingsStore.assetsHost)
@@ -445,7 +453,8 @@ async function loadData() {
       eventsData,
       eventMusicsData,
       charactersData,
-      outsideCharactersData
+      outsideCharactersData,
+      limitedData
     ] = await Promise.all([
       masterStore.getMaster<Music>('musics'),
       masterStore.getMaster<MusicDifficulty>('musicDifficulties'),
@@ -454,14 +463,27 @@ async function loadData() {
       masterStore.getMaster<EventMusic>('eventMusics'),
       masterStore.getMaster<Character>('gameCharacters'),
       masterStore.getMaster<OutsideCharacter>('outsideCharacters'),
+      masterStore.getMaster<LimitedTimeMusic>('limitedTimeMusics')
     ])
     
     // 设置角色数据
     characters.value = charactersData
     outsideCharacters.value = outsideCharactersData
+    limitedMusics.value = limitedData
 
     // 获取歌曲数据
     music.value = musicsData.find(m => m.id === musicId.value) || null
+
+    if (!music.value) {
+      isLoading.value = false
+      return
+    }
+
+    // 检查是否过期，受剧透过滤控制
+    if (isExpired.value && !settingsStore.showSpoilers) {
+      router.push('/musics')
+      return
+    }
 
 
     // 获取难度数据
@@ -585,6 +607,23 @@ function goBack() {
 }
 
 onMounted(loadData)
+
+const now = Date.now()
+const currentLimitedData = computed(() => {
+  return limitedMusics.value.find(lm => lm.musicId === musicId.value)
+})
+
+const isLimitedTime = computed(() => {
+  const lm = currentLimitedData.value
+  if (!lm) return false
+  return now >= lm.startAt && now < lm.endAt
+})
+
+const isExpired = computed(() => {
+  const lm = currentLimitedData.value
+  if (!lm) return false
+  return now >= lm.endAt
+})
 </script>
 
 <template>
@@ -626,17 +665,21 @@ onMounted(loadData)
             </div>
           </div>
 
-          <!-- 标题区 -->
-          <div class="text-center mt-6 w-full">
-            <h1 v-if="music.pronunciation && hasFurigana" class="text-2xl font-bold text-base-content select-all leading-relaxed">
-              <template v-for="(seg, i) in furiganaSegments" :key="i">
-                <ruby v-if="seg.ruby">{{ seg.text }}<rp>(</rp><rt class="text-xs font-medium text-primary/70 select-none">{{ seg.ruby }}</rt><rp>)</rp></ruby><template v-else>{{ seg.text }}</template>
-              </template>
-            </h1>
-            <h1 v-else class="text-2xl font-bold text-base-content select-all">{{ music.title }}</h1>
+            <div class="text-center mt-6 w-full flex flex-col items-center">
+              <div v-if="isLimitedTime" class="badge badge-warning text-warning-content font-bold shadow-sm mb-2">
+                期间限定 ({{ formatDate(currentLimitedData!.startAt) }} - {{ formatDate(currentLimitedData!.endAt) }})
+              </div>
+              <div v-else-if="isExpired" class="badge bg-base-300 text-base-content/60 font-bold border-none mb-2">已过期</div>
+              
+              <h1 v-if="music.pronunciation && hasFurigana" class="text-2xl font-bold text-base-content select-all leading-relaxed">
+                <template v-for="(seg, i) in furiganaSegments" :key="i">
+                  <ruby v-if="seg.ruby">{{ seg.text }}<rp>(</rp><rt class="text-xs font-medium text-primary/70 select-none">{{ seg.ruby }}</rt><rp>)</rp></ruby><template v-else>{{ seg.text }}</template>
+                </template>
+              </h1>
+              <h1 v-else class="text-2xl font-bold text-base-content select-all">{{ music.title }}</h1>
             
-            <!-- 翻译 -->
-            <p v-if="translation" class="text-base-content/70 mt-2 select-all">{{ translation }}</p>
+              <!-- 翻译 -->
+              <p v-if="translation" class="text-base-content/70 mt-2 select-all">{{ translation }}</p>
             <a 
               v-else
               href="https://paratranz.cn/projects/18073" 
