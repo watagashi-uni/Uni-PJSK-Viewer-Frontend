@@ -87,7 +87,10 @@ function onClickOutside(e: MouseEvent) {
   }
 }
 
-onMounted(() => document.addEventListener('click', onClickOutside))
+onMounted(() => {
+  document.addEventListener('click', onClickOutside)
+  masterStore.getMaster('cards')
+})
 onUnmounted(() => document.removeEventListener('click', onClickOutside))
 </script>
 

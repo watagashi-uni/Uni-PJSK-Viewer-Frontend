@@ -424,9 +424,8 @@ async function loadData() {
     musicDifficulties.value = diffData
     limitedMusics.value = limitedData
     
-    // 背景加载翻译和 pjskb30 定数，不阻塞主列表渲染
+    // 背景加载翻译，不阻塞主列表渲染
     masterStore.getTranslations().catch(e => console.error('加载翻译失败:', e))
-    loadPjskb30()
   } catch (error) {
     console.error('加载歌曲数据失败:', error)
   } finally {
@@ -513,6 +512,10 @@ watch(viewMode, async (newMode) => {
     setupObserver()
   } else {
     if (observer) observer.disconnect()
+  }
+  
+  if (newMode === 'b30' && pjskb30Map.value.size === 0) {
+    loadPjskb30()
   }
 })
 
@@ -717,8 +720,9 @@ watch(() => route.query.page, () => {})
                 <span class="label-text">民间定数</span>
                 <input type="checkbox" v-model="usePjskb30" class="toggle toggle-primary toggle-sm" />
               </label>
-              <div class="text-xs text-base-content/40 border-l border-base-300 pl-3 leading-tight flex items-center gap-1">
-                定数来源 <a href="https://github.com/auburnsummer/pjskb30" target="_blank" rel="noopener noreferrer" class="link link-hover flex items-center gap-1"><Github class="w-3 h-3" />pjskb30</a>
+              <div class="text-xs text-base-content/40 border-l border-base-300 pl-3 leading-tight flex flex-col gap-1 justify-center">
+                <div class="flex items-center gap-1">定数来源 <a href="https://github.com/auburnsummer/pjskb30" target="_blank" rel="noopener noreferrer" class="link link-hover flex items-center gap-1"><Github class="w-3 h-3" />pjskb30</a></div>
+                <div>民间定数，仅供参考，如有意见可以受着，或者写一整套更好的给项目提pr</div>
               </div>
             </div>
           </div>
