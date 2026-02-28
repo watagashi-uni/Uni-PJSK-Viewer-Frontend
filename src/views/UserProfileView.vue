@@ -312,9 +312,9 @@ function getCharaIcon(characterId: number): string {
   // 用 gameCharacterUnits 找到 unitId
   const unit = gameCharacterUnits.value.find(u => u.gameCharacterId === characterId && u.id <= 26)
   const unitId = unit?.id || characterId
-  if (unitId <= 20) return `/chr_ts_90_${unitId}.png`
-  if (characterId === 21) return unitId === 21 ? '/chr_ts_90_21.png' : `/chr_ts_90_21_${unitId - 25}.png`
-  return `/chr_ts_90_${characterId}_2.png`
+  if (unitId <= 20) return `/img/chr_ts/chr_ts_90_${unitId}.png`
+  if (characterId === 21) return unitId === 21 ? '/img/chr_ts/chr_ts_90_21.png' : `/img/chr_ts/chr_ts_90_21_${unitId - 25}.png`
+  return `/img/chr_ts/chr_ts_90_${characterId}_2.png`
 }
 
 // 挑战Live最高角色图标
