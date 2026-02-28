@@ -42,8 +42,8 @@ export default defineConfig({
             },
           },
           {
-            // 本地角色头像 (chr_ts_*.png) - 用户浏览后缓存，持久化存储
-            urlPattern: /^.*\/chr_ts_.*\.png$/i,
+            // 本地角色头像 (img/chr_ts/*.png) - 用户浏览后缓存，持久化存储
+            urlPattern: /^.*\/img\/chr_ts\/chr_ts_.*\.png$/i,
             handler: 'StaleWhileRevalidate',
             options: {
               cacheName: 'chara-images-cache',
@@ -109,19 +109,19 @@ export default defineConfig({
         theme_color: '#34DDFF',
         icons: [
           {
-            src: 'pwa-192x192-1771548657969.webp',
+            src: 'https://assets-direct.unipjsk.com/startapp/thumbnail/chara/res017_no037_after_training.png',
             sizes: '192x192',
-            type: 'image/webp'
+            type: 'image/png'
           },
           {
-            src: 'pwa-512x512-1771548657969.webp',
+            src: 'https://assets-direct.unipjsk.com/startapp/thumbnail/chara/res017_no037_after_training.png',
             sizes: '512x512',
-            type: 'image/webp'
+            type: 'image/png'
           },
           {
-            src: 'pwa-512x512-1771548657969.webp',
+            src: 'https://assets-direct.unipjsk.com/startapp/thumbnail/chara/res017_no037_after_training.png',
             sizes: '512x512',
-            type: 'image/webp',
+            type: 'image/png',
             purpose: 'any maskable'
           }
         ]

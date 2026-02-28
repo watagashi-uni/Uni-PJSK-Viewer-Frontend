@@ -236,7 +236,7 @@ onMounted(() => {
                   :class="selectedCharacterId === chara.id ? 'btn-primary shadow-sm' : 'btn-ghost'"
                   @click="selectedCharacterId = chara.id"
                 >
-                  <img :src="`/chr_ts_90_${chara.id}.png`" class="w-8 h-8 rounded-full" :alt="chara.givenName" />
+                  <img :src="`/img/chr_ts/chr_ts_90_${chara.id}.png`" class="w-8 h-8 rounded-full" :alt="chara.givenName" />
                 </button>
               </div>
             </div>

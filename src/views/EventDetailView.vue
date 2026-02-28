@@ -191,11 +191,11 @@ const bonusCharacterCards = computed(() => {
     // 生成头像文件名
     let iconFile = ''
     if (unitId <= 20) {
-      iconFile = `chr_ts_90_${unitId}.png`
+      iconFile = `img/chr_ts/chr_ts_90_${unitId}.png`
     } else if (unit.gameCharacterId === 21) {
-      iconFile = unitId === 21 ? 'chr_ts_90_21.png' : `chr_ts_90_21_${unitId - 25}.png`
+      iconFile = unitId === 21 ? 'img/chr_ts/chr_ts_90_21.png' : `img/chr_ts/chr_ts_90_21_${unitId - 25}.png`
     } else {
-      iconFile = `chr_ts_90_${unit.gameCharacterId}_2.png`
+      iconFile = `img/chr_ts/chr_ts_90_${unit.gameCharacterId}_2.png`
     }
     
     // 查找该角色该属性的所有卡牌
