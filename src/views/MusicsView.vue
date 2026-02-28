@@ -698,11 +698,11 @@ watch(() => route.query.page, () => {})
         </div>
         <template v-else>
           <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-            <div class="flex items-center gap-3">
+            <div class="flex items-center gap-3 flex-nowrap whitespace-nowrap">
               <h2 class="text-xl font-bold flex items-center gap-2">
-                <Trophy class="w-5 h-5 text-warning" /> Best 30
+                <Trophy class="w-5 h-5 text-warning shrink-0" /> Best 30
               </h2>
-              <div class="badge badge-lg badge-primary">Rating {{ b30Rating.toFixed(2) }}</div>
+              <div class="badge badge-lg badge-primary shrink-0">Rating {{ b30Rating.toFixed(2) }}</div>
             </div>
             
             <div class="flex flex-wrap items-center gap-3 text-sm">
@@ -755,12 +755,12 @@ watch(() => route.query.page, () => {})
                   <span
                     v-if="entry.rank === 'AP'"
                     class="px-1.5 py-0.5 rounded text-[10px] font-extrabold tracking-wide text-white"
-                    style="background: linear-gradient(135deg, #a855f7, #7c3aed); text-shadow: 0 1px 2px rgba(0,0,0,.25)"
+                    style="background: linear-gradient(135deg, #c084fc, #8b5cf6); text-shadow: 0 1px 2px rgba(0,0,0,.25)"
                   >AP</span>
                   <span
                     v-else-if="entry.rank === 'FC'"
                     class="px-1.5 py-0.5 rounded text-[10px] font-extrabold tracking-wide text-white"
-                    style="background: linear-gradient(135deg, #E04A4A, #9a3412); text-shadow: 0 1px 2px rgba(0,0,0,.25)"
+                    style="background: linear-gradient(135deg, #f87171, #ea580c); text-shadow: 0 1px 2px rgba(0,0,0,.25)"
                   >FC</span>
                 </div>
               </div>
@@ -1065,7 +1065,7 @@ watch(() => route.query.page, () => {})
         </div>
       </div>
       <div class="flex flex-col items-end gap-2">
-        <div class="badge badge-primary badge-lg text-lg py-4 px-6 font-bold shadow-sm">
+        <div class="badge badge-primary badge-lg text-lg py-4 px-6 font-bold">
           Rating {{ b30Rating.toFixed(3) }}
         </div>
         <div class="text-sm font-medium text-base-content/60">
@@ -1085,7 +1085,7 @@ watch(() => route.query.page, () => {})
         <AssetImage 
           :src="getMusicThumbnailUrl(entry.musicId)" 
           :alt="getMusicTitle(entry.musicId)"
-          class="w-14 h-14 rounded-lg object-cover flex-shrink-0 shadow-sm"
+          class="w-14 h-14 rounded-lg object-cover flex-shrink-0"
           :lazy="false"
         />
         <div class="flex-1 min-w-0 flex flex-col justify-center">
@@ -1101,13 +1101,13 @@ watch(() => route.query.page, () => {})
             </span>
             <span
               v-if="entry.rank === 'AP'"
-              class="px-2 py-0.5 rounded text-xs font-extrabold tracking-wide text-white leading-none shadow-sm"
-              style="background: linear-gradient(135deg, #a855f7, #7c3aed);"
+              class="px-2 py-0.5 rounded text-xs font-extrabold tracking-wide text-white leading-none"
+              style="background: linear-gradient(135deg, #c084fc, #8b5cf6);"
             >AP</span>
             <span
               v-else-if="entry.rank === 'FC'"
-              class="px-2 py-0.5 rounded text-xs font-extrabold tracking-wide text-white leading-none shadow-sm"
-              style="background: linear-gradient(135deg, #E04A4A, #9a3412);"
+              class="px-2 py-0.5 rounded text-xs font-extrabold tracking-wide text-white leading-none"
+              style="background: linear-gradient(135deg, #f87171, #ea580c);"
             >FC</span>
           </div>
         </div>

@@ -513,8 +513,6 @@ watch(() => route.params.id, loadData)
                 :src="eventImages[currentImageIndex]?.url ?? ''"
                 :alt="eventImages[currentImageIndex]?.label ?? ''"
                 class="max-w-full max-h-[500px] object-contain"
-                no-fallback
-                @failed="nextImage"
               />
             </div>
             
