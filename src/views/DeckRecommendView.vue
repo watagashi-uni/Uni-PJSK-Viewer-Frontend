@@ -3,15 +3,21 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useMasterStore } from '@/stores/master'
 import { useAccountStore } from '@/stores/account'
+import { useSettingsStore } from '@/stores/settings'
 import SekaiCard from '@/components/SekaiCard.vue'
+import AssetImage from '@/components/AssetImage.vue'
+import AccountSelector from '@/components/AccountSelector.vue'
 import { 
   Info, Play, Users, User,
-  Zap, Settings2, Loader2, AlertTriangle
+  Zap, Settings2, Loader2, AlertTriangle, ChevronDown
 } from 'lucide-vue-next'
 
 const masterStore = useMasterStore()
 const accountStore = useAccountStore()
+const settingsStore = useSettingsStore()
 const route = useRoute()
+
+const assetsHost = computed(() => settingsStore.assetsHost)
 
 // ==================== 类型定义 ====================
 interface EventData {
@@ -166,12 +172,16 @@ const filteredMusics = computed(() => {
 
 const filteredEvents = computed(() => {
   const now = Date.now()
-  let list = events.value.filter(e => e.startAt <= now)
+  let list = events.value.filter(e => e.aggregateAt >= now)
+  if (list.length === 0) {
+    const past = events.value.filter(e => e.aggregateAt < now).sort((a, b) => b.id - a.id)
+    if (past.length > 0) list = [past[0]!]
+  }
   if (eventSearchText.value.trim()) {
     const q = eventSearchText.value.toLowerCase()
     list = list.filter(e => e.name.toLowerCase().includes(q) || e.id.toString().includes(q))
   }
-  return list.sort((a, b) => b.id - a.id).slice(0, 50)
+  return list.sort((a, b) => a.id - b.id).slice(0, 50)
 })
 
 const availableDifficulties = computed(() => {
@@ -249,8 +259,13 @@ onMounted(async () => {
     }
 
     const now = Date.now()
-    const started = eventsData.filter(e => e.startAt <= now).sort((a, b) => b.id - a.id)
-    if (started.length > 0) selectedEventId.value = started[0]!.id
+    const activeAndFuture = eventsData.filter(e => e.aggregateAt >= now).sort((a, b) => a.id - b.id)
+    if (activeAndFuture.length > 0) {
+      selectedEventId.value = activeAndFuture[0]!.id
+    } else {
+      const past = eventsData.filter(e => e.aggregateAt < now).sort((a, b) => b.id - a.id)
+      if (past.length > 0) selectedEventId.value = past[0]!.id
+    }
 
     // 优先使用 URL query 参数，其次默认选择 ID 74
     const queryMusicId = route.query.musicId ? Number(route.query.musicId) : null
@@ -309,13 +324,10 @@ async function handleCalculate() {
     return
   }
 
-  if (!userId.value.trim()) { errorMsg.value = '请填写用户ID'; return }
-  const uid = userId.value.trim()
+  if (!userId.value) { errorMsg.value = '请选择绑定的账号'; return }
+  const uid = userId.value
   localStorage.setItem('deckRecommend_userId', uid)
-  // 自动添加到共享账号列表
-  if (!accountStore.accounts.some(a => a.userId === uid)) {
-    accountStore.addAccount({ userId: uid, name: uid, lastRefresh: Date.now() })
-  }
+
   if (!selectedMusic.value || !selectedDifficulty.value) { errorMsg.value = '请选择歌曲和难度'; return }
   if (mode.value === '1' && !selectedCharacter.value) { errorMsg.value = '请选择角色'; return }
   if (mode.value === '2' && !selectedEvent.value) { errorMsg.value = '请选择活动'; return }
@@ -417,7 +429,7 @@ async function handleCalculate() {
 
   const args: Record<string, unknown> = {
     mode: mode.value,
-    userId: userId.value.trim(),
+    userId: userId.value,
     music: JSON.parse(JSON.stringify(selectedMusic.value)), // 同样去除 music 的 proxy
     difficulty: selectedDifficulty.value,
     cardConfig: JSON.parse(JSON.stringify(cardConfig.value)), // 去除配置的 proxy
@@ -477,26 +489,18 @@ const rarityList = [
         <div class="card-body space-y-4">
           <!-- 用户ID -->
           <div class="form-control">
-            <label class="label"><span class="label-text font-medium">用户ID</span></label>
-            <div class="flex gap-2 items-center max-w-md">
-              <select
-                v-if="accountStore.accounts.length > 0"
+            <label class="label"><span class="label-text font-medium">用户账号</span></label>
+            <div class="max-w-md w-full border border-base-300 rounded-lg p-1 bg-base-100 shadow-sm">
+              <AccountSelector 
                 v-model="userId"
-                class="select select-bordered flex-1"
-              >
-                <option v-for="acc in accountStore.accounts" :key="acc.userId" :value="acc.userId">
-                  {{ acc.userId }} - {{ acc.name }}
-                </option>
-                <option value="">手动输入...</option>
-              </select>
-              <input
-                v-if="accountStore.accounts.length === 0 || userId === ''"
-                v-model="userId"
-                type="text"
-                placeholder="输入Sekai用户ID"
-                class="input input-bordered flex-1"
+                show-id
               />
             </div>
+            <label v-if="accountStore.accounts.length === 0" class="label mt-1">
+              <span class="label-text-alt text-base-content/60">
+                请先在 <RouterLink to="/profile" class="link text-primary">用户档案</RouterLink> 中添加账号
+              </span>
+            </label>
           </div>
 
           <!-- 模式 -->
@@ -516,12 +520,57 @@ const rarityList = [
           <div v-if="mode === '2'" class="form-control">
             <label class="label"><span class="label-text font-medium">活动</span></label>
             <div class="relative event-dropdown max-w-md">
-              <input v-model="eventSearchText" type="text" :placeholder="selectedEvent ? `${selectedEvent.id} - ${selectedEvent.name}` : '搜索活动...'" class="input input-bordered w-full" @focus="showEventDropdown = true" />
-              <ul v-if="showEventDropdown" class="absolute z-50 mt-1 w-full bg-base-100 shadow-xl rounded-box max-h-60 overflow-y-auto border border-base-300">
-                <li v-for="e in filteredEvents" :key="e.id" class="px-4 py-2 hover:bg-base-200 cursor-pointer text-sm" :class="{ 'bg-primary/10': selectedEventId === e.id }" @mousedown.prevent="selectEvent(e)">
-                  {{ e.id }} - {{ e.name }}
-                </li>
-              </ul>
+              <div 
+                class="border border-base-300 rounded-lg p-2 flex items-center gap-3 cursor-pointer hover:bg-base-200 transition-colors bg-base-100 shadow-sm"
+                @click="showEventDropdown = !showEventDropdown"
+              >
+                <template v-if="selectedEvent">
+                  <div class="w-12 h-12 flex-shrink-0 bg-base-300 rounded overflow-hidden flex items-center justify-center shadow-inner">
+                    <AssetImage 
+                      :src="`${assetsHost}/ondemand/event/${selectedEvent.assetbundleName}/logo/logo.png`"
+                      class="max-w-full max-h-full object-contain"
+                    />
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <div class="text-xs opacity-60 font-medium">ID: {{ selectedEvent.id }}</div>
+                    <div class="font-bold truncate text-sm" :title="selectedEvent.name">{{ selectedEvent.name }}</div>
+                  </div>
+                </template>
+                <template v-else>
+                  <div class="flex-1 text-base-content/60 px-2 py-1 text-sm">请选择活动...</div>
+                </template>
+                <ChevronDown class="w-5 h-5 opacity-50 mr-2 transition-transform duration-200" :class="{ 'rotate-180': showEventDropdown }" />
+              </div>
+
+              <!-- 下拉列表 -->
+              <div v-if="showEventDropdown" class="absolute z-50 mt-2 w-full bg-base-100 shadow-2xl rounded-xl border border-base-300 flex flex-col max-h-[350px] overflow-hidden">
+                <div class="p-3 border-b border-base-200 bg-base-100/95 backdrop-blur z-10 sticky top-0">
+                  <input v-model="eventSearchText" type="text" placeholder="搜索活动名称或ID..." class="input input-sm input-bordered w-full" />
+                </div>
+                <div class="overflow-y-auto flex-1 p-2 space-y-1 bg-base-100/50">
+                  <div 
+                    v-for="e in filteredEvents" 
+                    :key="e.id" 
+                    class="flex items-center gap-3 p-2 rounded-lg hover:bg-base-200 cursor-pointer transition-all duration-200 active:scale-[0.98]"
+                    :class="selectedEventId === e.id ? 'bg-primary/10 border-primary/20 border shadow-sm' : 'border border-transparent'"
+                    @click="selectEvent(e)"
+                  >
+                    <div class="w-14 h-14 flex-shrink-0 bg-base-300 rounded-md overflow-hidden flex items-center justify-center shadow-inner">
+                      <AssetImage 
+                        :src="`${assetsHost}/ondemand/event/${e.assetbundleName}/logo/logo.png`"
+                        class="max-w-full max-h-full object-contain p-1"
+                      />
+                    </div>
+                    <div class="flex-1 min-w-0">
+                      <div class="text-[11px] font-bold tracking-wider" :class="selectedEventId === e.id ? 'text-primary' : 'opacity-50'">ID: {{ e.id }}</div>
+                      <div class="font-bold truncate text-sm mt-0.5" :class="selectedEventId === e.id ? 'text-primary' : ''" :title="e.name">{{ e.name }}</div>
+                    </div>
+                  </div>
+                  <div v-if="filteredEvents.length === 0" class="p-6 text-center text-sm font-medium opacity-60">
+                    没有找到该活动
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
