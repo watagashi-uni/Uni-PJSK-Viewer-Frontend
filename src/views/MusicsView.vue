@@ -722,7 +722,7 @@ watch(() => route.query.page, () => {})
               </label>
               <div class="text-xs text-base-content/40 border-l border-base-300 pl-3 leading-tight flex flex-col gap-1 justify-center">
                 <div class="flex items-center gap-1">定数来源 <a href="https://github.com/auburnsummer/pjskb30" target="_blank" rel="noopener noreferrer" class="link link-hover flex items-center gap-1"><Github class="w-3 h-3" />pjskb30</a></div>
-                <div>民间定数，仅供参考，如有意见可以受着，或者写一整套更好的给项目提pr</div>
+                <div>民间定数，如有意见可以受着，或者写一整套更好的给项目提pr</div>
               </div>
             </div>
           </div>

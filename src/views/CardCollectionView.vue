@@ -3,7 +3,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useMasterStore } from '@/stores/master'
 import { useAccountStore } from '@/stores/account'
-import { useSettingsStore } from '@/stores/settings'
+
 import { RefreshCw, BookOpen, AlertTriangle } from 'lucide-vue-next'
 import confetti from 'canvas-confetti'
 import SekaiCard from '@/components/SekaiCard.vue'
@@ -28,7 +28,7 @@ interface Character {
 const router = useRouter()
 const masterStore = useMasterStore()
 const accountStore = useAccountStore()
-const settingsStore = useSettingsStore()
+
 
 const cards = ref<Card[]>([])
 const characters = ref<Character[]>([])
@@ -73,8 +73,8 @@ const characterCards = computed(() => {
   return cards.value.filter(c => {
     // Filter by selected character
     if (c.characterId !== selectedCharacterId.value) return false
-    // Filter spoiler content if setting is on
-    if (!settingsStore.showSpoilers && c.releaseAt > now) return false
+    // Force hide unreleased cards
+    if (c.releaseAt > now) return false
     return true
   }).sort((a, b) => b.id - a.id) // Sort by ID descending (newest first)
 })

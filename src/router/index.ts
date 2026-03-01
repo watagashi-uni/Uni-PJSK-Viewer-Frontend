@@ -75,6 +75,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '谱面分享' },
     },
     {
+        path: '/thumnail',
+        name: 'Thumnail',
+        component: () => import('@/views/ThumnailToolView.vue'),
+        meta: { title: '封面生成' },
+    },
+    {
         path: '/sus2img/preview',
         name: 'Sus2ImgPreview',
         component: () => import('@/views/Sus2ImgPreviewView.vue'),
