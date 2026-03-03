@@ -214,6 +214,47 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.</pre>
             </div>
           </div>
+          <!-- pjsekai.scores -->
+          <div class="collapse collapse-arrow bg-base-200">
+            <input type="checkbox" />
+            <div class="collapse-title font-medium">
+              pjsekai.scores (SUS 转图片核心算法)
+            </div>
+            <div class="collapse-content">
+              <p class="text-sm text-base-content/70 mb-2">
+                <a
+                  href="https://gitlab.com/pjsekai/scores"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="link link-primary inline-flex items-center gap-1"
+                >
+                  项目地址
+                  <ExternalLink class="w-3 h-3" />
+                </a>
+              </p>
+              <pre class="text-xs bg-base-300 p-3 rounded-lg overflow-x-auto whitespace-pre-wrap">MIT License
+
+Copyright (c) 2023 pjsekai.moe
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.</pre>
+            </div>
+          </div>
           <!-- sekai-calculator -->
           <div class="collapse collapse-arrow bg-base-200">
             <input type="checkbox" />
@@ -271,4 +312,3 @@ SOFTWARE.</pre>
     </div>
   </div>
 </template>
-
