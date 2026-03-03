@@ -16,6 +16,7 @@ export interface Sus2ImgRenderInput {
     playlevel?: string
     pixel?: string | number
     skin?: Sus2ImgSkin
+    jacket?: string
 }
 
 export interface Sus2ImgRuntimeOptions {
@@ -60,6 +61,25 @@ const resolveAssetBase = (override?: string): string => {
     }
 
     return ''
+}
+
+const resolveJacketPath = (assetBase: string, jacket?: string): string => {
+    const trimmed = (jacket ?? '').trim()
+    if (!trimmed) {
+        return joinAssetPath(assetBase, 'logo.png')
+    }
+
+    if (
+        trimmed.startsWith('data:') ||
+        trimmed.startsWith('blob:') ||
+        trimmed.startsWith('http://') ||
+        trimmed.startsWith('https://') ||
+        trimmed.startsWith('/')
+    ) {
+        return trimmed
+    }
+
+    return joinAssetPath(assetBase, trimmed)
 }
 
 const normalizePixel = (pixel: string | number | undefined): number => {
@@ -109,7 +129,7 @@ const createScore = (input: Sus2ImgRenderInput, runtimeOptions?: Sus2ImgRuntimeO
 
     rebased.meta.difficulty = input.difficulty ?? ''
     rebased.meta.artist = input.artist ?? ''
-    rebased.meta.jacket = joinAssetPath(assetBase, 'logo.png')
+    rebased.meta.jacket = resolveJacketPath(assetBase, input.jacket)
     rebased.meta.title = input.title ?? ''
 
     let playlevel = `${input.playlevel ?? ''} 創作譜面`
