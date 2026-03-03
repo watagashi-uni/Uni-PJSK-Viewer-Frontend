@@ -307,6 +307,38 @@ SOFTWARE.</pre>
               </p>
             </div>
           </div>
+          <!-- lunabot -->
+          <div class="collapse collapse-arrow bg-base-200">
+            <input type="checkbox" />
+            <div class="collapse-title font-medium">
+              lunabot
+            </div>
+            <div class="collapse-content">
+              <p class="text-sm text-base-content/70 mb-2">
+                <a
+                  href="https://github.com/NeuraXmy/lunabot"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="link link-primary inline-flex items-center gap-1"
+                >
+                  GitHub 项目地址
+                  <ExternalLink class="w-3 h-3" />
+                </a>
+              </p>
+              <p class="text-sm text-base-content/70">
+                协议全文请参阅：
+                <a
+                  href="https://github.com/NeuraXmy/lunabot/blob/master/LICENSE"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="link link-primary inline-flex items-center gap-1"
+                >
+                  LICENSE
+                  <ExternalLink class="w-3 h-3" />
+                </a>
+              </p>
+            </div>
+          </div>
         </div>
       </div>
     </div>
