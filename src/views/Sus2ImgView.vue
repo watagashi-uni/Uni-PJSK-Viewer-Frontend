@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, watch, onBeforeUnmount } from 'vue'
-import { Play, Trash2, ExternalLink, Download } from 'lucide-vue-next'
+import { Play, Trash2 } from 'lucide-vue-next'
 import apiClient from '@/api/client'
 import {
   renderSusToPng,
@@ -33,9 +33,12 @@ const form = ref({
   format: 'svg' as RenderFormat,
   skin: 'custom01' as Sus2ImgSkin,
   engine: 'frontend' as RenderEngine,
+  bottomLeftImageUrl: '',
 })
 
 const chartFile = ref<File | null>(null)
+const bottomLeftImageFile = ref<File | null>(null)
+const bottomLeftImageDataUrl = ref('')
 const isSubmitting = ref(false)
 const error = ref<string | null>(null)
 const infoMessage = ref<string | null>(null)
@@ -96,16 +99,41 @@ function handleFileChange(event: Event) {
   }
 }
 
+function handleBottomLeftImageChange(event: Event) {
+  const target = event.target as HTMLInputElement
+  const file = target.files?.[0]
+  if (!file) {
+    bottomLeftImageFile.value = null
+    bottomLeftImageDataUrl.value = ''
+    return
+  }
+
+  bottomLeftImageFile.value = file
+  const reader = new FileReader()
+  reader.onload = () => {
+    bottomLeftImageDataUrl.value = String(reader.result ?? '')
+  }
+  reader.onerror = () => {
+    bottomLeftImageDataUrl.value = ''
+    error.value = '读取左下角图片失败'
+  }
+  reader.readAsDataURL(file)
+}
+
 function showGeneratingHint(previewTab: Window | null) {
   if (!previewTab || previewTab.closed) return
 
   try {
     previewTab.document.title = '正在生成谱面预览...'
+    previewTab.document.documentElement.style.margin = '0'
+    previewTab.document.documentElement.style.height = '100%'
+    previewTab.document.body.style.margin = '0'
+    previewTab.document.body.style.height = '100%'
     previewTab.document.body.innerHTML = `
-      <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0f172a;color:#e2e8f0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
-        <div style="text-align:center;">
-          <div style="font-size:22px;font-weight:700;margin-bottom:10px;">正在生成谱面预览</div>
-          <div style="font-size:14px;opacity:.8;">请稍候，生成完成后将自动跳转...</div>
+      <div style="min-height:100vh;display:grid;place-items:center;padding:24px;background:radial-gradient(circle at 20% 20%, #f8fafc 0%, #eef2ff 45%, #e2e8f0 100%);color:#1e293b;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+        <div style="width:min(92vw,520px);padding:clamp(18px,3vw,28px);border-radius:16px;background:#ffffffcc;backdrop-filter:blur(8px);box-shadow:0 16px 40px rgba(15,23,42,.12);border:1px solid #cbd5e1;text-align:center;">
+          <div style="font-size:clamp(18px,2.4vw,24px);font-weight:700;letter-spacing:.01em;margin-bottom:8px;">正在生成谱面预览</div>
+          <div style="font-size:clamp(13px,1.8vw,15px);color:#475569;">请稍候，生成完成后将自动跳转...</div>
         </div>
       </div>
     `
@@ -162,6 +190,7 @@ async function renderViaBackend(chartText: string): Promise<BackendResult> {
 }
 
 async function renderViaFrontend(chartText: string): Promise<Sus2ImgFrontendResult> {
+  const bottomLeftImage = bottomLeftImageDataUrl.value || form.value.bottomLeftImageUrl.trim()
   const input = {
     sus: chartText,
     rebase: form.value.rebase,
@@ -172,6 +201,7 @@ async function renderViaFrontend(chartText: string): Promise<Sus2ImgFrontendResu
     playlevel: form.value.playlevel,
     pixel: form.value.pixel,
     skin: form.value.skin,
+    jacket: bottomLeftImage,
   }
 
   if (form.value.format === 'png') {
@@ -244,9 +274,12 @@ function clearForm() {
     format: 'svg',
     skin: 'custom01',
     engine: 'frontend',
+    bottomLeftImageUrl: '',
   }
 
   chartFile.value = null
+  bottomLeftImageFile.value = null
+  bottomLeftImageDataUrl.value = ''
   error.value = null
   infoMessage.value = null
   resultData.value = null
@@ -255,20 +288,6 @@ function clearForm() {
   sessionStorage.removeItem(FORM_STORAGE_KEY)
 }
 
-function openInNewTab() {
-  if (!resultData.value) return
-  window.open(resultData.value, '_blank')
-}
-
-function downloadResult() {
-  if (!resultData.value) return
-
-  const link = document.createElement('a')
-  link.href = resultData.value
-  link.download = `chart.${resultFormat.value}`
-  link.rel = 'noopener'
-  link.click()
-}
 </script>
 
 <template>
@@ -377,6 +396,31 @@ function downloadResult() {
             </div>
           </div>
 
+          <div class="grid md:grid-cols-2 gap-4">
+            <div class="form-control w-full">
+              <label class="label">
+                <span class="label-text font-medium">左下角图片 URL（前端专用，可选）</span>
+              </label>
+              <input
+                v-model="form.bottomLeftImageUrl"
+                type="text"
+                class="input input-bordered w-full"
+                placeholder="可填 data/http/绝对路径"
+              />
+            </div>
+            <div class="form-control w-full">
+              <label class="label">
+                <span class="label-text font-medium">上传左下角图片（前端专用，可选）</span>
+              </label>
+              <input
+                type="file"
+                class="file-input file-input-bordered w-full"
+                accept="image/*"
+                @change="handleBottomLeftImageChange"
+              />
+            </div>
+          </div>
+
           <div class="grid md:grid-cols-3 gap-4">
             <div class="form-control">
               <label class="label">
@@ -457,25 +501,6 @@ function downloadResult() {
             </button>
           </div>
 
-          <div v-if="resultData" class="alert alert-success mt-6">
-            <div class="flex flex-col sm:flex-row gap-4 w-full items-center justify-between">
-              <span class="font-medium">
-                ✓ 转换完成！
-                <span v-if="resultSource === 'frontend'" class="text-success">（前端）</span>
-                <span v-else-if="resultSource === 'backend'" class="text-warning">（后端）</span>
-              </span>
-              <div class="flex gap-2 flex-wrap justify-center">
-                <button class="btn btn-sm btn-primary" @click="openInNewTab">
-                  <ExternalLink class="w-4 h-4" />
-                  打开预览
-                </button>
-                <button class="btn btn-sm btn-success" @click="downloadResult">
-                  <Download class="w-4 h-4" />
-                  下载
-                </button>
-              </div>
-            </div>
-          </div>
         </form>
       </div>
     </div>
