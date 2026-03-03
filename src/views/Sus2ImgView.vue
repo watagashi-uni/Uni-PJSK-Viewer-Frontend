@@ -96,6 +96,24 @@ function handleFileChange(event: Event) {
   }
 }
 
+function showGeneratingHint(previewTab: Window | null) {
+  if (!previewTab || previewTab.closed) return
+
+  try {
+    previewTab.document.title = '正在生成谱面预览...'
+    previewTab.document.body.innerHTML = `
+      <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0f172a;color:#e2e8f0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+        <div style="text-align:center;">
+          <div style="font-size:22px;font-weight:700;margin-bottom:10px;">正在生成谱面预览</div>
+          <div style="font-size:14px;opacity:.8;">请稍候，生成完成后将自动跳转...</div>
+        </div>
+      </div>
+    `
+  } catch {
+    // ignore cross-origin / document write issues
+  }
+}
+
 async function getChartText(): Promise<string> {
   if (form.value.chart.trim()) {
     return form.value.chart
@@ -168,6 +186,7 @@ async function handleSubmit() {
   error.value = null
   infoMessage.value = null
   const previewTab = window.open('', '_blank')
+  showGeneratingHint(previewTab)
 
   try {
     const chartText = await getChartText()
