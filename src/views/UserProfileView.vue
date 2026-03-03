@@ -8,7 +8,7 @@ import SekaiCard from '@/components/SekaiCard.vue'
 import SekaiProfileHonor from '@/components/SekaiProfileHonor.vue'
 import AccountSelector from '@/components/AccountSelector.vue'
 import {
-  User, Eye, EyeOff, Download, Upload, Plus, Trash2, RefreshCw, Star, Zap, Trophy, Music, CircleHelp
+  User, Eye, EyeOff, Download, Upload, Plus, Trash2, RefreshCw, Star, Zap, Trophy, Music, CircleHelp, X
 } from 'lucide-vue-next'
 
 const masterStore = useMasterStore()
@@ -88,9 +88,42 @@ interface GameCharacterUnit {
   gameCharacterId: number
   unit: string
 }
+
+interface GameCharacter {
+  id: number
+  firstName?: string
+  givenName: string
+}
+
+interface CharacterMissionV2 {
+  characterId: number
+  characterMissionType: string
+  progress: number
+}
+
+interface CharacterMissionV2Status {
+  characterId: number
+  parameterGroupId: number
+  seq: number
+}
+
+interface CharacterMissionV2ParameterGroup {
+  id: number
+  seq: number
+  requirement: number
+}
+
+interface LeaderCountRow {
+  characterId: number
+  playCount: number | null
+  exLevel: number | null
+  exCount: number | null
+  progress: number
+}
 const accounts = computed(() => accountStore.accounts)
 const currentUserId = computed(() => accountStore.currentUserId)
 const profileData = ref<ProfileData | null>(null)
+const leaderCountModalRef = ref<HTMLDialogElement | null>(null)
 const isLoading = ref(false)
 const isInitLoading = ref(true)
 const errorMsg = ref('')
@@ -102,6 +135,13 @@ const infoModalRef = ref<HTMLDialogElement | null>(null)
 // Master data
 const allCards = ref<CardInfo[]>([])
 const gameCharacterUnits = ref<GameCharacterUnit[]>([])
+const gameCharacters = ref<GameCharacter[]>([])
+const characterMissionV2ParameterGroups = ref<CharacterMissionV2ParameterGroup[]>([])
+
+const suiteData = computed(() => {
+  if (!currentUserId.value) return null
+  return accountStore.getSuiteCache(currentUserId.value)
+})
 
 // ==================== 难度颜色 ====================
 const difficultyColors: Record<string, string> = {
@@ -140,6 +180,52 @@ function getCharaUnit(characterId: number): string {
 
 function getCharaPillColor(characterId: number): string {
   return unitColorMap[getCharaUnit(characterId)] || '#00bfbf'
+}
+
+function getLeaderProgressColor(playCount: number): string {
+  if (playCount > 50000) return '#64ff64'
+  if (playCount > 40000) return '#ffff64'
+  if (playCount > 30000) return '#ffc864'
+  if (playCount > 20000) return '#ff9664'
+  if (playCount > 10000) return '#ff6464'
+  return '#ff3232'
+}
+
+const charaNameByGameCharacterId = computed(() => {
+  const map = new Map<number, string>()
+  for (const chara of gameCharacters.value) {
+    const id = Number(chara.id)
+    if (!Number.isFinite(id)) continue
+    map.set(id, `${chara.firstName || ''}${chara.givenName}`)
+  }
+  return map
+})
+
+const gameCharacterIdByUnitId = computed(() => {
+  const map = new Map<number, number>()
+  for (const unit of gameCharacterUnits.value) {
+    const unitId = Number(unit.id)
+    const gameCharacterId = Number(unit.gameCharacterId)
+    if (!Number.isFinite(unitId) || !Number.isFinite(gameCharacterId)) continue
+    map.set(unitId, gameCharacterId)
+  }
+  return map
+})
+
+function getCharaName(characterId: number): string {
+  const normalizedId = Number(characterId)
+  if (!Number.isFinite(normalizedId)) return String(characterId)
+
+  const direct = charaNameByGameCharacterId.value.get(normalizedId)
+  if (direct) return direct
+
+  const mappedGameCharacterId = gameCharacterIdByUnitId.value.get(normalizedId)
+  if (mappedGameCharacterId) {
+    const mapped = charaNameByGameCharacterId.value.get(mappedGameCharacterId)
+    if (mapped) return mapped
+  }
+
+  return `角色 ${normalizedId}`
 }
 
 // Helper: Get honor by sequence
@@ -275,6 +361,108 @@ const lastRefreshText = computed(() => {
 
 const suiteUploadTimeText = computed(() => accountStore.uploadTimeText)
 
+const hasLeaderCountData = computed(() => {
+  const missions = suiteData.value?.userCharacterMissionV2s
+  const statuses = suiteData.value?.userCharacterMissionV2Statuses
+  return Array.isArray(missions) && Array.isArray(statuses)
+})
+
+const leaderCountMaxPlayCount = computed(() => {
+  const groups = characterMissionV2ParameterGroups.value
+    .filter(item => Number(item.id) === 1)
+    .map(item => Number(item.requirement))
+    .filter(value => Number.isFinite(value))
+  return groups.length > 0 ? Math.max(...groups) : 0
+})
+
+const leaderCountRows = computed<LeaderCountRow[]>(() => {
+  const missions = Array.isArray(suiteData.value?.userCharacterMissionV2s)
+    ? suiteData.value.userCharacterMissionV2s as CharacterMissionV2[]
+    : []
+  const statuses = Array.isArray(suiteData.value?.userCharacterMissionV2Statuses)
+    ? suiteData.value.userCharacterMissionV2Statuses as CharacterMissionV2Status[]
+    : []
+  const maxPlayCount = leaderCountMaxPlayCount.value
+
+  const exSeqPlayCountList = characterMissionV2ParameterGroups.value
+    .filter(item => Number(item.id) === 101)
+    .map(item => ({
+      seq: Number(item.seq),
+      requirement: Number(item.requirement),
+    }))
+    .filter(item => Number.isFinite(item.seq) && Number.isFinite(item.requirement))
+    .sort((a, b) => a.seq - b.seq)
+
+  function getExRequirementBySeq(seq: number): number {
+    let requirement = 0
+    for (const item of exSeqPlayCountList) {
+      if (item.seq > seq) break
+      requirement = item.requirement
+    }
+    return requirement
+  }
+
+  const playCounts = new Map<number, number>()
+  const exCounts = new Map<number, number>()
+  const exLevels = new Map<number, number>()
+
+  for (const item of missions) {
+    const cid = Number(item.characterId)
+    const progress = Number(item.progress)
+    if (!Number.isFinite(cid) || !Number.isFinite(progress)) continue
+    if (item.characterMissionType === 'play_live') {
+      playCounts.set(cid, progress)
+    } else if (item.characterMissionType === 'play_live_ex') {
+      exCounts.set(cid, progress)
+      exLevels.set(cid, 0)
+    }
+  }
+
+  for (const status of statuses) {
+    if (Number(status.parameterGroupId) !== 101) continue
+    const cid = Number(status.characterId)
+    const seq = Number(status.seq)
+    if (!Number.isFinite(cid) || !Number.isFinite(seq)) continue
+
+    const currentLevel = exLevels.get(cid) ?? 0
+    exLevels.set(cid, Math.max(currentLevel, seq))
+
+    const currentExCount = exCounts.get(cid) ?? 0
+    exCounts.set(cid, currentExCount + getExRequirementBySeq(seq))
+  }
+
+  const rows: LeaderCountRow[] = []
+  for (let cid = 1; cid <= 26; cid += 1) {
+    const playCount = playCounts.has(cid) ? (playCounts.get(cid) ?? 0) : null
+    rows.push({
+      characterId: cid,
+      playCount,
+      exLevel: exLevels.has(cid) ? (exLevels.get(cid) ?? 0) : null,
+      exCount: exCounts.has(cid) ? (exCounts.get(cid) ?? 0) : null,
+      progress: playCount !== null && maxPlayCount > 0
+        ? Math.max(0, Math.min(playCount / maxPlayCount, 1))
+        : 0,
+    })
+  }
+  return rows
+})
+
+const leaderCountSummary = computed(() => {
+  const rows = leaderCountRows.value
+  const availableRows = rows.filter(row => row.playCount !== null)
+  const totalPlayCount = availableRows.reduce((sum, row) => sum + (row.playCount ?? 0), 0)
+  const totalExCount = rows.reduce((sum, row) => sum + (row.exCount ?? 0), 0)
+  const maxPlayCount = availableRows.length > 0
+    ? Math.max(...availableRows.map(row => row.playCount ?? 0))
+    : 0
+  return {
+    availableRows: availableRows.length,
+    totalPlayCount,
+    totalExCount,
+    maxPlayCount,
+  }
+})
+
 // 卡组数据
 const deckCards = computed(() => {
   if (!profileData.value) return []
@@ -378,16 +566,39 @@ function getMaxStage(characterId: number): number {
   return Math.max(...stages.map(s => s.rank))
 }
 
+async function getFirstAvailableMaster<T = any>(names: string[]): Promise<T[]> {
+  for (const name of names) {
+    try {
+      const data = await masterStore.getMaster<T>(name)
+      if (Array.isArray(data) && data.length > 0) return data
+    } catch {
+      // try next name
+    }
+  }
+  return []
+}
+
+function openLeaderCountModal() {
+  leaderCountModalRef.value?.showModal()
+}
+
 // ==================== 初始化 ====================
 onMounted(async () => {
   try {
     if (!masterStore.isReady) await masterStore.initialize()
-    const [cardsData, unitsData] = await Promise.all([
+    const [cardsData, unitsData, charactersData, missionParamGroups] = await Promise.all([
       masterStore.getMaster<CardInfo>('cards'),
       masterStore.getMaster<GameCharacterUnit>('gameCharacterUnits'),
+      masterStore.getMaster<GameCharacter>('gameCharacters'),
+      getFirstAvailableMaster<CharacterMissionV2ParameterGroup>([
+        'characterMissionV2ParameterGroups',
+        'character_mission_v2_parameter_groups',
+      ]),
     ])
     allCards.value = cardsData
     gameCharacterUnits.value = unitsData
+    gameCharacters.value = charactersData
+    characterMissionV2ParameterGroups.value = missionParamGroups
   } catch (e) {
     console.error('加载master数据失败:', e)
   }
@@ -554,6 +765,105 @@ watch(currentUserId, async (newId) => {
             <form method="dialog">
               <button class="btn btn-primary btn-sm">我知道了</button>
             </form>
+          </div>
+        </div>
+        <form method="dialog" class="modal-backdrop">
+          <button>close</button>
+        </form>
+      </dialog>
+
+      <dialog ref="leaderCountModalRef" class="modal">
+        <div class="modal-box max-w-none w-[min(1400px,92vw)] h-[90vh] p-0 overflow-hidden">
+          <div class="h-full flex flex-col">
+            <div class="px-4 md:px-5 py-3 border-b border-base-300 flex items-start gap-3">
+              <div class="min-w-0">
+                <h3 class="text-xl font-semibold">队长次数视图</h3>
+                <p class="text-xs text-base-content/60 mt-1">全屏展示角色队长次数、EX等级和EX次数</p>
+              </div>
+              <div class="ml-auto flex items-center gap-2">
+                <span v-if="leaderCountMaxPlayCount > 0" class="badge badge-ghost">上限 {{ leaderCountMaxPlayCount.toLocaleString() }}</span>
+                <form method="dialog">
+                  <button class="btn btn-sm btn-ghost btn-circle" aria-label="关闭队长次数视图">
+                    <X class="w-4 h-4" />
+                  </button>
+                </form>
+              </div>
+            </div>
+
+            <div v-if="hasLeaderCountData" class="px-4 md:px-5 py-3 border-b border-base-300">
+              <div class="max-w-6xl mx-auto grid grid-cols-2 lg:grid-cols-4 gap-2">
+              <div class="rounded-lg bg-base-200 px-3 py-2">
+                <p class="text-[11px] text-base-content/60">角色数据</p>
+                <p class="text-lg font-semibold">{{ leaderCountSummary.availableRows }} / 26</p>
+              </div>
+              <div class="rounded-lg bg-base-200 px-3 py-2">
+                <p class="text-[11px] text-base-content/60">总队长次数</p>
+                <p class="text-lg font-semibold">{{ leaderCountSummary.totalPlayCount.toLocaleString() }}</p>
+              </div>
+              <div class="rounded-lg bg-base-200 px-3 py-2">
+                <p class="text-[11px] text-base-content/60">总EX次数</p>
+                <p class="text-lg font-semibold">{{ leaderCountSummary.totalExCount.toLocaleString() }}</p>
+              </div>
+              <div class="rounded-lg bg-base-200 px-3 py-2">
+                <p class="text-[11px] text-base-content/60">最高队长次数</p>
+                <p class="text-lg font-semibold">{{ leaderCountSummary.maxPlayCount.toLocaleString() }}</p>
+              </div>
+              </div>
+            </div>
+
+            <div class="flex-1 overflow-auto p-3 md:p-4">
+              <div v-if="!hasLeaderCountData" class="alert alert-info">
+                <span class="text-sm">当前账号没有可用的队长次数数据，请先点击“刷新Suite”。</span>
+              </div>
+              <div v-else class="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                <div
+                  v-for="row in leaderCountRows"
+                  :key="row.characterId"
+                  class="rounded-2xl border border-base-300 bg-base-100 px-3 py-2.5 shadow-sm"
+                >
+                  <div class="flex items-center gap-2.5 mb-2.5">
+                    <div class="w-10 h-10 rounded-full overflow-hidden ring-2 flex-shrink-0" :style="{ borderColor: getCharaPillColor(row.characterId) }">
+                      <img :src="getCharaIcon(row.characterId)" class="w-full h-full object-cover" />
+                    </div>
+                    <div>
+                      <p class="text-base font-bold">{{ getCharaName(row.characterId) }}</p>
+                      <p class="text-xs text-base-content/60">ID: {{ row.characterId }}</p>
+                    </div>
+                  </div>
+
+                  <div class="grid grid-cols-3 gap-2 mb-2.5">
+                    <div class="rounded-lg bg-base-200 px-2 py-1.5 text-center">
+                      <p class="text-[11px] text-base-content/60">队长次数</p>
+                      <p class="font-semibold">{{ row.playCount === null ? '-' : row.playCount.toLocaleString() }}</p>
+                    </div>
+                    <div class="rounded-lg bg-base-200 px-2 py-1.5 text-center">
+                      <p class="text-[11px] text-base-content/60">EX等级</p>
+                      <p class="font-semibold">{{ row.exLevel === null ? '-' : `x${row.exLevel}` }}</p>
+                    </div>
+                    <div class="rounded-lg bg-base-200 px-2 py-1.5 text-center">
+                      <p class="text-[11px] text-base-content/60">EX次数</p>
+                      <p class="font-semibold">{{ row.exCount === null ? '-' : row.exCount.toLocaleString() }}</p>
+                    </div>
+                  </div>
+
+                  <div class="space-y-1">
+                    <div class="flex items-center justify-between text-[11px] text-base-content/60">
+                      <span>进度</span>
+                      <span>{{ (row.progress * 100).toFixed(1) }}%</span>
+                    </div>
+                    <div class="w-full h-3 rounded-full bg-base-300 overflow-hidden">
+                      <div
+                        class="h-full rounded-full transition-all duration-300"
+                        :style="{
+                          width: `${(row.progress * 100).toFixed(2)}%`,
+                          backgroundColor: getLeaderProgressColor(row.playCount || 0),
+                        }"
+                      ></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
         <form method="dialog" class="modal-backdrop">
@@ -834,6 +1144,27 @@ watch(currentUserId, async (newId) => {
                     </div>
                   </div>
                 </div>
+              </div>
+            </div>
+
+            <div class="card bg-base-100 shadow-lg">
+              <div class="card-body">
+                <div class="flex items-center gap-3">
+                  <div>
+                    <h3 class="text-lg font-medium">队长次数</h3>
+                    <p class="text-xs text-base-content/60 mt-0.5">点击按钮打开队长次数视图</p>
+                  </div>
+                  <button
+                    class="btn btn-primary btn-sm ml-auto"
+                    :disabled="!hasLeaderCountData"
+                    @click="openLeaderCountModal"
+                  >
+                    全屏查看
+                  </button>
+                </div>
+                <p v-if="!hasLeaderCountData" class="text-xs text-base-content/60 mt-2">
+                  需要先点击上方“刷新Suite”才能查看队长次数。
+                </p>
               </div>
             </div>
           </div>

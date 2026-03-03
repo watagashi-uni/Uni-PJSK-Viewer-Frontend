@@ -1,5 +1,7 @@
 @import "tailwindcss";
-@plugin "daisyui";
+@plugin "daisyui" {
+  exclude: properties;
+}
 
 @plugin "daisyui/theme" {
   name: "moe";
