@@ -12,7 +12,7 @@ import {
 } from 'lucide-vue-next'
 import AssetImage from '@/components/AssetImage.vue'
 
-const FRONTEND_VERSION = '2.5.4'
+const FRONTEND_VERSION = '2.6.0'
 
 const masterStore = useMasterStore()
 const accountStore = useAccountStore()

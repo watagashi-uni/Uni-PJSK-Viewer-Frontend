@@ -6,17 +6,16 @@ import { useSettingsStore } from '@/stores/settings'
 import AssetImage from '@/components/AssetImage.vue'
 import SekaiCard from '@/components/SekaiCard.vue'
 import SekaiProfileHonor from '@/components/SekaiProfileHonor.vue'
+import SekaiHonorBonds from '@/components/SekaiHonorBonds.vue'
 import AccountSelector from '@/components/AccountSelector.vue'
 import {
-  User, Eye, EyeOff, Download, Upload, Plus, Trash2, RefreshCw, Star, Zap, Trophy, Music, CircleHelp, X
+  User, Eye, EyeOff, Download, Upload, Plus, Trash2, RefreshCw, Star, Zap, Trophy, Music, CircleHelp
 } from 'lucide-vue-next'
 
-const masterStore = useMasterStore()
-const accountStore = useAccountStore()
-const settingsStore = useSettingsStore()
-const assetsHost = computed(() => settingsStore.assetsHost)
-
-
+type AdvancedTabKey = 'challenge' | 'bonus' | 'bonds' | 'leader'
+type ProfileTabKey = 'basic' | AdvancedTabKey
+type UnitKey = 'light_sound' | 'idol' | 'street' | 'theme_park' | 'school_refusal' | 'piapro'
+type AttrKey = 'cool' | 'cute' | 'happy' | 'mysterious' | 'pure'
 
 interface ProfileData {
   totalPower: {
@@ -113,6 +112,125 @@ interface CharacterMissionV2ParameterGroup {
   requirement: number
 }
 
+interface ChallengeLiveHighScoreRewardRow {
+  id: number
+  characterId: number
+  highScore: number
+  resourceBoxId: number
+}
+
+interface ResourceBoxDetailRow {
+  resourceType: string
+  resourceId?: number
+  resourceQuantity?: number
+}
+
+interface ResourceBoxRow {
+  resourceBoxPurpose: string
+  id: number
+  details?: ResourceBoxDetailRow[]
+}
+
+interface AreaItemLevelMasterRow {
+  areaItemId: number
+  level: number
+  targetUnit?: string
+  targetCardAttr?: string
+  targetGameCharacterId?: number | string
+  power1BonusRate: number
+}
+
+interface CharacterRankRow {
+  characterId: number
+  characterRank: number
+  power1BonusRate: number
+}
+
+interface MysekaiGateLevelRow {
+  mysekaiGateId: number
+  level: number
+  powerBonusRate: number
+}
+
+interface BondMasterRow {
+  groupId: number
+  characterId1?: number
+  characterId2?: number
+}
+
+interface LevelMasterRow {
+  levelType: string
+  level: number
+  totalExp: number
+}
+
+interface BondsHonorMasterRow {
+  id: number
+  bondsGroupId: number
+  honorRarity?: string
+  levels?: Array<{
+    level: number
+    description?: string
+  }>
+}
+
+interface ChallengeRow {
+  characterId: number
+  rank: number
+  highScore: number
+  remainJewel: number
+  remainFragment: number
+  progress: number
+}
+
+interface PowerBonusRow {
+  areaItem: number
+  rank: number
+  fixture: number
+  total: number
+}
+
+interface UnitBonusRow {
+  areaItem: number
+  gate: number
+  total: number
+}
+
+interface AttrBonusRow {
+  areaItem: number
+  total: number
+}
+
+interface PowerBonusCharacterView extends PowerBonusRow {
+  characterId: number
+}
+
+interface PowerBonusUnitView extends UnitBonusRow {
+  unit: UnitKey
+}
+
+interface PowerBonusAttrView extends AttrBonusRow {
+  attr: AttrKey
+}
+
+interface PowerBonusCharacterGroupView {
+  unit: UnitKey
+  rows: PowerBonusCharacterView[]
+}
+
+interface BondViewRow {
+  c1: number
+  c2: number
+  rank1: number
+  rank2: number
+  bondLevel: number
+  needExpText: string
+  progress: number
+  capBlocked: boolean
+  honorId: number | null
+  honorLevel: number
+}
+
 interface LeaderCountRow {
   characterId: number
   playCount: number | null
@@ -120,30 +238,12 @@ interface LeaderCountRow {
   exCount: number | null
   progress: number
 }
-const accounts = computed(() => accountStore.accounts)
-const currentUserId = computed(() => accountStore.currentUserId)
-const profileData = ref<ProfileData | null>(null)
-const leaderCountModalRef = ref<HTMLDialogElement | null>(null)
-const isLoading = ref(false)
-const isInitLoading = ref(true)
-const errorMsg = ref('')
-const newUserIdInput = ref('')
-const showUserId = ref(true)
-const characterTab = ref<'rank' | 'stage'>('rank')
-const infoModalRef = ref<HTMLDialogElement | null>(null)
 
-// Master data
-const allCards = ref<CardInfo[]>([])
-const gameCharacterUnits = ref<GameCharacterUnit[]>([])
-const gameCharacters = ref<GameCharacter[]>([])
-const characterMissionV2ParameterGroups = ref<CharacterMissionV2ParameterGroup[]>([])
+const masterStore = useMasterStore()
+const accountStore = useAccountStore()
+const settingsStore = useSettingsStore()
+const assetsHost = computed(() => settingsStore.assetsHost)
 
-const suiteData = computed(() => {
-  if (!currentUserId.value) return null
-  return accountStore.getSuiteCache(currentUserId.value)
-})
-
-// ==================== 难度颜色 ====================
 const difficultyColors: Record<string, string> = {
   easy: 'bg-success text-success-content',
   normal: 'bg-info text-info-content',
@@ -154,9 +254,27 @@ const difficultyColors: Record<string, string> = {
 }
 
 const difficultyOrder = ['easy', 'normal', 'hard', 'expert', 'master', 'append']
+const CHALLENGE_RESOURCE_BOX_PURPOSE = 'challenge_live_high_score'
+const profileTabs: Array<{ key: ProfileTabKey; label: string }> = [
+  { key: 'basic', label: '基本Profile' },
+  { key: 'challenge', label: '挑战信息' },
+  { key: 'bonus', label: '加成信息' },
+  { key: 'bonds', label: '牵绊等级' },
+  { key: 'leader', label: '队长次数' },
+]
 
-// ==================== 团队颜色 ====================
-const unitColorMap: Record<string, string> = {
+const unitOrder: UnitKey[] = ['light_sound', 'idol', 'street', 'theme_park', 'school_refusal', 'piapro']
+const attrOrder: AttrKey[] = ['cool', 'cute', 'happy', 'mysterious', 'pure']
+const unitLabelMap: Record<UnitKey, string> = {
+  light_sound: 'Leo/need',
+  idol: 'MORE MORE JUMP!',
+  street: 'Vivid BAD SQUAD',
+  theme_park: 'Wonderlands x Showtime',
+  school_refusal: '25时、Nightcord见。',
+  piapro: 'VIRTUAL SINGER',
+}
+
+const unitColorMap: Record<UnitKey, string> = {
   light_sound: '#4455dd',
   idol: '#88dd44',
   street: '#ee1166',
@@ -165,10 +283,96 @@ const unitColorMap: Record<string, string> = {
   piapro: '#00bfbf',
 }
 
-// 根据角色ID获取所属团队
-function getCharaUnit(characterId: number): string {
+const unitLogoMap: Record<UnitKey, string> = {
+  light_sound: '/img/logo/logo_light_sound.png',
+  idol: '/img/logo/logo_idol.png',
+  street: '/img/logo/logo_street.png',
+  theme_park: '/img/logo/logo_theme_park.png',
+  school_refusal: '/img/logo/logo_school_refusal.png',
+  piapro: '/img/logo/logo_piapro.png',
+}
+
+const suiteKeyMap = {
+  challengeResults: ['userChallengeLiveSoloResults', 'user_challenge_live_solo_results'],
+  challengeStages: ['userChallengeLiveSoloStages', 'user_challenge_live_solo_stages'],
+  challengeRewardClaims: ['userChallengeLiveSoloHighScoreRewards', 'user_challenge_live_solo_high_score_rewards'],
+  userAreas: ['userAreas', 'user_areas'],
+  userCharacters: ['userCharacters', 'user_characters'],
+  fixtureBonuses: ['userMysekaiFixtureGameCharacterPerformanceBonuses', 'user_mysekai_fixture_game_character_performance_bonuses'],
+  userGates: ['userMysekaiGates', 'user_mysekai_gates'],
+  userBonds: ['userBonds', 'user_bonds'],
+  leaderMissions: ['userCharacterMissionV2s', 'user_character_mission_v2s'],
+  leaderStatuses: ['userCharacterMissionV2Statuses', 'user_character_mission_v2_statuses'],
+}
+
+const accounts = computed(() => accountStore.accounts)
+const currentUserId = computed(() => accountStore.currentUserId)
+const profileData = ref<ProfileData | null>(null)
+const isLoading = ref(false)
+const isInitLoading = ref(true)
+const errorMsg = ref('')
+const newUserIdInput = ref('')
+const showUserId = ref(true)
+const characterTab = ref<'rank' | 'stage'>('rank')
+const infoModalRef = ref<HTMLDialogElement | null>(null)
+const profileTab = ref<ProfileTabKey>('basic')
+const bondCharacterFilter = ref(0)
+
+const allCards = ref<CardInfo[]>([])
+const gameCharacterUnits = ref<GameCharacterUnit[]>([])
+const gameCharacters = ref<GameCharacter[]>([])
+const characterMissionV2ParameterGroups = ref<CharacterMissionV2ParameterGroup[]>([])
+const challengeLiveHighScoreRewards = ref<ChallengeLiveHighScoreRewardRow[]>([])
+const resourceBoxes = ref<ResourceBoxRow[]>([])
+const areaItemLevels = ref<AreaItemLevelMasterRow[]>([])
+const characterRanks = ref<CharacterRankRow[]>([])
+const mysekaiGateLevels = ref<MysekaiGateLevelRow[]>([])
+const bonds = ref<BondMasterRow[]>([])
+const levels = ref<LevelMasterRow[]>([])
+const bondsHonors = ref<BondsHonorMasterRow[]>([])
+
+const currentProfileTabLabel = computed(() =>
+  profileTabs.find(item => item.key === profileTab.value)?.label || '进阶信息')
+
+const suiteData = computed<any | null>(() => {
+  if (!currentUserId.value) return null
+  return accountStore.getSuiteCache(currentUserId.value)
+})
+
+function getNumber(value: unknown, fallback = 0): number {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : fallback
+}
+
+function getArrayByKeys<T = any>(source: any, keys: string[]): T[] {
+  if (!source || typeof source !== 'object') return []
+  const containers = [
+    source,
+    source.updatedResources,
+    source.updated_resources,
+  ].filter(item => item && typeof item === 'object')
+  for (const container of containers) {
+    for (const key of keys) {
+      const val = (container as any)[key]
+      if (Array.isArray(val)) return val as T[]
+    }
+  }
+  return []
+}
+
+function hasArrayByKeys(source: any, keys: string[]): boolean {
+  if (!source || typeof source !== 'object') return false
+  const containers = [
+    source,
+    source.updatedResources,
+    source.updated_resources,
+  ].filter(item => item && typeof item === 'object')
+  return containers.some(container => keys.some(key => Array.isArray((container as any)[key])))
+}
+
+function getCharaUnit(characterId: number): UnitKey {
   if (characterId >= 21) return 'piapro'
-  const unitMap: Record<number, string> = {
+  const unitMap: Record<number, UnitKey> = {
     1: 'light_sound', 2: 'light_sound', 3: 'light_sound', 4: 'light_sound',
     5: 'idol', 6: 'idol', 7: 'idol', 8: 'idol',
     9: 'street', 10: 'street', 11: 'street', 12: 'street',
@@ -191,50 +395,32 @@ function getLeaderProgressColor(playCount: number): string {
   return '#ff3232'
 }
 
-const charaNameByGameCharacterId = computed(() => {
-  const map = new Map<number, string>()
-  for (const chara of gameCharacters.value) {
-    const id = Number(chara.id)
-    if (!Number.isFinite(id)) continue
-    map.set(id, `${chara.firstName || ''}${chara.givenName}`)
-  }
-  return map
-})
-
-const gameCharacterIdByUnitId = computed(() => {
-  const map = new Map<number, number>()
-  for (const unit of gameCharacterUnits.value) {
-    const unitId = Number(unit.id)
-    const gameCharacterId = Number(unit.gameCharacterId)
-    if (!Number.isFinite(unitId) || !Number.isFinite(gameCharacterId)) continue
-    map.set(unitId, gameCharacterId)
-  }
-  return map
-})
-
-function getCharaName(characterId: number): string {
-  const normalizedId = Number(characterId)
-  if (!Number.isFinite(normalizedId)) return String(characterId)
-
-  const direct = charaNameByGameCharacterId.value.get(normalizedId)
-  if (direct) return direct
-
-  const mappedGameCharacterId = gameCharacterIdByUnitId.value.get(normalizedId)
-  if (mappedGameCharacterId) {
-    const mapped = charaNameByGameCharacterId.value.get(mappedGameCharacterId)
-    if (mapped) return mapped
-  }
-
-  return `角色 ${normalizedId}`
+function getChallengeProgressColor(score: number): string {
+  if (score > 2500000) return '#64ff64'
+  if (score > 2000000) return '#ffff64'
+  if (score > 1500000) return '#ffc864'
+  if (score > 1000000) return '#ff9664'
+  if (score > 500000) return '#ff6464'
+  return '#ff3232'
 }
 
-// Helper: Get honor by sequence
+function formatPercent(value: number): string {
+  return `${value.toFixed(1)}%`
+}
+
+function getUnitLogo(unit: UnitKey): string {
+  return unitLogoMap[unit]
+}
+
+function getAttrIcon(attr: string): string {
+  return `/newcard/attr_icon_${attr}.png`
+}
+
 function getHonor(seq: number) {
   if (!profileData.value?.userProfileHonors) return undefined
   return profileData.value.userProfileHonors.find((h) => h.seq === seq)
 }
 
-// ==================== 账号管理 ====================
 function loadAccounts() {
   // accountStore already initialized in App.vue
 }
@@ -244,7 +430,10 @@ function saveAccounts() {
 }
 
 function loadProfileData() {
-  if (!currentUserId.value) { profileData.value = null; return }
+  if (!currentUserId.value) {
+    profileData.value = null
+    return
+  }
   profileData.value = accountStore.getProfileCache(currentUserId.value)
 }
 
@@ -255,8 +444,14 @@ async function fetchProfile(userId: string): Promise<ProfileData> {
 
 async function addAccount() {
   const uid = newUserIdInput.value.trim()
-  if (!uid) { errorMsg.value = '请输入用户ID'; return }
-  if (accounts.value.some(a => a.userId === uid)) { errorMsg.value = '该账号已添加'; return }
+  if (!uid) {
+    errorMsg.value = '请输入用户ID'
+    return
+  }
+  if (accounts.value.some(a => a.userId === uid)) {
+    errorMsg.value = '该账号已添加'
+    return
+  }
 
   isLoading.value = true
   errorMsg.value = ''
@@ -308,7 +503,7 @@ function exportAccounts() {
     const raw = accountStore.getProfileCache(acc.userId)
     exportData[acc.userId] = {
       account: acc,
-      profile: raw ? raw : null,
+      profile: raw || null,
     }
   }
   const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
@@ -350,8 +545,52 @@ function importAccounts() {
   input.click()
 }
 
-// ==================== 计算属性 ====================
+const charaNameByGameCharacterId = computed(() => {
+  const map = new Map<number, string>()
+  for (const chara of gameCharacters.value) {
+    const id = Number(chara.id)
+    if (!Number.isFinite(id)) continue
+    map.set(id, `${chara.firstName || ''}${chara.givenName}`)
+  }
+  return map
+})
 
+const gameCharacterIdByUnitId = computed(() => {
+  const map = new Map<number, number>()
+  for (const unit of gameCharacterUnits.value) {
+    const unitId = Number(unit.id)
+    const gameCharacterId = Number(unit.gameCharacterId)
+    if (!Number.isFinite(unitId) || !Number.isFinite(gameCharacterId)) continue
+    map.set(unitId, gameCharacterId)
+  }
+  return map
+})
+
+function getCharaName(characterId: number): string {
+  const normalizedId = Number(characterId)
+  if (!Number.isFinite(normalizedId)) return String(characterId)
+
+  const direct = charaNameByGameCharacterId.value.get(normalizedId)
+  if (direct) return direct
+
+  const mappedGameCharacterId = gameCharacterIdByUnitId.value.get(normalizedId)
+  if (mappedGameCharacterId) {
+    const mapped = charaNameByGameCharacterId.value.get(mappedGameCharacterId)
+    if (mapped) return mapped
+  }
+
+  return `角色 ${normalizedId}`
+}
+
+function getCharaIcon(characterId: number): string {
+  const unit = gameCharacterUnits.value.find(u => u.gameCharacterId === characterId && u.id <= 26)
+  const unitId = unit?.id || characterId
+  if (unitId <= 20) return `/img/chr_ts/chr_ts_90_${unitId}.png`
+  if (characterId === 21) {
+    return unitId === 21 ? '/img/chr_ts/chr_ts_90_21.png' : `/img/chr_ts/chr_ts_90_21_${unitId - 25}.png`
+  }
+  return `/img/chr_ts/chr_ts_90_${characterId}_2.png`
+}
 
 const lastRefreshText = computed(() => {
   const acc = accountStore.currentAccount
@@ -361,11 +600,32 @@ const lastRefreshText = computed(() => {
 
 const suiteUploadTimeText = computed(() => accountStore.uploadTimeText)
 
-const hasLeaderCountData = computed(() => {
-  const missions = suiteData.value?.userCharacterMissionV2s
-  const statuses = suiteData.value?.userCharacterMissionV2Statuses
-  return Array.isArray(missions) && Array.isArray(statuses)
-})
+const suiteChallengeResults = computed(() => getArrayByKeys<any>(suiteData.value, suiteKeyMap.challengeResults))
+const suiteChallengeStages = computed(() => getArrayByKeys<any>(suiteData.value, suiteKeyMap.challengeStages))
+const suiteChallengeRewardClaims = computed(() => getArrayByKeys<any>(suiteData.value, suiteKeyMap.challengeRewardClaims))
+const suiteUserAreas = computed(() => getArrayByKeys<any>(suiteData.value, suiteKeyMap.userAreas))
+const suiteUserCharacters = computed(() => getArrayByKeys<any>(suiteData.value, suiteKeyMap.userCharacters))
+const suiteFixtureBonuses = computed(() => getArrayByKeys<any>(suiteData.value, suiteKeyMap.fixtureBonuses))
+const suiteUserGates = computed(() => getArrayByKeys<any>(suiteData.value, suiteKeyMap.userGates))
+const suiteUserBonds = computed(() => getArrayByKeys<any>(suiteData.value, suiteKeyMap.userBonds))
+const suiteLeaderMissions = computed(() => getArrayByKeys<CharacterMissionV2>(suiteData.value, suiteKeyMap.leaderMissions))
+const suiteLeaderStatuses = computed(() => getArrayByKeys<CharacterMissionV2Status>(suiteData.value, suiteKeyMap.leaderStatuses))
+
+const hasChallengeSuiteData = computed(() =>
+  hasArrayByKeys(suiteData.value, suiteKeyMap.challengeResults) &&
+  hasArrayByKeys(suiteData.value, suiteKeyMap.challengeStages) &&
+  hasArrayByKeys(suiteData.value, suiteKeyMap.challengeRewardClaims))
+
+const hasBonusSuiteData = computed(() =>
+  hasArrayByKeys(suiteData.value, suiteKeyMap.userAreas))
+
+const hasBondsSuiteData = computed(() =>
+  hasArrayByKeys(suiteData.value, suiteKeyMap.userBonds) &&
+  hasArrayByKeys(suiteData.value, suiteKeyMap.userCharacters))
+
+const hasLeaderCountData = computed(() =>
+  hasArrayByKeys(suiteData.value, suiteKeyMap.leaderMissions) &&
+  hasArrayByKeys(suiteData.value, suiteKeyMap.leaderStatuses))
 
 const leaderCountMaxPlayCount = computed(() => {
   const groups = characterMissionV2ParameterGroups.value
@@ -376,12 +636,8 @@ const leaderCountMaxPlayCount = computed(() => {
 })
 
 const leaderCountRows = computed<LeaderCountRow[]>(() => {
-  const missions = Array.isArray(suiteData.value?.userCharacterMissionV2s)
-    ? suiteData.value.userCharacterMissionV2s as CharacterMissionV2[]
-    : []
-  const statuses = Array.isArray(suiteData.value?.userCharacterMissionV2Statuses)
-    ? suiteData.value.userCharacterMissionV2Statuses as CharacterMissionV2Status[]
-    : []
+  const missions = suiteLeaderMissions.value
+  const statuses = suiteLeaderStatuses.value
   const maxPlayCount = leaderCountMaxPlayCount.value
 
   const exSeqPlayCountList = characterMissionV2ParameterGroups.value
@@ -407,8 +663,8 @@ const leaderCountRows = computed<LeaderCountRow[]>(() => {
   const exLevels = new Map<number, number>()
 
   for (const item of missions) {
-    const cid = Number(item.characterId)
-    const progress = Number(item.progress)
+    const cid = getNumber(item.characterId, NaN)
+    const progress = getNumber(item.progress, NaN)
     if (!Number.isFinite(cid) || !Number.isFinite(progress)) continue
     if (item.characterMissionType === 'play_live') {
       playCounts.set(cid, progress)
@@ -419,16 +675,12 @@ const leaderCountRows = computed<LeaderCountRow[]>(() => {
   }
 
   for (const status of statuses) {
-    if (Number(status.parameterGroupId) !== 101) continue
-    const cid = Number(status.characterId)
-    const seq = Number(status.seq)
+    if (getNumber(status.parameterGroupId) !== 101) continue
+    const cid = getNumber(status.characterId, NaN)
+    const seq = getNumber(status.seq, NaN)
     if (!Number.isFinite(cid) || !Number.isFinite(seq)) continue
-
-    const currentLevel = exLevels.get(cid) ?? 0
-    exLevels.set(cid, Math.max(currentLevel, seq))
-
-    const currentExCount = exCounts.get(cid) ?? 0
-    exCounts.set(cid, currentExCount + getExRequirementBySeq(seq))
+    exLevels.set(cid, Math.max(exLevels.get(cid) ?? 0, seq))
+    exCounts.set(cid, (exCounts.get(cid) ?? 0) + getExRequirementBySeq(seq))
   }
 
   const rows: LeaderCountRow[] = []
@@ -463,12 +715,507 @@ const leaderCountSummary = computed(() => {
   }
 })
 
-// 卡组数据
+const challengeMaxScore = computed(() => {
+  const rows = challengeLiveHighScoreRewards.value.map(item => getNumber(item.highScore))
+  return rows.length > 0 ? Math.max(...rows) : 1
+})
+
+const challengeRewardById = computed(() => {
+  const map = new Map<number, ChallengeLiveHighScoreRewardRow>()
+  for (const row of challengeLiveHighScoreRewards.value) {
+    map.set(getNumber(row.id), row)
+  }
+  return map
+})
+
+const resourceBoxByPurposeAndId = computed(() => {
+  const map = new Map<string, ResourceBoxRow>()
+  for (const box of resourceBoxes.value) {
+    const id = getNumber(box.id, NaN)
+    if (!Number.isFinite(id)) continue
+    const purpose = String((box as any).resourceBoxPurpose ?? '')
+    if (!purpose) continue
+    map.set(`${purpose}_${id}`, box)
+  }
+  return map
+})
+
+const challengeResourceBoxById = computed(() => {
+  const map = new Map<number, ResourceBoxRow>()
+  for (const box of resourceBoxes.value) {
+    const id = getNumber(box.id, NaN)
+    const purpose = String((box as any).resourceBoxPurpose ?? '')
+    if (!Number.isFinite(id) || purpose !== CHALLENGE_RESOURCE_BOX_PURPOSE) continue
+    if (!map.has(id)) map.set(id, box)
+  }
+  return map
+})
+
+const resourceBoxByIdFallback = computed(() => {
+  const map = new Map<number, ResourceBoxRow>()
+  for (const box of resourceBoxes.value) {
+    const id = getNumber(box.id, NaN)
+    if (!Number.isFinite(id) || map.has(id)) continue
+    map.set(id, box)
+  }
+  return map
+})
+
+const challengeRows = computed<ChallengeRow[]>(() => {
+  const resultByCid = new Map<number, number>()
+  const rankByCid = new Map<number, number>()
+  const completedByCid = new Map<number, Set<number>>()
+  const maxScore = challengeMaxScore.value
+
+  for (const row of suiteChallengeResults.value) {
+    const cid = getNumber(row.characterId, NaN)
+    const score = getNumber(row.highScore)
+    if (!Number.isFinite(cid)) continue
+    resultByCid.set(cid, score)
+  }
+
+  for (const row of suiteChallengeStages.value) {
+    const cid = getNumber(row.characterId, NaN)
+    const rank = getNumber(row.rank)
+    if (!Number.isFinite(cid)) continue
+    rankByCid.set(cid, Math.max(rankByCid.get(cid) ?? 0, rank))
+  }
+
+  for (const row of suiteChallengeRewardClaims.value) {
+    const rewardId = getNumber(row.challengeLiveHighScoreRewardId ?? row.challenge_live_high_score_reward_id, NaN)
+    if (!Number.isFinite(rewardId)) continue
+    let cid = getNumber(row.characterId ?? row.gameCharacterId ?? row.challengeLiveCharacterId, NaN)
+    if (!Number.isFinite(cid)) {
+      const reward = challengeRewardById.value.get(rewardId)
+      cid = getNumber(reward?.characterId, NaN)
+    }
+    if (!Number.isFinite(cid)) continue
+    const set = completedByCid.get(cid) ?? new Set<number>()
+    set.add(rewardId)
+    completedByCid.set(cid, set)
+  }
+
+  const rows: ChallengeRow[] = []
+  for (let cid = 1; cid <= 26; cid += 1) {
+    let remainJewel = 0
+    let remainFragment = 0
+    const completed = completedByCid.get(cid) ?? new Set<number>()
+
+    for (const reward of challengeLiveHighScoreRewards.value) {
+      if (getNumber(reward.characterId) !== cid) continue
+      if (completed.has(getNumber(reward.id))) continue
+      const boxId = getNumber(reward.resourceBoxId, NaN)
+      if (!Number.isFinite(boxId)) continue
+      const box =
+        challengeResourceBoxById.value.get(boxId) ??
+        resourceBoxByPurposeAndId.value.get(`${CHALLENGE_RESOURCE_BOX_PURPOSE}_${boxId}`) ??
+        resourceBoxByIdFallback.value.get(boxId)
+      for (const detail of box?.details ?? []) {
+        const resourceType = String((detail as any).resourceType ?? (detail as any).resource_type ?? '')
+        const quantity = getNumber((detail as any).resourceQuantity ?? (detail as any).resource_quantity)
+        const resourceId = getNumber((detail as any).resourceId ?? (detail as any).resource_id, NaN)
+        if (resourceType === 'jewel') {
+          remainJewel += quantity
+        } else if (resourceType === 'material' && resourceId === 15) {
+          remainFragment += quantity
+        }
+      }
+    }
+
+    const score = resultByCid.get(cid) ?? 0
+    rows.push({
+      characterId: cid,
+      rank: rankByCid.get(cid) ?? 0,
+      highScore: score,
+      remainJewel,
+      remainFragment,
+      progress: maxScore > 0 ? Math.max(0, Math.min(score / maxScore, 1)) : 0,
+    })
+  }
+  return rows
+})
+
+const challengeSummary = computed(() => {
+  const totalJewel = challengeRows.value.reduce((sum, row) => sum + row.remainJewel, 0)
+  const totalFragment = challengeRows.value.reduce((sum, row) => sum + row.remainFragment, 0)
+  return {
+    totalJewel,
+    totalFragment,
+  }
+})
+
+const areaItemLevelByKey = computed(() => {
+  const map = new Map<string, AreaItemLevelMasterRow>()
+  for (const row of areaItemLevels.value) {
+    map.set(`${getNumber(row.areaItemId)}_${getNumber(row.level)}`, row)
+  }
+  return map
+})
+
+const userCharacterRankMap = computed(() => {
+  const map = new Map<number, number>()
+  for (const item of suiteUserCharacters.value) {
+    const cid = getNumber(item.characterId, NaN)
+    const rank = getNumber(item.characterRank)
+    if (!Number.isFinite(cid)) continue
+    map.set(cid, rank)
+  }
+  if (map.size === 0) {
+    for (const item of profileData.value?.userCharacters ?? []) {
+      map.set(getNumber(item.characterId), getNumber(item.characterRank))
+    }
+  }
+  return map
+})
+
+const powerBonusCharacterRows = computed<PowerBonusCharacterView[]>(() => {
+  const charaMap = new Map<number, PowerBonusRow>()
+  for (let cid = 1; cid <= 26; cid += 1) {
+    charaMap.set(cid, { areaItem: 0, rank: 0, fixture: 0, total: 0 })
+  }
+
+  for (const area of suiteUserAreas.value) {
+    for (const areaItem of area.areaItems ?? []) {
+      const itemId = getNumber(areaItem.areaItemId, NaN)
+      const lv = getNumber(areaItem.level)
+      if (!Number.isFinite(itemId)) continue
+      const row = areaItemLevelByKey.value.get(`${itemId}_${lv}`)
+      if (!row) continue
+      const targetCid = getNumber(row.targetGameCharacterId, NaN)
+      if (Number.isFinite(targetCid) && targetCid > 0) {
+        const bonus = charaMap.get(targetCid)
+        if (bonus) bonus.areaItem += getNumber(row.power1BonusRate)
+      }
+    }
+  }
+
+  for (const [cid, rank] of userCharacterRankMap.value.entries()) {
+    const rankRow = characterRanks.value.find(item =>
+      getNumber(item.characterId) === cid && getNumber(item.characterRank) === rank)
+    if (!rankRow) continue
+    const bonus = charaMap.get(cid)
+    if (!bonus) continue
+    bonus.rank += getNumber(rankRow.power1BonusRate)
+  }
+
+  for (const item of suiteFixtureBonuses.value) {
+    const cid = getNumber(item.gameCharacterId, NaN)
+    if (!Number.isFinite(cid)) continue
+    const bonus = charaMap.get(cid)
+    if (!bonus) continue
+    bonus.fixture += getNumber(item.totalBonusRate) * 0.1
+  }
+
+  const rows: PowerBonusCharacterView[] = []
+  for (let cid = 1; cid <= 26; cid += 1) {
+    const bonus = charaMap.get(cid) ?? { areaItem: 0, rank: 0, fixture: 0, total: 0 }
+    bonus.total = bonus.areaItem + bonus.rank + bonus.fixture
+    rows.push({ characterId: cid, ...bonus })
+  }
+  return rows
+})
+
+const powerBonusUnitRows = computed<PowerBonusUnitView[]>(() => {
+  const unitMap = new Map<UnitKey, UnitBonusRow>()
+  for (const unit of unitOrder) {
+    unitMap.set(unit, { areaItem: 0, gate: 0, total: 0 })
+  }
+
+  for (const area of suiteUserAreas.value) {
+    for (const areaItem of area.areaItems ?? []) {
+      const itemId = getNumber(areaItem.areaItemId, NaN)
+      const lv = getNumber(areaItem.level)
+      if (!Number.isFinite(itemId)) continue
+      const row = areaItemLevelByKey.value.get(`${itemId}_${lv}`)
+      if (!row) continue
+      const targetUnit = String(row.targetUnit ?? 'any') as UnitKey | 'any'
+      if (targetUnit !== 'any' && unitMap.has(targetUnit)) {
+        const bonus = unitMap.get(targetUnit)!
+        bonus.areaItem += getNumber(row.power1BonusRate)
+      }
+    }
+  }
+
+  let maxGateBonus = 0
+  for (const gate of suiteUserGates.value) {
+    const gateId = getNumber(gate.mysekaiGateId, NaN)
+    const gateLevel = getNumber(gate.mysekaiGateLevel)
+    if (!Number.isFinite(gateId)) continue
+    const gateRow = mysekaiGateLevels.value.find(item =>
+      getNumber(item.mysekaiGateId) === gateId && getNumber(item.level) === gateLevel)
+    if (!gateRow) continue
+    const bonusRate = getNumber(gateRow.powerBonusRate)
+    maxGateBonus = Math.max(maxGateBonus, bonusRate)
+    const unit = unitOrder[Math.max(0, gateId - 1)]
+    if (!unit || !unitMap.has(unit)) continue
+    unitMap.get(unit)!.gate += bonusRate
+  }
+  unitMap.get('piapro')!.gate += maxGateBonus
+
+  return unitOrder.map(unit => {
+    const row = unitMap.get(unit)!
+    row.total = row.areaItem + row.gate
+    return { unit, ...row }
+  })
+})
+
+const powerBonusAttrRows = computed<PowerBonusAttrView[]>(() => {
+  const attrMap = new Map<AttrKey, AttrBonusRow>()
+  for (const attr of attrOrder) {
+    attrMap.set(attr, { areaItem: 0, total: 0 })
+  }
+  for (const area of suiteUserAreas.value) {
+    for (const areaItem of area.areaItems ?? []) {
+      const itemId = getNumber(areaItem.areaItemId, NaN)
+      const lv = getNumber(areaItem.level)
+      if (!Number.isFinite(itemId)) continue
+      const row = areaItemLevelByKey.value.get(`${itemId}_${lv}`)
+      if (!row) continue
+      const attr = String(row.targetCardAttr ?? 'any') as AttrKey | 'any'
+      if (attr !== 'any' && attrMap.has(attr)) {
+        const bonus = attrMap.get(attr)!
+        bonus.areaItem += getNumber(row.power1BonusRate)
+      }
+    }
+  }
+  return attrOrder.map(attr => {
+    const row = attrMap.get(attr)!
+    row.total = row.areaItem
+    return { attr, ...row }
+  })
+})
+
+const powerBonusCharacterGroupRows = computed<PowerBonusCharacterGroupView[]>(() => {
+  const grouped = new Map<UnitKey, PowerBonusCharacterView[]>()
+  for (const unit of unitOrder) {
+    grouped.set(unit, [])
+  }
+  for (const row of powerBonusCharacterRows.value) {
+    const unit = getCharaUnit(row.characterId)
+    grouped.get(unit)?.push(row)
+  }
+  return unitOrder.map(unit => ({
+    unit,
+    rows: grouped.get(unit) ?? [],
+  }))
+})
+
+const bondCharacterOptions = computed(() => [
+  { id: 0, name: 'Top25 总览' },
+  ...Array.from({ length: 26 }, (_, idx) => {
+    const id = idx + 1
+    return { id, name: getCharaName(id) }
+  }),
+])
+
+const bondMaxLevel = computed(() => {
+  const levelRows = levels.value
+    .filter(item => item.levelType === 'bonds')
+    .map(item => getNumber(item.level))
+  return levelRows.length > 0 ? Math.max(...levelRows) : 0
+})
+
+const bondTotalExpByLevel = computed(() => {
+  const map = new Map<number, number>()
+  for (const row of levels.value) {
+    if (row.levelType !== 'bonds') continue
+    map.set(getNumber(row.level), getNumber(row.totalExp))
+  }
+  return map
+})
+
+const bondHonorByGroupId = computed(() => {
+  const map = new Map<number, BondsHonorMasterRow[]>()
+  for (const row of bondsHonors.value) {
+    const groupId = getNumber(row.bondsGroupId, NaN)
+    if (!Number.isFinite(groupId)) continue
+    const list = map.get(groupId) ?? []
+    list.push(row)
+    map.set(groupId, list)
+  }
+  for (const [groupId, list] of map.entries()) {
+    const sorted = [...list].sort((a, b) => getNumber(a.id) - getNumber(b.id))
+    map.set(groupId, sorted)
+  }
+  return map
+})
+
+function getBondHonorRequiredRank(desc: unknown): number | null {
+  const text = String(desc ?? '')
+  if (!text) return null
+  const nums = text.match(/\d+/g)
+  if (!nums || nums.length === 0) return null
+  const value = Number(nums[nums.length - 1])
+  return Number.isFinite(value) ? value : null
+}
+
+const bondRows = computed<BondViewRow[]>(() => {
+  const bondRankMap = new Map<number, { rank: number; exp: number }>()
+  for (const row of suiteUserBonds.value) {
+    const groupId = getNumber(row.bondsGroupId ?? row.bondGroupId, NaN)
+    if (!Number.isFinite(groupId)) continue
+    bondRankMap.set(groupId, {
+      rank: getNumber(row.rank),
+      exp: getNumber(row.exp),
+    })
+  }
+
+  const rankMap = userCharacterRankMap.value
+  const allBondPairs: Array<{ groupId: number; c1: number; c2: number }> = []
+  const pairDedup = new Set<string>()
+  const unitToGameMap = gameCharacterIdByUnitId.value
+
+  const normalizeBondCharacterId = (value: number): number => {
+    if (!Number.isFinite(value) || value <= 0) return value
+    if (value > 26 && unitToGameMap.has(value)) {
+      return unitToGameMap.get(value) ?? value
+    }
+    return value
+  }
+
+  for (const row of bonds.value) {
+    const groupId = getNumber(row.groupId, NaN)
+    if (!Number.isFinite(groupId)) continue
+    const rawC1 = getNumber(row.characterId1, Math.floor(groupId / 100) % 100)
+    const rawC2 = getNumber(row.characterId2, groupId % 100)
+    const c1 = normalizeBondCharacterId(rawC1)
+    const c2 = normalizeBondCharacterId(rawC2)
+    if (c1 <= 0 || c2 <= 0) continue
+    const k1 = Math.min(c1, c2)
+    const k2 = Math.max(c1, c2)
+    const dedupKey = `${groupId}_${k1}_${k2}`
+    if (pairDedup.has(dedupKey)) continue
+    pairDedup.add(dedupKey)
+    allBondPairs.push({ groupId, c1, c2 })
+  }
+
+  let selectedPairs = allBondPairs
+  if (bondCharacterFilter.value > 0) {
+    selectedPairs = allBondPairs.filter(pair => pair.c1 === bondCharacterFilter.value || pair.c2 === bondCharacterFilter.value)
+      .map(pair => pair.c1 === bondCharacterFilter.value ? pair : { ...pair, c1: pair.c2, c2: pair.c1 })
+      .sort((a, b) => a.c2 - b.c2)
+  } else {
+    selectedPairs = [...allBondPairs]
+      .sort((a, b) => (bondRankMap.get(b.groupId)?.rank ?? 0) - (bondRankMap.get(a.groupId)?.rank ?? 0))
+      .slice(0, 25)
+      .map(pair => {
+        const rank1 = rankMap.get(pair.c1) ?? 0
+        const rank2 = rankMap.get(pair.c2) ?? 0
+        return rank1 >= rank2 ? pair : { ...pair, c1: pair.c2, c2: pair.c1 }
+      })
+  }
+
+  const maxLevel = bondMaxLevel.value
+  return selectedPairs.map(pair => {
+    const rank1 = rankMap.get(pair.c1) ?? 0
+    const rank2 = rankMap.get(pair.c2) ?? 0
+    const bondData = bondRankMap.get(pair.groupId)
+    const level = bondData?.rank ?? 0
+    const exp = bondData?.exp ?? 0
+
+    let needExpText = '-'
+    if (bondData) {
+      if (level >= maxLevel) {
+        needExpText = 'MAX'
+      } else {
+        const currentTotal = bondTotalExpByLevel.value.get(level) ?? 0
+        const nextTotal = bondTotalExpByLevel.value.get(level + 1) ?? currentTotal
+        const levelNeed = Math.max(0, nextTotal - currentTotal - exp)
+        needExpText = String(levelNeed)
+      }
+    }
+
+    const groupHonors = bondHonorByGroupId.value.get(pair.groupId) ?? []
+    let honorId: number | null = null
+    let honorLevel = 0
+    if (level > 0 && groupHonors.length > 0) {
+      const honorProgress = groupHonors.map(honor => {
+        const levels = Array.isArray(honor.levels) ? honor.levels : []
+        const unlockThreshold = levels.length > 0
+          ? (getBondHonorRequiredRank(levels[0]?.description) ?? Number.MAX_SAFE_INTEGER)
+          : Number.MAX_SAFE_INTEGER
+        const unlockedCount = levels.reduce((count, item) => {
+          const required = getBondHonorRequiredRank(item.description)
+          return required !== null && level >= required ? count + 1 : count
+        }, 0)
+        return {
+          honorId: getNumber(honor.id),
+          unlockThreshold,
+          unlockedCount,
+        }
+      })
+      const available = honorProgress
+        .filter(item => item.unlockedCount > 0)
+        .sort((a, b) => a.unlockThreshold - b.unlockThreshold)
+      const selected = available[available.length - 1]
+      if (selected) {
+        honorId = selected.honorId
+        honorLevel = selected.unlockedCount
+      }
+    }
+
+    return {
+      c1: pair.c1,
+      c2: pair.c2,
+      rank1,
+      rank2,
+      bondLevel: level,
+      needExpText,
+      progress: maxLevel > 0 ? Math.max(0, Math.min(level / maxLevel, 1)) : 0,
+      capBlocked: bondData ? (Math.min(rank1, rank2) <= level && level < maxLevel) : false,
+      honorId,
+      honorLevel,
+    }
+  })
+})
+
+const challengeCharaIcon = computed(() => {
+  if (!profileData.value?.userChallengeLiveSoloResult) return ''
+  return getCharaIcon(profileData.value.userChallengeLiveSoloResult.characterId)
+})
+
+const characterRows = computed(() => {
+  if (!profileData.value) return []
+  const chars = profileData.value.userCharacters
+  const rows: Array<Array<{ characterId: number; value: number }>> = []
+
+  const vs1 = [21, 22, 23, 24]
+    .map(id => {
+      const c = chars.find(ch => ch.characterId === id)
+      if (!c) return null
+      return { characterId: id, value: characterTab.value === 'rank' ? c.characterRank : getMaxStage(id) }
+    })
+    .filter(Boolean) as Array<{ characterId: number; value: number }>
+  if (vs1.length > 0) rows.push(vs1)
+
+  const vs2 = [25, 26]
+    .map(id => {
+      const c = chars.find(ch => ch.characterId === id)
+      if (!c) return null
+      return { characterId: id, value: characterTab.value === 'rank' ? c.characterRank : getMaxStage(id) }
+    })
+    .filter(Boolean) as Array<{ characterId: number; value: number }>
+  if (vs2.length > 0) rows.push(vs2)
+
+  for (let i = 1; i <= 20; i += 4) {
+    const row: Array<{ characterId: number; value: number }> = []
+    for (let j = i; j < i + 4 && j <= 20; j += 1) {
+      const c = chars.find(ch => ch.characterId === j)
+      if (!c) continue
+      row.push({
+        characterId: j,
+        value: characterTab.value === 'rank' ? c.characterRank : getMaxStage(j),
+      })
+    }
+    if (row.length > 0) rows.push(row)
+  }
+  return rows
+})
+
 const deckCards = computed(() => {
   if (!profileData.value) return []
   const deck = profileData.value.userDeck
   const memberIds = [deck.member1, deck.member2, deck.member3, deck.member4, deck.member5]
-
   return memberIds.map(cardId => {
     const userCard = profileData.value!.userCards.find(c => c.cardId === cardId)
     const masterCard = allCards.value.find(c => c.id === cardId)
@@ -487,76 +1234,11 @@ const deckCards = computed(() => {
   }>
 })
 
-// 难度统计排序
 const sortedClearCounts = computed(() => {
   if (!profileData.value) return []
   return difficultyOrder
     .map(d => profileData.value!.userMusicDifficultyClearCount.find(c => c.musicDifficultyType === d))
     .filter(Boolean) as ProfileData['userMusicDifficultyClearCount']
-})
-
-// 角色头像
-function getCharaIcon(characterId: number): string {
-  // 用 gameCharacterUnits 找到 unitId
-  const unit = gameCharacterUnits.value.find(u => u.gameCharacterId === characterId && u.id <= 26)
-  const unitId = unit?.id || characterId
-  if (unitId <= 20) return `/img/chr_ts/chr_ts_90_${unitId}.png`
-  if (characterId === 21) return unitId === 21 ? '/img/chr_ts/chr_ts_90_21.png' : `/img/chr_ts/chr_ts_90_21_${unitId - 25}.png`
-  return `/img/chr_ts/chr_ts_90_${characterId}_2.png`
-}
-
-// 挑战Live最高角色图标
-const challengeCharaIcon = computed(() => {
-  if (!profileData.value?.userChallengeLiveSoloResult) return ''
-  return getCharaIcon(profileData.value.userChallengeLiveSoloResult.characterId)
-})
-
-// 角色分组：21-24一行, 25-26一行, 1-20每行四个
-const characterRows = computed(() => {
-  if (!profileData.value) return []
-  const chars = profileData.value.userCharacters
-  const rows: Array<Array<{ characterId: number; value: number }>> = []
-
-  // VS row 1: 21-24
-  const vs1 = [21, 22, 23, 24]
-    .map(id => {
-      const c = chars.find(ch => ch.characterId === id)
-      if (!c) return null
-      const value = characterTab.value === 'rank'
-        ? c.characterRank
-        : getMaxStage(id)
-      return { characterId: id, value }
-    })
-    .filter(Boolean) as Array<{ characterId: number; value: number }>
-  if (vs1.length > 0) rows.push(vs1)
-
-  // VS row 2: 25-26
-  const vs2 = [25, 26]
-    .map(id => {
-      const c = chars.find(ch => ch.characterId === id)
-      if (!c) return null
-      const value = characterTab.value === 'rank'
-        ? c.characterRank
-        : getMaxStage(id)
-      return { characterId: id, value }
-    })
-    .filter(Boolean) as Array<{ characterId: number; value: number }>
-  if (vs2.length > 0) rows.push(vs2)
-
-  // 1-20: 每行4个
-  for (let i = 1; i <= 20; i += 4) {
-    const row = []
-    for (let j = i; j < i + 4 && j <= 20; j++) {
-      const c = chars.find(ch => ch.characterId === j)
-      if (!c) continue
-      const value = characterTab.value === 'rank'
-        ? c.characterRank
-        : getMaxStage(j)
-      row.push({ characterId: j, value })
-    }
-    if (row.length > 0) rows.push(row)
-  }
-  return rows
 })
 
 function getMaxStage(characterId: number): number {
@@ -578,15 +1260,23 @@ async function getFirstAvailableMaster<T = any>(names: string[]): Promise<T[]> {
   return []
 }
 
-function openLeaderCountModal() {
-  leaderCountModalRef.value?.showModal()
-}
-
-// ==================== 初始化 ====================
 onMounted(async () => {
   try {
     if (!masterStore.isReady) await masterStore.initialize()
-    const [cardsData, unitsData, charactersData, missionParamGroups] = await Promise.all([
+    const [
+      cardsData,
+      unitsData,
+      charactersData,
+      missionParamGroups,
+      challengeRewardRows,
+      resourceBoxRows,
+      areaItemLevelRows,
+      characterRankRows,
+      gateLevelRows,
+      bondRowsMaster,
+      levelRows,
+      bondHonorRows,
+    ] = await Promise.all([
       masterStore.getMaster<CardInfo>('cards'),
       masterStore.getMaster<GameCharacterUnit>('gameCharacterUnits'),
       masterStore.getMaster<GameCharacter>('gameCharacters'),
@@ -594,11 +1284,31 @@ onMounted(async () => {
         'characterMissionV2ParameterGroups',
         'character_mission_v2_parameter_groups',
       ]),
+      getFirstAvailableMaster<ChallengeLiveHighScoreRewardRow>([
+        'challengeLiveHighScoreRewards',
+        'challenge_live_high_score_rewards',
+      ]),
+      getFirstAvailableMaster<ResourceBoxRow>(['resourceBoxes', 'resource_boxes']),
+      getFirstAvailableMaster<AreaItemLevelMasterRow>(['areaItemLevels', 'area_item_levels']),
+      getFirstAvailableMaster<CharacterRankRow>(['characterRanks', 'character_ranks']),
+      getFirstAvailableMaster<MysekaiGateLevelRow>(['mysekaiGateLevels', 'mysekai_gate_levels']),
+      getFirstAvailableMaster<BondMasterRow>(['bonds']),
+      getFirstAvailableMaster<LevelMasterRow>(['levels']),
+      getFirstAvailableMaster<BondsHonorMasterRow>(['bondsHonors', 'bonds_honors']),
     ])
+
     allCards.value = cardsData
     gameCharacterUnits.value = unitsData
     gameCharacters.value = charactersData
     characterMissionV2ParameterGroups.value = missionParamGroups
+    challengeLiveHighScoreRewards.value = challengeRewardRows
+    resourceBoxes.value = resourceBoxRows
+    areaItemLevels.value = areaItemLevelRows
+    characterRanks.value = characterRankRows
+    mysekaiGateLevels.value = gateLevelRows
+    bonds.value = bondRowsMaster
+    levels.value = levelRows
+    bondsHonors.value = bondHonorRows
   } catch (e) {
     console.error('加载master数据失败:', e)
   }
@@ -772,110 +1482,27 @@ watch(currentUserId, async (newId) => {
         </form>
       </dialog>
 
-      <dialog ref="leaderCountModalRef" class="modal">
-        <div class="modal-box max-w-none w-[min(1400px,92vw)] h-[90vh] p-0 overflow-hidden">
-          <div class="h-full flex flex-col">
-            <div class="px-4 md:px-5 py-3 border-b border-base-300 flex items-start gap-3">
-              <div class="min-w-0">
-                <h3 class="text-xl font-semibold">队长次数视图</h3>
-                <p class="text-xs text-base-content/60 mt-1">全屏展示角色队长次数、EX等级和EX次数</p>
-              </div>
-              <div class="ml-auto flex items-center gap-2">
-                <span v-if="leaderCountMaxPlayCount > 0" class="badge badge-ghost">上限 {{ leaderCountMaxPlayCount.toLocaleString() }}</span>
-                <form method="dialog">
-                  <button class="btn btn-sm btn-ghost btn-circle" aria-label="关闭队长次数视图">
-                    <X class="w-4 h-4" />
-                  </button>
-                </form>
-              </div>
-            </div>
-
-            <div v-if="hasLeaderCountData" class="px-4 md:px-5 py-3 border-b border-base-300">
-              <div class="max-w-6xl mx-auto grid grid-cols-2 lg:grid-cols-4 gap-2">
-              <div class="rounded-lg bg-base-200 px-3 py-2">
-                <p class="text-[11px] text-base-content/60">角色数据</p>
-                <p class="text-lg font-semibold">{{ leaderCountSummary.availableRows }} / 26</p>
-              </div>
-              <div class="rounded-lg bg-base-200 px-3 py-2">
-                <p class="text-[11px] text-base-content/60">总队长次数</p>
-                <p class="text-lg font-semibold">{{ leaderCountSummary.totalPlayCount.toLocaleString() }}</p>
-              </div>
-              <div class="rounded-lg bg-base-200 px-3 py-2">
-                <p class="text-[11px] text-base-content/60">总EX次数</p>
-                <p class="text-lg font-semibold">{{ leaderCountSummary.totalExCount.toLocaleString() }}</p>
-              </div>
-              <div class="rounded-lg bg-base-200 px-3 py-2">
-                <p class="text-[11px] text-base-content/60">最高队长次数</p>
-                <p class="text-lg font-semibold">{{ leaderCountSummary.maxPlayCount.toLocaleString() }}</p>
-              </div>
-              </div>
-            </div>
-
-            <div class="flex-1 overflow-auto p-3 md:p-4">
-              <div v-if="!hasLeaderCountData" class="alert alert-info">
-                <span class="text-sm">当前账号没有可用的队长次数数据，请先点击“刷新Suite”。</span>
-              </div>
-              <div v-else class="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-                <div
-                  v-for="row in leaderCountRows"
-                  :key="row.characterId"
-                  class="rounded-2xl border border-base-300 bg-base-100 px-3 py-2.5 shadow-sm"
-                >
-                  <div class="flex items-center gap-2.5 mb-2.5">
-                    <div class="w-10 h-10 rounded-full overflow-hidden ring-2 flex-shrink-0" :style="{ borderColor: getCharaPillColor(row.characterId) }">
-                      <img :src="getCharaIcon(row.characterId)" class="w-full h-full object-cover" />
-                    </div>
-                    <div>
-                      <p class="text-base font-bold">{{ getCharaName(row.characterId) }}</p>
-                      <p class="text-xs text-base-content/60">ID: {{ row.characterId }}</p>
-                    </div>
-                  </div>
-
-                  <div class="grid grid-cols-3 gap-2 mb-2.5">
-                    <div class="rounded-lg bg-base-200 px-2 py-1.5 text-center">
-                      <p class="text-[11px] text-base-content/60">队长次数</p>
-                      <p class="font-semibold">{{ row.playCount === null ? '-' : row.playCount.toLocaleString() }}</p>
-                    </div>
-                    <div class="rounded-lg bg-base-200 px-2 py-1.5 text-center">
-                      <p class="text-[11px] text-base-content/60">EX等级</p>
-                      <p class="font-semibold">{{ row.exLevel === null ? '-' : `x${row.exLevel}` }}</p>
-                    </div>
-                    <div class="rounded-lg bg-base-200 px-2 py-1.5 text-center">
-                      <p class="text-[11px] text-base-content/60">EX次数</p>
-                      <p class="font-semibold">{{ row.exCount === null ? '-' : row.exCount.toLocaleString() }}</p>
-                    </div>
-                  </div>
-
-                  <div class="space-y-1">
-                    <div class="flex items-center justify-between text-[11px] text-base-content/60">
-                      <span>进度</span>
-                      <span>{{ (row.progress * 100).toFixed(1) }}%</span>
-                    </div>
-                    <div class="w-full h-3 rounded-full bg-base-300 overflow-hidden">
-                      <div
-                        class="h-full rounded-full transition-all duration-300"
-                        :style="{
-                          width: `${(row.progress * 100).toFixed(2)}%`,
-                          backgroundColor: getLeaderProgressColor(row.playCount || 0),
-                        }"
-                      ></div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+      <!-- ==================== Profile 展示 ==================== -->
+      <template v-if="profileData">
+        <div class="card bg-base-100 shadow-lg">
+          <div class="card-body py-3">
+            <div class="tabs tabs-boxed w-fit">
+              <button
+                v-for="item in profileTabs"
+                :key="item.key"
+                class="tab tab-sm"
+                :class="{ 'tab-active': profileTab === item.key }"
+                @click="profileTab = item.key"
+              >
+                {{ item.label }}
+              </button>
             </div>
           </div>
         </div>
-        <form method="dialog" class="modal-backdrop">
-          <button>close</button>
-        </form>
-      </dialog>
 
-      <!-- ==================== Profile 展示 ==================== -->
-      <template v-if="profileData">
-        <div class="grid grid-cols-1 min-[1150px]:grid-cols-2 gap-6">
+        <div class="grid grid-cols-1 gap-6" :class="{ 'min-[1150px]:grid-cols-2': profileTab === 'basic' }">
           <!-- ========== 左侧：用户信息 ========== -->
-          <div class="space-y-6">
+          <div v-if="profileTab === 'basic'" class="space-y-6">
             <!-- 用户基本信息 -->
             <div class="card bg-base-100 shadow-lg">
               <div class="card-body">
@@ -1063,108 +1690,374 @@ watch(currentUserId, async (newId) => {
 
           <!-- ========== 右侧：成就与角色 ========== -->
           <div class="space-y-6">
-            <!-- MULTI LIVE -->
-            <div class="card bg-base-100 shadow-lg">
-              <div class="card-body">
-                <h3 class="text-lg font-medium mb-3 flex items-center gap-2">
-                  <Trophy class="w-5 h-5 text-primary" />
-                  MULTI LIVE
-                </h3>
-                <div class="flex gap-6 justify-center">
-                  <div class="text-center">
-                    <div class="badge badge-primary badge-lg mb-1">MVP</div>
-                    <div class="text-2xl font-bold">{{ profileData.userMultiLiveTopScoreCount.mvp.toLocaleString() }}<span class="text-sm text-base-content/60 ml-1">回</span></div>
-                  </div>
-                  <div class="text-center">
-                    <div class="badge badge-secondary badge-lg mb-1">SUPER STAR</div>
-                    <div class="text-2xl font-bold">{{ profileData.userMultiLiveTopScoreCount.superStar.toLocaleString() }}<span class="text-sm text-base-content/60 ml-1">回</span></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- CHALLENGE LIVE -->
-            <div class="card bg-base-100 shadow-lg">
-              <div class="card-body">
-                <h3 class="text-lg font-medium mb-3 flex items-center gap-2">
-                  <Star class="w-5 h-5 text-primary" />
-                  CHALLENGE LIVE
-                </h3>
-                <div class="flex items-center gap-4 justify-center">
-                  <span class="badge badge-primary badge-lg">SOLO</span>
-                  <div v-if="challengeCharaIcon" class="w-10 h-10 rounded-full overflow-hidden ring-2 ring-primary">
-                    <img :src="challengeCharaIcon" class="w-full h-full object-cover" />
-                  </div>
-                  <span class="text-2xl font-bold">{{ (profileData.userChallengeLiveSoloResult?.highScore || 0).toLocaleString() }}</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- 角色等级 / 挑战Live Stage -->
-            <div class="card bg-base-100 shadow-lg">
-              <div class="card-body">
-                <h3 class="text-lg font-medium mb-3">
-                  {{ characterTab === 'rank' ? 'CHARACTER RANK' : 'CHALLENGE LIVE STAGE' }}
-                </h3>
-                <!-- Tab 切换 -->
-                <div class="tabs tabs-boxed mb-4 justify-center">
-                  <button
-                    class="tab"
-                    :class="{ 'tab-active': characterTab === 'rank' }"
-                    @click="characterTab = 'rank'"
-                  >
-                    角色等级
-                  </button>
-                  <button
-                    class="tab"
-                    :class="{ 'tab-active': characterTab === 'stage' }"
-                    @click="characterTab = 'stage'"
-                  >
-                    挑战Live Stage
-                  </button>
-                </div>
-
-                <!-- 角色网格 (pill layout, fill width) -->
-                <div class="space-y-2">
-                  <div
-                    v-for="(row, rowIdx) in characterRows"
-                    :key="rowIdx"
-                    class="grid grid-cols-4 gap-2"
-                  >
-                    <div
-                      v-for="item in row"
-                      :key="item.characterId"
-                      class="flex items-center gap-1 rounded-full pr-3"
-                      :style="{ backgroundColor: getCharaPillColor(item.characterId) + '40' }"
-                    >
-                      <div class="w-9 h-9 rounded-full overflow-hidden ring-2 flex-shrink-0" :style="{ borderColor: getCharaPillColor(item.characterId) }">
-                        <img :src="getCharaIcon(item.characterId)" class="w-full h-full object-cover" />
-                      </div>
-                      <span class="text-sm font-bold flex-1 text-center">{{ item.value }}</span>
+            <template v-if="profileTab === 'basic'">
+              <!-- MULTI LIVE -->
+              <div class="card bg-base-100 shadow-lg">
+                <div class="card-body">
+                  <h3 class="text-lg font-medium mb-3 flex items-center gap-2">
+                    <Trophy class="w-5 h-5 text-primary" />
+                    MULTI LIVE
+                  </h3>
+                  <div class="flex gap-6 justify-center">
+                    <div class="text-center">
+                      <div class="badge badge-primary badge-lg mb-1">MVP</div>
+                      <div class="text-2xl font-bold">{{ profileData.userMultiLiveTopScoreCount.mvp.toLocaleString() }}<span class="text-sm text-base-content/60 ml-1">回</span></div>
+                    </div>
+                    <div class="text-center">
+                      <div class="badge badge-secondary badge-lg mb-1">SUPER STAR</div>
+                      <div class="text-2xl font-bold">{{ profileData.userMultiLiveTopScoreCount.superStar.toLocaleString() }}<span class="text-sm text-base-content/60 ml-1">回</span></div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            <div class="card bg-base-100 shadow-lg">
-              <div class="card-body">
-                <div class="flex items-center gap-3">
-                  <div>
-                    <h3 class="text-lg font-medium">队长次数</h3>
-                    <p class="text-xs text-base-content/60 mt-0.5">点击按钮打开队长次数视图</p>
+              <!-- CHALLENGE LIVE -->
+              <div class="card bg-base-100 shadow-lg">
+                <div class="card-body">
+                  <h3 class="text-lg font-medium mb-3 flex items-center gap-2">
+                    <Star class="w-5 h-5 text-primary" />
+                    CHALLENGE LIVE
+                  </h3>
+                  <div class="flex items-center gap-4 justify-center">
+                    <span class="badge badge-primary badge-lg">SOLO</span>
+                    <div v-if="challengeCharaIcon" class="w-10 h-10 rounded-full overflow-hidden ring-2 ring-primary">
+                      <img :src="challengeCharaIcon" class="w-full h-full object-cover" />
+                    </div>
+                    <span class="text-2xl font-bold">{{ (profileData.userChallengeLiveSoloResult?.highScore || 0).toLocaleString() }}</span>
                   </div>
-                  <button
-                    class="btn btn-primary btn-sm ml-auto"
-                    :disabled="!hasLeaderCountData"
-                    @click="openLeaderCountModal"
-                  >
-                    全屏查看
-                  </button>
                 </div>
-                <p v-if="!hasLeaderCountData" class="text-xs text-base-content/60 mt-2">
-                  需要先点击上方“刷新Suite”才能查看队长次数。
-                </p>
+              </div>
+
+              <!-- 角色等级 / 挑战Live Stage -->
+              <div class="card bg-base-100 shadow-lg">
+                <div class="card-body">
+                  <h3 class="text-lg font-medium mb-3">
+                    {{ characterTab === 'rank' ? 'CHARACTER RANK' : 'CHALLENGE LIVE STAGE' }}
+                  </h3>
+                  <!-- Tab 切换 -->
+                  <div class="tabs tabs-boxed mb-4 justify-center">
+                    <button
+                      class="tab"
+                      :class="{ 'tab-active': characterTab === 'rank' }"
+                      @click="characterTab = 'rank'"
+                    >
+                      角色等级
+                    </button>
+                    <button
+                      class="tab"
+                      :class="{ 'tab-active': characterTab === 'stage' }"
+                      @click="characterTab = 'stage'"
+                    >
+                      挑战Live Stage
+                    </button>
+                  </div>
+
+                  <!-- 角色网格 (pill layout, fill width) -->
+                  <div class="space-y-2">
+                    <div
+                      v-for="(row, rowIdx) in characterRows"
+                      :key="rowIdx"
+                      class="grid grid-cols-4 gap-2"
+                    >
+                      <div
+                        v-for="item in row"
+                        :key="item.characterId"
+                        class="flex items-center gap-1 rounded-full pr-3"
+                        :style="{ backgroundColor: getCharaPillColor(item.characterId) + '40' }"
+                      >
+                        <div class="w-9 h-9 rounded-full overflow-hidden ring-2 flex-shrink-0" :style="{ borderColor: getCharaPillColor(item.characterId) }">
+                          <img :src="getCharaIcon(item.characterId)" class="w-full h-full object-cover" />
+                        </div>
+                        <span class="text-sm font-bold flex-1 text-center">{{ item.value }}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </template>
+
+            <div v-if="profileTab !== 'basic'" class="space-y-3">
+              <h3 class="text-lg font-medium">{{ currentProfileTabLabel }}</h3>
+
+              <div v-if="profileTab === 'challenge'" class="space-y-3">
+                <div v-if="!hasChallengeSuiteData" class="alert alert-info py-2">
+                  <span class="text-sm">当前账号缺少挑战信息数据，请先点击上方“刷新Suite”。</span>
+                </div>
+                <template v-else>
+                  <div class="grid grid-cols-2 gap-2">
+                    <div class="rounded-lg bg-base-200 px-3 py-2">
+                      <p class="text-[11px] text-base-content/60">剩余水晶</p>
+                      <p class="text-lg font-semibold text-success">{{ challengeSummary.totalJewel.toLocaleString() }}</p>
+                    </div>
+                    <div class="rounded-lg bg-base-200 px-3 py-2">
+                      <p class="text-[11px] text-base-content/60">剩余碎片(材料15)</p>
+                      <p class="text-lg font-semibold text-warning">{{ challengeSummary.totalFragment.toLocaleString() }}</p>
+                    </div>
+                  </div>
+                  <div class="rounded-xl border border-base-300 bg-base-100">
+                    <div class="overflow-x-auto">
+                      <table class="table table-zebra table-sm">
+                        <thead>
+                          <tr>
+                            <th>角色</th>
+                            <th>等级</th>
+                            <th>分数</th>
+                            <th>进度(上限{{ Math.floor(challengeMaxScore / 10000) }}w)</th>
+                            <th>水晶</th>
+                            <th>碎片</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr v-for="row in challengeRows" :key="`challenge-${row.characterId}`">
+                            <td>
+                              <div class="flex items-center gap-2">
+                                <img :src="getCharaIcon(row.characterId)" class="w-8 h-8 rounded-full ring-1 ring-base-300" />
+                                <span>{{ getCharaName(row.characterId) }}</span>
+                              </div>
+                            </td>
+                            <td class="font-semibold">{{ row.rank || '-' }}</td>
+                            <td class="font-semibold">{{ row.highScore ? row.highScore.toLocaleString() : '-' }}</td>
+                            <td class="min-w-[180px]">
+                              <div class="space-y-1">
+                                <div class="w-full h-2.5 rounded-full bg-base-300 overflow-hidden">
+                                  <div
+                                    class="h-full rounded-full"
+                                    :style="{
+                                      width: `${(row.progress * 100).toFixed(2)}%`,
+                                      backgroundColor: getChallengeProgressColor(row.highScore),
+                                    }"
+                                  ></div>
+                                </div>
+                                <div class="text-[11px] text-base-content/60 text-right">{{ formatPercent(row.progress * 100) }}</div>
+                              </div>
+                            </td>
+                            <td class="font-medium text-success">{{ row.remainJewel.toLocaleString() }}</td>
+                            <td class="font-medium text-warning">{{ row.remainFragment.toLocaleString() }}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </template>
+              </div>
+
+              <div v-else-if="profileTab === 'bonus'" class="space-y-3">
+                <div v-if="!hasBonusSuiteData" class="alert alert-info py-2">
+                  <span class="text-sm">当前账号缺少加成信息数据，请先点击上方“刷新Suite”。</span>
+                </div>
+                <template v-else>
+                  <div class="grid gap-3 lg:grid-cols-2">
+                    <div
+                      v-for="group in powerBonusCharacterGroupRows"
+                      :key="`bonus-group-${group.unit}`"
+                      class="rounded-xl border border-base-300 bg-base-100 p-3 shadow-sm"
+                    >
+                      <div class="mb-2 flex items-center gap-2">
+                        <img :src="getUnitLogo(group.unit)" class="h-5 w-auto object-contain" />
+                        <p class="text-sm font-semibold">{{ unitLabelMap[group.unit] }}</p>
+                      </div>
+                      <div class="grid gap-2 sm:grid-cols-2">
+                        <div
+                          v-for="row in group.rows"
+                          :key="`bonus-chara-${group.unit}-${row.characterId}`"
+                          class="rounded-lg bg-base-200/70 px-2.5 py-2"
+                        >
+                          <div class="flex items-center gap-2">
+                            <img :src="getCharaIcon(row.characterId)" class="w-8 h-8 rounded-full ring-1 ring-base-300" />
+                            <div class="min-w-0">
+                              <p class="text-[11px] text-base-content/65 leading-none">{{ getCharaName(row.characterId) }}</p>
+                              <p class="text-2xl leading-none font-bold text-success mt-1">{{ formatPercent(row.total) }}</p>
+                            </div>
+                          </div>
+                          <p class="mt-1 text-[11px] leading-4 text-base-content/70 break-all">
+                            区域道具{{ formatPercent(row.areaItem) }} + 角色等级{{ formatPercent(row.rank) }} + 烤森玩偶{{ formatPercent(row.fixture) }}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="grid gap-3 xl:grid-cols-2">
+                    <div class="rounded-xl border border-base-300 bg-base-100 p-3 shadow-sm">
+                      <p class="text-sm font-semibold">组合总加成</p>
+                      <div class="mt-2 grid gap-2 sm:grid-cols-2">
+                        <div
+                          v-for="row in powerBonusUnitRows"
+                          :key="`bonus-unit-${row.unit}`"
+                          class="rounded-lg bg-base-200/70 px-2.5 py-2"
+                        >
+                          <div class="flex items-center justify-between gap-2">
+                            <div class="flex items-center gap-2 min-w-0">
+                              <img :src="getUnitLogo(row.unit)" class="h-5 w-auto object-contain" />
+                              <span class="text-xs truncate">{{ unitLabelMap[row.unit] }}</span>
+                            </div>
+                            <span class="text-lg font-bold text-success">{{ formatPercent(row.total) }}</span>
+                          </div>
+                          <p class="mt-1 text-[11px] text-base-content/70">区域道具{{ formatPercent(row.areaItem) }} + 烤森门{{ formatPercent(row.gate) }}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="rounded-xl border border-base-300 bg-base-100 p-3 shadow-sm">
+                      <p class="text-sm font-semibold">属性总加成</p>
+                      <div class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                        <div
+                          v-for="row in powerBonusAttrRows"
+                          :key="`bonus-attr-${row.attr}`"
+                          class="rounded-lg bg-base-200/70 px-2.5 py-2"
+                        >
+                          <div class="flex items-center justify-between gap-2">
+                            <div class="flex items-center gap-2">
+                              <img :src="getAttrIcon(row.attr)" class="w-5 h-5 object-contain" />
+                              <span class="text-xs">{{ row.attr }}</span>
+                            </div>
+                            <span class="font-bold text-success">{{ formatPercent(row.total) }}</span>
+                          </div>
+                          <p class="mt-1 text-[11px] text-base-content/70">区域道具{{ formatPercent(row.areaItem) }}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </template>
+              </div>
+
+              <div v-else-if="profileTab === 'bonds'" class="space-y-3">
+                <div v-if="!hasBondsSuiteData" class="alert alert-info py-2">
+                  <span class="text-sm">当前账号缺少牵绊等级数据，请先点击上方“刷新Suite”。</span>
+                </div>
+                <template v-else>
+                  <div class="flex flex-wrap gap-2 items-center">
+                    <select v-model.number="bondCharacterFilter" class="select select-bordered select-xs">
+                      <option v-for="item in bondCharacterOptions" :key="`bond-filter-${item.id}`" :value="item.id">{{ item.name }}</option>
+                    </select>
+                  </div>
+                  <div class="rounded-xl border border-base-300 bg-base-100">
+                    <div class="overflow-x-auto">
+                      <table class="table table-zebra table-sm">
+                        <thead>
+                          <tr>
+                            <th>角色</th>
+                            <th>角色等级</th>
+                            <th>牵绊等级</th>
+                            <th>进度</th>
+                            <th>升级经验</th>
+                            <th>牵绊徽章</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr v-for="row in bondRows" :key="`bond-${row.c1}-${row.c2}`">
+                            <td>
+                              <div class="flex items-center">
+                                <img :src="getCharaIcon(row.c1)" class="w-8 h-8 rounded-full ring-1 ring-base-300" />
+                                <img :src="getCharaIcon(row.c2)" class="w-8 h-8 rounded-full ring-1 ring-base-300 -ml-2" />
+                                <span class="ml-2 text-xs">{{ getCharaName(row.c1) }} × {{ getCharaName(row.c2) }}</span>
+                              </div>
+                            </td>
+                            <td>
+                              <span :class="row.capBlocked ? 'text-error font-semibold' : ''">{{ row.rank1 }} & {{ row.rank2 }}</span>
+                            </td>
+                            <td>
+                              <span :class="row.capBlocked ? 'text-error font-semibold' : 'font-semibold'">{{ row.bondLevel || '-' }}</span>
+                            </td>
+                            <td class="min-w-[170px]">
+                              <div class="space-y-1">
+                                <div class="w-full h-2.5 rounded-full bg-base-300 overflow-hidden">
+                                  <div class="h-full rounded-full bg-info" :style="{ width: `${(row.progress * 100).toFixed(2)}%` }"></div>
+                                </div>
+                                <div class="text-[11px] text-base-content/60 text-right">{{ (row.progress * 100).toFixed(1) }}%</div>
+                              </div>
+                            </td>
+                            <td class="font-medium">{{ row.needExpText }}</td>
+                            <td>
+                              <div v-if="row.honorId && row.honorLevel > 0" class="h-8">
+                                <SekaiHonorBonds
+                                  :honor-id="row.honorId"
+                                  :honor-level="row.honorLevel"
+                                  :sub="true"
+                                />
+                              </div>
+                              <span v-else class="text-xs text-base-content/50">-</span>
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </template>
+              </div>
+
+              <div v-else class="space-y-3">
+                <div v-if="!hasLeaderCountData" class="alert alert-info py-2">
+                  <span class="text-sm">当前账号缺少队长次数数据，请先点击上方“刷新Suite”。</span>
+                </div>
+                <template v-else>
+                  <div class="grid grid-cols-2 lg:grid-cols-4 gap-2">
+                    <div class="rounded-lg bg-base-200 px-3 py-2">
+                      <p class="text-[11px] text-base-content/60">角色数据</p>
+                      <p class="text-lg font-semibold">{{ leaderCountSummary.availableRows }} / 26</p>
+                    </div>
+                    <div class="rounded-lg bg-base-200 px-3 py-2">
+                      <p class="text-[11px] text-base-content/60">总队长次数</p>
+                      <p class="text-lg font-semibold">{{ leaderCountSummary.totalPlayCount.toLocaleString() }}</p>
+                    </div>
+                    <div class="rounded-lg bg-base-200 px-3 py-2">
+                      <p class="text-[11px] text-base-content/60">总EX次数</p>
+                      <p class="text-lg font-semibold">{{ leaderCountSummary.totalExCount.toLocaleString() }}</p>
+                    </div>
+                    <div class="rounded-lg bg-base-200 px-3 py-2">
+                      <p class="text-[11px] text-base-content/60">最高队长次数</p>
+                      <p class="text-lg font-semibold">{{ leaderCountSummary.maxPlayCount.toLocaleString() }}</p>
+                    </div>
+                  </div>
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-3 pr-1">
+                    <div
+                      v-for="row in leaderCountRows"
+                      :key="row.characterId"
+                      class="rounded-2xl border border-base-300 bg-base-100 px-3 py-2.5 shadow-sm"
+                    >
+                      <div class="flex items-center gap-2.5 mb-2.5">
+                        <div class="w-10 h-10 rounded-full overflow-hidden ring-2 flex-shrink-0" :style="{ borderColor: getCharaPillColor(row.characterId) }">
+                          <img :src="getCharaIcon(row.characterId)" class="w-full h-full object-cover" />
+                        </div>
+                        <div>
+                          <p class="text-base font-bold">{{ getCharaName(row.characterId) }}</p>
+                          <p class="text-xs text-base-content/60">ID: {{ row.characterId }}</p>
+                        </div>
+                      </div>
+
+                      <div class="grid grid-cols-3 gap-2 mb-2.5">
+                        <div class="rounded-lg bg-base-200 px-2 py-1.5 text-center">
+                          <p class="text-[11px] text-base-content/60">队长次数</p>
+                          <p class="font-semibold">{{ row.playCount === null ? '-' : row.playCount.toLocaleString() }}</p>
+                        </div>
+                        <div class="rounded-lg bg-base-200 px-2 py-1.5 text-center">
+                          <p class="text-[11px] text-base-content/60">EX等级</p>
+                          <p class="font-semibold">{{ row.exLevel === null ? '-' : `x${row.exLevel}` }}</p>
+                        </div>
+                        <div class="rounded-lg bg-base-200 px-2 py-1.5 text-center">
+                          <p class="text-[11px] text-base-content/60">EX次数</p>
+                          <p class="font-semibold">{{ row.exCount === null ? '-' : row.exCount.toLocaleString() }}</p>
+                        </div>
+                      </div>
+
+                      <div class="space-y-1">
+                        <div class="flex items-center justify-between text-[11px] text-base-content/60">
+                          <span>进度</span>
+                          <span>{{ (row.progress * 100).toFixed(1) }}%</span>
+                        </div>
+                        <div class="w-full h-3 rounded-full bg-base-300 overflow-hidden">
+                          <div
+                            class="h-full rounded-full transition-all duration-300"
+                            :style="{
+                              width: `${(row.progress * 100).toFixed(2)}%`,
+                              backgroundColor: getLeaderProgressColor(row.playCount || 0),
+                            }"
+                          ></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </template>
               </div>
             </div>
           </div>
@@ -1248,4 +2141,5 @@ watch(currentUserId, async (newId) => {
   background-color: #c39bd3;
   color: #fff;
 }
+
 </style>
