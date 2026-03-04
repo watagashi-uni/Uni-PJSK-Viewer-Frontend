@@ -139,6 +139,68 @@ interface RecordItem {
   owned: boolean
 }
 
+interface GameCharacterRow {
+  id: number
+  firstName: string
+  givenName: string
+}
+
+interface GameCharacterUnitRow {
+  id: number
+  gameCharacterId: number
+  unit: string
+}
+
+interface MysekaiCharacterTalkConditionRow {
+  id: number
+  conditionType: string
+  conditionTypeValue: number
+}
+
+interface MysekaiCharacterTalkConditionGroupRow {
+  id: number
+  groupId: number
+  conditionId: number
+}
+
+interface MysekaiCharacterTalkRow {
+  id: number
+  characterUnitGroupId: number
+  conditionGroupId: number
+  archiveGroupId: number
+}
+
+interface MysekaiGameCharacterUnitGroupRow {
+  id: number
+  unitIds: number[]
+}
+
+interface CharacterArchiveMysekaiCharacterTalkGroupRow {
+  id: number
+  archiveDisplayType: string
+}
+
+interface MysekaiGateCharacterLotteryRow {
+  gameCharacterUnitId: number
+}
+
+interface TalkCharacterOption {
+  characterId: number
+  label: string
+}
+
+interface TalkUnitOption {
+  key: string
+  label: string
+  shortLabel: string
+}
+
+interface FixtureTalkStat {
+  total: number
+  read: number
+  unread: number
+}
+
 const route = useRoute()
 const router = useRouter()
 const accountStore = useAccountStore()
@@ -147,9 +209,38 @@ const settingsStore = useSettingsStore()
 
 const tabOptions: Array<{ key: TabKey, label: string }> = [
   { key: 'furniture', label: '家具库存' },
-  { key: 'gate', label: 'Gate' },
-  { key: 'record', label: 'Record' },
+  { key: 'gate', label: '大门' },
+  { key: 'record', label: '唱片' },
 ]
+
+const unitAliasMap: Record<string, string> = {
+  light_sound: 'ln',
+  idol: 'mmj',
+  street: 'vbs',
+  theme_park: 'ws',
+  school_refusal: 'n25',
+  piapro: 'vs',
+}
+
+const unitLabelMap: Record<string, string> = {
+  light_sound: 'Leo/need',
+  idol: 'MORE MORE JUMP!',
+  street: 'Vivid BAD SQUAD',
+  theme_park: 'Wonderlands x Showtime',
+  school_refusal: '25时、Nightcord见。',
+  piapro: 'VIRTUAL SINGER',
+}
+
+const unitLogoMap: Record<string, string> = {
+  light_sound: '/img/logo/logo_light_sound.png',
+  idol: '/img/logo/logo_idol.png',
+  street: '/img/logo/logo_street.png',
+  theme_park: '/img/logo/logo_theme_park.png',
+  school_refusal: '/img/logo/logo_school_refusal.png',
+  piapro: '/img/logo/logo_piapro.png',
+}
+
+const unitOrder = ['light_sound', 'idol', 'street', 'theme_park', 'school_refusal', 'piapro']
 
 const showUserData = ref(false)
 const isMasterLoading = ref(true)
@@ -162,6 +253,8 @@ const selectedFixtureId = ref<number | null>(null)
 const furnitureSearch = ref('')
 const selectedMainGenre = ref(0)
 const onlyOwned = ref(false)
+const selectedTalkCharacterId = ref(0)
+const selectedTalkUnit = ref('')
 
 const autoLoadedUserIds = ref<Set<string>>(new Set())
 const autoShowResolvedUserIds = ref<Set<string>>(new Set())
@@ -180,6 +273,14 @@ const mysekaiMaterials = ref<MaterialRow[]>([])
 const musicRecords = ref<MusicRecordRow[]>([])
 const musics = ref<MusicRow[]>([])
 const musicTags = ref<MusicTagRow[]>([])
+const gameCharacters = ref<GameCharacterRow[]>([])
+const gameCharacterUnits = ref<GameCharacterUnitRow[]>([])
+const mysekaiCharacterTalkConditions = ref<MysekaiCharacterTalkConditionRow[]>([])
+const mysekaiCharacterTalkConditionGroups = ref<MysekaiCharacterTalkConditionGroupRow[]>([])
+const mysekaiCharacterTalks = ref<MysekaiCharacterTalkRow[]>([])
+const mysekaiGameCharacterUnitGroups = ref<MysekaiGameCharacterUnitGroupRow[]>([])
+const characterArchiveMysekaiCharacterTalkGroups = ref<CharacterArchiveMysekaiCharacterTalkGroupRow[]>([])
+const mysekaiGateCharacterLotteries = ref<MysekaiGateCharacterLotteryRow[]>([])
 
 const mysekaiAssetsHost = computed(() => String(settingsStore.ASSETS_HOST_GLOBAL || '').replace(/\/+$/, ''))
 
@@ -226,6 +327,11 @@ const hasSuiteGateData = computed(() => {
 
 const hasRecordData = computed(() => {
   const rows = currentMysekaiCache.value?.updatedResources?.userMysekaiMusicRecords
+  return showUserData.value && Array.isArray(rows)
+})
+
+const hasSuiteTalkData = computed(() => {
+  const rows = currentSuiteCache.value?.userMysekaiCharacterTalks
   return showUserData.value && Array.isArray(rows)
 })
 
@@ -325,6 +431,205 @@ const mainGenreOptions = computed(() => {
     }))
 })
 
+const gameCharacterNameMap = computed(() => {
+  const map = new Map<number, string>()
+  for (const row of gameCharacters.value) {
+    map.set(row.id, `${row.firstName || ''}${row.givenName || ''}`.trim() || `角色 ${row.id}`)
+  }
+  return map
+})
+
+const mysekaiCharacterUnitIdSet = computed(() => {
+  const set = new Set<number>()
+  for (const row of mysekaiGateCharacterLotteries.value) {
+    if (row.gameCharacterUnitId > 0) {
+      set.add(row.gameCharacterUnitId)
+    }
+  }
+  return set
+})
+
+const talkCharacterOptions = computed<TalkCharacterOption[]>(() => {
+  const ids = new Set<number>()
+  for (const row of gameCharacterUnits.value) {
+    if (mysekaiCharacterUnitIdSet.value.has(row.id)) {
+      ids.add(row.gameCharacterId)
+    }
+  }
+
+  return [...ids]
+    .sort((a, b) => a - b)
+    .map((characterId) => ({
+      characterId,
+      label: gameCharacterNameMap.value.get(characterId) || `角色 ${characterId}`,
+    }))
+})
+
+const selectedTalkCharacterUnitRows = computed(() => {
+  if (selectedTalkCharacterId.value <= 0) return []
+  return gameCharacterUnits.value.filter((row) => {
+    if (row.gameCharacterId !== selectedTalkCharacterId.value) return false
+    return mysekaiCharacterUnitIdSet.value.has(row.id)
+  })
+})
+
+const talkUnitOptions = computed<TalkUnitOption[]>(() => {
+  const map = new Map<string, TalkUnitOption>()
+  for (const row of selectedTalkCharacterUnitRows.value) {
+    const key = row.unit
+    const shortLabel = unitAliasMap[key] || key
+    if (!map.has(key)) {
+      map.set(key, {
+        key,
+        label: unitLabelMap[key] || key,
+        shortLabel: shortLabel.toUpperCase(),
+      })
+    }
+  }
+
+  return unitOrder
+    .map((key) => map.get(key))
+    .filter((item): item is TalkUnitOption => !!item)
+})
+
+const selectedTalkCharacterUnitIds = computed(() => {
+  const set = new Set<number>()
+  for (const row of selectedTalkCharacterUnitRows.value) {
+    if (selectedTalkUnit.value && row.unit !== selectedTalkUnit.value) continue
+    set.add(row.id)
+  }
+  return set
+})
+
+const suiteReadTalkIds = computed(() => {
+  const set = new Set<number>()
+  if (!hasSuiteTalkData.value) return set
+  const rows = currentSuiteCache.value?.userMysekaiCharacterTalks || []
+  for (const row of rows) {
+    const talkId = pickNumber(row, ['mysekaiCharacterTalkId', 'characterTalkId'])
+    if (talkId === null || talkId <= 0) continue
+    if (Boolean(row?.isRead)) {
+      set.add(talkId)
+    }
+  }
+  return set
+})
+
+const talkConditionIdToFixtureIds = computed(() => {
+  const map = new Map<number, Set<number>>()
+  for (const row of mysekaiCharacterTalkConditions.value) {
+    if (row.conditionType !== 'mysekai_fixture_id') continue
+    if (row.conditionTypeValue <= 0) continue
+    if (!map.has(row.id)) map.set(row.id, new Set())
+    map.get(row.id)!.add(row.conditionTypeValue)
+  }
+  return map
+})
+
+const talkConditionGroupToFixtureIds = computed(() => {
+  const map = new Map<number, Set<number>>()
+  for (const row of mysekaiCharacterTalkConditionGroups.value) {
+    const fixtureIds = talkConditionIdToFixtureIds.value.get(row.conditionId)
+    if (!fixtureIds || fixtureIds.size === 0) continue
+    if (!map.has(row.groupId)) map.set(row.groupId, new Set())
+    const target = map.get(row.groupId)!
+    for (const fixtureId of fixtureIds) {
+      target.add(fixtureId)
+    }
+  }
+  return map
+})
+
+const talkArchiveDisplaySet = computed(() => {
+  const set = new Set<number>()
+  for (const row of characterArchiveMysekaiCharacterTalkGroups.value) {
+    if (row.archiveDisplayType === 'normal') {
+      set.add(row.id)
+    }
+  }
+  return set
+})
+
+const talkUnitGroupIdToUnitIds = computed(() => {
+  const map = new Map<number, number[]>()
+  for (const row of mysekaiGameCharacterUnitGroups.value) {
+    map.set(row.id, row.unitIds)
+  }
+  return map
+})
+
+const selectedTalkFixtureSummary = computed(() => {
+  const fixtureStats = new Map<number, FixtureTalkStat>()
+  if (selectedTalkCharacterId.value <= 0 || selectedTalkCharacterUnitIds.value.size === 0) {
+    return { total: 0, read: 0, fixtureStats }
+  }
+
+  const archiveMap = new Map<number, { fixtureIds: Set<number>, hasRead: boolean }>()
+  for (const talk of mysekaiCharacterTalks.value) {
+    if (!talkArchiveDisplaySet.value.has(talk.archiveGroupId)) continue
+
+    const unitIds = talkUnitGroupIdToUnitIds.value.get(talk.characterUnitGroupId) || []
+    const matched = unitIds.some((id) => selectedTalkCharacterUnitIds.value.has(id))
+    if (!matched) continue
+
+    const fixtureIds = talkConditionGroupToFixtureIds.value.get(talk.conditionGroupId)
+    if (!fixtureIds || fixtureIds.size === 0) continue
+
+    const archiveId = talk.archiveGroupId || talk.id
+    if (!archiveMap.has(archiveId)) {
+      archiveMap.set(archiveId, { fixtureIds: new Set<number>(), hasRead: false })
+    }
+    const archive = archiveMap.get(archiveId)!
+    for (const fixtureId of fixtureIds) {
+      archive.fixtureIds.add(fixtureId)
+    }
+    if (suiteReadTalkIds.value.has(talk.id)) {
+      archive.hasRead = true
+    }
+  }
+
+  let total = 0
+  let read = 0
+  for (const item of archiveMap.values()) {
+    total += 1
+    if (item.hasRead) read += 1
+    for (const fixtureId of item.fixtureIds) {
+      if (!fixtureStats.has(fixtureId)) {
+        fixtureStats.set(fixtureId, { total: 0, read: 0, unread: 0 })
+      }
+      const stat = fixtureStats.get(fixtureId)!
+      stat.total += 1
+      if (item.hasRead) {
+        stat.read += 1
+      } else {
+        stat.unread += 1
+      }
+    }
+  }
+
+  return { total, read, fixtureStats }
+})
+
+const selectedTalkFixtureStats = computed(() => selectedTalkFixtureSummary.value.fixtureStats)
+
+const selectedTalkTotal = computed(() => selectedTalkFixtureSummary.value.total)
+const selectedTalkRead = computed(() => selectedTalkFixtureSummary.value.read)
+const selectedTalkUnread = computed(() => Math.max(0, selectedTalkTotal.value - selectedTalkRead.value))
+const selectedTalkCharacterLabel = computed(() => {
+  if (selectedTalkCharacterId.value <= 0) return ''
+  return gameCharacterNameMap.value.get(selectedTalkCharacterId.value) || `角色 ${selectedTalkCharacterId.value}`
+})
+const selectedTalkFurnitureCount = computed(() => {
+  if (selectedTalkCharacterId.value <= 0) return 0
+  let count = 0
+  for (const row of allFurniture.value) {
+    if (selectedTalkFixtureStats.value.has(row.id)) {
+      count += 1
+    }
+  }
+  return count
+})
+
 const filteredFurniture = computed(() => {
   const keyword = furnitureSearch.value.trim().toLowerCase()
 
@@ -335,6 +640,13 @@ const filteredFurniture = computed(() => {
 
     if (onlyOwned.value && hasMysekaiBlueprintData.value && !isFixtureOwnedByAccount(row)) {
       return false
+    }
+
+    if (selectedTalkCharacterId.value > 0) {
+      const stat = selectedTalkFixtureStats.value.get(row.id)
+      if (!stat || stat.total <= 0) {
+        return false
+      }
     }
 
     if (!keyword) return true
@@ -723,6 +1035,24 @@ watch(hasMysekaiBlueprintData, (ready) => {
   }
 })
 
+watch(selectedTalkCharacterId, (characterId) => {
+  if (characterId <= 0) {
+    selectedTalkUnit.value = ''
+    return
+  }
+  const hasCurrentUnit = talkUnitOptions.value.some((item) => item.key === selectedTalkUnit.value)
+  if (!hasCurrentUnit) {
+    selectedTalkUnit.value = ''
+  }
+})
+
+watch(talkUnitOptions, (rows) => {
+  if (!selectedTalkUnit.value) return
+  if (!rows.some((row) => row.key === selectedTalkUnit.value)) {
+    selectedTalkUnit.value = ''
+  }
+})
+
 watch(selectedUserId, (userId) => {
   if (!userId) return
   if (autoShowResolvedUserIds.value.has(userId)) return
@@ -769,6 +1099,14 @@ async function loadMasterData() {
       musicRecordRaw,
       musicRaw,
       musicTagRaw,
+      gameCharacterRaw,
+      gameCharacterUnitRaw,
+      talkConditionRaw,
+      talkConditionGroupRaw,
+      talkRaw,
+      talkCharacterUnitGroupRaw,
+      archiveTalkGroupRaw,
+      gateCharacterLotteryRaw,
     ] = await Promise.all([
       getFirstAvailableMaster(['mysekaiFixtures', 'mysekai_fixtures']),
       getFirstAvailableMaster(['mysekaiBlueprints', 'mysekai_blueprints']),
@@ -782,6 +1120,14 @@ async function loadMasterData() {
       getFirstAvailableMaster(['mysekaiMusicRecords', 'mysekai_musicrecords', 'mysekai_music_records']),
       getFirstAvailableMaster(['musics']),
       getFirstAvailableMaster(['musicTags', 'music_tags']),
+      getFirstAvailableMaster(['gameCharacters', 'game_characters']),
+      getFirstAvailableMaster(['gameCharacterUnits', 'game_character_units']),
+      getFirstAvailableMaster(['mysekaiCharacterTalkConditions', 'mysekai_character_talk_conditions']),
+      getFirstAvailableMaster(['mysekaiCharacterTalkConditionGroups', 'mysekai_character_talk_condition_groups']),
+      getFirstAvailableMaster(['mysekaiCharacterTalks', 'mysekai_character_talks']),
+      getFirstAvailableMaster(['mysekaiGameCharacterUnitGroups', 'mysekai_game_character_unit_groups']),
+      getFirstAvailableMaster(['characterArchiveMysekaiCharacterTalkGroups', 'character_archive_mysekai_character_talk_groups']),
+      getFirstAvailableMaster(['mysekaiGateCharacterLotteries', 'mysekai_gate_character_lotteries']),
     ])
 
     fixtures.value = fixtureRaw.map((row: any) => {
@@ -883,6 +1229,60 @@ async function loadMasterData() {
       musicId: pickNumber(row, ['musicId']) || 0,
       musicTag: pickString(row, ['musicTag', 'musicTagType', 'tag']) || '',
     })).filter((row: MusicTagRow) => row.musicId > 0 && !!row.musicTag)
+
+    gameCharacters.value = gameCharacterRaw.map((row: any) => ({
+      id: pickNumber(row, ['id', 'gameCharacterId']) || 0,
+      firstName: pickString(row, ['firstName']) || '',
+      givenName: pickString(row, ['givenName']) || '',
+    })).filter((row: GameCharacterRow) => row.id > 0)
+
+    gameCharacterUnits.value = gameCharacterUnitRaw.map((row: any) => ({
+      id: pickNumber(row, ['id', 'gameCharacterUnitId']) || 0,
+      gameCharacterId: pickNumber(row, ['gameCharacterId']) || 0,
+      unit: pickString(row, ['unit']) || '',
+    })).filter((row: GameCharacterUnitRow) => row.id > 0 && row.gameCharacterId > 0 && !!row.unit)
+
+    mysekaiCharacterTalkConditions.value = talkConditionRaw.map((row: any) => ({
+      id: pickNumber(row, ['id']) || 0,
+      conditionType: pickString(row, ['mysekaiCharacterTalkConditionType']) || '',
+      conditionTypeValue: pickNumber(row, ['mysekaiCharacterTalkConditionTypeValue']) || 0,
+    })).filter((row: MysekaiCharacterTalkConditionRow) => row.id > 0 && !!row.conditionType)
+
+    mysekaiCharacterTalkConditionGroups.value = talkConditionGroupRaw.map((row: any) => ({
+      id: pickNumber(row, ['id']) || 0,
+      groupId: pickNumber(row, ['groupId', 'mysekaiCharacterTalkConditionGroupId']) || 0,
+      conditionId: pickNumber(row, ['mysekaiCharacterTalkConditionId']) || 0,
+    })).filter((row: MysekaiCharacterTalkConditionGroupRow) => row.id > 0 && row.groupId > 0 && row.conditionId > 0)
+
+    mysekaiCharacterTalks.value = talkRaw.map((row: any) => ({
+      id: pickNumber(row, ['id', 'mysekaiCharacterTalkId']) || 0,
+      characterUnitGroupId: pickNumber(row, ['mysekaiGameCharacterUnitGroupId']) || 0,
+      conditionGroupId: pickNumber(row, ['mysekaiCharacterTalkConditionGroupId']) || 0,
+      archiveGroupId: pickNumber(row, ['characterArchiveMysekaiCharacterTalkGroupId']) || 0,
+    })).filter((row: MysekaiCharacterTalkRow) => row.id > 0 && row.characterUnitGroupId > 0 && row.conditionGroupId > 0)
+
+    mysekaiGameCharacterUnitGroups.value = talkCharacterUnitGroupRaw.map((row: any) => {
+      const unitIds: number[] = []
+      for (let idx = 1; idx <= 9; idx += 1) {
+        const unitId = pickNumber(row, [`gameCharacterUnitId${idx}`])
+        if (unitId && unitId > 0) {
+          unitIds.push(unitId)
+        }
+      }
+      return {
+        id: pickNumber(row, ['id', 'mysekaiGameCharacterUnitGroupId']) || 0,
+        unitIds,
+      }
+    }).filter((row: MysekaiGameCharacterUnitGroupRow) => row.id > 0 && row.unitIds.length > 0)
+
+    characterArchiveMysekaiCharacterTalkGroups.value = archiveTalkGroupRaw.map((row: any) => ({
+      id: pickNumber(row, ['id', 'characterArchiveMysekaiCharacterTalkGroupId']) || 0,
+      archiveDisplayType: pickString(row, ['archiveDisplayType']) || '',
+    })).filter((row: CharacterArchiveMysekaiCharacterTalkGroupRow) => row.id > 0)
+
+    mysekaiGateCharacterLotteries.value = gateCharacterLotteryRaw.map((row: any) => ({
+      gameCharacterUnitId: pickNumber(row, ['gameCharacterUnitId']) || 0,
+    })).filter((row: MysekaiGateCharacterLotteryRow) => row.gameCharacterUnitId > 0)
   } catch (e) {
     console.error('加载 MySekai master 数据失败', e)
     errorMsg.value = '加载 master 数据失败，请稍后重试'
@@ -993,13 +1393,13 @@ function normalizeUnixSeconds(timestamp: unknown): number | null {
 
 function getGateLabel(gateId: number): string {
   const map: Record<number, string> = {
-    1: 'Leo/need Gate',
-    2: 'MORE MORE JUMP! Gate',
-    3: 'Vivid BAD SQUAD Gate',
-    4: 'Wonderlands x Showtime Gate',
-    5: '25时、Nightcord见。 Gate',
+    1: 'Leo/need 大门',
+    2: 'MORE MORE JUMP! 大门',
+    3: 'Vivid BAD SQUAD 大门',
+    4: 'Wonderlands x Showtime 大门',
+    5: '25时、Nightcord见。 大门',
   }
-  return map[gateId] || `Gate ${gateId}`
+  return map[gateId] || `大门 ${gateId}`
 }
 
 function getGateLogo(gateId: number): string {
@@ -1011,6 +1411,46 @@ function getGateLogo(gateId: number): string {
     5: '/img/logo/logo_school_refusal.png',
   }
   return map[gateId] || ''
+}
+
+function getUnitLogo(unit: string): string {
+  return unitLogoMap[unit] || ''
+}
+
+function clearTalkFilter() {
+  selectedTalkCharacterId.value = 0
+  selectedTalkUnit.value = ''
+}
+
+function getTalkCharacterIcon(characterId: number): string {
+  if (characterId <= 0) return ''
+  if (characterId <= 20) {
+    return `/img/chr_ts/chr_ts_90_${characterId}.png`
+  }
+
+  // VS 角色在“全部组合”下统一使用默认头像
+  if (characterId >= 21 && characterId <= 26 && !selectedTalkUnit.value) {
+    return `/img/chr_ts/chr_ts_90_${characterId}.png`
+  }
+
+  const variantUnitRows = gameCharacterUnits.value.filter((row) => {
+    if (row.gameCharacterId !== characterId) return false
+    if (!mysekaiCharacterUnitIdSet.value.has(row.id)) return false
+    return !selectedTalkUnit.value || row.unit === selectedTalkUnit.value
+  })
+
+  const variantUnitId = variantUnitRows[0]?.id || 0
+  if (characterId === 21) {
+    if (variantUnitId > 26) {
+      return `/img/chr_ts/chr_ts_90_21_${variantUnitId - 25}.png`
+    }
+    return '/img/chr_ts/chr_ts_90_21.png'
+  }
+  return `/img/chr_ts/chr_ts_90_${characterId}_2.png`
+}
+
+function getFixtureTalkStat(fixtureId: number): FixtureTalkStat | null {
+  return selectedTalkFixtureStats.value.get(fixtureId) || null
 }
 
 function resolveMusicGroup(tags: string[]): string {
@@ -1191,6 +1631,83 @@ function closeFixtureDetail() {
                 <span class="label-text">只看已拥有</span>
               </label>
             </div>
+
+            <div class="rounded-xl border border-base-200 bg-base-200/30 p-3 space-y-2">
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="text-sm font-medium">家具对话筛选</span>
+                <button
+                  v-if="selectedTalkCharacterId > 0"
+                  type="button"
+                  class="btn btn-ghost btn-xs"
+                  @click="clearTalkFilter"
+                >
+                  清空
+                </button>
+                <span v-if="selectedTalkCharacterId > 0" class="badge badge-outline">
+                  {{ selectedTalkCharacterLabel }} · {{ selectedTalkFurnitureCount }} 件家具
+                </span>
+                <span v-if="selectedTalkCharacterId > 0 && hasSuiteTalkData" class="badge badge-primary">
+                  对话 {{ selectedTalkRead }} / {{ selectedTalkTotal }}
+                </span>
+                <span
+                  v-if="selectedTalkCharacterId > 0 && hasSuiteTalkData && selectedTalkUnread > 0"
+                  class="badge badge-error badge-outline"
+                >
+                  未读 {{ selectedTalkUnread }}
+                </span>
+                <span v-if="selectedTalkCharacterId > 0 && !hasSuiteTalkData" class="text-xs text-base-content/60">
+                  未检测到对话抓包，仅按 master 显示可触发家具
+                </span>
+              </div>
+
+              <div v-if="talkCharacterOptions.length > 0" class="flex flex-wrap gap-1.5">
+                <button
+                  v-for="chara in talkCharacterOptions"
+                  :key="`talk-chara-${chara.characterId}`"
+                  type="button"
+                  class="btn btn-xs px-2 gap-1.5"
+                  :class="selectedTalkCharacterId === chara.characterId ? 'btn-primary' : 'btn-ghost'"
+                  :title="chara.label"
+                  @click="selectedTalkCharacterId = selectedTalkCharacterId === chara.characterId ? 0 : chara.characterId"
+                >
+                  <img
+                    :src="getTalkCharacterIcon(chara.characterId)"
+                    :alt="chara.label"
+                    class="w-5 h-5 rounded-full object-cover"
+                    loading="lazy"
+                  />
+                  <span class="text-[11px] hidden sm:inline">{{ chara.label }}</span>
+                </button>
+              </div>
+
+              <div v-if="selectedTalkCharacterId > 0 && talkUnitOptions.length > 1" class="flex flex-wrap gap-1.5">
+                <button
+                  type="button"
+                  class="btn btn-xs"
+                  :class="selectedTalkUnit === '' ? 'btn-secondary' : 'btn-ghost'"
+                  @click="selectedTalkUnit = ''"
+                >
+                  全部组合
+                </button>
+                <button
+                  v-for="unit in talkUnitOptions"
+                  :key="`talk-unit-${unit.key}`"
+                  type="button"
+                  class="btn btn-xs gap-1.5 px-2"
+                  :class="selectedTalkUnit === unit.key ? 'btn-secondary' : 'btn-ghost'"
+                  @click="selectedTalkUnit = unit.key"
+                >
+                  <img
+                    v-if="getUnitLogo(unit.key)"
+                    :src="getUnitLogo(unit.key)"
+                    :alt="unit.label"
+                    class="h-4 w-auto object-contain"
+                    loading="lazy"
+                  />
+                  <span v-else>{{ unit.shortLabel }}</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -1246,8 +1763,29 @@ function closeFixtureDetail() {
                         class="absolute inset-0 bg-black/55"
                         title="未拥有"
                       ></div>
+
+                      <div
+                        v-if="selectedTalkCharacterId > 0 && getFixtureTalkStat(row.id)"
+                        class="absolute top-0.5 right-0.5 badge badge-xs px-1 min-h-0 h-4"
+                        :class="!hasSuiteTalkData ? 'badge-neutral' : ((getFixtureTalkStat(row.id)?.unread || 0) > 0 ? 'badge-error' : 'badge-success')"
+                      >
+                        <template v-if="hasSuiteTalkData">
+                          {{ getFixtureTalkStat(row.id)?.read }}/{{ getFixtureTalkStat(row.id)?.total }}
+                        </template>
+                        <template v-else>
+                          {{ getFixtureTalkStat(row.id)?.total }}
+                        </template>
+                      </div>
                     </button>
-                    <div class="text-[10px] text-center mt-1 text-base-content/70">#{{ row.id }}</div>
+                    <div class="text-[10px] text-center mt-1 text-base-content/70">
+                      <div>#{{ row.id }}</div>
+                      <div
+                        v-if="selectedTalkCharacterId > 0 && hasSuiteTalkData && getFixtureTalkStat(row.id)"
+                        :class="(getFixtureTalkStat(row.id)?.unread || 0) > 0 ? 'text-error' : 'text-success'"
+                      >
+                        未读 {{ getFixtureTalkStat(row.id)?.unread }}
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1260,10 +1798,10 @@ function closeFixtureDetail() {
         <div class="card bg-base-100 shadow-sm">
           <div class="card-body p-4">
             <p class="text-sm text-base-content/70" v-if="!hasSuiteGateData">
-              当前无可用 Suite 门/材料数据，展示基础全量升级需求。
+              当前无可用 Suite 大门/材料数据，展示基础全量升级需求。
             </p>
             <p class="text-sm text-base-content/70" v-else>
-              当前账号 Gate 材料缺口已按累计需求计算。
+              当前账号大门材料缺口已按累计需求计算。
             </p>
           </div>
         </div>
@@ -1271,7 +1809,7 @@ function closeFixtureDetail() {
         <div class="card bg-base-100 shadow-sm" v-if="gateViews.length > 0">
           <div class="card-body p-4">
             <div class="flex flex-wrap items-center gap-1.5 sm:gap-2">
-              <span class="text-sm text-base-content/70 mr-1">选择门:</span>
+              <span class="text-sm text-base-content/70 mr-1">选择大门:</span>
               <button
                 v-for="gate in gateViews"
                 :key="`switch-${gate.gateId}`"
@@ -1350,7 +1888,7 @@ function closeFixtureDetail() {
             </div>
           </div>
         </div>
-        <div v-else class="text-sm text-base-content/60">暂无 Gate 数据</div>
+        <div v-else class="text-sm text-base-content/60">暂无大门数据</div>
       </div>
 
       <div v-else class="space-y-4">

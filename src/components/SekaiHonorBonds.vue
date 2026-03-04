@@ -63,6 +63,12 @@ const props = withDefaults(defineProps<{
 const settingsStore = useSettingsStore()
 const assetsHost = computed(() => settingsStore.assetsHost)
 
+// Sub (small) layout tuning:
+// Increase values to move character visuals further toward the center split.
+const SUB_INSET_LEFT = 6
+const SUB_INSET_RIGHT = 6
+const SUB_CLIP_START_X = 10
+
 const degreeFrameMap: Record<string, string> = {
   low: '/honor/frame_degree_m_1.png',
   middle: '/honor/frame_degree_m_2.png',
@@ -130,15 +136,27 @@ const rightColor = computed(() => {
 })
 
 const halfWidth = computed(() => props.sub ? 90 : 190)
+const subHalfClipWidth = computed(() => props.sub ? halfWidth.value - SUB_CLIP_START_X : halfWidth.value)
+const subLeftClipX = computed(() => props.sub ? SUB_CLIP_START_X : 0)
+const subRightClipX = computed(() => halfWidth.value)
+const subLeftCenterX = computed(() => subLeftClipX.value + subHalfClipWidth.value / 2)
+const subRightCenterX = computed(() => subRightClipX.value + subHalfClipWidth.value / 2)
+
+const displayHonorLevel = computed(() => {
+  const lv = Number(props.honorLevel) || 0
+  if (lv <= 0) return 0
+  // 这里 honorLevel 是外部传入的“展示等级”，限制在 1..10
+  return Math.max(1, Math.min(lv, 10))
+})
 
 const levelStarsNormal = computed(() => {
-  if (!props.honorLevel || !honor.value || honor.value.levels.length <= 1) return 0
-  return Math.min(5, props.honorLevel)
+  if (!displayHonorLevel.value || !honor.value || honor.value.levels.length <= 1) return 0
+  return Math.min(5, displayHonorLevel.value)
 })
 
 const levelStarsGold = computed(() => {
-  if (!props.honorLevel || !honor.value || honor.value.levels.length <= 1) return 0
-  return Math.max(0, props.honorLevel - 5)
+  if (!displayHonorLevel.value || !honor.value || honor.value.levels.length <= 1) return 0
+  return Math.max(0, displayHonorLevel.value - 5)
 })
 
 // 使用 SVG <path> 直接绘制圆角矩形的左右两半，
@@ -223,19 +241,39 @@ async function loadHonor() {
       const scale = props.sub ? 1.35 : 1
       sdLeftWidth.value = leftSize.width / scale
       sdLeftHeight.value = leftSize.height / scale
-      sdLeftOffsetX.value = props.sub ? 26 : 20
+      if (props.sub) {
+        sdLeftOffsetX.value = subLeftCenterX.value - sdLeftWidth.value / 2 + SUB_INSET_LEFT
+      } else {
+        sdLeftOffsetX.value = 20
+      }
       sdLeftOffsetY.value = (props.sub ? 77 : 93) - leftSize.height / scale
 
       sdRightWidth.value = rightSize.width / scale
       sdRightHeight.value = rightSize.height / scale
-      sdRightOffsetX.value = (props.sub ? 160 : 360) - rightSize.width / scale
+      if (props.sub) {
+        sdRightOffsetX.value = subRightCenterX.value - sdRightWidth.value / 2 - SUB_INSET_RIGHT
+      } else {
+        sdRightOffsetX.value = 360 - rightSize.width / scale
+      }
       sdRightOffsetY.value = (props.sub ? 78 : 93) - rightSize.height / scale
     } catch {
       // 如果获取尺寸失败，使用默认值
       sdLeftWidth.value = 80
       sdLeftHeight.value = 80
+      if (props.sub) {
+        sdLeftOffsetX.value = subLeftCenterX.value - sdLeftWidth.value / 2 + SUB_INSET_LEFT
+      } else {
+        sdLeftOffsetX.value = 20
+      }
+      sdLeftOffsetY.value = props.sub ? 18 : 13
       sdRightWidth.value = 80
       sdRightHeight.value = 80
+      if (props.sub) {
+        sdRightOffsetX.value = subRightCenterX.value - sdRightWidth.value / 2 - SUB_INSET_RIGHT
+      } else {
+        sdRightOffsetX.value = 280
+      }
+      sdRightOffsetY.value = props.sub ? 18 : 13
     }
   }
   } catch {
@@ -251,7 +289,15 @@ watch(() => [props.honorId, props.honorLevel, props.bondsHonorWordId, props.bond
   honor.value = undefined
   gameCharas.value = []
   sdLeft.value = ''
+  sdLeftWidth.value = 0
+  sdLeftHeight.value = 0
+  sdLeftOffsetX.value = 0
+  sdLeftOffsetY.value = 0
   sdRight.value = ''
+  sdRightWidth.value = 0
+  sdRightHeight.value = 0
+  sdRightOffsetX.value = 0
+  sdRightOffsetY.value = 0
   wordImage.value = ''
   loadHonor()
 })
@@ -279,26 +325,53 @@ watch(() => [props.honorId, props.honorLevel, props.bondsHonorWordId, props.bond
       fill-opacity="0"
     />
 
-    <!-- 左侧角色 -->
-    <image
-      v-if="sdLeft"
-      :href="sdLeft"
-      :x="sdLeftOffsetX"
-      :y="sdLeftOffsetY"
-      :height="sdLeftHeight"
-      :width="sdLeftWidth"
-      @error="handleSvgImageError"
-    />
-    <!-- 右侧角色 -->
-    <image
-      v-if="sdRight"
-      :href="sdRight"
-      :x="sdRightOffsetX"
-      :y="sdRightOffsetY"
-      :height="sdRightHeight"
-      :width="sdRightWidth"
-      @error="handleSvgImageError"
-    />
+    <template v-if="sub">
+      <!-- sub 模式下用嵌套 svg 的 viewport 做左右半区裁剪，避免角色越界到另一侧 -->
+      <svg :x="subLeftClipX" y="0" :width="subHalfClipWidth" height="80" overflow="hidden">
+        <image
+          v-if="sdLeft"
+          :href="sdLeft"
+          :x="sdLeftOffsetX - subLeftClipX"
+          :y="sdLeftOffsetY"
+          :height="sdLeftHeight"
+          :width="sdLeftWidth"
+          @error="handleSvgImageError"
+        />
+      </svg>
+      <svg :x="subRightClipX" y="0" :width="subHalfClipWidth" height="80" overflow="hidden">
+        <image
+          v-if="sdRight"
+          :href="sdRight"
+          :x="sdRightOffsetX - subRightClipX"
+          :y="sdRightOffsetY"
+          :height="sdRightHeight"
+          :width="sdRightWidth"
+          @error="handleSvgImageError"
+        />
+      </svg>
+    </template>
+    <template v-else>
+      <!-- 左侧角色 -->
+      <image
+        v-if="sdLeft"
+        :href="sdLeft"
+        :x="sdLeftOffsetX"
+        :y="sdLeftOffsetY"
+        :height="sdLeftHeight"
+        :width="sdLeftWidth"
+        @error="handleSvgImageError"
+      />
+      <!-- 右侧角色 -->
+      <image
+        v-if="sdRight"
+        :href="sdRight"
+        :x="sdRightOffsetX"
+        :y="sdRightOffsetY"
+        :height="sdRightHeight"
+        :width="sdRightWidth"
+        @error="handleSvgImageError"
+      />
+    </template>
 
     <!-- 台词文字 -->
     <image

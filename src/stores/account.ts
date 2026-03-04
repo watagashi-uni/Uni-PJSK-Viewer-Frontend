@@ -103,7 +103,17 @@ export const useAccountStore = defineStore('account', () => {
     const mysekaiRefreshing = ref(false)
     const profileRefreshing = ref(false)
     const suiteRefreshToastMessage = ref('')
+    const suiteRefreshToastHint = ref('')
     let suiteRefreshToastTimer: number | null = null
+
+    function dismissSuiteRefreshToast() {
+        suiteRefreshToastMessage.value = ''
+        suiteRefreshToastHint.value = ''
+        if (suiteRefreshToastTimer !== null) {
+            window.clearTimeout(suiteRefreshToastTimer)
+            suiteRefreshToastTimer = null
+        }
+    }
 
     // 内存中的缓存（UI 界面可以直接读取）
     const suiteCaches = ref<Record<string, any>>({})
@@ -335,13 +345,15 @@ export const useAccountStore = defineStore('account', () => {
                 suiteRefreshToastMessage.value = source === 'public'
                     ? '已通过公开API更新'
                     : '已通过oauth认证更新'
+                suiteRefreshToastHint.value = source === 'public'
+                    ? '打开工具箱的公开访问不安全，有id就可以获取所有抓包信息，如在意可关闭公开访问，本站支持工具箱oauth私有数据获取'
+                    : ''
                 if (suiteRefreshToastTimer !== null) {
                     window.clearTimeout(suiteRefreshToastTimer)
                 }
                 suiteRefreshToastTimer = window.setTimeout(() => {
-                    suiteRefreshToastMessage.value = ''
-                    suiteRefreshToastTimer = null
-                }, 3000)
+                    dismissSuiteRefreshToast()
+                }, source === 'public' ? 12000 : 5000)
             }
 
             // 已有该账号 token 时，优先走 OAuth 受保护接口，避免先请求 public API
@@ -442,6 +454,8 @@ export const useAccountStore = defineStore('account', () => {
         mysekaiRefreshing,
         profileRefreshing,
         suiteRefreshToastMessage,
+        suiteRefreshToastHint,
+        dismissSuiteRefreshToast,
         initialize,
         save,
         selectAccount,

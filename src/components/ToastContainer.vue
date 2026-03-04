@@ -53,7 +53,13 @@ function dismissUpdate() {
           <CheckCircle2 class="w-5 h-5 text-success" />
           <div>
             <h3 class="font-bold text-sm">{{ accountStore.suiteRefreshToastMessage }}</h3>
+            <p v-if="accountStore.suiteRefreshToastHint" class="text-xs text-base-content/70 mt-1">
+              {{ accountStore.suiteRefreshToastHint }}
+            </p>
           </div>
+          <button class="btn btn-sm btn-ghost" @click="accountStore.dismissSuiteRefreshToast">
+            <X class="w-4 h-4" />
+          </button>
         </div>
       </Transition>
     </div>
