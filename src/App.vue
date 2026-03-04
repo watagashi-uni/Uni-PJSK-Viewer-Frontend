@@ -7,7 +7,7 @@ import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
 import { useAccountStore } from '@/stores/account'
 import { useOAuthStore } from '@/stores/oauth'
-import { Music, Image, BarChart3, Info, Settings, Calendar, Gift, Share2, Zap, User, RefreshCw, Github } from 'lucide-vue-next'
+import { Music, Image, BarChart3, Info, Settings, Calendar, Gift, Zap, User, RefreshCw, Github, House } from 'lucide-vue-next'
 import AccountSelector from '@/components/AccountSelector.vue'
 
 const route = useRoute()
@@ -124,13 +124,13 @@ async function handleSuiteRefresh() {
             </RouterLink>
           </li>
           <li>
-            <RouterLink to="/chart-share" active-class="active">
-              <Share2 class="w-5 h-5" /> 谱面分享
+            <RouterLink to="/deck-recommend" active-class="active">
+              <Zap class="w-5 h-5" /> 自动组队
             </RouterLink>
           </li>
           <li>
-            <RouterLink to="/deck-recommend" active-class="active">
-              <Zap class="w-5 h-5" /> 自动组队
+            <RouterLink to="/mysekai" active-class="active">
+              <House class="w-5 h-5" /> MySekai
             </RouterLink>
           </li>
           <li>

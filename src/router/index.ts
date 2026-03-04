@@ -118,8 +118,14 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '个人信息' },
     },
     {
+        path: '/mysekai',
+        name: 'MySekaiHub',
+        component: () => import('@/views/MySekaiHubView.vue'),
+        meta: { title: 'MySekai' },
+    },
+    {
         path: '/never-gonna-give-you-up',
-        name: 'MySekai',
+        name: 'MySekaiMap',
         component: () => import('@/views/MySekaiView.vue'),
         meta: { title: 'MySekai 透视' },
     },
