@@ -75,7 +75,7 @@ function dismissUpdate() {
             rel="noopener noreferrer"
             class="link link-primary font-medium"
           >Haruki工具箱</a>
-          先注册账号、绑定自己QQ账号、再绑定游戏账号后上传自己的数据，才能使用此功能。不注册验证单纯上传是查不到的
+          先注册账号、绑定游戏账号验证后上传自己的数据，才能使用此功能。不注册验证单纯上传是查不到的
         </p>
         <div class="modal-action">
           <button class="btn btn-primary" @click="accountStore.dismissSuiteNotFoundModal">我知道了</button>
