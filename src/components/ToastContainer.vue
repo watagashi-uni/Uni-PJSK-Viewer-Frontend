@@ -64,6 +64,28 @@ function dismissUpdate() {
       </Transition>
     </div>
 
+    <dialog :open="accountStore.suiteNotFoundModalVisible" class="modal modal-bottom sm:modal-middle">
+      <div class="modal-box">
+        <h3 class="font-bold text-lg">未查询到 Suite 数据</h3>
+        <p class="py-3 text-sm text-base-content/80">
+          Haruki工具箱没有查询到该玩家的数据。你可能需要前往
+          <a
+            href="https://haruki.seiunx.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="link link-primary font-medium"
+          >Haruki工具箱</a>
+          先注册账号、绑定自己QQ账号、再绑定游戏账号后上传自己的数据，才能使用此功能。不注册验证单纯上传是查不到的
+        </p>
+        <div class="modal-action">
+          <button class="btn btn-primary" @click="accountStore.dismissSuiteNotFoundModal">我知道了</button>
+        </div>
+      </div>
+      <form method="dialog" class="modal-backdrop" @submit.prevent="accountStore.dismissSuiteNotFoundModal">
+        <button type="button" @click="accountStore.dismissSuiteNotFoundModal">close</button>
+      </form>
+    </dialog>
+
     <!-- Toast 容器 (底部右侧) -->
     <div class="fixed bottom-4 right-4 z-50 flex flex-col gap-3 max-w-sm">
       <!-- PWA 更新提示 Toast -->

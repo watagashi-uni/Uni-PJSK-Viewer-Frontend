@@ -104,6 +104,7 @@ export const useAccountStore = defineStore('account', () => {
     const profileRefreshing = ref(false)
     const suiteRefreshToastMessage = ref('')
     const suiteRefreshToastHint = ref('')
+    const suiteNotFoundModalVisible = ref(false)
     let suiteRefreshToastTimer: number | null = null
 
     function dismissSuiteRefreshToast() {
@@ -113,6 +114,14 @@ export const useAccountStore = defineStore('account', () => {
             window.clearTimeout(suiteRefreshToastTimer)
             suiteRefreshToastTimer = null
         }
+    }
+
+    function showSuiteNotFoundModal() {
+        suiteNotFoundModalVisible.value = true
+    }
+
+    function dismissSuiteNotFoundModal() {
+        suiteNotFoundModalVisible.value = false
     }
 
     // 内存中的缓存（UI 界面可以直接读取）
@@ -368,6 +377,10 @@ export const useAccountStore = defineStore('account', () => {
                     setSuiteRefreshToast('oauth')
                     return oauthData
                 } catch (e: any) {
+                    if (Number(e?.status) === 404) {
+                        showSuiteNotFoundModal()
+                        throw new Error('用户未上传数据')
+                    }
                     if (isOAuthTokenError(e)) {
                         oauthStore.clearTokensForUser(userId)
                         // Token 失效时先回退 public API，仅在 public=403 时再触发 OAuth 授权
@@ -379,7 +392,10 @@ export const useAccountStore = defineStore('account', () => {
 
             const resp = await fetch(`https://suite-api.haruki.seiunx.com/public/jp/suite/${userId}`)
             if (!resp.ok) {
-                if (resp.status === 404) throw new Error('用户未上传数据')
+                if (resp.status === 404) {
+                    showSuiteNotFoundModal()
+                    throw new Error('用户未上传数据')
+                }
                 if (resp.status === 403) {
                     const data = await fetchSuiteByOAuth(userId)
                     const uploadTime = normalizeUnixSeconds(data.upload_time)
@@ -455,7 +471,10 @@ export const useAccountStore = defineStore('account', () => {
         profileRefreshing,
         suiteRefreshToastMessage,
         suiteRefreshToastHint,
+        suiteNotFoundModalVisible,
         dismissSuiteRefreshToast,
+        showSuiteNotFoundModal,
+        dismissSuiteNotFoundModal,
         initialize,
         save,
         selectAccount,
