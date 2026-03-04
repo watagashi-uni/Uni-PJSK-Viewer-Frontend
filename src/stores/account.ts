@@ -18,6 +18,15 @@ function buildOAuthPromptText() {
     return '你没有勾选公开访问，需要 OAuth 授权本站访问游戏数据。是否现在去授权？'
 }
 
+function normalizeUnixSeconds(timestamp: unknown): number | null {
+    const value = Number(timestamp)
+    if (!Number.isFinite(value) || value <= 0) return null
+    if (value > 1_000_000_000_000) {
+        return Math.floor(value / 1000)
+    }
+    return Math.floor(value)
+}
+
 async function fetchSuiteByOAuth(userId: string): Promise<any> {
     const oauthStore = useOAuthStore()
     const returnTo = `${window.location.pathname}${window.location.search}${window.location.hash}`
@@ -42,6 +51,30 @@ async function fetchSuiteByOAuth(userId: string): Promise<any> {
     throw new Error('正在跳转 OAuth 授权页面...')
 }
 
+async function fetchMysekaiByOAuth(userId: string): Promise<any> {
+    const oauthStore = useOAuthStore()
+    const returnTo = `${window.location.pathname}${window.location.search}${window.location.hash}`
+
+    if (oauthStore.hasTokenForUser(userId)) {
+        try {
+            return await oauthStore.fetchGameData('jp', 'mysekai', userId)
+        } catch (e: any) {
+            if (e?.status === 401 || e?.status === 403) {
+                oauthStore.clearTokensForUser(userId)
+            } else {
+                throw e
+            }
+        }
+    }
+
+    const shouldAuthorize = window.confirm(buildOAuthPromptText())
+    if (!shouldAuthorize) {
+        throw new Error('未完成 OAuth 授权，无法读取 MySekai 数据')
+    }
+    await oauthStore.startAuthorization(userId, returnTo)
+    throw new Error('正在跳转 OAuth 授权页面...')
+}
+
 const dbPromise = openDB('sekai-viewer-db', 1, {
     upgrade(db) {
         if (!db.objectStoreNames.contains('caches')) {
@@ -56,12 +89,14 @@ export const useAccountStore = defineStore('account', () => {
 
     // suite 刷新中状态（全局可用）
     const suiteRefreshing = ref(false)
+    const mysekaiRefreshing = ref(false)
     const profileRefreshing = ref(false)
     const suiteRefreshToastMessage = ref('')
     let suiteRefreshToastTimer: number | null = null
 
     // 内存中的缓存（UI 界面可以直接读取）
     const suiteCaches = ref<Record<string, any>>({})
+    const mysekaiCaches = ref<Record<string, any>>({})
     const profileCaches = ref<Record<string, any>>({})
 
     // 当前账号
@@ -145,11 +180,13 @@ export const useAccountStore = defineStore('account', () => {
         if (!userId) return
         try {
             const db = await dbPromise
-            const [suiteData, profileData] = await Promise.all([
+            const [suiteData, mysekaiData, profileData] = await Promise.all([
                 db.get('caches', `suite_${userId}`),
+                db.get('caches', `mysekai_${userId}`),
                 db.get('caches', `profile_${userId}`)
             ])
             if (suiteData) suiteCaches.value[userId] = suiteData
+            if (mysekaiData) mysekaiCaches.value[userId] = mysekaiData
             if (profileData) profileCaches.value[userId] = profileData
         } catch (e) {
             console.error('Failed to load user data from IDB:', e)
@@ -176,9 +213,11 @@ export const useAccountStore = defineStore('account', () => {
             const db = await dbPromise
             const tx = db.transaction('caches', 'readwrite')
             tx.store.delete(`suite_${userId}`)
+            tx.store.delete(`mysekai_${userId}`)
             tx.store.delete(`profile_${userId}`)
             await tx.done
             delete suiteCaches.value[userId]
+            delete mysekaiCaches.value[userId]
             delete profileCaches.value[userId]
 
             // Clean up old localStorage fallback
@@ -219,6 +258,18 @@ export const useAccountStore = defineStore('account', () => {
             const db = await dbPromise
             await db.put('caches', JSON.parse(JSON.stringify(data)), `suite_${userId}`)
         } catch (e) { console.error('Failed to save suite to IDB', e) }
+    }
+
+    function getMysekaiCache(userId: string): any | null {
+        return mysekaiCaches.value[userId] || null
+    }
+
+    async function saveMysekaiCache(userId: string, data: any) {
+        mysekaiCaches.value[userId] = data
+        try {
+            const db = await dbPromise
+            await db.put('caches', JSON.parse(JSON.stringify(data)), `mysekai_${userId}`)
+        } catch (e) { console.error('Failed to save mysekai to IDB', e) }
     }
 
     function getProfileCache(userId: string): any | null {
@@ -286,8 +337,9 @@ export const useAccountStore = defineStore('account', () => {
             if (oauthStore.hasTokenForUser(userId)) {
                 try {
                     const oauthData = await oauthStore.fetchGameData('jp', 'suite', userId)
-                    if (oauthData.upload_time) {
-                        updateUploadTime(userId, oauthData.upload_time)
+                    const uploadTime = normalizeUnixSeconds(oauthData.upload_time)
+                    if (uploadTime) {
+                        updateUploadTime(userId, uploadTime)
                     }
                     await saveSuiteCache(userId, oauthData)
                     setSuiteRefreshToast('oauth')
@@ -296,8 +348,9 @@ export const useAccountStore = defineStore('account', () => {
                     if (e?.status === 401 || e?.status === 403) {
                         oauthStore.clearTokensForUser(userId)
                         const fallbackData = await fetchSuiteByOAuth(userId)
-                        if (fallbackData.upload_time) {
-                            updateUploadTime(userId, fallbackData.upload_time)
+                        const uploadTime = normalizeUnixSeconds(fallbackData.upload_time)
+                        if (uploadTime) {
+                            updateUploadTime(userId, uploadTime)
                         }
                         await saveSuiteCache(userId, fallbackData)
                         setSuiteRefreshToast('oauth')
@@ -312,8 +365,9 @@ export const useAccountStore = defineStore('account', () => {
                 if (resp.status === 404) throw new Error('用户未上传数据')
                 if (resp.status === 403) {
                     const data = await fetchSuiteByOAuth(userId)
-                    if (data.upload_time) {
-                        updateUploadTime(userId, data.upload_time)
+                    const uploadTime = normalizeUnixSeconds(data.upload_time)
+                    if (uploadTime) {
+                        updateUploadTime(userId, uploadTime)
                     }
                     await saveSuiteCache(userId, data)
                     setSuiteRefreshToast('oauth')
@@ -322,14 +376,55 @@ export const useAccountStore = defineStore('account', () => {
                 throw new Error(`HTTP ${resp.status}`)
             }
             const data = await resp.json()
-            if (data.upload_time) {
-                updateUploadTime(userId, data.upload_time)
+            const uploadTime = normalizeUnixSeconds(data.upload_time)
+            if (uploadTime) {
+                updateUploadTime(userId, uploadTime)
             }
             await saveSuiteCache(userId, data)
             setSuiteRefreshToast('public')
             return data
         } finally {
             suiteRefreshing.value = false
+        }
+    }
+
+    async function refreshMysekai(userId: string) {
+        mysekaiRefreshing.value = true
+        try {
+            const oauthStore = useOAuthStore()
+
+            if (oauthStore.hasTokenForUser(userId)) {
+                try {
+                    const oauthData = await oauthStore.fetchGameData('jp', 'mysekai', userId)
+                    await saveMysekaiCache(userId, oauthData)
+                    return oauthData
+                } catch (e: any) {
+                    if (e?.status === 401 || e?.status === 403) {
+                        oauthStore.clearTokensForUser(userId)
+                        const fallbackData = await fetchMysekaiByOAuth(userId)
+                        await saveMysekaiCache(userId, fallbackData)
+                        return fallbackData
+                    }
+                    throw e
+                }
+            }
+
+            const resp = await fetch(`https://suite-api.haruki.seiunx.com/public/jp/mysekai/${userId}`)
+            if (!resp.ok) {
+                if (resp.status === 404) throw new Error('用户未上传 MySekai 数据')
+                if (resp.status === 403) {
+                    const data = await fetchMysekaiByOAuth(userId)
+                    await saveMysekaiCache(userId, data)
+                    return data
+                }
+                throw new Error(`HTTP ${resp.status}`)
+            }
+
+            const data = await resp.json()
+            await saveMysekaiCache(userId, data)
+            return data
+        } finally {
+            mysekaiRefreshing.value = false
         }
     }
 
@@ -340,6 +435,7 @@ export const useAccountStore = defineStore('account', () => {
         uploadTimeText,
         lastRefreshText,
         suiteRefreshing,
+        mysekaiRefreshing,
         profileRefreshing,
         suiteRefreshToastMessage,
         initialize,
@@ -351,9 +447,12 @@ export const useAccountStore = defineStore('account', () => {
         saveProfileCache,
         getProfileCache,
         getSuiteCache,
+        getMysekaiCache,
         saveSuiteCache,
+        saveMysekaiCache,
         loadDataForUser,
         refreshProfile,
         refreshSuite,
+        refreshMysekai,
     }
 })

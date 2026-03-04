@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useAccountStore } from '@/stores/account'
-import { useOAuthStore } from '@/stores/oauth'
 import { useSettingsStore } from '@/stores/settings'
 import { useMasterStore } from '@/stores/master'
 
@@ -11,6 +10,7 @@ interface SceneConfig {
   siteId: number
   name: string
   imagePath: string
+  sketchImagePath: string
   physicalWidth: number
   offsetX: number
   offsetY: number
@@ -100,6 +100,7 @@ const SITE_SCENES: SceneConfig[] = [
     siteId: 5,
     name: 'さいしょの原っぱ',
     imagePath: '/img/mysekai/grassland.png',
+    sketchImagePath: '/img/mysekai/grassland_sketch.png',
     physicalWidth: 33.333,
     offsetX: 0,
     offsetY: -40,
@@ -111,6 +112,7 @@ const SITE_SCENES: SceneConfig[] = [
     siteId: 7,
     name: '彩りの花畑',
     imagePath: '/img/mysekai/flowergarden.png',
+    sketchImagePath: '/img/mysekai/flowergarden_sketch.png',
     physicalWidth: 24.806,
     offsetX: -62.015,
     offsetY: 20.672,
@@ -122,6 +124,7 @@ const SITE_SCENES: SceneConfig[] = [
     siteId: 6,
     name: '願いの砂浜',
     imagePath: '/img/mysekai/beach.png',
+    sketchImagePath: '/img/mysekai/beach_sketch.png',
     physicalWidth: 20.513,
     offsetX: 0,
     offsetY: 80,
@@ -133,6 +136,7 @@ const SITE_SCENES: SceneConfig[] = [
     siteId: 8,
     name: '忘れ去られた場所',
     imagePath: '/img/mysekai/memorialplace.png',
+    sketchImagePath: '/img/mysekai/memorialplace_sketch.png',
     physicalWidth: 21.333,
     offsetX: 0,
     offsetY: -106.667,
@@ -178,7 +182,6 @@ const RARE_RES_KEYS: Record<1 | 2, string[]> = {
 }
 
 const accountStore = useAccountStore()
-const oauthStore = useOAuthStore()
 const settingsStore = useSettingsStore()
 const masterStore = useMasterStore()
 
@@ -189,10 +192,15 @@ const currentUserId = computed({
   get: () => accountStore.currentUserId,
   set: (value) => accountStore.selectAccount(value),
 })
+const currentMysekaiCache = computed<any | null>(() => {
+  if (!currentUserId.value) return null
+  return accountStore.getMysekaiCache(currentUserId.value)
+})
 
 const imageRef = ref<HTMLImageElement | null>(null)
 const selectedSiteId = ref<number>(SITE_ORDER[0] ?? 5)
 const showHarvested = ref(false)
+const useOriginalMapImage = ref(false)
 const isLoading = ref(false)
 const errorMsg = ref('')
 const parsedData = ref<ParsedMySekaiData | null>(null)
@@ -216,6 +224,9 @@ const imageMetrics = ref({
 })
 
 const selectedScene = computed(() => SITE_SCENE_MAP[selectedSiteId.value] ?? SITE_SCENES[0]!)
+const selectedSceneImagePath = computed(() => {
+  return useOriginalMapImage.value ? selectedScene.value.imagePath : selectedScene.value.sketchImagePath
+})
 
 const uploadTimeStr = computed(() => {
   if (!uploadTime.value) return ''
@@ -289,8 +300,8 @@ const renderCalls = computed<ResourceRenderCall[]>(() => {
   const displayScale = metrics.width / Math.max(1, metrics.naturalWidth)
   const iconScale = MAP_IMAGE_SCALE * displayScale
 
-  const largeBase = 35 * iconScale
-  const smallBase = 17 * iconScale
+  const largeBase = 39 * iconScale
+  const smallBase = 19 * iconScale
   const largeGap = largeBase * 0.92
   const smallGap = smallBase * 0.76
 
@@ -873,63 +884,24 @@ async function fetchUserData() {
 
   isLoading.value = true
   errorMsg.value = ''
-  parsedData.value = null
-  uploadTime.value = null
-  visibleResources.value = new Set()
 
   try {
     const loadMasterTask = ensureMysekaiMasterIconMaps()
-    const url = `https://suite-api.haruki.seiunx.com/public/jp/mysekai/${currentUserId.value}`
-    const res = await fetch(url)
+    const [mysekaiResult, suiteResult] = await Promise.allSettled([
+      accountStore.refreshMysekai(currentUserId.value),
+      accountStore.refreshSuite(currentUserId.value),
+    ])
 
-    if (!res.ok) {
-      if (res.status === 404) {
-        throw new Error('用户未上传 MySekai 数据')
-      }
-
-      if (res.status === 403) {
-        let oauthData: any = null
-        const returnTo = `${window.location.pathname}${window.location.search}${window.location.hash}`
-
-        if (oauthStore.hasTokenForUser(currentUserId.value)) {
-          try {
-            oauthData = await oauthStore.fetchGameData('jp', 'mysekai', currentUserId.value)
-          } catch (error: any) {
-            if (error?.status === 401 || error?.status === 403) {
-              oauthStore.clearTokensForUser(currentUserId.value)
-            } else {
-              throw error
-            }
-          }
-        }
-
-        if (!oauthData) {
-          const shouldAuthorize = window.confirm('你没有勾选公开访问，需要 OAuth 授权本站访问游戏数据。是否现在去授权？')
-          if (!shouldAuthorize) {
-            throw new Error('未完成 OAuth 授权，无法读取 MySekai 数据')
-          }
-          await oauthStore.startAuthorization(currentUserId.value, returnTo)
-          throw new Error('正在跳转 OAuth 授权页面...')
-        }
-
-        const parsed = parseMySekaiPayload(oauthData)
-        await loadMasterTask
-        uploadTime.value = parsed.uploadTime
-        parsedData.value = parsed
-        if (parsed.uploadTime) {
-          accountStore.updateUploadTime(currentUserId.value, parsed.uploadTime)
-        }
-
-        await nextTick()
-        refreshImageMetrics()
-        return
-      }
-
-      throw new Error(`API 请求失败: ${res.status}`)
+    if (mysekaiResult.status === 'rejected') {
+      throw mysekaiResult.reason
     }
 
-    const json = await res.json()
-    const parsed = parseMySekaiPayload(json)
+    const payload = mysekaiResult.value || accountStore.getMysekaiCache(currentUserId.value)
+    if (!payload) {
+      throw new Error('未读取到 MySekai 数据')
+    }
+
+    const parsed = parseMySekaiPayload(payload)
     await loadMasterTask
     if (!Object.keys(parsed.harvestMaps).length) {
       throw new Error('返回数据缺少 userMysekaiHarvestMaps，无法绘制资源地图')
@@ -939,6 +911,10 @@ async function fetchUserData() {
     parsedData.value = parsed
     if (parsed.uploadTime) {
       accountStore.updateUploadTime(currentUserId.value, parsed.uploadTime)
+    }
+
+    if (suiteResult.status === 'rejected') {
+      errorMsg.value = `MySekai 已更新，Suite 刷新失败: ${suiteResult.reason?.message || '未知错误'}`
     }
 
     await nextTick()
@@ -954,8 +930,29 @@ watch([parsedData, selectedSiteId, showHarvested], () => {
   visibleResources.value = new Set()
 })
 
+watch(currentMysekaiCache, async (cache) => {
+  if (!cache) {
+    parsedData.value = null
+    uploadTime.value = null
+    return
+  }
+
+  errorMsg.value = ''
+  const parsed = parseMySekaiPayload(cache)
+  uploadTime.value = parsed.uploadTime
+  parsedData.value = parsed
+
+  if (parsed.uploadTime && currentUserId.value) {
+    accountStore.updateUploadTime(currentUserId.value, parsed.uploadTime)
+  }
+
+  await ensureMysekaiMasterIconMaps()
+  await nextTick()
+  refreshImageMetrics()
+}, { immediate: true })
+
 watch(
-  () => selectedScene.value.imagePath,
+  () => selectedSceneImagePath.value,
   async () => {
     await nextTick()
     refreshImageMetrics()
@@ -1009,7 +1006,7 @@ onBeforeUnmount(() => {
 
           <button class="btn btn-primary btn-sm" :disabled="!currentUserId || isLoading" @click="fetchUserData">
             <span v-if="isLoading" class="loading loading-spinner loading-xs" />
-            获取数据
+            刷新MySekai数据
           </button>
 
           <span v-if="errorMsg" class="text-error text-sm">{{ errorMsg }}</span>
@@ -1028,6 +1025,11 @@ onBeforeUnmount(() => {
           <label class="label cursor-pointer gap-2">
             <input v-model="showHarvested" type="checkbox" class="checkbox checkbox-sm" />
             <span class="label-text">包含已采集点</span>
+          </label>
+
+          <label class="label cursor-pointer gap-2">
+            <input v-model="useOriginalMapImage" type="checkbox" class="toggle toggle-sm toggle-secondary" />
+            <span class="label-text">不玩抽象了</span>
           </label>
         </div>
       </div>
@@ -1067,7 +1069,7 @@ onBeforeUnmount(() => {
         <div class="relative inline-block w-full min-w-[900px]">
           <img
             ref="imageRef"
-            :src="selectedScene.imagePath"
+            :src="selectedSceneImagePath"
             class="block w-full h-auto"
             @load="refreshImageMetrics"
           />
@@ -1078,7 +1080,7 @@ onBeforeUnmount(() => {
               :key="`res-${call.id}-${call.left}-${call.top}-${call.drawOrder}`"
               class="resource-icon"
               :class="[
-                call.rarity === 2 ? 'resource-icon-super' : '',
+                call.rarity === 2 ? 'resource-icon-super' : (call.rarity === 1 ? 'resource-icon-rare' : ''),
                 call.smallIcon ? 'resource-icon-small' : '',
               ]"
               :style="{
@@ -1159,7 +1161,57 @@ onBeforeUnmount(() => {
 .resource-icon-super {
   border-width: 2px;
   border-color: rgba(239, 68, 68, 0.9);
-  box-shadow: 0 0 8px rgba(239, 68, 68, 0.8);
+  box-shadow:
+    0 0 10px rgba(239, 68, 68, 0.92),
+    0 0 18px rgba(239, 68, 68, 0.68),
+    0 0 30px rgba(239, 68, 68, 0.45);
+  animation: rareGlowPulseSuper 1.35s ease-in-out infinite;
+}
+
+.resource-icon-rare {
+  border-color: rgba(56, 189, 248, 0.92);
+  box-shadow:
+    0 0 8px rgba(56, 189, 248, 0.88),
+    0 0 14px rgba(56, 189, 248, 0.58),
+    0 0 24px rgba(56, 189, 248, 0.38);
+  animation: rareGlowPulse 1.6s ease-in-out infinite;
+}
+
+.resource-icon-rare img,
+.resource-icon-super img {
+  filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.6));
+}
+
+@keyframes rareGlowPulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 6px rgba(56, 189, 248, 0.7),
+      0 0 12px rgba(56, 189, 248, 0.45),
+      0 0 22px rgba(56, 189, 248, 0.28);
+  }
+  50% {
+    box-shadow:
+      0 0 11px rgba(56, 189, 248, 0.95),
+      0 0 20px rgba(56, 189, 248, 0.72),
+      0 0 34px rgba(56, 189, 248, 0.48);
+  }
+}
+
+@keyframes rareGlowPulseSuper {
+  0%,
+  100% {
+    box-shadow:
+      0 0 8px rgba(239, 68, 68, 0.78),
+      0 0 16px rgba(239, 68, 68, 0.58),
+      0 0 28px rgba(239, 68, 68, 0.4);
+  }
+  50% {
+    box-shadow:
+      0 0 14px rgba(239, 68, 68, 1),
+      0 0 24px rgba(239, 68, 68, 0.82),
+      0 0 42px rgba(239, 68, 68, 0.58);
+  }
 }
 
 .resource-qty {
