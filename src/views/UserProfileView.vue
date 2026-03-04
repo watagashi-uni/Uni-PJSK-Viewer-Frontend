@@ -1812,7 +1812,7 @@ watch(currentUserId, async (newId) => {
                             <td>
                               <div class="flex items-center gap-2">
                                 <img :src="getCharaIcon(row.characterId)" class="w-8 h-8 rounded-full ring-1 ring-base-300" />
-                                <span>{{ getCharaName(row.characterId) }}</span>
+                                <span class="hidden sm:inline">{{ getCharaName(row.characterId) }}</span>
                               </div>
                             </td>
                             <td class="font-semibold">{{ row.rank || '-' }}</td>
@@ -1950,7 +1950,7 @@ watch(currentUserId, async (newId) => {
                               <div class="flex items-center">
                                 <img :src="getCharaIcon(row.c1)" class="w-8 h-8 rounded-full ring-1 ring-base-300" />
                                 <img :src="getCharaIcon(row.c2)" class="w-8 h-8 rounded-full ring-1 ring-base-300 -ml-2" />
-                                <span class="ml-2 text-xs">{{ getCharaName(row.c1) }} × {{ getCharaName(row.c2) }}</span>
+                                <span class="ml-2 text-xs hidden sm:inline">{{ getCharaName(row.c1) }} × {{ getCharaName(row.c2) }}</span>
                               </div>
                             </td>
                             <td>
