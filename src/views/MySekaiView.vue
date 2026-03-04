@@ -300,8 +300,8 @@ const renderCalls = computed<ResourceRenderCall[]>(() => {
   const displayScale = metrics.width / Math.max(1, metrics.naturalWidth)
   const iconScale = MAP_IMAGE_SCALE * displayScale
 
-  const largeBase = 39 * iconScale
-  const smallBase = 19 * iconScale
+  const largeBase = 39 * 1.15 * iconScale
+  const smallBase = 19 * 1.15 * iconScale
   const largeGap = largeBase * 0.92
   const smallGap = smallBase * 0.76
 

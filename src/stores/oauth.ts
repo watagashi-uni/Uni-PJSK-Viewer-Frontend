@@ -54,6 +54,7 @@ async function parseJsonSafe(res: Response): Promise<any> {
 
 export const useOAuthStore = defineStore('oauth', () => {
     const tokensByUserId = ref<Record<string, StoredOAuthToken>>({})
+    const refreshTaskByUserId = new Map<string, Promise<void>>()
 
     const hasToken = computed(() => Object.keys(tokensByUserId.value).length > 0)
     const clientId = computed(() => (import.meta.env.VITE_TOOLBOX_OAUTH_CLIENT_ID || '').trim())
@@ -245,13 +246,27 @@ export const useOAuthStore = defineStore('oauth', () => {
         saveTokenPayload(userId, payload)
     }
 
+    async function refreshAccessTokenOnce(userId: string) {
+        const existingTask = refreshTaskByUserId.get(userId)
+        if (existingTask) {
+            await existingTask
+            return
+        }
+
+        const task = refreshAccessToken(userId).finally(() => {
+            refreshTaskByUserId.delete(userId)
+        })
+        refreshTaskByUserId.set(userId, task)
+        await task
+    }
+
     async function getValidAccessToken(userId: string): Promise<string> {
         const tokenData = tokensByUserId.value[userId]
         const token = tokenData?.accessToken || ''
         const exp = tokenData?.expiresAt ?? null
         const shouldRefresh = !token || (exp !== null && Date.now() >= exp - 30_000)
         if (shouldRefresh) {
-            await refreshAccessToken(userId)
+            await refreshAccessTokenOnce(userId)
         }
         const latest = tokensByUserId.value[userId]?.accessToken || ''
         if (!latest) {

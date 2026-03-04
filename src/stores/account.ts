@@ -18,6 +18,17 @@ function buildOAuthPromptText() {
     return '你没有勾选公开访问，需要 OAuth 授权本站访问游戏数据。是否现在去授权？'
 }
 
+function isOAuthTokenError(error: any): boolean {
+    const status = Number(error?.status)
+    const oauthError = String(error?.oauthError || '').toLowerCase()
+    const message = String(error?.message || '').toLowerCase()
+
+    if ([400, 401, 403].includes(status)) return true
+    if (oauthError === 'invalid_grant' || oauthError === 'invalid_token') return true
+    if (message.includes('refresh token') || message.includes('invalid_grant') || message.includes('access_token')) return true
+    return false
+}
+
 function normalizeUnixSeconds(timestamp: unknown): number | null {
     const value = Number(timestamp)
     if (!Number.isFinite(value) || value <= 0) return null
@@ -35,7 +46,7 @@ async function fetchSuiteByOAuth(userId: string): Promise<any> {
         try {
             return await oauthStore.fetchGameData('jp', 'suite', userId)
         } catch (e: any) {
-            if (e?.status === 401 || e?.status === 403) {
+            if (isOAuthTokenError(e)) {
                 oauthStore.clearTokensForUser(userId)
             } else {
                 throw e
@@ -59,7 +70,7 @@ async function fetchMysekaiByOAuth(userId: string): Promise<any> {
         try {
             return await oauthStore.fetchGameData('jp', 'mysekai', userId)
         } catch (e: any) {
-            if (e?.status === 401 || e?.status === 403) {
+            if (isOAuthTokenError(e)) {
                 oauthStore.clearTokensForUser(userId)
             } else {
                 throw e
@@ -345,18 +356,12 @@ export const useAccountStore = defineStore('account', () => {
                     setSuiteRefreshToast('oauth')
                     return oauthData
                 } catch (e: any) {
-                    if (e?.status === 401 || e?.status === 403) {
+                    if (isOAuthTokenError(e)) {
                         oauthStore.clearTokensForUser(userId)
-                        const fallbackData = await fetchSuiteByOAuth(userId)
-                        const uploadTime = normalizeUnixSeconds(fallbackData.upload_time)
-                        if (uploadTime) {
-                            updateUploadTime(userId, uploadTime)
-                        }
-                        await saveSuiteCache(userId, fallbackData)
-                        setSuiteRefreshToast('oauth')
-                        return fallbackData
+                        // Token 失效时先回退 public API，仅在 public=403 时再触发 OAuth 授权
+                    } else {
+                        throw e
                     }
-                    throw e
                 }
             }
 
@@ -399,13 +404,12 @@ export const useAccountStore = defineStore('account', () => {
                     await saveMysekaiCache(userId, oauthData)
                     return oauthData
                 } catch (e: any) {
-                    if (e?.status === 401 || e?.status === 403) {
+                    if (isOAuthTokenError(e)) {
                         oauthStore.clearTokensForUser(userId)
-                        const fallbackData = await fetchMysekaiByOAuth(userId)
-                        await saveMysekaiCache(userId, fallbackData)
-                        return fallbackData
+                        // Token 失效时先回退 public API，仅在 public=403 时再触发 OAuth 授权
+                    } else {
+                        throw e
                     }
-                    throw e
                 }
             }
 
