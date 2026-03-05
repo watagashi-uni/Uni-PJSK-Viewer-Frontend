@@ -1485,20 +1485,22 @@ watch(currentUserId, async (newId) => {
 
       <!-- ==================== Profile 展示 ==================== -->
       <template v-if="profileData">
-        <div class="card bg-base-100 shadow-lg">
-          <div class="card-body py-3">
-            <div class="tabs tabs-boxed w-fit">
-              <button
-                v-for="item in profileTabs"
-                :key="item.key"
-                class="tab tab-sm"
-                :class="{ 'tab-active': profileTab === item.key }"
-                @click="profileTab = item.key"
-              >
-                {{ item.label }}
-              </button>
-            </div>
-          </div>
+        <div class="flex flex-wrap gap-2">
+          <button
+            v-for="item in profileTabs"
+            :key="item.key"
+            type="button"
+            class="btn btn-sm h-9 min-h-9 text-xs sm:text-sm"
+            :class="profileTab === item.key ? 'btn-primary' : 'btn-ghost'"
+            @click="profileTab = item.key"
+          >
+            <User v-if="item.key === 'basic'" class="w-3.5 h-3.5 mr-1.5" />
+            <Star v-else-if="item.key === 'challenge'" class="w-3.5 h-3.5 mr-1.5" />
+            <Zap v-else-if="item.key === 'bonus'" class="w-3.5 h-3.5 mr-1.5" />
+            <Music v-else-if="item.key === 'bonds'" class="w-3.5 h-3.5 mr-1.5" />
+            <Trophy v-else class="w-3.5 h-3.5 mr-1.5" />
+            {{ item.label }}
+          </button>
         </div>
 
         <div class="grid grid-cols-1 gap-6" :class="{ 'min-[1150px]:grid-cols-2': profileTab === 'basic' }">
@@ -1736,19 +1738,23 @@ watch(currentUserId, async (newId) => {
                     {{ characterTab === 'rank' ? 'CHARACTER RANK' : 'CHALLENGE LIVE STAGE' }}
                   </h3>
                   <!-- Tab 切换 -->
-                  <div class="tabs tabs-boxed mb-4 justify-center">
+                  <div class="flex flex-wrap gap-2 mb-4">
                     <button
-                      class="tab"
-                      :class="{ 'tab-active': characterTab === 'rank' }"
+                      type="button"
+                      class="btn btn-sm h-9 min-h-9 text-xs sm:text-sm"
+                      :class="characterTab === 'rank' ? 'btn-primary' : 'btn-ghost'"
                       @click="characterTab = 'rank'"
                     >
+                      <User class="w-3.5 h-3.5 mr-1.5" />
                       角色等级
                     </button>
                     <button
-                      class="tab"
-                      :class="{ 'tab-active': characterTab === 'stage' }"
+                      type="button"
+                      class="btn btn-sm h-9 min-h-9 text-xs sm:text-sm"
+                      :class="characterTab === 'stage' ? 'btn-primary' : 'btn-ghost'"
                       @click="characterTab = 'stage'"
                     >
+                      <Star class="w-3.5 h-3.5 mr-1.5" />
                       挑战Live Stage
                     </button>
                   </div>
