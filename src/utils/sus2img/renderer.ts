@@ -65,7 +65,7 @@ const DEFAULT_STYLE = `.bar-line {
 
 .lyric-text {
     font-size: 12px;
-    font-family: \"Hiragino Kaku Gothic Pro\", sans-serif;
+    font-family: "Hiragino Kaku Gothic Pro", sans-serif;
     fill: #ffffff;
     text-anchor: start;
 }
@@ -116,7 +116,7 @@ const DEFAULT_STYLE = `.bar-line {
 .title {
     font-size: 96px;
     font-weight: 900;
-    font-family: \"Hiragino Kaku Gothic Pro\", sans-serif;
+    font-family: "Hiragino Kaku Gothic Pro", sans-serif;
     fill: #ffffff;
     text-anchor: start;
 }
@@ -124,7 +124,7 @@ const DEFAULT_STYLE = `.bar-line {
 .subtitle {
     font-size: 48px;
     font-weight: 700;
-    font-family: \"Hiragino Kaku Gothic Pro\", sans-serif;
+    font-family: "Hiragino Kaku Gothic Pro", sans-serif;
     fill: #ffffff;
     text-anchor: start;
 }
@@ -322,8 +322,6 @@ const formatBar = (bar: Fraction): string => {
     }
     return `${Number(n.toFixed(4))}`
 }
-
-const fraction = (value: Fraction | number): Fraction => (value instanceof Fraction ? value : new Fraction(value))
 
 const cloneEvent = (event: Event): Event =>
     new Event({
@@ -713,7 +711,7 @@ class SentenceRenderer {
         )
     }
 
-    private renderEvents(height: number): string[] {
+    private renderEvents(): string[] {
         const parts: string[] = []
 
         for (let bar = this.barStart; bar <= this.barStop; bar += 1) {
@@ -929,7 +927,7 @@ class SentenceRenderer {
             )
         }
 
-        parts.push(...this.renderEvents(height))
+        parts.push(...this.renderEvents())
         parts.push(...this.slidePaths)
         parts.push(...this.noteImages)
         parts.push(...this.amongImages)

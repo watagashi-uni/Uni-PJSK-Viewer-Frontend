@@ -349,15 +349,12 @@ export class Slide extends Note {
         }
 
         if (this.decoration) {
-            let tapTick: boolean | null | undefined
-            let directionalTick: boolean | null | undefined
-
-            tapTick = this.tap ? this.tap.isTick() : null
+            const tapTick = this.tap ? this.tap.isTick() : null
             if (tapTick) {
                 return tapTick
             }
 
-            directionalTick = this.directional ? this.directional.isTick() : null
+            const directionalTick = this.directional ? this.directional.isTick() : null
             if (directionalTick) {
                 return directionalTick
             }
