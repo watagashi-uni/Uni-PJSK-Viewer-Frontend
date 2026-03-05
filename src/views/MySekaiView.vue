@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useAccountStore } from '@/stores/account'
 import { useSettingsStore } from '@/stores/settings'
 import { useMasterStore } from '@/stores/master'
+import AccountSelector from '@/components/AccountSelector.vue'
 
 type RarityLevel = 0 | 1 | 2
 
@@ -974,21 +975,6 @@ onBeforeUnmount(() => {
             {{ sourceLabel }}
           </div>
 
-          <select
-            v-if="accounts.length > 0"
-            v-model="currentUserId"
-            class="select select-bordered select-sm w-full max-w-xs"
-          >
-            <option disabled value="">选择账号</option>
-            <option v-for="account in accounts" :key="account.userId" :value="account.userId">
-              {{ account.userId }} - {{ account.name }}
-            </option>
-          </select>
-
-          <div v-else class="text-sm text-error">
-            请先在个人信息页面添加账号
-          </div>
-
           <button class="btn btn-primary btn-sm" :disabled="!currentUserId || isLoading" @click="fetchUserData">
             <span v-if="isLoading" class="loading loading-spinner loading-xs" />
             刷新MySekai数据
@@ -998,6 +984,15 @@ onBeforeUnmount(() => {
         </div>
 
         <div class="flex flex-wrap gap-4 items-end">
+          <label v-if="accounts.length > 0" class="form-control w-full sm:w-auto sm:min-w-[170px] sm:max-w-[260px]">
+            <div class="label"><span class="label-text">账号</span></div>
+            <AccountSelector v-model="currentUserId" />
+          </label>
+
+          <div v-else class="text-sm text-error self-center">
+            请先在个人信息页面添加账号
+          </div>
+
           <label class="form-control w-full max-w-xs">
             <div class="label"><span class="label-text">站点</span></div>
             <select v-model.number="selectedSiteId" class="select select-bordered select-sm">
