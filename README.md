@@ -42,6 +42,8 @@ Variable notes:
 - `VITE_TOOLBOX_OAUTH_BASE_URL`: Haruki toolbox OAuth server base URL
 - `VITE_TOOLBOX_OAUTH_CLIENT_ID`: OAuth client id for toolbox game-data read scope
 
+If you want to deploy your own backend, you can refer to [API_README.md](API_README.md).
+
 ## Contributing
 
 1. Create a branch: `git checkout -b feature/<name>`
