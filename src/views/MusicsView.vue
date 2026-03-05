@@ -718,7 +718,7 @@ watch(() => route.query.page, () => {})
               
               <label class="cursor-pointer label p-0 gap-2">
                 <span class="label-text">民间定数</span>
-                <input type="checkbox" v-model="usePjskb30" class="toggle toggle-primary toggle-sm" />
+                <input v-model="usePjskb30" type="checkbox" class="toggle toggle-primary toggle-sm" />
               </label>
               <div class="text-xs text-base-content/40 border-l border-base-300 pl-3 leading-tight flex flex-col gap-1 justify-center">
                 <div class="flex items-center gap-1">定数来源 <a href="https://github.com/auburnsummer/pjskb30" target="_blank" rel="noopener noreferrer" class="link link-hover flex items-center gap-1"><Github class="w-3 h-3" />pjskb30</a></div>
@@ -1049,85 +1049,85 @@ watch(() => route.query.page, () => {})
       class="w-[1120px] bg-base-100 p-8 text-base-content flex flex-col gap-6 font-sans antialiased"
       style="contain: none;"
     >
-    <!-- 顶部：玩家信息与总览 -->
-    <div class="flex justify-between items-end border-b border-base-200 pb-4">
-      <div class="flex flex-col gap-1 justify-end">
-        <h1 class="text-3xl font-black flex items-center gap-3">
-          <Trophy class="w-8 h-8 text-warning" />
-          Best 30
-        </h1>
-        <div class="mt-4 w-64 -mx-2 origin-left scale-[1.3] pl-2 pb-1">
-          <AccountSelector
-            :model-value="accountStore.currentUserId"
-            :show-id="false"
-            :readonly="true"
+      <!-- 顶部：玩家信息与总览 -->
+      <div class="flex justify-between items-end border-b border-base-200 pb-4">
+        <div class="flex flex-col gap-1 justify-end">
+          <h1 class="text-3xl font-black flex items-center gap-3">
+            <Trophy class="w-8 h-8 text-warning" />
+            Best 30
+          </h1>
+          <div class="mt-4 w-64 -mx-2 origin-left scale-[1.3] pl-2 pb-1">
+            <AccountSelector
+              :model-value="accountStore.currentUserId"
+              :show-id="false"
+              :readonly="true"
+            />
+          </div>
+        </div>
+        <div class="flex flex-col items-end gap-2">
+          <div class="badge badge-primary badge-lg text-lg py-4 px-6 font-bold">
+            Rating {{ b30Rating.toFixed(3) }}
+          </div>
+          <div class="text-sm font-medium text-base-content/60">
+            生成时间: {{ new Date().toLocaleString() }}
+          </div>
+        </div>
+      </div>
+
+      <!-- 中部：3 列网格排版 -->
+      <div class="grid grid-cols-3 gap-3">
+        <div 
+          v-for="(entry, idx) in b30List" 
+          :key="`cap-${entry.musicId}-${entry.difficulty}`"
+          class="flex items-center gap-3 p-3 rounded-xl bg-base-200/40 border border-base-200/80"
+        >
+          <div class="text-sm font-black text-base-content/30 w-6 text-right shrink-0">#{{ idx + 1 }}</div>
+          <AssetImage 
+            :src="getMusicThumbnailUrl(entry.musicId)" 
+            :alt="getMusicTitle(entry.musicId)"
+            class="w-14 h-14 rounded-lg object-cover flex-shrink-0"
+            :lazy="false"
           />
-        </div>
-      </div>
-      <div class="flex flex-col items-end gap-2">
-        <div class="badge badge-primary badge-lg text-lg py-4 px-6 font-bold">
-          Rating {{ b30Rating.toFixed(3) }}
-        </div>
-        <div class="text-sm font-medium text-base-content/60">
-          生成时间: {{ new Date().toLocaleString() }}
-        </div>
-      </div>
-    </div>
-
-    <!-- 中部：3 列网格排版 -->
-    <div class="grid grid-cols-3 gap-3">
-      <div 
-        v-for="(entry, idx) in b30List" 
-        :key="`cap-${entry.musicId}-${entry.difficulty}`"
-        class="flex items-center gap-3 p-3 rounded-xl bg-base-200/40 border border-base-200/80"
-      >
-        <div class="text-sm font-black text-base-content/30 w-6 text-right shrink-0">#{{ idx + 1 }}</div>
-        <AssetImage 
-          :src="getMusicThumbnailUrl(entry.musicId)" 
-          :alt="getMusicTitle(entry.musicId)"
-          class="w-14 h-14 rounded-lg object-cover flex-shrink-0"
-          :lazy="false"
-        />
-        <div class="flex-1 min-w-0 flex flex-col justify-center">
-          <div class="text-base font-bold truncate leading-tight mb-1" :title="getMusicTitle(entry.musicId)">
-            {{ getMusicTitle(entry.musicId) }}
+          <div class="flex-1 min-w-0 flex flex-col justify-center">
+            <div class="text-base font-bold truncate leading-tight mb-1" :title="getMusicTitle(entry.musicId)">
+              {{ getMusicTitle(entry.musicId) }}
+            </div>
+            <div class="flex items-center gap-2">
+              <span 
+                class="px-2 py-0.5 rounded text-xs font-bold leading-none"
+                :style="{ backgroundColor: diffColors[entry.difficulty], color: ['easy','normal','hard'].includes(entry.difficulty) ? 'black' : 'white' }"
+              >
+                {{ diffLabels[entry.difficulty] }} {{ entry.playLevel.toFixed(1) }}
+              </span>
+              <span
+                v-if="entry.rank === 'AP'"
+                class="px-2 py-0.5 rounded text-xs font-extrabold tracking-wide text-white leading-none"
+                style="background: linear-gradient(135deg, #c084fc, #8b5cf6);"
+              >AP</span>
+              <span
+                v-else-if="entry.rank === 'FC'"
+                class="px-2 py-0.5 rounded text-xs font-extrabold tracking-wide text-white leading-none"
+                style="background: linear-gradient(135deg, #f87171, #ea580c);"
+              >FC</span>
+            </div>
           </div>
-          <div class="flex items-center gap-2">
-            <span 
-              class="px-2 py-0.5 rounded text-xs font-bold leading-none"
-              :style="{ backgroundColor: diffColors[entry.difficulty], color: ['easy','normal','hard'].includes(entry.difficulty) ? 'black' : 'white' }"
-            >
-              {{ diffLabels[entry.difficulty] }} {{ entry.playLevel.toFixed(1) }}
-            </span>
-            <span
-              v-if="entry.rank === 'AP'"
-              class="px-2 py-0.5 rounded text-xs font-extrabold tracking-wide text-white leading-none"
-              style="background: linear-gradient(135deg, #c084fc, #8b5cf6);"
-            >AP</span>
-            <span
-              v-else-if="entry.rank === 'FC'"
-              class="px-2 py-0.5 rounded text-xs font-extrabold tracking-wide text-white leading-none"
-              style="background: linear-gradient(135deg, #f87171, #ea580c);"
-            >FC</span>
-          </div>
+          <div class="text-lg font-mono font-black text-primary pr-2 shrink-0">{{ entry.score.toFixed(2) }}</div>
         </div>
-        <div class="text-lg font-mono font-black text-primary pr-2 shrink-0">{{ entry.score.toFixed(2) }}</div>
       </div>
-    </div>
 
-    <!-- 底部：网站信息声明 -->
-    <div class="flex justify-between items-center border-t border-base-200 pt-4 text-sm text-base-content/50 font-medium">
-      <div class="flex items-center gap-2">
-        <span class="font-bold text-base-content/70">Uni PJSK Viewer</span>
-        <span>•</span>
-        <span>{{ siteUrl }}</span>
-      </div>
-      <div>
-        定数来源: {{ usePjskb30 ? 'auburnsummer/pjskb30 (民间定数)' : '官方定数' }}
+      <!-- 底部：网站信息声明 -->
+      <div class="flex justify-between items-center border-t border-base-200 pt-4 text-sm text-base-content/50 font-medium">
+        <div class="flex items-center gap-2">
+          <span class="font-bold text-base-content/70">Uni PJSK Viewer</span>
+          <span>•</span>
+          <span>{{ siteUrl }}</span>
+        </div>
+        <div>
+          定数来源: {{ usePjskb30 ? 'auburnsummer/pjskb30 (民间定数)' : '官方定数' }}
+        </div>
       </div>
     </div>
   </div>
-</div>
 </template>
 
 <style scoped>
