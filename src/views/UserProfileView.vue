@@ -1314,10 +1314,11 @@ onMounted(async () => {
   }
 
   loadAccounts()
-  if (accounts.value.length > 0) {
+  const hasCurrentAccount = !!currentUserId.value && accounts.value.some(a => a.userId === currentUserId.value)
+  if (!hasCurrentAccount && accounts.value.length > 0) {
     await accountStore.selectAccount(accounts.value[0]!.userId)
-    loadProfileData()
   }
+  loadProfileData()
   isInitLoading.value = false
 })
 
