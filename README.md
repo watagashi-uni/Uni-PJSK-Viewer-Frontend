@@ -22,12 +22,25 @@ npm run preview
 ```
 
 ### Environment variables
-Create `.env.development` in the project root:
+Configuration flow:
 
+1. Create `.env.development` in the project root.
+2. Fill values based on your API deployment.
+3. Run `npm run dev`.
+
+Example:
 ```env
-VITE_API_BASE_URL=
+VITE_API_BASE_URL=https://viewer-api.unipjsk.com
 VITE_CHART_PREVIEW_URL=http://localhost:5175
+VITE_TOOLBOX_OAUTH_BASE_URL=https://toolbox-api-direct.haruki.seiunx.com
+VITE_TOOLBOX_OAUTH_CLIENT_ID=uni-viewer-public
 ```
+
+Variable notes:
+- `VITE_API_BASE_URL`: backend API base URL (master/version/chart-share/sus2img etc.)
+- `VITE_CHART_PREVIEW_URL`: chart preview service URL used in music detail page
+- `VITE_TOOLBOX_OAUTH_BASE_URL`: Haruki toolbox OAuth server base URL
+- `VITE_TOOLBOX_OAUTH_CLIENT_ID`: OAuth client id for toolbox game-data read scope
 
 ## Contributing
 
