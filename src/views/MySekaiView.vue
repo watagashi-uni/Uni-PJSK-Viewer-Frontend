@@ -10,7 +10,6 @@ interface SceneConfig {
   siteId: number
   name: string
   imagePath: string
-  sketchImagePath: string
   physicalWidth: number
   offsetX: number
   offsetY: number
@@ -99,8 +98,7 @@ const SITE_SCENES: SceneConfig[] = [
   {
     siteId: 5,
     name: 'さいしょの原っぱ',
-    imagePath: '/img/mysekai/grassland.png',
-    sketchImagePath: '/img/mysekai/grassland_sketch.png',
+    imagePath: '/img/mysekai/grassland_sketch.jpg',
     physicalWidth: 33.333,
     offsetX: 0,
     offsetY: -40,
@@ -111,8 +109,7 @@ const SITE_SCENES: SceneConfig[] = [
   {
     siteId: 7,
     name: '彩りの花畑',
-    imagePath: '/img/mysekai/flowergarden.png',
-    sketchImagePath: '/img/mysekai/flowergarden_sketch.png',
+    imagePath: '/img/mysekai/flowergarden_sketch.jpg',
     physicalWidth: 24.806,
     offsetX: -62.015,
     offsetY: 20.672,
@@ -123,8 +120,7 @@ const SITE_SCENES: SceneConfig[] = [
   {
     siteId: 6,
     name: '願いの砂浜',
-    imagePath: '/img/mysekai/beach.png',
-    sketchImagePath: '/img/mysekai/beach_sketch.png',
+    imagePath: '/img/mysekai/beach_sketch.jpg',
     physicalWidth: 20.513,
     offsetX: 0,
     offsetY: 80,
@@ -135,8 +131,7 @@ const SITE_SCENES: SceneConfig[] = [
   {
     siteId: 8,
     name: '忘れ去られた場所',
-    imagePath: '/img/mysekai/memorialplace.png',
-    sketchImagePath: '/img/mysekai/memorialplace_sketch.png',
+    imagePath: '/img/mysekai/memorialplace_sketch.jpg',
     physicalWidth: 21.333,
     offsetX: 0,
     offsetY: -106.667,
@@ -200,7 +195,6 @@ const currentMysekaiCache = computed<any | null>(() => {
 const imageRef = ref<HTMLImageElement | null>(null)
 const selectedSiteId = ref<number>(SITE_ORDER[0] ?? 5)
 const showHarvested = ref(false)
-const useOriginalMapImage = ref(false)
 const isLoading = ref(false)
 const errorMsg = ref('')
 const parsedData = ref<ParsedMySekaiData | null>(null)
@@ -224,9 +218,7 @@ const imageMetrics = ref({
 })
 
 const selectedScene = computed(() => SITE_SCENE_MAP[selectedSiteId.value] ?? SITE_SCENES[0]!)
-const selectedSceneImagePath = computed(() => {
-  return useOriginalMapImage.value ? selectedScene.value.imagePath : selectedScene.value.sketchImagePath
-})
+const selectedSceneImagePath = computed(() => selectedScene.value.imagePath)
 
 const uploadTimeStr = computed(() => {
   if (!uploadTime.value) return ''
@@ -1025,11 +1017,6 @@ onBeforeUnmount(() => {
           <label class="label cursor-pointer gap-2">
             <input v-model="showHarvested" type="checkbox" class="checkbox checkbox-sm" />
             <span class="label-text">包含已采集点</span>
-          </label>
-
-          <label class="label cursor-pointer gap-2">
-            <input v-model="useOriginalMapImage" type="checkbox" class="toggle toggle-sm toggle-secondary" />
-            <span class="label-text">不玩抽象了</span>
           </label>
         </div>
       </div>
