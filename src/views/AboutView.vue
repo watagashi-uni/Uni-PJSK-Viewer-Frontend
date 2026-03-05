@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { 
-  Music, Code, Wrench, ExternalLink, Github, Heart, Languages 
+  Music, Code, Wrench, ExternalLink, Github, Heart, Languages, ShieldCheck
 } from 'lucide-vue-next'
 </script>
 
@@ -17,6 +17,37 @@ import {
     <!-- <AlertBanner type="warning">
       <strong class="flex items-center gap-1"><AlertTriangle class="w-4 h-4" /> 内测中！</strong> 该网站还在内部测试中，出现问题请及时反馈
     </AlertBanner> -->
+
+    <!-- 数据与隐私 -->
+    <div class="card bg-base-100 shadow-lg mb-6 animate-fade-in-up animation-delay-50">
+      <div class="card-body">
+        <h3 class="card-title text-lg flex items-center gap-2">
+          <ShieldCheck class="w-5 h-5 text-primary" /> 账号数据与隐私说明
+        </h3>
+        <div class="mt-3 space-y-3 text-base-content/75 leading-relaxed">
+          <p>
+            <strong style="font-weight: bold; font-size: 1.2rem;">账号数据只在浏览器里，不会存到本站服务器。所有的账号数据展示都是浏览器本地计算</strong>
+          </p>
+          <p>
+            <strong>你看到的你的账号数据，主要来自两处：</strong><br />
+            1) 游戏公开查询（当前等级，名字，卡组，角色等级等）。<br />
+            2) Haruki 工具箱数据（你抓包上传的个人数据，比如持卡、编队、挑战信息、MySekai家具、打歌成绩等）。<br />
+            网站只是把这些数据拉到你的浏览器里显示。
+          </p>
+          <p>
+            <strong>会保存在浏览器本地的内容：</strong><br />
+            账号 ID、你查过的数据缓存、页面设置（主题/剧透开关等），还有一些加速用缓存。
+          </p>
+          <p>
+            <strong>不会上传到本站服务器的内容：</strong><br />
+            账号相关的所有数据、你在页面里的筛选、查看过程、以及大部分本地计算结果，不会被当作你的个人档案长期保存。
+          </p>
+          <p class="text-sm text-base-content/60">
+            换设备、换浏览器，或者清除缓存后，本地数据不会自动跟着走。你可以在用户页面导出数据自行备份。
+          </p>
+        </div>
+      </div>
+    </div>
 
     <!-- 开发者信息 -->
     <div class="card bg-base-100 shadow-lg mb-6 animate-fade-in-up animation-delay-100">
