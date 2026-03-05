@@ -879,16 +879,13 @@ async function fetchUserData() {
 
   try {
     const loadMasterTask = ensureMysekaiMasterIconMaps()
-    const [mysekaiResult, suiteResult] = await Promise.allSettled([
-      accountStore.refreshMysekai(currentUserId.value),
-      accountStore.refreshSuite(currentUserId.value),
-    ])
+    const payload = await accountStore.refreshMysekai(currentUserId.value)
+      .catch((error) => {
+        const cache = accountStore.getMysekaiCache(currentUserId.value)
+        if (cache) return cache
+        throw error
+      })
 
-    if (mysekaiResult.status === 'rejected') {
-      throw mysekaiResult.reason
-    }
-
-    const payload = mysekaiResult.value || accountStore.getMysekaiCache(currentUserId.value)
     if (!payload) {
       throw new Error('未读取到 MySekai 数据')
     }
@@ -903,10 +900,6 @@ async function fetchUserData() {
     parsedData.value = parsed
     if (parsed.uploadTime) {
       accountStore.updateUploadTime(currentUserId.value, parsed.uploadTime)
-    }
-
-    if (suiteResult.status === 'rejected') {
-      errorMsg.value = `MySekai 已更新，Suite 刷新失败: ${suiteResult.reason?.message || '未知错误'}`
     }
 
     await nextTick()
