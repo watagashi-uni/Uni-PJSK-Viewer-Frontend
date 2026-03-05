@@ -10,6 +10,7 @@ export class WorkerProxyDataProvider implements DataProvider {
     private postMessage: (msg: any) => void
     private pendingRequests = new Map<string, { resolve: (data: any) => void, reject: (err: any) => void }>()
     private requestIdCounter = 0
+    private dataFetchDuration = 0
 
     constructor(postMessage: (msg: any) => void, userId?: string) {
         this.postMessage = postMessage
@@ -33,9 +34,19 @@ export class WorkerProxyDataProvider implements DataProvider {
         // 主线程 masterStore 会处理具体的获取逻辑
         const requestKey = key === 'ingameNodes' ? 'ingameNotes' : key
 
+        const start = performance.now()
         return new Promise<T[]>((resolve, reject) => {
             const requestId = `req_${++this.requestIdCounter}`
-            this.pendingRequests.set(requestId, { resolve, reject })
+            this.pendingRequests.set(requestId, {
+                resolve: (data: T[]) => {
+                    this.dataFetchDuration += performance.now() - start
+                    resolve(data)
+                },
+                reject: (err: any) => {
+                    this.dataFetchDuration += performance.now() - start
+                    reject(err)
+                }
+            })
 
             // 发送请求给主线程
             this.postMessage({
@@ -49,7 +60,9 @@ export class WorkerProxyDataProvider implements DataProvider {
 
     async getMusicMeta(): Promise<MusicMeta[]> {
         // 使用后端反代 /api/music_metas，避免前端 CORS 问题
+        const start = performance.now()
         const res = await apiClient.get<MusicMeta[]>('/api/music_metas')
+        this.dataFetchDuration += performance.now() - start
         return res.data
     }
 
@@ -60,9 +73,19 @@ export class WorkerProxyDataProvider implements DataProvider {
 
     async getUserDataAll(): Promise<Record<string, any>> {
         if (!this.userId) throw new Error('未指定用户ID')
+        const start = performance.now()
         return new Promise<Record<string, any>>((resolve, reject) => {
             const requestId = `req_${++this.requestIdCounter}`
-            this.pendingRequests.set(requestId, { resolve, reject })
+            this.pendingRequests.set(requestId, {
+                resolve: (data: Record<string, any>) => {
+                    this.dataFetchDuration += performance.now() - start
+                    resolve(data)
+                },
+                reject: (err: any) => {
+                    this.dataFetchDuration += performance.now() - start
+                    reject(err)
+                }
+            })
 
             // 由主线程读取 accountStore 缓存，避免 Worker 侧重复直连 public API
             this.postMessage({
@@ -71,5 +94,9 @@ export class WorkerProxyDataProvider implements DataProvider {
                 userId: this.userId,
             })
         })
+    }
+
+    getDataFetchDuration(): number {
+        return this.dataFetchDuration
     }
 }

@@ -149,6 +149,7 @@ const calculating = ref(false)
 const recommend = ref<RecommendDeckResult[] | null>(null)
 const errorMsg = ref('')
 const challengeHighScore = ref(0)
+const fetchDuration = ref(0)
 const calcDuration = ref(0)
 
 let workerRef: Worker | null = null
@@ -335,11 +336,15 @@ async function handleCalculate() {
   errorMsg.value = ''
   recommend.value = null
   challengeHighScore.value = 0
+  fetchDuration.value = 0
+  calcDuration.value = 0
   calculating.value = true
 
   // 自动刷新 suite 数据
   try {
+    const fetchStart = performance.now()
     await accountStore.refreshSuite(uid)
+    fetchDuration.value = performance.now() - fetchStart
   } catch (e: any) {
     const msg = String(e?.message || e || '')
     // 已跳转 OAuth 授权流程，当前计算中止，等待授权完成后重试
@@ -417,6 +422,7 @@ async function handleCalculate() {
     } else if (data.type === 'result') {
       recommend.value = data.result.result
       if (data.result.challengeHighScore) challengeHighScore.value = data.result.challengeHighScore
+      if (data.result.dataFetchDuration > 0) fetchDuration.value += data.result.dataFetchDuration
       if (data.result.duration > 0) calcDuration.value = data.result.duration
       calculating.value = false
     }
@@ -471,14 +477,7 @@ const rarityList = [
       自动组队
     </h1>
 
-    <div class="alert alert-info shadow-sm">
-      <Info class="w-5 h-5 shrink-0" />
-      <div class="text-sm">
-        <p>使用前请先将用户数据传到 <a href="https://haruki.seiunx.com/upload_suite" target="_blank" class="link font-medium">Haruki工具箱</a>。</p>
-        <p>计算过程全部在您的浏览器中进行，不会记录任何用户数据。手机性能有限建议使用电脑。</p>
-        <p>本页面抄的 <a href="https://3-3.dev/sekai/deck-recommend" target="_blank" class="link font-medium">3-3.dev</a></p>
-      </div>
-    </div>
+
 
     <div v-if="isLoading" class="flex justify-center py-20">
       <span class="loading loading-spinner loading-lg text-primary"></span>
@@ -684,6 +683,7 @@ const rarityList = [
           <p v-if="mode === '1' && selectedCharacter && challengeHighScore > 0" class="text-sm">
             <strong>{{ getCharacterName(selectedCharacter) }}</strong> 当前最高分：<strong>{{ challengeHighScore }}</strong>
           </p>
+          <p class="text-sm">拉数据耗时：<strong>{{ fetchDuration.toFixed(0) }} 毫秒</strong></p>
           <p class="text-sm">计算耗时：<strong>{{ calcDuration.toFixed(0) }} 毫秒</strong></p>
         </div>
       </div>
@@ -737,6 +737,11 @@ const rarityList = [
 
       <div v-if="recommend && recommend.length === 0" class="text-center py-10 opacity-60">
         没有找到符合条件的卡组
+      </div>
+
+      <div class="text-center text-xs opacity-70 pb-2">
+        本页面修改自
+        <a href="https://3-3.dev/sekai/deck-recommend" target="_blank" class="link font-medium">3-3.dev</a>
       </div>
     </template>
   </div>

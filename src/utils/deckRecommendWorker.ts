@@ -57,7 +57,6 @@ async function deckRecommendRunner(args: any) {
         }
 
         const result = await recommend.recommendChallengeLiveDeck(gameCharacter.id, config)
-        const endTime = performance.now()
 
         // 获取挑战最高分
         let challengeHighScore = 0
@@ -69,7 +68,12 @@ async function deckRecommendRunner(args: any) {
             }
         } catch { /* ignore */ }
 
-        return { result, challengeHighScore, duration: endTime - startTime }
+        const endTime = performance.now()
+        const totalDuration = endTime - startTime
+        const dataFetchDuration = globalDataProvider.getDataFetchDuration()
+        const computeDuration = Math.max(0, totalDuration - dataFetchDuration)
+
+        return { result, challengeHighScore, duration: computeDuration, dataFetchDuration, totalDuration }
     } else {
         // 活动模式
         const recommend = new EventDeckRecommend(dataProvider)
@@ -86,7 +90,11 @@ async function deckRecommendRunner(args: any) {
         const specialCharacterId = supportCharacter?.id
         const result = await recommend.recommendEventDeck(event0.id, liveType, config, specialCharacterId)
         const endTime = performance.now()
+        const totalDuration = endTime - startTime
 
-        return { result, duration: endTime - startTime }
+        const dataFetchDuration = globalDataProvider.getDataFetchDuration()
+        const computeDuration = Math.max(0, totalDuration - dataFetchDuration)
+
+        return { result, duration: computeDuration, dataFetchDuration, totalDuration }
     }
 }
