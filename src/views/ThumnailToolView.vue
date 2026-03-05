@@ -182,7 +182,6 @@ function copyMusicTitle() {
 
 <template>
   <div class="max-w-7xl mx-auto p-4 flex flex-col lg:flex-row gap-6">
-    
     <!-- 左侧：预览区域 -->
     <div class="lg:w-2/3 flex flex-col gap-4">
       <div class="flex items-center justify-between">
@@ -265,17 +264,21 @@ function copyMusicTitle() {
             </div>
             
             <!-- 文字区域（与封面同宽） -->
-            <div class="flex flex-col items-start w-full" :style="{
-              filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.8))',
-              transform: 'translateX(4%)'
-            }">
+            <div
+              class="flex flex-col items-start w-full" :style="{
+                filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.8))',
+                transform: 'translateX(4%)'
+              }"
+            >
               <!-- 难度和等级 -->
-              <div class="flex items-baseline gap-[0.4em] w-full" :style="{
-                marginBottom: '-2%',
-                filter: 'drop-shadow(0 0 10px #ae17ff) drop-shadow(0 0 4px #ae17ff)',
-                fontSize: '5.5cqi',
-                letterSpacing: '0.05em' /* <--- 在这里调整 MASTER 和数字的字间距，0em 为默认，越大间距越宽 */
-              }">
+              <div
+                class="flex items-baseline gap-[0.4em] w-full" :style="{
+                  marginBottom: '-2%',
+                  filter: 'drop-shadow(0 0 10px #ae17ff) drop-shadow(0 0 4px #ae17ff)',
+                  fontSize: '5.5cqi',
+                  letterSpacing: '0.05em' /* <--- 在这里调整 MASTER 和数字的字间距，0em 为默认，越大间距越宽 */
+                }"
+              >
                 <span class="font-bold text-white" style="-webkit-text-stroke: 1px white">
                   {{ selectedDifficulty.toUpperCase() }}
                 </span>
@@ -285,14 +288,16 @@ function copyMusicTitle() {
               </div>
               
               <!-- 评价文本 (ALL PERFECT 等) -->
-              <div class="font-black uppercase whitespace-nowrap w-full" :style="{
-                fontSize: '5.2cqi',
-                color: 'transparent',
-                backgroundImage: 'linear-gradient(to bottom, #c164eb 0%, #cdfdff 100%)',
-                backgroundClip: 'text',
-                WebkitBackgroundClip: 'text',
-                filter: 'drop-shadow(0 0 8px rgba(193,100,235,0.5))'
-              }">
+              <div
+                class="font-black uppercase whitespace-nowrap w-full" :style="{
+                  fontSize: '5.2cqi',
+                  color: 'transparent',
+                  backgroundImage: 'linear-gradient(to bottom, #c164eb 0%, #cdfdff 100%)',
+                  backgroundClip: 'text',
+                  WebkitBackgroundClip: 'text',
+                  filter: 'drop-shadow(0 0 8px rgba(193,100,235,0.5))'
+                }"
+              >
                 {{ customText }}
               </div>
             </div>
@@ -320,26 +325,26 @@ function copyMusicTitle() {
             
             <!-- X 轴 -->
             <div class="form-control">
-              <label class="label py-1"><span class="label-text text-xs flex items-center gap-1"><Crosshair class="w-3 h-3"/> 水平平移 (X)</span></label>
-              <input type="range" min="-1000" max="1000" v-model.number="bgX" class="range range-xs range-primary" />
+              <label class="label py-1"><span class="label-text text-xs flex items-center gap-1"><Crosshair class="w-3 h-3" /> 水平平移 (X)</span></label>
+              <input v-model.number="bgX" type="range" min="-1000" max="1000" class="range range-xs range-primary" />
             </div>
             
             <!-- Y 轴 -->
             <div class="form-control">
-              <label class="label py-1"><span class="label-text text-xs flex items-center gap-1"><Crosshair class="w-3 h-3"/> 垂直平移 (Y)</span></label>
-              <input type="range" min="-1000" max="1000" v-model.number="bgY" class="range range-xs range-primary" />
+              <label class="label py-1"><span class="label-text text-xs flex items-center gap-1"><Crosshair class="w-3 h-3" /> 垂直平移 (Y)</span></label>
+              <input v-model.number="bgY" type="range" min="-1000" max="1000" class="range range-xs range-primary" />
             </div>
 
             <!-- 缩放 -->
             <div class="form-control">
-              <label class="label py-1"><span class="label-text text-xs flex items-center gap-1"><ZoomIn class="w-3 h-3"/> 缩放比例</span></label>
-              <input type="range" min="0.1" max="3" step="0.01" v-model.number="bgScale" class="range range-xs range-secondary" />
+              <label class="label py-1"><span class="label-text text-xs flex items-center gap-1"><ZoomIn class="w-3 h-3" /> 缩放比例</span></label>
+              <input v-model.number="bgScale" type="range" min="0.1" max="3" step="0.01" class="range range-xs range-secondary" />
             </div>
 
             <!-- 旋转 -->
             <div class="form-control">
-              <label class="label py-1"><span class="label-text text-xs flex items-center gap-1"><RefreshCcw class="w-3 h-3"/> 旋转角度</span></label>
-              <input type="range" min="-180" max="180" v-model.number="bgRotate" class="range range-xs range-accent" />
+              <label class="label py-1"><span class="label-text text-xs flex items-center gap-1"><RefreshCcw class="w-3 h-3" /> 旋转角度</span></label>
+              <input v-model.number="bgRotate" type="range" min="-180" max="180" class="range range-xs range-accent" />
             </div>
 
             <button class="btn btn-outline btn-sm mt-3 w-full" @click="resetTransform">重置微调</button>
@@ -372,7 +377,7 @@ function copyMusicTitle() {
               class="menu bg-base-100 border border-base-300 w-full rounded-box shadow-xl absolute top-[60px] z-50 max-h-48 flex-nowrap overflow-y-auto"
             >
               <li v-for="music in searchResults" :key="music.id">
-                <a @click="selectMusic(music)" class="py-2 text-sm">
+                <a class="py-2 text-sm" @click="selectMusic(music)">
                   <AssetImage 
                     :src="`${settingsStore.assetsHost}/startapp/music/jacket/${music.assetbundleName}/${music.assetbundleName}.png`" 
                     class="w-8 h-8 rounded shrink-0 object-cover"
@@ -423,10 +428,8 @@ function copyMusicTitle() {
               <button class="btn btn-xs btn-outline" @click="customText = 'CLEAR'">CLEAR</button>
             </div>
           </div>
-
         </div>
       </div>
     </div>
-
   </div>
 </template>

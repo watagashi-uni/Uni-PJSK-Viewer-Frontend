@@ -502,7 +502,7 @@ const suiteReadTalkIds = computed(() => {
   for (const row of rows) {
     const talkId = pickNumber(row, ['mysekaiCharacterTalkId', 'characterTalkId'])
     if (talkId === null || talkId <= 0) continue
-    if (Boolean(row?.isRead)) {
+    if (row?.isRead) {
       set.add(talkId)
     }
   }
@@ -1756,16 +1756,16 @@ function closeFixtureDetail() {
       <div v-else-if="activeTab === 'gate'" class="space-y-4">
         <div class="card bg-base-100 shadow-sm">
           <div class="card-body p-4">
-            <p class="text-sm text-base-content/70" v-if="!hasSuiteGateData">
+            <p v-if="!hasSuiteGateData" class="text-sm text-base-content/70">
               当前无可用 Suite 大门/材料数据，展示基础全量升级需求。
             </p>
-            <p class="text-sm text-base-content/70" v-else>
+            <p v-else class="text-sm text-base-content/70">
               当前账号大门材料缺口已按累计需求计算。
             </p>
           </div>
         </div>
 
-        <div class="card bg-base-100 shadow-sm" v-if="gateViews.length > 0">
+        <div v-if="gateViews.length > 0" class="card bg-base-100 shadow-sm">
           <div class="card-body p-4">
             <div class="flex flex-wrap items-center gap-1.5 sm:gap-2">
               <span class="text-sm text-base-content/70 mr-1">选择大门:</span>

@@ -500,7 +500,6 @@ function clearForm() {
               {{ isSubmitting ? '转换中...' : '开始转换' }}
             </button>
           </div>
-
         </form>
       </div>
     </div>

@@ -665,24 +665,24 @@ const isExpired = computed(() => {
             </div>
           </div>
 
-            <div class="text-center mt-6 w-full flex flex-col items-center">
-              <div v-if="isLimitedTime" class="badge badge-warning text-warning-content font-bold shadow-sm mb-2 h-auto py-1.5 px-3 flex flex-col text-center whitespace-normal leading-tight">
-                <span>期间限定</span>
-                <span class="text-[10px] sm:text-[11px] font-normal opacity-90 mt-0.5">
-                  {{ formatDate(currentLimitedData!.startAt) }} - {{ formatDate(currentLimitedData!.endAt) }}
-                </span>
-              </div>
-              <div v-else-if="isExpired" class="badge bg-base-300 text-base-content/60 font-bold border-none mb-2">已过期</div>
+          <div class="text-center mt-6 w-full flex flex-col items-center">
+            <div v-if="isLimitedTime" class="badge badge-warning text-warning-content font-bold shadow-sm mb-2 h-auto py-1.5 px-3 flex flex-col text-center whitespace-normal leading-tight">
+              <span>期间限定</span>
+              <span class="text-[10px] sm:text-[11px] font-normal opacity-90 mt-0.5">
+                {{ formatDate(currentLimitedData!.startAt) }} - {{ formatDate(currentLimitedData!.endAt) }}
+              </span>
+            </div>
+            <div v-else-if="isExpired" class="badge bg-base-300 text-base-content/60 font-bold border-none mb-2">已过期</div>
               
-              <h1 v-if="music.pronunciation && hasFurigana" class="text-2xl font-bold text-base-content select-all leading-relaxed">
-                <template v-for="(seg, i) in furiganaSegments" :key="i">
-                  <ruby v-if="seg.ruby">{{ seg.text }}<rp>(</rp><rt class="text-xs font-medium text-primary/70 select-none">{{ seg.ruby }}</rt><rp>)</rp></ruby><template v-else>{{ seg.text }}</template>
-                </template>
-              </h1>
-              <h1 v-else class="text-2xl font-bold text-base-content select-all">{{ music.title }}</h1>
+            <h1 v-if="music.pronunciation && hasFurigana" class="text-2xl font-bold text-base-content select-all leading-relaxed">
+              <template v-for="(seg, i) in furiganaSegments" :key="i">
+                <ruby v-if="seg.ruby">{{ seg.text }}<rp>(</rp><rt class="text-xs font-medium text-primary/70 select-none">{{ seg.ruby }}</rt><rp>)</rp></ruby><template v-else>{{ seg.text }}</template>
+              </template>
+            </h1>
+            <h1 v-else class="text-2xl font-bold text-base-content select-all">{{ music.title }}</h1>
             
-              <!-- 翻译 -->
-              <p v-if="translation" class="text-base-content/70 mt-2 select-all">{{ translation }}</p>
+            <!-- 翻译 -->
+            <p v-if="translation" class="text-base-content/70 mt-2 select-all">{{ translation }}</p>
             <a 
               v-else
               href="https://paratranz.cn/projects/18073" 
