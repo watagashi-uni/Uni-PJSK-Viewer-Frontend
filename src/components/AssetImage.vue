@@ -19,9 +19,9 @@ const props = withDefaults(defineProps<{
 
 <template>
   <img 
-    :src="src"
-    :alt="alt"
-    :loading="lazy ? 'lazy' : 'eager'"
-    :crossorigin="src.startsWith('http') ? 'anonymous' : undefined"
+    :src="props.src"
+    :alt="props.alt"
+    :loading="props.lazy ? 'lazy' : 'eager'"
+    :crossorigin="props.src.startsWith('http') ? 'anonymous' : undefined"
   />
 </template>

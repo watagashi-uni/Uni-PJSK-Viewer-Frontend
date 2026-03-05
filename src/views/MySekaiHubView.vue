@@ -483,7 +483,7 @@ const talkUnitOptions = computed<TalkUnitOption[]>(() => {
 
   return unitOrder
     .map((key) => map.get(key))
-    .filter((item): item is TalkUnitOption => !!item)
+    .filter((item): item is TalkUnitOption => item != null)
 })
 
 const selectedTalkCharacterUnitIds = computed(() => {
