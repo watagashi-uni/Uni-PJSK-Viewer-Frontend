@@ -244,7 +244,6 @@ const unitOrder = ['light_sound', 'idol', 'street', 'theme_park', 'school_refusa
 
 const showUserData = ref(false)
 const isMasterLoading = ref(true)
-const isAutoLoading = ref(false)
 const isManualRefreshing = ref(false)
 const errorMsg = ref('')
 const fixtureDetailModalRef = ref<HTMLDialogElement | null>(null)
@@ -256,7 +255,6 @@ const onlyOwned = ref(false)
 const selectedTalkCharacterId = ref(0)
 const selectedTalkUnit = ref('')
 
-const autoLoadedUserIds = ref<Set<string>>(new Set())
 const autoShowResolvedUserIds = ref<Set<string>>(new Set())
 const fixtureImageIndex = ref<Record<number, number>>({})
 const selectedGateId = ref(0)
@@ -348,10 +346,6 @@ const mysekaiSource = computed(() => {
 
 const refreshing = computed(() => {
   return isManualRefreshing.value || accountStore.suiteRefreshing || accountStore.mysekaiRefreshing
-})
-
-const isAutoLoadingHintVisible = computed(() => {
-  return showUserData.value && isAutoLoading.value
 })
 
 const blueprintIdToFixtureId = computed(() => {
@@ -1074,11 +1068,6 @@ watch(selectedUserId, (userId) => {
   autoShowResolvedUserIds.value = next
 }, { immediate: true })
 
-watch([showUserData, selectedUserId], async ([show, userId]) => {
-  if (!show || !userId) return
-  await autoLoadUserDataOnce(userId)
-}, { immediate: true })
-
 onMounted(async () => {
   await loadMasterData()
 })
@@ -1305,60 +1294,30 @@ async function getFirstAvailableMaster(names: string[]): Promise<any[]> {
   return []
 }
 
-async function autoLoadUserDataOnce(userId: string) {
-  if (autoLoadedUserIds.value.has(userId)) return
-
-  const mysekaiCached = accountStore.getMysekaiCache(userId)
-  const suiteCached = accountStore.getSuiteCache(userId)
-  const hasMysekaiCachedData =
-    Array.isArray(mysekaiCached?.updatedResources?.userMysekaiBlueprints) ||
-    Array.isArray(mysekaiCached?.updatedResources?.userMysekaiMusicRecords)
-  const hasSuiteCachedData =
-    Array.isArray(suiteCached?.userMysekaiGates) &&
-    Array.isArray(suiteCached?.userMysekaiMaterials)
-
-  const nextSet = new Set(autoLoadedUserIds.value)
-  nextSet.add(userId)
-  autoLoadedUserIds.value = nextSet
-
-  if (hasMysekaiCachedData && hasSuiteCachedData) {
-    return
-  }
-
-  const tasks: Array<Promise<any>> = [
-    accountStore.refreshMysekai(userId),
-    accountStore.refreshSuite(userId),
-  ]
-
-  isAutoLoading.value = true
-  try {
-    const results = await Promise.allSettled(tasks)
-    const failed = results.find((item) => item.status === 'rejected') as PromiseRejectedResult | undefined
-    if (failed) {
-      errorMsg.value = failed.reason?.message || '自动加载账号数据失败'
-    }
-  } finally {
-    isAutoLoading.value = false
-  }
-}
-
 async function refreshCurrentUserData() {
   if (!selectedUserId.value) return
 
   isManualRefreshing.value = true
   errorMsg.value = ''
   try {
-    const [mysekaiResult, suiteResult] = await Promise.allSettled([
-      accountStore.refreshMysekai(selectedUserId.value),
-      accountStore.refreshSuite(selectedUserId.value),
-    ])
+    const runRefresh = async (job: () => Promise<any>) => {
+      try {
+        await job()
+        return true
+      } catch (e: any) {
+        const msg = String(e?.message || '')
+        if (msg.includes('正在跳转 OAuth 授权页面') || msg.includes('未完成 OAuth 授权')) {
+          errorMsg.value = msg
+          return false
+        }
+        throw e
+      }
+    }
 
-    if (mysekaiResult.status === 'rejected') {
-      throw mysekaiResult.reason
-    }
-    if (suiteResult.status === 'rejected') {
-      throw suiteResult.reason
-    }
+    const okMysekai = await runRefresh(() => accountStore.refreshMysekai(selectedUserId.value))
+    if (!okMysekai) return
+    const okSuite = await runRefresh(() => accountStore.refreshSuite(selectedUserId.value))
+    if (!okSuite) return
   } catch (e: any) {
     errorMsg.value = e?.message || '刷新失败'
   } finally {
@@ -1563,28 +1522,28 @@ function closeFixtureDetail() {
         </div>
 
         <div
-          v-if="showUserData && (mysekaiUploadTimeText || mysekaiSource || isAutoLoadingHintVisible || errorMsg)"
+          v-if="showUserData && (mysekaiUploadTimeText || mysekaiSource || errorMsg)"
           class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-base-content/60"
         >
           <span v-if="mysekaiUploadTimeText">MySekai 更新: {{ mysekaiUploadTimeText }}</span>
           <span v-if="mysekaiSource">来源: {{ mysekaiSource }}</span>
-          <span v-if="isAutoLoadingHintVisible" class="text-info">首次自动加载中</span>
           <span v-if="errorMsg" class="text-error">{{ errorMsg }}</span>
         </div>
       </div>
     </div>
 
-    <div class="tabs tabs-boxed bg-base-100 shadow-sm p-1 w-fit">
+    <div class="flex flex-wrap gap-2">
       <button
         v-for="tab in tabOptions"
         :key="tab.key"
-        class="tab"
-        :class="activeTab === tab.key ? 'tab-active' : ''"
+        type="button"
+        class="btn btn-sm h-9 min-h-9 text-xs sm:text-sm"
+        :class="activeTab === tab.key ? 'btn-primary' : 'btn-ghost'"
         @click="activeTab = tab.key"
       >
-        <Sofa v-if="tab.key === 'furniture'" class="w-4 h-4 mr-1" />
-        <DoorOpen v-else-if="tab.key === 'gate'" class="w-4 h-4 mr-1" />
-        <Disc3 v-else class="w-4 h-4 mr-1" />
+        <Sofa v-if="tab.key === 'furniture'" class="w-4 h-4 mr-1.5" />
+        <DoorOpen v-else-if="tab.key === 'gate'" class="w-4 h-4 mr-1.5" />
+        <Disc3 v-else class="w-4 h-4 mr-1.5" />
         {{ tab.label }}
       </button>
     </div>
