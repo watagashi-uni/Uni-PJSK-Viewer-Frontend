@@ -24,3 +24,6 @@ dist-ssr
 *.sw?
 .agents/
 .vscode/
+
+# Local env (do not commit)
+.env.development
