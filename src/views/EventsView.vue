@@ -4,20 +4,10 @@ import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
 import { Calendar, Trophy, Users, EyeOff } from 'lucide-vue-next'
 import AssetImage from '@/components/AssetImage.vue'
+import type { EventData } from '@/types/master'
 
 const masterStore = useMasterStore()
 const settingsStore = useSettingsStore()
-
-interface EventData {
-  id: number
-  eventType: string
-  name: string
-  assetbundleName: string
-  startAt: number
-  aggregateAt: number
-  closedAt: number
-  unit: string
-}
 
 const events = ref<EventData[]>([])
 const searchQuery = ref('')
@@ -175,6 +165,9 @@ function isLeak(event: EventData): boolean {
           <!-- 简单角标 (替代之前的内部遮罩) -->
           <div v-if="event.startAt > Date.now()" class="absolute top-2 left-2 z-20 badge badge-warning gap-1 font-bold shadow-md">
             <EyeOff class="w-3 h-3" /> 即将开始
+          </div>
+          <div v-else-if="Date.now() >= event.startAt && Date.now() < event.aggregateAt" class="absolute top-2 left-2 z-20 badge badge-success text-white gap-1 font-bold shadow-md">
+            <Calendar class="w-3 h-3" /> 进行中
           </div>
 
           <!-- 活动类型标签 (位置调整) -->

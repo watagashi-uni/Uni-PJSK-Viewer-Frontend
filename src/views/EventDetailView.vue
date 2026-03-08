@@ -11,32 +11,13 @@ import {
 import SekaiCard from '@/components/SekaiCard.vue'
 import AssetImage from '@/components/AssetImage.vue'
 import SekaiHonor from '@/components/SekaiHonor.vue'
+import type { EventData } from '@/types/master'
 
 const route = useRoute()
 const masterStore = useMasterStore()
 const settingsStore = useSettingsStore()
 
 const assetsHost = computed(() => settingsStore.assetsHost)
-
-interface EventData {
-  id: number
-  eventType: string
-  name: string
-  assetbundleName: string
-  startAt: number
-  aggregateAt: number
-  closedAt: number
-  unit: string
-  eventRankingRewardRanges?: {
-    id: number
-    fromRank: number
-    toRank: number
-    eventRankingRewards: {
-        id: number
-        resourceBoxId: number
-    }[]
-  }[]
-}
 
 interface EventMusic {
   eventId: number

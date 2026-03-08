@@ -5,95 +5,11 @@ import { useSettingsStore } from '@/stores/settings'
 import { useMasterStore } from '@/stores/master'
 import AccountSelector from '@/components/AccountSelector.vue'
 
-type RarityLevel = 0 | 1 | 2
-
-interface SceneConfig {
-  siteId: number
-  name: string
-  imagePath: string
-  physicalWidth: number
-  offsetX: number
-  offsetY: number
-  xDirection: 1 | -1
-  yDirection: 1 | -1
-  reverseXY: boolean
-}
-
-interface RawFixture {
-  mysekaiSiteHarvestFixtureId?: number
-  userMysekaiSiteHarvestFixtureStatus?: string
-  positionX?: number
-  positionZ?: number
-}
-
-interface RawDrop {
-  resourceType?: string
-  resourceId?: number
-  quantity?: number
-  positionX?: number
-  positionZ?: number
-  mysekaiSiteHarvestResourceDropStatus?: string
-}
-
-interface RawHarvestMap {
-  mysekaiSiteId?: number
-  userMysekaiSiteHarvestFixtures?: RawFixture[]
-  userMysekaiSiteHarvestResourceDrops?: RawDrop[]
-}
-
-interface ParsedMySekaiData {
-  uploadTime: number | null
-  source: string
-  harvestMaps: Record<number, RawHarvestMap>
-  ownedMusicRecordIds: Set<number>
-}
-
-interface AggregatedResource {
-  key: string
-  type: string
-  id: number
-  quantity: number
-  smallIcon: boolean
-  deleted: boolean
-  rarity: RarityLevel
-  texture: string
-  hasAttachment: boolean
-}
-
-interface PointGroup {
-  key: string
-  fixtureId: number
-  gameX: number
-  gameZ: number
-  resources: Record<string, AggregatedResource>
-}
-
-interface PositionedPoint extends PointGroup {
-  drawX: number
-  drawY: number
-}
-
-interface ResourceRenderCall {
-  id: string
-  left: number
-  top: number
-  size: number
-  quantity: number
-  texture: string
-  rarity: RarityLevel
-  smallIcon: boolean
-  hasAttachment: boolean
-  drawOrder: number
-}
-
-interface ResourceStat {
-  id: string
-  type: string
-  itemId: number
-  texture: string
-  count: number
-  rarity: RarityLevel
-}
+import type {
+  RarityLevel, SceneConfig, RawHarvestMap,
+  ParsedMySekaiData, AggregatedResource, PointGroup, PositionedPoint,
+  ResourceRenderCall, ResourceStat
+} from '@/types/mysekai'
 
 const SITE_SCENES: SceneConfig[] = [
   {

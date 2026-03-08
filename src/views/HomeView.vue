@@ -11,6 +11,7 @@ import {
   ExternalLink, Link
 } from 'lucide-vue-next'
 import AssetImage from '@/components/AssetImage.vue'
+import type { EventData, MusicData } from '@/types/master'
 
 const FRONTEND_VERSION = '2.6.0'
 
@@ -39,34 +40,7 @@ function selectTheme(val: any) {
   }
 }
 
-interface EventData {
-  id: number
-  eventType: string
-  name: string
-  assetbundleName: string
-  startAt: number
-  aggregateAt: number
-}
-
-interface MusicData {
-  id: number
-  title: string
-  assetbundleName: string
-  publishedAt: number
-  composer: string
-  lyricist: string
-}
-
-interface Gacha {
-  id: number
-  gachaType: string
-  name: string
-  seq: number
-  assetbundleName: string
-  gachaCeilItemId: number
-  startAt: number
-  endAt: number
-}
+import type { Gacha } from '@/types/gacha'
 
 const events = ref<EventData[]>([])
 const musics = ref<MusicData[]>([])

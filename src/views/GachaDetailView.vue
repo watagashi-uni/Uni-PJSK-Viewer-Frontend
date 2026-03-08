@@ -10,80 +10,10 @@ import {
 import SekaiCard from '@/components/SekaiCard.vue'
 import AssetImage from '@/components/AssetImage.vue'
 
-// 类型定义
-interface GachaPickup {
-  id: number
-  gachaId: number
-  cardId: number
-  gachaPickupType: string
-}
-
-interface Gacha {
-  id: number
-  gachaType: string
-  name: string
-  seq: number
-  assetbundleName: string
-  gachaCeilItemId: number
-  startAt: number
-  endAt: number
-  gachaBehaviors: GachaBehavior[]
-  gachaCardRarityRates: GachaCardRarityRate[]
-  gachaDetails: GachaDetail[]
-  gachaInformation?: {
-    summary: string
-    description: string
-  }
-  gachaPickups?: GachaPickup[]
-}
-
-interface GachaBehavior {
-  id: number
-  gachaId: number
-  gachaBehaviorType: string
-  costResourceType: string
-  costResourceQuantity: number
-  spinCount: number
-  groupId: number
-  resourceCategory?: string
-  gachaSpinnableType?: string
-}
-
-interface GachaCardRarityRate {
-  id: number
-  gachaId: number
-  cardRarityType: string
-  rate: number
-}
-
-interface GachaDetail {
-  id: number
-  gachaId: number
-  cardId: number
-  weight: number
-  isWish: boolean
-}
-
-interface Card {
-  id: number
-  characterId: number
-  cardRarityType: string
-  attr: string
-  assetbundleName: string
-  prefix: string
-}
-
-interface SimulationResult {
-  cardId: number
-  card: Card | null
-}
-
-interface SimulationStats {
-  totalPulls: number
-  totalJewels: number
-  totalTickets: number
-  rarityCount: Record<string, number>
-}
+import type { 
+  Gacha, GachaBehavior, GachaCardRarityRate, 
+  Card, SimulationResult, SimulationStats 
+} from '@/types/gacha'
 
 const route = useRoute()
 const masterStore = useMasterStore()
@@ -267,8 +197,8 @@ function getRateDisplay(rate: GachaCardRarityRate): string {
 function simulateSinglePull(isGuaranteed: boolean = false): SimulationResult {
   if (!gacha.value) return { cardId: 0, card: null }
 
-  const rates = gacha.value.gachaCardRarityRates
-  const details = gacha.value.gachaDetails
+  const rates = gacha.value.gachaCardRarityRates || []
+  const details = gacha.value.gachaDetails || []
 
   let roll = Math.random() * 100
   let selectedRarityType = 'rarity_2'
@@ -509,7 +439,7 @@ watch(() => route.params.id, loadData)
           <div class="flex items-center gap-2 flex-wrap">
             <Percent class="w-4 h-4 text-primary" />
             <span 
-              v-for="rate in gacha.gachaCardRarityRates.filter(r => r.rate > 0)" 
+              v-for="rate in (gacha.gachaCardRarityRates || []).filter(r => r.rate > 0)" 
               :key="rate.id"
               class="badge"
               :class="{
@@ -628,7 +558,7 @@ watch(() => route.params.id, loadData)
           <!-- 抽卡按钮 -->
           <div class="flex flex-wrap gap-2">
             <button
-              v-for="behavior in gacha.gachaBehaviors.filter(b => b.spinCount > 0)"
+              v-for="behavior in (gacha.gachaBehaviors || []).filter(b => b.spinCount > 0)"
               :key="behavior.id"
               class="btn btn-primary btn-sm"
               @click="doGacha(behavior)"
