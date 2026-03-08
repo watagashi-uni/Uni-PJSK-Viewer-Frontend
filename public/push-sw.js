@@ -1,3 +1,4 @@
+/* global clients */
 self.addEventListener('push', function (e) {
     if (!(self.Notification && self.Notification.permission === 'granted')) {
         return;
@@ -7,7 +8,7 @@ self.addEventListener('push', function (e) {
     if (e.data) {
         try {
             data = e.data.json();
-        } catch (err) {
+        } catch {
             data = { body: e.data.text() };
         }
     }
