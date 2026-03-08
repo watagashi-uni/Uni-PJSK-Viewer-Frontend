@@ -75,9 +75,9 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '谱面分享' },
     },
     {
-        path: '/thumnail',
-        name: 'Thumnail',
-        component: () => import('@/views/ThumnailToolView.vue'),
+        path: '/thumbnail',
+        name: 'Thumbnail',
+        component: () => import('@/views/ThumbnailToolView.vue'),
         meta: { title: '封面生成' },
     },
     {
