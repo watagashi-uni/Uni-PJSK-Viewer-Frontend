@@ -7,11 +7,10 @@ import { useSettingsStore } from '@/stores/settings'
 import { 
   Play, Pause, BarChart2, Eye, Download, ChevronLeft, 
   Disc3, Sparkles, Mic, Volume2, VolumeX, SkipBack, SkipForward,
-  PlayCircle, Zap, Bell, BellRing
+  PlayCircle, Zap
 } from 'lucide-vue-next'
 import AssetImage from '@/components/AssetImage.vue'
 import { alignFurigana } from '@/utils/furigana'
-import { useNotificationStore } from '@/stores/notification'
 import type { EventData } from '@/types/master'
 
 interface Music {
@@ -71,19 +70,8 @@ const route = useRoute()
 const router = useRouter()
 const masterStore = useMasterStore()
 const settingsStore = useSettingsStore()
-const notificationStore = useNotificationStore()
 
 const musicId = computed(() => Number(route.params.id))
-const topicId = computed(() => `music_${musicId.value}`)
-const isSubscribedToThis = computed(() => notificationStore.hasSubscription(topicId.value))
-
-async function toggleSub() {
-  try {
-    await notificationStore.toggleSubscription(topicId.value)
-  } catch (e) {
-    alert('订阅切换失败: ' + (e instanceof Error ? e.message : String(e)))
-  }
-}
 const music = ref<Music | null>(null)
 const difficulties = ref<MusicDifficulty[]>([])
 const vocals = ref<MusicVocal[]>([])
@@ -639,20 +627,9 @@ const isExpired = computed(() => {
     <!-- 歌曲详情 -->
     <template v-else-if="music">
       <!-- 顶部导航 -->
-      <div class="mb-4 flex items-center justify-between">
+      <div class="mb-4">
         <button class="btn btn-ghost btn-sm gap-2 pl-0" @click="goBack">
           <ChevronLeft class="w-4 h-4" /> 返回列表
-        </button>
-
-        <button 
-          v-if="notificationStore.isSupported"
-          class="btn btn-sm gap-2"
-          :class="isSubscribedToThis ? 'btn-primary' : 'btn-ghost'"
-          @click="toggleSub"
-        >
-          <BellRing v-if="isSubscribedToThis" class="w-4 h-4" />
-          <Bell v-else class="w-4 h-4" />
-          {{ isSubscribedToThis ? '已订阅提醒' : '订阅提醒' }}
         </button>
       </div>
 

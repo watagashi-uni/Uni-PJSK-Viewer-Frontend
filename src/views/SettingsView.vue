@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useSettingsStore } from '@/stores/settings'
 import { useMasterStore } from '@/stores/master'
 import { useNotificationStore } from '@/stores/notification'
-import { Settings, Trash2, Database, Eye, Palette, RefreshCw, Languages, Mic, Bell, AlertTriangle, MonitorSmartphone, Send, X, Music, Radio } from 'lucide-vue-next'
+import { Settings, Trash2, Database, Eye, Palette, RefreshCw, Languages, Mic, Bell, AlertTriangle, MonitorSmartphone, Send } from 'lucide-vue-next'
 import { clearAllCache } from '@/utils/masterDB'
 
 const settingsStore = useSettingsStore()
@@ -41,24 +41,17 @@ async function testPush() {
   }
 }
 
-const subscribedDetails = computed(() => {
-  const musics = masterStore.cache?.['musics'] || []
-  const vlives = masterStore.cache?.['virtualLives'] || []
+function isTopicSubscribed(topic: string) {
+  return notificationStore.subscribedTopics.includes(topic)
+}
 
-  return notificationStore.subscribedTopics.map(topic => {
-    if (topic.startsWith('music_')) {
-      const id = parseInt(topic.split('_')[1] || '0')
-      const m = musics.find((x: any) => x.id === id)
-      return { topic, type: 'music', id, name: m ? m.title : `歌曲 #${id}`, icon: Music }
-    }
-    if (topic.startsWith('vlive_')) {
-      const id = parseInt(topic.split('_')[1] || '0')
-      const v = vlives.find((x: any) => x.id === id)
-      return { topic, type: 'vlive', id, name: v ? v.name : `虚拟 Live #${id}`, icon: Radio }
-    }
-    return { topic, type: 'unknown', id: 0, name: topic, icon: Bell }
-  })
-})
+async function toggleTopic(topic: string) {
+  try {
+    await notificationStore.toggleSubscription(topic)
+  } catch (e) {
+    alert('订阅切换失败: ' + (e instanceof Error ? e.message : String(e)))
+  }
+}
 
 const isClearing = ref(false)
 const isClearingTranslation = ref(false)
@@ -263,28 +256,26 @@ async function handleClearTranslationCache() {
 
           <div v-if="notificationStore.isSubscribed" class="bg-base-200 rounded-lg p-4 space-y-4">
             <div>
-              <p class="font-medium text-sm mb-2 opacity-80 flex items-center justify-between">
-                <span>您的订阅列表：</span>
-                <span class="text-xs">{{ subscribedDetails.length }} 项</span>
-              </p>
-              
-              <div v-if="subscribedDetails.length === 0" class="text-sm text-base-content/50 py-4 text-center border border-dashed border-base-300 rounded-lg">
-                您还没有订阅任何提醒。<br/>请前往歌曲或 Live 详情页点击🔔订阅。
-              </div>
-
-              <div v-else class="flex flex-col gap-2 max-h-60 overflow-y-auto pr-2">
-                <div v-for="item in subscribedDetails" :key="item.topic" class="flex items-center justify-between bg-base-100 p-2 rounded-md shadow-sm border border-base-300/50">
-                  <div class="flex items-center gap-2 overflow-hidden">
-                    <component :is="item.icon" class="w-4 h-4 text-primary shrink-0" />
-                    <span class="text-sm truncate">{{ item.name }}</span>
-                  </div>
-                  <button 
-                    class="btn btn-ghost btn-xs text-error hover:bg-error/20"
-                    @click="notificationStore.toggleSubscription(item.topic)"
-                  >
-                    <X class="w-3.5 h-3.5" />
-                  </button>
-                </div>
+              <p class="font-medium text-sm mb-3 opacity-80">推送内容：</p>
+              <div class="flex flex-col gap-2">
+                <label class="label cursor-pointer justify-start gap-3 py-1">
+                  <input type="checkbox" class="checkbox checkbox-sm checkbox-primary"
+                    :checked="isTopicSubscribed('music')"
+                    @change="toggleTopic('music')" />
+                  <span class="label-text">新歌曲上线提醒</span>
+                </label>
+                <label class="label cursor-pointer justify-start gap-3 py-1">
+                  <input type="checkbox" class="checkbox checkbox-sm checkbox-primary"
+                    :checked="isTopicSubscribed('vlive')"
+                    @change="toggleTopic('vlive')" />
+                  <span class="label-text">虚拟 Live 提醒</span>
+                </label>
+                <label class="label cursor-pointer justify-start gap-3 py-1">
+                  <input type="checkbox" class="checkbox checkbox-sm checkbox-primary"
+                    :checked="isTopicSubscribed('apd')"
+                    @change="toggleTopic('apd')" />
+                  <span class="label-text">新 APPEND 谱面提醒</span>
+                </label>
               </div>
             </div>
 

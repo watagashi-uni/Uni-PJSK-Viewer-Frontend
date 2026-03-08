@@ -3,29 +3,16 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
-import { Calendar, Clock, ChevronLeft, Users, Bell, BellRing } from 'lucide-vue-next'
+import { Calendar, Clock, ChevronLeft, Users } from 'lucide-vue-next'
 import AssetImage from '@/components/AssetImage.vue'
-import { useNotificationStore } from '@/stores/notification'
 
 const route = useRoute()
 const masterStore = useMasterStore()
 const settingsStore = useSettingsStore()
-const notificationStore = useNotificationStore()
 
 const vlive = ref<any>(null)
 const gameCharacterUnits = ref<any[]>([])
 const isLoading = ref(true)
-
-const topicId = computed(() => `vlive_${route.params.id}`)
-const isSubscribedToThis = computed(() => notificationStore.hasSubscription(topicId.value))
-
-async function toggleSub() {
-  try {
-    await notificationStore.toggleSubscription(topicId.value)
-  } catch (e) {
-    alert('订阅切换失败: ' + (e instanceof Error ? e.message : String(e)))
-  }
-}
 
 
 const assetsHost = computed(() => settingsStore.assetsHost)
@@ -133,17 +120,6 @@ const schedules = computed(() => {
               {{ typeMap[vlive.virtualLiveType]?.label || vlive.virtualLiveType }}
             </span>
           </div>
-          
-          <button 
-            v-if="notificationStore.isSupported"
-            class="btn btn-sm gap-2"
-            :class="isSubscribedToThis ? 'btn-primary' : 'btn-ghost'"
-            @click="toggleSub"
-          >
-            <BellRing v-if="isSubscribedToThis" class="w-4 h-4" />
-            <Bell v-else class="w-4 h-4" />
-            <span class="hidden sm:inline">{{ isSubscribedToThis ? '已订阅提醒' : '订阅提醒' }}</span>
-          </button>
         </div>
         <h1 class="text-2xl font-bold ml-1">{{ vlive.name }}</h1>
       </div>
