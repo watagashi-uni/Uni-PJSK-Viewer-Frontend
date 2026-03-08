@@ -20,12 +20,16 @@ async function toggleVliveSub() {
     alert('iOS Safari 浏览器不支持直接推送。\n请点击底部“共享”按钮 -> “添加到主屏幕”，然后从桌面打开本网站即可开启推送通知。')
     return
   }
+  if (notificationStore.isAndroid && !isVliveSubscribed.value) {
+    const ok = confirm('注意：安卓设备依赖谷歌 FCM 推送服务，国内网络可能无法连接，导致无法开启或收到推送。\n\n建议开启代理后再试，或使用 iOS/桌面端接收推送。\n\n是否继续尝试？')
+    if (!ok) return
+  }
   try {
     await notificationStore.toggleSubscription('vlive')
   } catch (e: any) {
     const msg = e instanceof Error ? e.message : String(e)
-    if (msg.includes('push service error')) {
-      alert('订阅失败：国内安卓设备通常无法连接谷歌厂商推送服务 (FCM)，导致无法接收通知。\n建议在配置代理的环境下使用，或从系统层面解决网络连通性问题。')
+    if (msg.toLowerCase().includes('registration failed') || msg.toLowerCase().includes('push service')) {
+      alert('订阅失败：无法连接推送服务。\n\n安卓设备依赖谷歌 FCM 服务，国内网络通常无法连接。\n建议开启代理后重试，或使用 iOS / 桌面端设备接收推送。')
     } else {
       alert('订阅切换失败: ' + msg)
     }
