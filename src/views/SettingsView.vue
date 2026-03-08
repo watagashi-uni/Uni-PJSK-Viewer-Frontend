@@ -19,15 +19,19 @@ async function togglePush(event: Event) {
   try {
     if (isChecked) {
       if (!notificationStore.subscribedTopics.length) {
-        // First-time fallback, maybe no default topics anymore to avoid bombing
         notificationStore.subscribedTopics = []
       }
       await notificationStore.subscribe(notificationStore.subscribedTopics)
     } else {
       await notificationStore.unsubscribe()
     }
-  } catch(e) {
-    alert('通知设置失败: ' + (e instanceof Error ? e.message : String(e)))
+  } catch(e: any) {
+    const msg = e instanceof Error ? e.message : String(e)
+    if (msg.includes('Registration failed') || msg.includes('push service')) {
+      alert('通知设置失败：无法连接推送服务。\n\n安卓设备依赖谷歌 FCM 服务，国内网络通常无法连接。\n建议开启代理后重试，或使用 iOS / 桌面端设备接收推送。')
+    } else {
+      alert('通知设置失败: ' + msg)
+    }
     ;(event.target as HTMLInputElement).checked = false
   }
 }
@@ -269,8 +273,8 @@ async function handleClearTranslationCache() {
             </label>
           </div>
 
-          <!-- 国服安卓警告 (提升到外层) -->
-          <div v-if="notificationStore.isAndroid && notificationStore.isChina" class="alert alert-warning shadow-sm py-2 mb-4">
+          <!-- 安卓警告 (不再依赖 isChina，对所有安卓显示) -->
+          <div v-if="notificationStore.isAndroid" class="alert alert-warning shadow-sm py-2 mb-4">
             <AlertTriangle class="w-5 h-5 shrink-0" />
             <div>
               <h3 class="font-bold text-sm">重要：Android 限制</h3>
