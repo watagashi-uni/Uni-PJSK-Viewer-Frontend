@@ -4,6 +4,8 @@ import { useMasterStore } from '@/stores/master'
 import SekaiCard from '@/components/SekaiCard.vue'
 import SekaiProfileHonor from '@/components/SekaiProfileHonor.vue'
 import { RefreshCw } from 'lucide-vue-next'
+import { request } from '@/utils/request'
+import type { EventData, CardData } from '@/types/master'
 
 const masterStore = useMasterStore()
 
@@ -20,24 +22,6 @@ const borderData = ref<any[]>([])
 const cardsMap = ref<Record<number, any>>({})
 const top100Error = ref('')
 const borderError = ref('')
-
-// Master Data Types
-interface EventData {
-  id: number
-  eventType: string
-  name: string
-  assetbundleName: string
-  startAt: number
-  aggregateAt: number
-}
-
-interface CardData {
-  id: number
-  characterId: number
-  cardRarityType: string
-  attr: string
-  assetbundleName: string
-}
 
 // 初始化
 onMounted(async () => {
@@ -115,17 +99,12 @@ async function fetchTop100() {
   isLoading.value = true
   top100Error.value = ''
   try {
-    const top100Res = await fetch(`https://api.unipjsk.com/api/user/%7Buser_id%7D/event/${eventId.value}/ranking?rankingViewType=top100`)
-    if (top100Res.ok) {
-      const data = await top100Res.json()
-      if (data.rankings) {
-        top100Data.value = data.rankings
-      } else {
-        console.warn('Unknown Top 100 data format:', data)
-        top100Data.value = []
-      }
+    const data = await request.getProfile<any>(`/api/user/%7Buser_id%7D/event/${eventId.value}/ranking?rankingViewType=top100`)
+    if (data.rankings) {
+      top100Data.value = data.rankings
     } else {
-      top100Error.value = '加载 Top 100 失败'
+      console.warn('Unknown Top 100 data format:', data)
+      top100Data.value = []
     }
     lastUpdate.value = Date.now()
   } catch (e) {
@@ -142,17 +121,12 @@ async function fetchBorders() {
   isLoading.value = true
   borderError.value = ''
   try {
-    const borderRes = await fetch(`https://api.unipjsk.com/api/event/${eventId.value}/ranking-border`)
-    if (borderRes.ok) {
-      const data = await borderRes.json()
-      if (data.borderRankings) {
-        borderData.value = data.borderRankings.sort((a: any, b: any) => a.rank - b.rank)
-      } else {
-        console.warn('Unknown Border data format:', data)
-        borderData.value = []
-      }
+    const data = await request.getProfile<any>(`/api/event/${eventId.value}/ranking-border`)
+    if (data.borderRankings) {
+      borderData.value = data.borderRankings.sort((a: any, b: any) => a.rank - b.rank)
     } else {
-      borderError.value = '加载榜线失败'
+      console.warn('Unknown Border data format:', data)
+      borderData.value = []
     }
     lastUpdate.value = Date.now()
   } catch (e) {

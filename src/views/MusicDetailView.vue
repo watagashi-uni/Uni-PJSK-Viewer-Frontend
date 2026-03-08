@@ -11,6 +11,7 @@ import {
 } from 'lucide-vue-next'
 import AssetImage from '@/components/AssetImage.vue'
 import { alignFurigana } from '@/utils/furigana'
+import type { EventData } from '@/types/master'
 
 interface Music {
   id: number
@@ -40,15 +41,6 @@ interface MusicVocal {
   caption: string
   characters: { characterType: string; characterId: number }[]
   assetbundleName: string
-}
-
-interface EventData {
-  id: number
-  eventType: string
-  name: string
-  assetbundleName: string
-  startAt: number
-  aggregateAt: number
 }
 
 interface EventMusic {
@@ -91,8 +83,8 @@ const limitedMusics = ref<LimitedTimeMusic[]>([])
 const isLoading = ref(true)
 
 const assetsHost = computed(() => settingsStore.assetsHost)
-const chartHost = 'https://charts-new.unipjsk.com/moe/svg'
 const chartPreviewHost = import.meta.env.VITE_CHART_PREVIEW_URL || ''
+const chartHost = `${chartPreviewHost}/moe/svg`
 
 // ===== 自定义播放器状态 =====
 const audioRef = ref<HTMLAudioElement | null>(null)

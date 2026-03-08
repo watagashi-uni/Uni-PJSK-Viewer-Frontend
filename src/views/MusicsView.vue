@@ -344,8 +344,14 @@ const filteredMusics = computed(() => {
   let result = [...musics.value]
   const resultsMap = musicResultsMap.value
 
+  const currentNow = Date.now()
   if (!settingsStore.showSpoilers) {
-    result = result.filter(m => m.publishedAt <= now && !isExpired(m.id))
+    result = result.filter(m => {
+      if (m.publishedAt > currentNow) return false
+      const limited = limitedMusics.value.find(l => l.musicId === m.id)
+      if (limited && limited.startAt > currentNow) return false
+      return !isExpired(m.id)
+    })
   }
 
   if (searchText.value) {
@@ -447,8 +453,10 @@ function toggleSort(key: 'publishedAt' | 'id' | 'level') {
   }
 }
 
-function isLeak(publishedAt: number): boolean {
-  return publishedAt > now
+function isLeak(music: Music): boolean {
+  if (music.publishedAt > Date.now()) return true
+  const limited = limitedMusics.value.find(l => l.musicId === music.id)
+  return limited ? limited.startAt > Date.now() : false
 }
 
 function getTranslation(id: number): string {
@@ -899,7 +907,7 @@ watch(() => route.query.page, () => {})
                     <div v-if="getTranslation(music.id)" class="text-xs text-base-content/50 truncate max-w-[200px] lg:max-w-[400px]">{{ getTranslation(music.id) }}</div>
                   </RouterLink>
                   <div class="flex items-center gap-1 mt-1">
-                    <div v-if="isLeak(music.publishedAt)" class="badge badge-sm badge-error text-error-content font-bold shadow-sm whitespace-nowrap">LEAK (#)</div>
+                    <div v-if="isLeak(music)" class="badge badge-sm badge-error text-error-content font-bold shadow-sm whitespace-nowrap">LEAK</div>
                     <div v-else class="badge badge-sm badge-ghost text-base-content/60 font-bold shadow-sm whitespace-nowrap">#{{ music.id }}</div>
                     <div v-if="isLimitedTime(music.id)" class="badge badge-sm badge-warning text-warning-content font-bold shadow-sm whitespace-nowrap">期间限定</div>
                     <div v-else-if="isExpired(music.id)" class="badge badge-sm bg-base-300 text-base-content/60 font-bold border-none whitespace-nowrap">已过期</div>
@@ -955,6 +963,12 @@ watch(() => route.query.page, () => {})
                 <div v-if="getTranslation(music.id)" class="text-xs text-base-content/50 truncate leading-tight">{{ getTranslation(music.id) }}</div>
               </RouterLink>
               
+              <div class="flex items-center gap-1 mt-0.5 mb-1">
+                <div v-if="isLeak(music)" class="badge badge-xs badge-error text-error-content font-bold shadow-sm whitespace-nowrap hidden sm:inline-flex">LEAK</div>
+                <div v-else class="badge badge-xs badge-ghost text-base-content/60 font-bold shadow-sm whitespace-nowrap">#{{ music.id }}</div>
+                <div v-if="isLimitedTime(music.id)" class="badge badge-xs badge-warning text-warning-content font-bold shadow-sm whitespace-nowrap">限定</div>
+              </div>
+
               <div class="grid grid-cols-6 gap-0.5 mt-auto">
                 <div v-for="d in allDifficulties" :key="d" class="flex flex-col items-center justify-center bg-base-200/50 rounded p-0.5">
                   <template v-if="musicDifficultiesMap[music.id]?.[d] !== undefined">
@@ -1016,7 +1030,7 @@ watch(() => route.query.page, () => {})
             :composer="music.composer"
             :assetbundle-name="music.assetbundleName"
             :difficulties="musicDifficultiesMap[music.id] || EMPTY_OBJ"
-            :is-leak="isLeak(music.publishedAt)"
+            :is-leak="isLeak(music)"
             :is-limited-time="isLimitedTime(music.id)"
             :is-expired="isExpired(music.id)"
             :assets-host="assetsHost"

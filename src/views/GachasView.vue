@@ -6,16 +6,7 @@ import { Calendar, Gift, Search, EyeOff } from 'lucide-vue-next'
 import Pagination from '@/components/Pagination.vue'
 import AssetImage from '@/components/AssetImage.vue'
 
-interface Gacha {
-  id: number
-  gachaType: string
-  name: string
-  seq: number
-  assetbundleName: string
-  gachaCeilItemId: number
-  startAt: number
-  endAt: number
-}
+import type { Gacha } from '@/types/gacha'
 
 const masterStore = useMasterStore()
 const settingsStore = useSettingsStore()

@@ -20,22 +20,7 @@ const route = useRoute()
 const assetsHost = computed(() => settingsStore.assetsHost)
 
 // ==================== 类型定义 ====================
-interface EventData {
-  id: number
-  eventType: string
-  name: string
-  assetbundleName: string
-  startAt: number
-  aggregateAt: number
-}
-
-interface MusicData {
-  id: number
-  title: string
-  assetbundleName: string
-  publishedAt: number
-  composer: string
-}
+import type { EventData, MusicData, CardData } from '@/types/master'
 
 interface MusicDiffData {
   id: number
@@ -58,14 +43,6 @@ interface WorldBloomData {
   eventId: number
   gameCharacterId: number
   worldBloomChapterType: string
-}
-
-interface CardData {
-  id: number
-  characterId: number
-  cardRarityType: string
-  attr: string
-  assetbundleName: string
 }
 
 interface CardConfigLocal {
