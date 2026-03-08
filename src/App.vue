@@ -7,7 +7,8 @@ import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
 import { useAccountStore } from '@/stores/account'
 import { useOAuthStore } from '@/stores/oauth'
-import { Music, Image, BarChart3, Info, Settings, Calendar, Gift, Zap, User, RefreshCw, Github, House } from 'lucide-vue-next'
+import { useNotificationStore } from '@/stores/notification'
+import { Music, Image, BarChart3, Info, Settings, Calendar, Gift, Zap, User, RefreshCw, Github, House, Radio } from 'lucide-vue-next'
 import AccountSelector from '@/components/AccountSelector.vue'
 
 const route = useRoute()
@@ -15,6 +16,7 @@ const masterStore = useMasterStore()
 const settingsStore = useSettingsStore()
 const accountStore = useAccountStore()
 const oauthStore = useOAuthStore()
+const notificationStore = useNotificationStore()
 
 const refreshError = ref('')
 
@@ -28,6 +30,7 @@ onMounted(async () => {
   oauthStore.initialize()
   await accountStore.initialize()
   await masterStore.initialize()
+  await notificationStore.initialize()
 })
 
 async function handleProfileRefresh() {
@@ -106,6 +109,11 @@ async function handleSuiteRefresh() {
           <li>
             <RouterLink to="/events" active-class="active">
               <Calendar class="w-5 h-5" /> 活动
+            </RouterLink>
+          </li>
+          <li>
+            <RouterLink to="/vlives" active-class="active">
+              <Radio class="w-5 h-5" /> 虚拟 Live
             </RouterLink>
           </li>
           <li>

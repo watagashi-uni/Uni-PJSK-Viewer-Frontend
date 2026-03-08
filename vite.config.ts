@@ -14,6 +14,7 @@ export default defineConfig({
       registerType: 'prompt',  // 改为 prompt 模式，让用户手动点击更新
       injectRegister: 'auto',
       workbox: {
+        importScripts: ['push-sw.js'],
         // 1. 取消 js/css 预缓存，只预留入口 HTML 和必要图标。其余资源按需下载
         globPatterns: ['**/*.{html,ico,svg,webmanifest}'],
         // 2. 排除隐藏页面和特定文件的预缓存

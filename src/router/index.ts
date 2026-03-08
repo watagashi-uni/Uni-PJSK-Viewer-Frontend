@@ -51,6 +51,18 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '活动' },
     },
     {
+        path: '/vlives',
+        name: 'VirtualLives',
+        component: () => import('@/views/VirtualLivesView.vue'),
+        meta: { title: '虚拟 Live' },
+    },
+    {
+        path: '/vlives/:id',
+        name: 'VirtualLiveDetail',
+        component: () => import('@/views/VirtualLiveDetailView.vue'),
+        meta: { title: '虚拟 Live 详情' },
+    },
+    {
         path: '/ranking',
         name: 'EventRanking',
         component: () => import('@/views/EventRankingView.vue'),
