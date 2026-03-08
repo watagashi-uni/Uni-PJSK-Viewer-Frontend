@@ -208,8 +208,8 @@ function onBondCharacterFilterChange(e: Event) {
         <div class="flex flex-wrap gap-2 items-center">
           <select 
             :value="bondCharacterFilter" 
-            @change="onBondCharacterFilterChange"
             class="select select-bordered select-xs"
+            @change="onBondCharacterFilterChange"
           >
             <option v-for="item in bondCharacterOptions" :key="`bond-filter-${item.id}`" :value="item.id">{{ item.name }}</option>
           </select>

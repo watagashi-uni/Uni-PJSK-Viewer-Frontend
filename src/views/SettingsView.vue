@@ -257,76 +257,82 @@ async function handleClearTranslationCache() {
 
           <!-- 正常支持推送的环境 -->
           <template v-if="notificationStore.isSupported">
-          <div class="form-control mb-4">
-            <label class="label cursor-pointer justify-start gap-4 p-0">
-              <input 
-                type="checkbox" 
-                class="toggle toggle-primary"
-                :checked="notificationStore.isSubscribed"
-                :disabled="notificationStore.isLoading"
-                @change="togglePush"
-              />
+            <div class="form-control mb-4">
+              <label class="label cursor-pointer justify-start gap-4 p-0">
+                <input 
+                  type="checkbox" 
+                  class="toggle toggle-primary"
+                  :checked="notificationStore.isSubscribed"
+                  :disabled="notificationStore.isLoading"
+                  @change="togglePush"
+                />
+                <div>
+                  <span class="label-text font-medium text-base">开启网页推送</span>
+                  <p class="text-sm text-base-content/60">接收新歌、活动和虚拟 Live 提醒</p>
+                </div>
+              </label>
+            </div>
+
+            <!-- 安卓警告 (不再依赖 isChina，对所有安卓显示) -->
+            <div v-if="notificationStore.isAndroid" class="alert alert-warning shadow-sm py-2 mb-4">
+              <AlertTriangle class="w-5 h-5 shrink-0" />
               <div>
-                <span class="label-text font-medium text-base">开启网页推送</span>
-                <p class="text-sm text-base-content/60">接收新歌、活动和虚拟 Live 提醒</p>
-              </div>
-            </label>
-          </div>
-
-          <!-- 安卓警告 (不再依赖 isChina，对所有安卓显示) -->
-          <div v-if="notificationStore.isAndroid" class="alert alert-warning shadow-sm py-2 mb-4">
-            <AlertTriangle class="w-5 h-5 shrink-0" />
-            <div>
-              <h3 class="font-bold text-sm">重要：Android 限制</h3>
-              <div class="text-xs">
-                国内通常无法连接 FCM 服务，可能导致您<strong>无法收到推送，或甚至无法开启推送开关</strong>。请通过下方的“发送测试”验证。
-              </div>
-            </div>
-          </div>
-
-          <!-- iOS未添加到桌面警告 (提升到外层) -->
-          <div v-if="notificationStore.isIOS && !notificationStore.isStandalone" class="alert shadow-sm py-2 mb-4">
-            <MonitorSmartphone class="w-5 h-5 shrink-0 text-info" />
-            <div>
-              <h3 class="font-bold text-sm">iOS 用户指南</h3>
-              <div class="text-xs">
-                由于 iOS 限制，如果您希望在后台稳定接收推送，请点击 Safari 底部<strong>“共享”</strong > -> <strong>“添加到主屏幕”</strong>，然后从桌面打开本网站再进行订阅测试。
-              </div>
-            </div>
-          </div>
-
-          <div v-if="notificationStore.isSubscribed" class="bg-base-200 rounded-lg p-4 space-y-4">
-            <div>
-              <p class="font-medium text-sm mb-3 opacity-80">推送内容：</p>
-              <div class="flex flex-col gap-2">
-                <label class="label cursor-pointer justify-start gap-3 py-1">
-                  <input type="checkbox" class="checkbox checkbox-sm checkbox-primary"
-                    :checked="isTopicSubscribed('music')"
-                    @change="toggleTopic('music')" />
-                  <span class="label-text">新歌曲上线提醒</span>
-                </label>
-                <label class="label cursor-pointer justify-start gap-3 py-1">
-                  <input type="checkbox" class="checkbox checkbox-sm checkbox-primary"
-                    :checked="isTopicSubscribed('vlive')"
-                    @change="toggleTopic('vlive')" />
-                  <span class="label-text">虚拟 Live 提醒</span>
-                </label>
-                <label class="label cursor-pointer justify-start gap-3 py-1">
-                  <input type="checkbox" class="checkbox checkbox-sm checkbox-primary"
-                    :checked="isTopicSubscribed('apd')"
-                    @change="toggleTopic('apd')" />
-                  <span class="label-text">新 APPEND 谱面提醒</span>
-                </label>
+                <h3 class="font-bold text-sm">重要：Android 限制</h3>
+                <div class="text-xs">
+                  国内通常无法连接 FCM 服务，可能导致您<strong>无法收到推送，或甚至无法开启推送开关</strong>。请通过下方的“发送测试”验证。
+                </div>
               </div>
             </div>
 
-            <!-- (Warnings moved out) -->
+            <!-- iOS未添加到桌面警告 (提升到外层) -->
+            <div v-if="notificationStore.isIOS && !notificationStore.isStandalone" class="alert shadow-sm py-2 mb-4">
+              <MonitorSmartphone class="w-5 h-5 shrink-0 text-info" />
+              <div>
+                <h3 class="font-bold text-sm">iOS 用户指南</h3>
+                <div class="text-xs">
+                  由于 iOS 限制，如果您希望在后台稳定接收推送，请点击 Safari 底部<strong>“共享”</strong> -> <strong>“添加到主屏幕”</strong>，然后从桌面打开本网站再进行订阅测试。
+                </div>
+              </div>
+            </div>
 
-            <button class="btn btn-sm btn-outline btn-primary w-full mt-2" @click="testPush">
-              <Send class="w-4 h-4" />
-              发送测试推送
-            </button>
-          </div>
+            <div v-if="notificationStore.isSubscribed" class="bg-base-200 rounded-lg p-4 space-y-4">
+              <div>
+                <p class="font-medium text-sm mb-3 opacity-80">推送内容：</p>
+                <div class="flex flex-col gap-2">
+                  <label class="label cursor-pointer justify-start gap-3 py-1">
+                    <input
+                      type="checkbox" class="checkbox checkbox-sm checkbox-primary"
+                      :checked="isTopicSubscribed('music')"
+                      @change="toggleTopic('music')"
+                    />
+                    <span class="label-text">新歌曲上线提醒</span>
+                  </label>
+                  <label class="label cursor-pointer justify-start gap-3 py-1">
+                    <input
+                      type="checkbox" class="checkbox checkbox-sm checkbox-primary"
+                      :checked="isTopicSubscribed('vlive')"
+                      @change="toggleTopic('vlive')"
+                    />
+                    <span class="label-text">虚拟 Live 提醒</span>
+                  </label>
+                  <label class="label cursor-pointer justify-start gap-3 py-1">
+                    <input
+                      type="checkbox" class="checkbox checkbox-sm checkbox-primary"
+                      :checked="isTopicSubscribed('apd')"
+                      @change="toggleTopic('apd')"
+                    />
+                    <span class="label-text">新 APPEND 谱面提醒</span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- (Warnings moved out) -->
+
+              <button class="btn btn-sm btn-outline btn-primary w-full mt-2" @click="testPush">
+                <Send class="w-4 h-4" />
+                发送测试推送
+              </button>
+            </div>
           </template>
         </div>
       </div>

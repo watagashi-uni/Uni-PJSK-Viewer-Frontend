@@ -202,7 +202,7 @@ function isLeak(vlive: any): boolean {
       <div class="flex items-center">
         <label class="label cursor-pointer gap-2 bg-base-200 px-3 py-1 rounded-lg">
           <span class="label-text font-medium text-sm">展示已结束</span>
-          <input type="checkbox" class="toggle toggle-sm toggle-primary" v-model="showEnded" />
+          <input v-model="showEnded" type="checkbox" class="toggle toggle-sm toggle-primary" />
         </label>
       </div>
 
@@ -249,7 +249,7 @@ function isLeak(vlive: any): boolean {
           
           <!-- 状态角标 -->
           <div class="absolute top-2 left-2 z-20 badge font-bold shadow-md gap-1" :class="getStatusInfo(vlive).color">
-            <component v-if="getStatusInfo(vlive).icon" :is="getStatusInfo(vlive).icon" class="w-3 h-3" />
+            <component :is="getStatusInfo(vlive).icon" v-if="getStatusInfo(vlive).icon" class="w-3 h-3" />
             {{ getStatusInfo(vlive).label }}
           </div>
           

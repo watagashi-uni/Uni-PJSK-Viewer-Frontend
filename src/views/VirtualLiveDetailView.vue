@@ -104,7 +104,6 @@ const schedules = computed(() => {
     </div>
 
     <div v-else class="space-y-6">
-      
       <!-- 独立出来的 Header (返回按钮 + 标题等) -->
       <div class="flex flex-col gap-2">
         <div class="flex items-center justify-between">
@@ -198,7 +197,6 @@ const schedules = computed(() => {
           </div>
         </div>
       </div>
-      
     </div>
   </div>
 </template>
