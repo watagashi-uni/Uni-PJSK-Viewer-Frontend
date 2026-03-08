@@ -231,13 +231,28 @@ async function handleClearTranslationCache() {
       </div>
 
       <!-- 推送通知设置 -->
-      <div v-if="notificationStore.isSupported" class="card bg-base-100 shadow-lg border-2 border-primary/20">
+      <div v-if="notificationStore.isSupported || notificationStore.isIOS" class="card bg-base-100 shadow-lg border-2 border-primary/20">
         <div class="card-body">
           <h2 class="card-title text-lg mb-2 flex items-center gap-2 text-primary">
             <Bell class="w-5 h-5" />
             推送通知 (Beta)
           </h2>
-          
+
+          <!-- iOS 非 PWA 模式：引导添加到桌面 -->
+          <div v-if="!notificationStore.isSupported && notificationStore.isIOS" class="alert shadow-sm py-3">
+            <MonitorSmartphone class="w-5 h-5 shrink-0 text-info" />
+            <div>
+              <h3 class="font-bold text-sm">iOS 推送需要添加到主屏幕</h3>
+              <div class="text-xs mt-1">
+                iOS Safari 浏览器不支持直接推送通知。请点击底部
+                <strong>"共享"</strong> 按钮 -> <strong>"添加到主屏幕"</strong>，
+                然后从桌面图标打开本网站，即可在此处开启推送通知。
+              </div>
+            </div>
+          </div>
+
+          <!-- 正常支持推送的环境 -->
+          <template v-if="notificationStore.isSupported">
           <div class="form-control mb-4">
             <label class="label cursor-pointer justify-start gap-4 p-0">
               <input 
@@ -306,6 +321,7 @@ async function handleClearTranslationCache() {
               发送测试推送
             </button>
           </div>
+          </template>
         </div>
       </div>
 
