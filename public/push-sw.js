@@ -16,6 +16,7 @@ self.addEventListener('push', function (e) {
     const options = {
         body: data.body || '您有一条新推送',
         icon: data.icon || '/pwa-icon.png',
+        image: data.image,
         data: { url: data.url || '/' },
         vibrate: [100, 50, 100],
         badge: '/pwa-icon.png'
