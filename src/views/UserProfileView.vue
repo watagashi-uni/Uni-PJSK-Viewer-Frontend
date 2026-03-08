@@ -3,241 +3,24 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useMasterStore } from '@/stores/master'
 import { useAccountStore } from '@/stores/account'
 import { useSettingsStore } from '@/stores/settings'
-import AssetImage from '@/components/AssetImage.vue'
-import SekaiCard from '@/components/SekaiCard.vue'
-import SekaiProfileHonor from '@/components/SekaiProfileHonor.vue'
-import SekaiHonorBonds from '@/components/SekaiHonorBonds.vue'
 import AccountSelector from '@/components/AccountSelector.vue'
+import ProfileHeader from '@/components/UserProfile/ProfileHeader.vue'
+import ProfileDeck from '@/components/UserProfile/ProfileDeck.vue'
+import ProfileCharacterRank from '@/components/UserProfile/ProfileCharacterRank.vue'
+import ProfileAdvancedData from '@/components/UserProfile/ProfileAdvancedData.vue'
 import {
-  User, Eye, EyeOff, Download, Upload, Plus, Trash2, RefreshCw, Star, Zap, Trophy, Music, CircleHelp
+  User, Download, Upload, Plus, Trash2, RefreshCw, Star, Zap, Trophy, Music, CircleHelp
 } from 'lucide-vue-next'
-
-type AdvancedTabKey = 'challenge' | 'bonus' | 'bonds' | 'leader'
-type ProfileTabKey = 'basic' | AdvancedTabKey
-type UnitKey = 'light_sound' | 'idol' | 'street' | 'theme_park' | 'school_refusal' | 'piapro'
-type AttrKey = 'cool' | 'cute' | 'happy' | 'mysterious' | 'pure'
-
-interface ProfileData {
-  totalPower: {
-    areaItemBonus: number
-    basicCardTotalPower: number
-    characterRankBonus: number
-    honorBonus: number
-    mysekaiFixtureGameCharacterPerformanceBonus: number
-    mysekaiGateLevelBonus: number
-    totalPower: number
-  }
-  user: { name: string; rank: number; userId: number }
-  userCards: Array<{
-    cardId: number
-    defaultImage: string
-    level: number
-    masterRank: number
-    specialTrainingStatus: string
-  }>
-  userChallengeLiveSoloResult?: { characterId: number; highScore: number }
-  userChallengeLiveSoloStages?: Array<{ characterId: number; rank: number }>
-  userCharacters: Array<{ characterId: number; characterRank: number }>
-  userDeck: {
-    deckId: number
-    leader: number
-    member1: number
-    member2: number
-    member3: number
-    member4: number
-    member5: number
-    name: string
-    subLeader: number
-    userId: number
-  }
-  userMusicDifficultyClearCount: Array<{
-    allPerfect: number
-    fullCombo: number
-    liveClear: number
-    musicDifficultyType: string
-  }>
-  userProfile: {
-    profileImageType: string
-    twitterId: string
-    userId: number
-    word: string
-  }
-  userProfileHonors: Array<{
-    bondsHonorViewType: string
-    bondsHonorWordId: number
-    honorId: number
-    honorLevel: number
-    profileHonorType: string
-    seq: number
-  }>
-  userMultiLiveTopScoreCount: { mvp: number; superStar: number }
-  userHonorMissions: Array<{ honorMissionType: string; progress: number }>
-}
-
-interface CardInfo {
-  id: number
-  characterId: number
-  cardRarityType: string
-  attr: string
-  assetbundleName: string
-}
-
-interface GameCharacterUnit {
-  id: number
-  gameCharacterId: number
-  unit: string
-}
-
-interface GameCharacter {
-  id: number
-  firstName?: string
-  givenName: string
-}
-
-interface CharacterMissionV2 {
-  characterId: number
-  characterMissionType: string
-  progress: number
-}
-
-interface CharacterMissionV2Status {
-  characterId: number
-  parameterGroupId: number
-  seq: number
-}
-
-interface CharacterMissionV2ParameterGroup {
-  id: number
-  seq: number
-  requirement: number
-}
-
-interface ChallengeLiveHighScoreRewardRow {
-  id: number
-  characterId: number
-  highScore: number
-  resourceBoxId: number
-}
-
-interface ResourceBoxDetailRow {
-  resourceType: string
-  resourceId?: number
-  resourceQuantity?: number
-}
-
-interface ResourceBoxRow {
-  resourceBoxPurpose: string
-  id: number
-  details?: ResourceBoxDetailRow[]
-}
-
-interface AreaItemLevelMasterRow {
-  areaItemId: number
-  level: number
-  targetUnit?: string
-  targetCardAttr?: string
-  targetGameCharacterId?: number | string
-  power1BonusRate: number
-}
-
-interface CharacterRankRow {
-  characterId: number
-  characterRank: number
-  power1BonusRate: number
-}
-
-interface MysekaiGateLevelRow {
-  mysekaiGateId: number
-  level: number
-  powerBonusRate: number
-}
-
-interface BondMasterRow {
-  groupId: number
-  characterId1?: number
-  characterId2?: number
-}
-
-interface LevelMasterRow {
-  levelType: string
-  level: number
-  totalExp: number
-}
-
-interface BondsHonorMasterRow {
-  id: number
-  bondsGroupId: number
-  honorRarity?: string
-  levels?: Array<{
-    level: number
-    description?: string
-  }>
-}
-
-interface ChallengeRow {
-  characterId: number
-  rank: number
-  highScore: number
-  remainJewel: number
-  remainFragment: number
-  progress: number
-}
-
-interface PowerBonusRow {
-  areaItem: number
-  rank: number
-  fixture: number
-  total: number
-}
-
-interface UnitBonusRow {
-  areaItem: number
-  gate: number
-  total: number
-}
-
-interface AttrBonusRow {
-  areaItem: number
-  total: number
-}
-
-interface PowerBonusCharacterView extends PowerBonusRow {
-  characterId: number
-}
-
-interface PowerBonusUnitView extends UnitBonusRow {
-  unit: UnitKey
-}
-
-interface PowerBonusAttrView extends AttrBonusRow {
-  attr: AttrKey
-}
-
-interface PowerBonusCharacterGroupView {
-  unit: UnitKey
-  rows: PowerBonusCharacterView[]
-}
-
-interface BondViewRow {
-  c1: number
-  c2: number
-  rank1: number
-  rank2: number
-  bondLevel: number
-  needExpText: string
-  progress: number
-  capBlocked: boolean
-  honorId: number | null
-  honorLevel: number
-}
-
-interface LeaderCountRow {
-  characterId: number
-  playCount: number | null
-  exLevel: number | null
-  exCount: number | null
-  progress: number
-}
+import type {
+  ProfileTabKey, UnitKey, AttrKey, ProfileData, CardInfo,
+  GameCharacterUnit, GameCharacter, CharacterMissionV2, CharacterMissionV2Status,
+  CharacterMissionV2ParameterGroup, ChallengeLiveHighScoreRewardRow,
+  ResourceBoxRow, AreaItemLevelMasterRow, CharacterRankRow,
+  MysekaiGateLevelRow, BondMasterRow, LevelMasterRow, BondsHonorMasterRow,
+  ChallengeRow, PowerBonusRow, UnitBonusRow, AttrBonusRow, PowerBonusCharacterView,
+  PowerBonusUnitView, PowerBonusAttrView, PowerBonusCharacterGroupView, BondViewRow,
+  LeaderCountRow
+} from '@/types/profile'
 
 const masterStore = useMasterStore()
 const accountStore = useAccountStore()
@@ -414,11 +197,6 @@ function getUnitLogo(unit: UnitKey): string {
 
 function getAttrIcon(attr: string): string {
   return `/newcard/attr_icon_${attr}.png`
-}
-
-function getHonor(seq: number) {
-  if (!profileData.value?.userProfileHonors) return undefined
-  return profileData.value.userProfileHonors.find((h) => h.seq === seq)
 }
 
 function loadAccounts() {
@@ -1507,103 +1285,19 @@ watch(currentUserId, async (newId) => {
           <!-- ========== 左侧：用户信息 ========== -->
           <div v-if="profileTab === 'basic'" class="space-y-6">
             <!-- 用户基本信息 -->
-            <div class="card bg-base-100 shadow-lg">
-              <div class="card-body">
-                <div class="flex items-center gap-4 mb-4">
-                  <!-- Leader Avatar based on first deck card -->
-                  <div v-if="deckCards.length > 0 && deckCards[0]?.masterCard" class="w-14 h-14 sm:w-16 sm:h-16 flex-shrink-0 shadow-sm rounded-full overflow-hidden border-2 border-primary/20 bg-base-200">
-                    <AssetImage
-                      :src="`${assetsHost}/startapp/thumbnail/chara/${deckCards[0].masterCard.assetbundleName}_${deckCards[0]?.trained ? 'after_training' : 'normal'}.png`"
-                      class="w-full h-full object-cover"
-                    />
-                  </div>
-                  <div class="flex-1 min-w-0">
-                    <h2 class="text-2xl font-bold truncate">{{ profileData.user.name }}</h2>
-                    <div class="flex items-center gap-2 mt-1 flex-nowrap">
-                      <span class="badge badge-primary flex-shrink-0">等级 {{ profileData.user.rank }}</span>
-                      <button
-                        class="btn btn-xs btn-ghost gap-1 min-w-0 flex-shrink"
-                        @click="showUserId = !showUserId"
-                      >
-                        <Eye v-if="showUserId" class="w-3 h-3 flex-shrink-0" />
-                        <EyeOff v-else class="w-3 h-3 flex-shrink-0" />
-                        <span class="truncate">id:{{ showUserId ? profileData.user.userId : '保密' }}</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- 称号 (3-in-a-row with placeholders) -->
-                <div class="flex items-center gap-1 h-10 sm:h-12 mb-4 max-w-full">
-                  <template v-for="i in 3" :key="i">
-                    <div v-if="getHonor(i)" class="h-full shrink min-w-0">
-                      <SekaiProfileHonor
-                        :data="getHonor(i)!"
-                        :user-honor-missions="profileData.userHonorMissions"
-                        class="h-full w-auto max-w-full block"
-                      />
-                    </div>
-                    <div v-else class="h-full shrink min-w-0">
-                      <img
-                        v-if="i === 1"
-                        src="/honor/frame_degree_m_1.png"
-                        class="h-full w-auto max-w-full opacity-50"
-                        alt="empty-slot-main"
-                      />
-                      <img
-                        v-else
-                        src="/honor/frame_degree_s_1.png"
-                        class="h-full w-auto max-w-full opacity-50"
-                        alt="empty-slot-sub"
-                      />
-                    </div>
-                  </template>
-                </div>
-
-                <!-- Twitter ID -->
-                <div class="flex items-center gap-2 text-sm mb-1">
-                  <span class="font-medium">𝕏</span>
-                  <span v-if="profileData.userProfile.twitterId?.trim()">@{{ profileData.userProfile.twitterId.trim() }}</span>
-                  <span v-else class="text-base-content/40">未设置</span>
-                </div>
-                <!-- 签名 -->
-                <div class="text-sm text-base-content/70 italic">
-                  <template v-if="profileData.userProfile.word">「{{ profileData.userProfile.word }}」</template>
-                  <span v-else class="text-base-content/40 not-italic">暂无签名</span>
-                </div>
-              </div>
-            </div>
+            <ProfileHeader
+              :profile-data="profileData"
+              :deck-cards="deckCards"
+              :show-user-id="showUserId"
+              :assets-host="assetsHost"
+              @toggle-user-id="showUserId = !showUserId"
+            />
 
             <!-- 卡组 (Deck) -->
-            <div class="card bg-base-100 shadow-lg">
-              <div class="card-body">
-                <h3 class="text-lg font-medium mb-3 flex items-center gap-2">
-                  <Star class="w-5 h-5 text-primary" />
-                  卡组 - {{ profileData.userDeck.name }}
-                </h3>
-                <div class="grid grid-cols-5 gap-1 sm:gap-2">
-                  <div
-                    v-for="dc in deckCards"
-                    :key="dc.cardId"
-                    class="text-center"
-                  >
-                    <RouterLink
-                      :to="`/cards/${dc.cardId}`"
-                      class="block hover:scale-105 transition-transform"
-                    >
-                      <SekaiCard
-                        :card="dc.masterCard"
-                        :trained="dc.trained"
-                        :master-rank="dc.userCard?.masterRank || 0"
-                      />
-                    </RouterLink>
-                    <div class="text-[10px] sm:text-xs mt-1 truncate">
-                      <span class="font-medium">Lv.{{ dc.userCard?.level || '?' }}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <ProfileDeck
+              :deck-name="profileData.userDeck.name"
+              :deck-cards="deckCards"
+            />
 
             <!-- 综合力 -->
             <div class="card bg-base-100 shadow-lg">
@@ -1732,340 +1426,45 @@ watch(currentUserId, async (newId) => {
               </div>
 
               <!-- 角色等级 / 挑战Live Stage -->
-              <div class="card bg-base-100 shadow-lg">
-                <div class="card-body">
-                  <h3 class="text-lg font-medium mb-3">
-                    {{ characterTab === 'rank' ? 'CHARACTER RANK' : 'CHALLENGE LIVE STAGE' }}
-                  </h3>
-                  <!-- Tab 切换 -->
-                  <div class="flex flex-wrap gap-2 mb-4">
-                    <button
-                      type="button"
-                      class="btn btn-sm h-9 min-h-9 text-xs sm:text-sm"
-                      :class="characterTab === 'rank' ? 'btn-primary' : 'btn-ghost'"
-                      @click="characterTab = 'rank'"
-                    >
-                      <User class="w-3.5 h-3.5 mr-1.5" />
-                      角色等级
-                    </button>
-                    <button
-                      type="button"
-                      class="btn btn-sm h-9 min-h-9 text-xs sm:text-sm"
-                      :class="characterTab === 'stage' ? 'btn-primary' : 'btn-ghost'"
-                      @click="characterTab = 'stage'"
-                    >
-                      <Star class="w-3.5 h-3.5 mr-1.5" />
-                      挑战Live Stage
-                    </button>
-                  </div>
-
-                  <!-- 角色网格 (pill layout, fill width) -->
-                  <div class="space-y-2">
-                    <div
-                      v-for="(row, rowIdx) in characterRows"
-                      :key="rowIdx"
-                      class="grid grid-cols-4 gap-2"
-                    >
-                      <div
-                        v-for="item in row"
-                        :key="item.characterId"
-                        class="flex items-center gap-1 rounded-full pr-3"
-                        :style="{ backgroundColor: getCharaPillColor(item.characterId) + '40' }"
-                      >
-                        <div class="w-9 h-9 rounded-full overflow-hidden ring-2 flex-shrink-0" :style="{ borderColor: getCharaPillColor(item.characterId) }">
-                          <img :src="getCharaIcon(item.characterId)" class="w-full h-full object-cover" />
-                        </div>
-                        <span class="text-sm font-bold flex-1 text-center">{{ item.value }}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <ProfileCharacterRank
+                :character-tab="characterTab"
+                :character-rows="characterRows"
+                :get-chara-pill-color="getCharaPillColor"
+                :get-chara-icon="getCharaIcon"
+                @update:character-tab="characterTab = $event"
+              />
             </template>
 
             <div v-if="profileTab !== 'basic'" class="space-y-3">
-              <h3 class="text-lg font-medium">{{ currentProfileTabLabel }}</h3>
-
-              <div v-if="profileTab === 'challenge'" class="space-y-3">
-                <div v-if="!hasChallengeSuiteData" class="alert alert-info py-2">
-                  <span class="text-sm">当前账号缺少挑战信息数据，请先点击上方“刷新Suite”。</span>
-                </div>
-                <template v-else>
-                  <div class="grid grid-cols-2 gap-2">
-                    <div class="rounded-lg bg-base-200 px-3 py-2">
-                      <p class="text-[11px] text-base-content/60">剩余水晶</p>
-                      <p class="text-lg font-semibold text-success">{{ challengeSummary.totalJewel.toLocaleString() }}</p>
-                    </div>
-                    <div class="rounded-lg bg-base-200 px-3 py-2">
-                      <p class="text-[11px] text-base-content/60">剩余碎片(材料15)</p>
-                      <p class="text-lg font-semibold text-warning">{{ challengeSummary.totalFragment.toLocaleString() }}</p>
-                    </div>
-                  </div>
-                  <div class="rounded-xl border border-base-300 bg-base-100">
-                    <div class="overflow-x-auto">
-                      <table class="table table-zebra table-sm">
-                        <thead>
-                          <tr>
-                            <th>角色</th>
-                            <th>等级</th>
-                            <th>分数</th>
-                            <th>进度(上限{{ Math.floor(challengeMaxScore / 10000) }}w)</th>
-                            <th>水晶</th>
-                            <th>碎片</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr v-for="row in challengeRows" :key="`challenge-${row.characterId}`">
-                            <td>
-                              <div class="flex items-center gap-2">
-                                <img :src="getCharaIcon(row.characterId)" class="w-8 h-8 rounded-full ring-1 ring-base-300" />
-                                <span class="hidden sm:inline">{{ getCharaName(row.characterId) }}</span>
-                              </div>
-                            </td>
-                            <td class="font-semibold">{{ row.rank || '-' }}</td>
-                            <td class="font-semibold">{{ row.highScore ? row.highScore.toLocaleString() : '-' }}</td>
-                            <td class="min-w-[180px]">
-                              <div class="space-y-1">
-                                <div class="w-full h-2.5 rounded-full bg-base-300 overflow-hidden">
-                                  <div
-                                    class="h-full rounded-full"
-                                    :style="{
-                                      width: `${(row.progress * 100).toFixed(2)}%`,
-                                      backgroundColor: getChallengeProgressColor(row.highScore),
-                                    }"
-                                  ></div>
-                                </div>
-                                <div class="text-[11px] text-base-content/60 text-right">{{ formatPercent(row.progress * 100) }}</div>
-                              </div>
-                            </td>
-                            <td class="font-medium text-success">{{ row.remainJewel.toLocaleString() }}</td>
-                            <td class="font-medium text-warning">{{ row.remainFragment.toLocaleString() }}</td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </template>
-              </div>
-
-              <div v-else-if="profileTab === 'bonus'" class="space-y-3">
-                <div v-if="!hasBonusSuiteData" class="alert alert-info py-2">
-                  <span class="text-sm">当前账号缺少加成信息数据，请先点击上方“刷新Suite”。</span>
-                </div>
-                <template v-else>
-                  <div class="grid gap-3 lg:grid-cols-2">
-                    <div
-                      v-for="group in powerBonusCharacterGroupRows"
-                      :key="`bonus-group-${group.unit}`"
-                      class="rounded-xl border border-base-300 bg-base-100 p-3 shadow-sm"
-                    >
-                      <div class="mb-2 flex items-center gap-2">
-                        <img :src="getUnitLogo(group.unit)" class="h-5 w-auto object-contain" />
-                        <p class="text-sm font-semibold">{{ unitLabelMap[group.unit] }}</p>
-                      </div>
-                      <div class="grid gap-2 sm:grid-cols-2">
-                        <div
-                          v-for="row in group.rows"
-                          :key="`bonus-chara-${group.unit}-${row.characterId}`"
-                          class="rounded-lg bg-base-200/70 px-2.5 py-2"
-                        >
-                          <div class="flex items-center gap-2">
-                            <img :src="getCharaIcon(row.characterId)" class="w-8 h-8 rounded-full ring-1 ring-base-300" />
-                            <div class="min-w-0">
-                              <p class="text-[11px] text-base-content/65 leading-none">{{ getCharaName(row.characterId) }}</p>
-                              <p class="text-2xl leading-none font-bold text-success mt-1">{{ formatPercent(row.total) }}</p>
-                            </div>
-                          </div>
-                          <p class="mt-1 text-[11px] leading-4 text-base-content/70 break-all">
-                            区域道具{{ formatPercent(row.areaItem) }} + 角色等级{{ formatPercent(row.rank) }} + 烤森玩偶{{ formatPercent(row.fixture) }}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div class="grid gap-3 xl:grid-cols-2">
-                    <div class="rounded-xl border border-base-300 bg-base-100 p-3 shadow-sm">
-                      <p class="text-sm font-semibold">组合总加成</p>
-                      <div class="mt-2 grid gap-2 sm:grid-cols-2">
-                        <div
-                          v-for="row in powerBonusUnitRows"
-                          :key="`bonus-unit-${row.unit}`"
-                          class="rounded-lg bg-base-200/70 px-2.5 py-2"
-                        >
-                          <div class="flex items-center justify-between gap-2">
-                            <div class="flex items-center gap-2 min-w-0">
-                              <img :src="getUnitLogo(row.unit)" class="h-5 w-auto object-contain" />
-                              <span class="text-xs truncate">{{ unitLabelMap[row.unit] }}</span>
-                            </div>
-                            <span class="text-lg font-bold text-success">{{ formatPercent(row.total) }}</span>
-                          </div>
-                          <p class="mt-1 text-[11px] text-base-content/70">区域道具{{ formatPercent(row.areaItem) }} + 烤森门{{ formatPercent(row.gate) }}</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div class="rounded-xl border border-base-300 bg-base-100 p-3 shadow-sm">
-                      <p class="text-sm font-semibold">属性总加成</p>
-                      <div class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
-                        <div
-                          v-for="row in powerBonusAttrRows"
-                          :key="`bonus-attr-${row.attr}`"
-                          class="rounded-lg bg-base-200/70 px-2.5 py-2"
-                        >
-                          <div class="flex items-center justify-between gap-2">
-                            <div class="flex items-center gap-2">
-                              <img :src="getAttrIcon(row.attr)" class="w-5 h-5 object-contain" />
-                              <span class="text-xs">{{ row.attr }}</span>
-                            </div>
-                            <span class="font-bold text-success">{{ formatPercent(row.total) }}</span>
-                          </div>
-                          <p class="mt-1 text-[11px] text-base-content/70">区域道具{{ formatPercent(row.areaItem) }}</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </template>
-              </div>
-
-              <div v-else-if="profileTab === 'bonds'" class="space-y-3">
-                <div v-if="!hasBondsSuiteData" class="alert alert-info py-2">
-                  <span class="text-sm">当前账号缺少牵绊等级数据，请先点击上方“刷新Suite”。</span>
-                </div>
-                <template v-else>
-                  <div class="flex flex-wrap gap-2 items-center">
-                    <select v-model.number="bondCharacterFilter" class="select select-bordered select-xs">
-                      <option v-for="item in bondCharacterOptions" :key="`bond-filter-${item.id}`" :value="item.id">{{ item.name }}</option>
-                    </select>
-                  </div>
-                  <div class="rounded-xl border border-base-300 bg-base-100">
-                    <div class="overflow-x-auto">
-                      <table class="table table-zebra table-sm">
-                        <thead>
-                          <tr>
-                            <th>角色</th>
-                            <th>角色等级</th>
-                            <th>牵绊等级</th>
-                            <th>进度</th>
-                            <th>升级经验</th>
-                            <th>牵绊徽章</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr v-for="row in bondRows" :key="`bond-${row.c1}-${row.c2}`">
-                            <td>
-                              <div class="flex items-center">
-                                <img :src="getCharaIcon(row.c1)" class="w-8 h-8 rounded-full ring-1 ring-base-300" />
-                                <img :src="getCharaIcon(row.c2)" class="w-8 h-8 rounded-full ring-1 ring-base-300 -ml-2" />
-                                <span class="ml-2 text-xs hidden sm:inline">{{ getCharaName(row.c1) }} × {{ getCharaName(row.c2) }}</span>
-                              </div>
-                            </td>
-                            <td>
-                              <span :class="row.capBlocked ? 'text-error font-semibold' : ''">{{ row.rank1 }} & {{ row.rank2 }}</span>
-                            </td>
-                            <td>
-                              <span :class="row.capBlocked ? 'text-error font-semibold' : 'font-semibold'">{{ row.bondLevel || '-' }}</span>
-                            </td>
-                            <td class="min-w-[170px]">
-                              <div class="space-y-1">
-                                <div class="w-full h-2.5 rounded-full bg-base-300 overflow-hidden">
-                                  <div class="h-full rounded-full bg-info" :style="{ width: `${(row.progress * 100).toFixed(2)}%` }"></div>
-                                </div>
-                                <div class="text-[11px] text-base-content/60 text-right">{{ (row.progress * 100).toFixed(1) }}%</div>
-                              </div>
-                            </td>
-                            <td class="font-medium">{{ row.needExpText }}</td>
-                            <td>
-                              <div v-if="row.honorId && row.honorLevel > 0" class="h-8">
-                                <SekaiHonorBonds
-                                  :honor-id="row.honorId"
-                                  :honor-level="row.honorLevel"
-                                  :sub="true"
-                                />
-                              </div>
-                              <span v-else class="text-xs text-base-content/50">-</span>
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </template>
-              </div>
-
-              <div v-else class="space-y-3">
-                <div v-if="!hasLeaderCountData" class="alert alert-info py-2">
-                  <span class="text-sm">当前账号缺少队长次数数据，请先点击上方“刷新Suite”。</span>
-                </div>
-                <template v-else>
-                  <div class="grid grid-cols-2 lg:grid-cols-4 gap-2">
-                    <div class="rounded-lg bg-base-200 px-3 py-2">
-                      <p class="text-[11px] text-base-content/60">角色数据</p>
-                      <p class="text-lg font-semibold">{{ leaderCountSummary.availableRows }} / 26</p>
-                    </div>
-                    <div class="rounded-lg bg-base-200 px-3 py-2">
-                      <p class="text-[11px] text-base-content/60">总队长次数</p>
-                      <p class="text-lg font-semibold">{{ leaderCountSummary.totalPlayCount.toLocaleString() }}</p>
-                    </div>
-                    <div class="rounded-lg bg-base-200 px-3 py-2">
-                      <p class="text-[11px] text-base-content/60">总EX次数</p>
-                      <p class="text-lg font-semibold">{{ leaderCountSummary.totalExCount.toLocaleString() }}</p>
-                    </div>
-                    <div class="rounded-lg bg-base-200 px-3 py-2">
-                      <p class="text-[11px] text-base-content/60">最高队长次数</p>
-                      <p class="text-lg font-semibold">{{ leaderCountSummary.maxPlayCount.toLocaleString() }}</p>
-                    </div>
-                  </div>
-                  <div class="grid grid-cols-1 md:grid-cols-2 gap-3 pr-1">
-                    <div
-                      v-for="row in leaderCountRows"
-                      :key="row.characterId"
-                      class="rounded-2xl border border-base-300 bg-base-100 px-3 py-2.5 shadow-sm"
-                    >
-                      <div class="flex items-center gap-2.5 mb-2.5">
-                        <div class="w-10 h-10 rounded-full overflow-hidden ring-2 flex-shrink-0" :style="{ borderColor: getCharaPillColor(row.characterId) }">
-                          <img :src="getCharaIcon(row.characterId)" class="w-full h-full object-cover" />
-                        </div>
-                        <div>
-                          <p class="text-base font-bold">{{ getCharaName(row.characterId) }}</p>
-                          <p class="text-xs text-base-content/60">ID: {{ row.characterId }}</p>
-                        </div>
-                      </div>
-
-                      <div class="grid grid-cols-3 gap-2 mb-2.5">
-                        <div class="rounded-lg bg-base-200 px-2 py-1.5 text-center">
-                          <p class="text-[11px] text-base-content/60">队长次数</p>
-                          <p class="font-semibold">{{ row.playCount === null ? '-' : row.playCount.toLocaleString() }}</p>
-                        </div>
-                        <div class="rounded-lg bg-base-200 px-2 py-1.5 text-center">
-                          <p class="text-[11px] text-base-content/60">EX等级</p>
-                          <p class="font-semibold">{{ row.exLevel === null ? '-' : `x${row.exLevel}` }}</p>
-                        </div>
-                        <div class="rounded-lg bg-base-200 px-2 py-1.5 text-center">
-                          <p class="text-[11px] text-base-content/60">EX次数</p>
-                          <p class="font-semibold">{{ row.exCount === null ? '-' : row.exCount.toLocaleString() }}</p>
-                        </div>
-                      </div>
-
-                      <div class="space-y-1">
-                        <div class="flex items-center justify-between text-[11px] text-base-content/60">
-                          <span>进度</span>
-                          <span>{{ (row.progress * 100).toFixed(1) }}%</span>
-                        </div>
-                        <div class="w-full h-3 rounded-full bg-base-300 overflow-hidden">
-                          <div
-                            class="h-full rounded-full transition-all duration-300"
-                            :style="{
-                              width: `${(row.progress * 100).toFixed(2)}%`,
-                              backgroundColor: getLeaderProgressColor(row.playCount || 0),
-                            }"
-                          ></div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </template>
-              </div>
+              <ProfileAdvancedData
+                :profile-tab="profileTab"
+                :current-profile-tab-label="currentProfileTabLabel"
+                :has-challenge-suite-data="hasChallengeSuiteData"
+                :challenge-summary="challengeSummary"
+                :challenge-max-score="challengeMaxScore"
+                :challenge-rows="challengeRows"
+                :has-bonus-suite-data="hasBonusSuiteData"
+                :power-bonus-character-group-rows="powerBonusCharacterGroupRows"
+                :unit-label-map="unitLabelMap"
+                :power-bonus-unit-rows="powerBonusUnitRows"
+                :power-bonus-attr-rows="powerBonusAttrRows"
+                :has-bonds-suite-data="hasBondsSuiteData"
+                :bond-character-filter="bondCharacterFilter"
+                :bond-character-options="bondCharacterOptions"
+                :bond-rows="bondRows"
+                :has-leader-count-data="hasLeaderCountData"
+                :leader-count-summary="leaderCountSummary"
+                :leader-count-rows="leaderCountRows"
+                :get-chara-icon="getCharaIcon"
+                :get-chara-name="getCharaName"
+                :get-challenge-progress-color="getChallengeProgressColor"
+                :format-percent="formatPercent"
+                :get-unit-logo="getUnitLogo"
+                :get-attr-icon="getAttrIcon"
+                :get-chara-pill-color="getCharaPillColor"
+                :get-leader-progress-color="getLeaderProgressColor"
+                @update:bond-character-filter="bondCharacterFilter = $event"
+              />
             </div>
           </div>
         </div>
