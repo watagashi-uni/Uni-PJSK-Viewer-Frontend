@@ -28,7 +28,7 @@ async function toggleVliveSub() {
     await notificationStore.toggleSubscription('vlive')
   } catch (e: any) {
     const msg = e instanceof Error ? e.message : String(e)
-    if (msg.toLowerCase().includes('registration failed') || msg.toLowerCase().includes('push service')) {
+    if (msg.toLowerCase().includes('registration failed') || msg.toLowerCase().includes('push service') || msg.includes('订阅失败')) {
       alert('订阅失败：无法连接推送服务。\n\n安卓设备依赖谷歌 FCM 服务，国内网络通常无法连接。\n建议开启代理后重试，或使用 iOS / 桌面端设备接收推送。')
     } else {
       alert('订阅切换失败: ' + msg)
