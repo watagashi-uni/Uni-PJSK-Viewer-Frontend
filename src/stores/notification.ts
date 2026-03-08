@@ -14,7 +14,7 @@ export const useNotificationStore = defineStore('notification', () => {
 
     async function checkLocation() {
         try {
-            const res = await fetch('/api/location')
+            const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/location`)
             const text = await res.text()
             isChina.value = (text.trim() === '1')
         } catch {
@@ -74,7 +74,7 @@ export const useNotificationStore = defineStore('notification', () => {
         const registration = await navigator.serviceWorker.ready
 
         // 获取 VAPID
-        const res = await fetch('/api/push/vapid-key')
+        const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/push/vapid-key`)
         if (!res.ok) throw new Error('Failed to get VAPID key')
         const { publicKey } = await res.json()
 
@@ -85,7 +85,7 @@ export const useNotificationStore = defineStore('notification', () => {
         })
 
         // 发到后端
-        const subscribeRes = await fetch('/api/push/subscribe', {
+        const subscribeRes = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/push/subscribe`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -113,7 +113,7 @@ export const useNotificationStore = defineStore('notification', () => {
         const subscription = await registration.pushManager.getSubscription()
 
         if (subscription) {
-            await fetch('/api/push/unsubscribe', {
+            await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/push/unsubscribe`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ endpoint: subscription.endpoint })
@@ -167,7 +167,7 @@ export const useNotificationStore = defineStore('notification', () => {
         const subscription = await registration.pushManager.getSubscription()
         if (!subscription) throw new Error('Not subscribed')
 
-        await fetch('/api/push/test', {
+        await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/push/test`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

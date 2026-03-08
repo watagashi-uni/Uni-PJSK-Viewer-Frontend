@@ -13,7 +13,7 @@ import {
 import AssetImage from '@/components/AssetImage.vue'
 import type { EventData, MusicData } from '@/types/master'
 
-const FRONTEND_VERSION = '2.6.0'
+const FRONTEND_VERSION = '2.7.0'
 
 const masterStore = useMasterStore()
 const accountStore = useAccountStore()
