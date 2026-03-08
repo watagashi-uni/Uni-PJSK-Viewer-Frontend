@@ -3,7 +3,8 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
-import { Calendar, EyeOff, Radio, PlayCircle, Clock } from 'lucide-vue-next'
+import { useNotificationStore } from '@/stores/notification'
+import { Calendar, EyeOff, Radio, PlayCircle, Clock, Bell, BellRing } from 'lucide-vue-next'
 import AssetImage from '@/components/AssetImage.vue'
 import Pagination from '@/components/Pagination.vue'
 
@@ -11,6 +12,16 @@ const route = useRoute()
 const router = useRouter()
 const masterStore = useMasterStore()
 const settingsStore = useSettingsStore()
+const notificationStore = useNotificationStore()
+
+const isVliveSubscribed = computed(() => notificationStore.hasSubscription('vlive'))
+async function toggleVliveSub() {
+  try {
+    await notificationStore.toggleSubscription('vlive')
+  } catch (e) {
+    alert('订阅切换失败: ' + (e instanceof Error ? e.message : String(e)))
+  }
+}
 
 const vlives = ref<any[]>([])
 const searchQuery = ref('')
@@ -181,6 +192,17 @@ function isLeak(vlive: any): boolean {
           <input type="checkbox" class="toggle toggle-sm toggle-primary" v-model="showEnded" />
         </label>
       </div>
+
+      <button 
+        v-if="notificationStore.isSupported"
+        class="btn btn-sm gap-1"
+        :class="isVliveSubscribed ? 'btn-primary' : 'btn-ghost'"
+        @click="toggleVliveSub"
+      >
+        <BellRing v-if="isVliveSubscribed" class="w-4 h-4" />
+        <Bell v-else class="w-4 h-4" />
+        {{ isVliveSubscribed ? '已订阅 Live' : '订阅 Live' }}
+      </button>
     </div>
 
     <!-- 加载状态 -->

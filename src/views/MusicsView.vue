@@ -4,7 +4,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
 import { useAccountStore } from '@/stores/account'
-import { Search, ArrowUpDown, Languages, Trophy, List, LayoutGrid, RefreshCw, Layers, Github, Camera, Loader2 } from 'lucide-vue-next'
+import { useNotificationStore } from '@/stores/notification'
+import { Search, ArrowUpDown, Languages, Trophy, List, LayoutGrid, RefreshCw, Layers, Github, Camera, Loader2, Bell, BellRing } from 'lucide-vue-next'
 import { toPng } from 'html-to-image'
 import MusicCard from '@/components/MusicCard.vue'
 import Pagination from '@/components/Pagination.vue'
@@ -50,6 +51,16 @@ const router = useRouter()
 const masterStore = useMasterStore()
 const settingsStore = useSettingsStore()
 const accountStore = useAccountStore()
+const notificationStore = useNotificationStore()
+
+const isMusicSubscribed = computed(() => notificationStore.hasSubscription('music'))
+async function toggleMusicSub() {
+  try {
+    await notificationStore.toggleSubscription('music')
+  } catch (e) {
+    alert('订阅切换失败: ' + (e instanceof Error ? e.message : String(e)))
+  }
+}
 
 const musics = ref<Music[]>([])
 const musicDifficulties = ref<MusicDifficulty[]>([])
@@ -544,7 +555,7 @@ watch(() => route.query.page, () => {})
 
 <template>
   <div>
-    <!-- 第一行：搜索框 + 排序 -->
+    <!-- 第一行：搜索框 + 排序 + 订阅 -->
     <div class="flex flex-col sm:flex-row gap-3 mb-3 items-center">
       <div class="relative w-full sm:w-72">
         <input 
@@ -606,6 +617,17 @@ watch(() => route.query.page, () => {})
           <Languages class="w-4 h-4" />
           贡献翻译
         </a>
+
+        <button 
+          v-if="notificationStore.isSupported"
+          class="btn btn-sm gap-1"
+          :class="isMusicSubscribed ? 'btn-primary' : 'btn-ghost'"
+          @click="toggleMusicSub"
+        >
+          <BellRing v-if="isMusicSubscribed" class="w-4 h-4" />
+          <Bell v-else class="w-4 h-4" />
+          {{ isMusicSubscribed ? '已订阅新歌' : '订阅新歌' }}
+        </button>
       </div>
     </div>
 
