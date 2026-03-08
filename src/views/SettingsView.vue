@@ -27,7 +27,7 @@ async function togglePush(event: Event) {
     }
   } catch(e: any) {
     const msg = e instanceof Error ? e.message : String(e)
-    if (msg.includes('Registration failed') || msg.includes('push service')) {
+    if (msg.includes('Registration failed') || msg.includes('push service') || msg.includes('订阅失败')) {
       alert('通知设置失败：无法连接推送服务。\n\n安卓设备依赖谷歌 FCM 服务，国内网络通常无法连接。\n建议开启代理后重试，或使用 iOS / 桌面端设备接收推送。')
     } else {
       alert('通知设置失败: ' + msg)

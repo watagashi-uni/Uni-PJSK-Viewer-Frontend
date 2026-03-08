@@ -84,6 +84,12 @@ export const useNotificationStore = defineStore('notification', () => {
             applicationServerKey: urlBase64ToUint8Array(publicKey)
         })
 
+        // 拦截国内 FCM 假地址
+        if (subscription.endpoint.includes('permanently-removed.invalid')) {
+            await subscription.unsubscribe()
+            throw new Error('订阅失败：推送服务异常 (当前网络环境无法连接谷歌 FCM 服务，无法接收推送)')
+        }
+
         // 发到后端
         const subscribeRes = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/push/subscribe`, {
             method: 'POST',
