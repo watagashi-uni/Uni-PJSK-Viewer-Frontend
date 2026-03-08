@@ -269,6 +269,28 @@ async function handleClearTranslationCache() {
             </label>
           </div>
 
+          <!-- 国服安卓警告 (提升到外层) -->
+          <div v-if="notificationStore.isAndroid && notificationStore.isChina" class="alert alert-warning shadow-sm py-2 mb-4">
+            <AlertTriangle class="w-5 h-5 shrink-0" />
+            <div>
+              <h3 class="font-bold text-sm">重要：Android 限制</h3>
+              <div class="text-xs">
+                国内通常无法连接 FCM 服务，可能导致您<strong>无法收到推送，或甚至无法开启推送开关</strong>。请通过下方的“发送测试”验证。
+              </div>
+            </div>
+          </div>
+
+          <!-- iOS未添加到桌面警告 (提升到外层) -->
+          <div v-if="notificationStore.isIOS && !notificationStore.isStandalone" class="alert shadow-sm py-2 mb-4">
+            <MonitorSmartphone class="w-5 h-5 shrink-0 text-info" />
+            <div>
+              <h3 class="font-bold text-sm">iOS 用户指南</h3>
+              <div class="text-xs">
+                由于 iOS 限制，如果您希望在后台稳定接收推送，请点击 Safari 底部<strong>“共享”</strong > -> <strong>“添加到主屏幕”</strong>，然后从桌面打开本网站再进行订阅测试。
+              </div>
+            </div>
+          </div>
+
           <div v-if="notificationStore.isSubscribed" class="bg-base-200 rounded-lg p-4 space-y-4">
             <div>
               <p class="font-medium text-sm mb-3 opacity-80">推送内容：</p>
@@ -294,27 +316,7 @@ async function handleClearTranslationCache() {
               </div>
             </div>
 
-            <!-- 国服安卓警告 -->
-            <div v-if="notificationStore.isAndroid && notificationStore.isChina" class="alert alert-warning shadow-sm py-2">
-              <AlertTriangle class="w-5 h-5 shrink-0" />
-              <div>
-                <h3 class="font-bold text-sm">重要：Android 限制</h3>
-                <div class="text-xs">
-                  国内通常无法连接 FCM 服务，可能导致您<strong>无法收到推送</strong>。请通过下方的“发送测试”验证连通性。如果一直收不到，请开启代理或放弃使用。
-                </div>
-              </div>
-            </div>
-
-            <!-- iOS 未添加到桌面警告 -->
-            <div v-if="notificationStore.isIOS && !notificationStore.isStandalone" class="alert shadow-sm py-2">
-              <MonitorSmartphone class="w-5 h-5 shrink-0 text-info" />
-              <div>
-                <h3 class="font-bold text-sm">iOS 用户指南</h3>
-                <div class="text-xs">
-                  由于 iOS 限制，如果您希望在后台稳定接收推送，请点击 Safari 底部<strong>“共享”</strong > -> <strong>“添加到主屏幕”</strong>，然后从桌面打开本网站再进行订阅测试。
-                </div>
-              </div>
-            </div>
+            <!-- (Warnings moved out) -->
 
             <button class="btn btn-sm btn-outline btn-primary w-full mt-2" @click="testPush">
               <Send class="w-4 h-4" />
