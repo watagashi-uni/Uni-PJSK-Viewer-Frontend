@@ -8,7 +8,7 @@ import {
   revokeSus2ImgResult,
   type Sus2ImgFrontendResult,
   type Sus2ImgSkin,
-} from '@/utils/sus2img'
+} from 'sekai-sus2img'
 
 const FORM_STORAGE_KEY = 'sus2img-form-data'
 
