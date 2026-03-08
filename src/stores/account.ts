@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { openDB } from 'idb'
+import { request } from '@/utils/request'
 import { useOAuthStore } from '@/stores/oauth'
 
 export interface StoredAccount {
@@ -13,10 +14,6 @@ export interface StoredAccount {
 const STORAGE_KEY = 'sekaiUserProfiles'
 const SUITE_CACHE_PREFIX = 'suiteCache_'
 const PROFILE_DATA_KEY = 'sekaiUserProfileData'
-
-function buildOAuthPromptText() {
-    return '你没有勾选公开访问，需要 OAuth 授权本站访问游戏数据。是否现在去授权？'
-}
 
 function isOAuthTokenError(error: any): boolean {
     const status = Number(error?.status)
@@ -40,6 +37,7 @@ function normalizeUnixSeconds(timestamp: unknown): number | null {
 
 async function fetchSuiteByOAuth(userId: string): Promise<any> {
     const oauthStore = useOAuthStore()
+    const accountStore = useAccountStore()
     const returnTo = `${window.location.pathname}${window.location.search}${window.location.hash}`
 
     if (oauthStore.hasTokenForUser(userId)) {
@@ -54,7 +52,7 @@ async function fetchSuiteByOAuth(userId: string): Promise<any> {
         }
     }
 
-    const shouldAuthorize = window.confirm(buildOAuthPromptText())
+    const shouldAuthorize = await accountStore.requestOAuthConfirm()
     if (!shouldAuthorize) {
         throw new Error('未完成 OAuth 授权，无法读取 Suite 数据')
     }
@@ -64,6 +62,7 @@ async function fetchSuiteByOAuth(userId: string): Promise<any> {
 
 async function fetchMysekaiByOAuth(userId: string): Promise<any> {
     const oauthStore = useOAuthStore()
+    const accountStore = useAccountStore()
     const returnTo = `${window.location.pathname}${window.location.search}${window.location.hash}`
 
     if (oauthStore.hasTokenForUser(userId)) {
@@ -78,7 +77,7 @@ async function fetchMysekaiByOAuth(userId: string): Promise<any> {
         }
     }
 
-    const shouldAuthorize = window.confirm(buildOAuthPromptText())
+    const shouldAuthorize = await accountStore.requestOAuthConfirm()
     if (!shouldAuthorize) {
         throw new Error('未完成 OAuth 授权，无法读取 MySekai 数据')
     }
@@ -106,6 +105,28 @@ export const useAccountStore = defineStore('account', () => {
     const suiteRefreshToastHint = ref('')
     const suiteNotFoundModalVisible = ref(false)
     let suiteRefreshToastTimer: number | null = null
+
+    // OAuth Confirm
+    const oauthConfirmVisible = ref(false)
+    let resolveOAuth: ((value: boolean) => void) | null = null
+
+    function confirmOAuth() {
+        if (resolveOAuth) resolveOAuth(true)
+    }
+
+    function cancelOAuth() {
+        if (resolveOAuth) resolveOAuth(false)
+    }
+
+    async function requestOAuthConfirm(): Promise<boolean> {
+        oauthConfirmVisible.value = true
+        return new Promise((resolve) => {
+            resolveOAuth = (value: boolean) => {
+                oauthConfirmVisible.value = false
+                resolve(value)
+            }
+        })
+    }
 
     function dismissSuiteRefreshToast() {
         suiteRefreshToastMessage.value = ''
@@ -318,14 +339,17 @@ export const useAccountStore = defineStore('account', () => {
     async function refreshProfile(userId: string) {
         profileRefreshing.value = true
         try {
-            const url = `https://api.unipjsk.com/api/user/%7Buser_id%7D/${userId}/profile`
-            const res = await fetch(url)
-            if (!res.ok) {
-                if (res.status === 404) throw new Error('用户不存在')
-                if (res.status === 403) throw new Error('该用户未公开Profile')
-                throw new Error(`请求失败: ${res.status}`)
+            let data: any
+            try {
+                data = await request.getProfile<any>(`/api/user/%7Buser_id%7D/${userId}/profile`)
+            } catch (err: any) {
+                if (err.name === 'RequestError') {
+                    if (err.status === 404) throw new Error('用户不存在')
+                    if (err.status === 403) throw new Error('该用户未公开Profile')
+                    throw new Error(`请求失败: ${err.status}`)
+                }
+                throw err
             }
-            const data = await res.json()
             const acc = accounts.value.find(a => a.userId === userId)
 
             // 构建 userHonorMissions
@@ -390,25 +414,29 @@ export const useAccountStore = defineStore('account', () => {
                 }
             }
 
-            const resp = await fetch(`https://suite-api.haruki.seiunx.com/public/jp/suite/${userId}`)
-            if (!resp.ok) {
-                if (resp.status === 404) {
-                    showSuiteNotFoundModal()
-                    throw new Error('用户未上传数据')
-                }
-                if (resp.status === 403) {
-                    const data = await fetchSuiteByOAuth(userId)
-                    const uploadTime = normalizeUnixSeconds(data.upload_time)
-                    if (uploadTime) {
-                        updateUploadTime(userId, uploadTime)
+            let data: any
+            try {
+                data = await request.getSuite<any>(`/public/jp/suite/${userId}`)
+            } catch (err: any) {
+                if (err.name === 'RequestError') {
+                    if (err.status === 404) {
+                        showSuiteNotFoundModal()
+                        throw new Error('用户未上传数据')
                     }
-                    await saveSuiteCache(userId, data)
-                    setSuiteRefreshToast('oauth')
-                    return data
+                    if (err.status === 403) {
+                        data = await fetchSuiteByOAuth(userId)
+                        const uploadTime = normalizeUnixSeconds(data.upload_time)
+                        if (uploadTime) {
+                            updateUploadTime(userId, uploadTime)
+                        }
+                        await saveSuiteCache(userId, data)
+                        setSuiteRefreshToast('oauth')
+                        return data
+                    }
+                    throw new Error(`HTTP ${err.status}`)
                 }
-                throw new Error(`HTTP ${resp.status}`)
+                throw err
             }
-            const data = await resp.json()
             const uploadTime = normalizeUnixSeconds(data.upload_time)
             if (uploadTime) {
                 updateUploadTime(userId, uploadTime)
@@ -441,18 +469,21 @@ export const useAccountStore = defineStore('account', () => {
                 }
             }
 
-            const resp = await fetch(`https://suite-api.haruki.seiunx.com/public/jp/mysekai/${userId}`)
-            if (!resp.ok) {
-                if (resp.status === 404) throw new Error('用户未上传 MySekai 数据')
-                if (resp.status === 403) {
-                    const data = await fetchMysekaiByOAuth(userId)
-                    await saveMysekaiCache(userId, data)
-                    return data
+            let data: any
+            try {
+                data = await request.getSuite<any>(`/public/jp/mysekai/${userId}`)
+            } catch (err: any) {
+                if (err.name === 'RequestError') {
+                    if (err.status === 404) throw new Error('用户未上传 MySekai 数据')
+                    if (err.status === 403) {
+                        data = await fetchMysekaiByOAuth(userId)
+                        await saveMysekaiCache(userId, data)
+                        return data
+                    }
+                    throw new Error(`HTTP ${err.status}`)
                 }
-                throw new Error(`HTTP ${resp.status}`)
+                throw err
             }
-
-            const data = await resp.json()
             await saveMysekaiCache(userId, data)
             return data
         } finally {
@@ -475,6 +506,10 @@ export const useAccountStore = defineStore('account', () => {
         dismissSuiteRefreshToast,
         showSuiteNotFoundModal,
         dismissSuiteNotFoundModal,
+        oauthConfirmVisible,
+        confirmOAuth,
+        cancelOAuth,
+        requestOAuthConfirm,
         initialize,
         save,
         selectAccount,

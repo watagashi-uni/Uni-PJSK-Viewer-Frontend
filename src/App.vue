@@ -205,6 +205,21 @@ async function handleSuiteRefresh() {
     </div>
     
     <ToastContainer />
+
+    <!-- OAuth 授权确认弹窗 -->
+    <dialog class="modal" :class="{ 'modal-open': accountStore.oauthConfirmVisible }">
+      <div class="modal-box">
+        <h3 class="text-lg font-bold">需要 OAuth 授权</h3>
+        <p class="py-4">你没有勾选公开访问，需要 OAuth 授权本站访问游戏数据。是否现在去授权？</p>
+        <div class="modal-action">
+          <button class="btn btn-ghost" @click="accountStore.cancelOAuth()">取消</button>
+          <button class="btn btn-primary" @click="accountStore.confirmOAuth()">去授权</button>
+        </div>
+      </div>
+      <form method="dialog" class="modal-backdrop" @click="accountStore.cancelOAuth()">
+        <button>close</button>
+      </form>
+    </dialog>
   </div>
 </template>
 
