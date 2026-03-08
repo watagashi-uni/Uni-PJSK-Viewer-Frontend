@@ -1312,7 +1312,7 @@ function closeFixtureDetail() {
   <div class="max-w-7xl mx-auto space-y-5 pb-10">
     <h1 class="text-3xl font-bold">MySekai</h1>
 
-    <div class="card bg-base-100 shadow-md">
+    <div class="card bg-base-100 shadow-md relative z-10">
       <div class="card-body p-4 space-y-3">
         <div class="flex flex-wrap items-center gap-2">
           <label class="label cursor-pointer gap-2 p-0">
