@@ -16,6 +16,10 @@ const notificationStore = useNotificationStore()
 
 const isVliveSubscribed = computed(() => notificationStore.hasSubscription('vlive'))
 async function toggleVliveSub() {
+  if (!notificationStore.isSupported) {
+    alert('iOS Safari 浏览器不支持直接推送。\n请点击底部“共享”按钮 -> “添加到主屏幕”，然后从桌面打开本网站即可开启推送通知。')
+    return
+  }
   try {
     await notificationStore.toggleSubscription('vlive')
   } catch (e) {
@@ -194,7 +198,7 @@ function isLeak(vlive: any): boolean {
       </div>
 
       <button 
-        v-if="notificationStore.isSupported"
+        v-if="notificationStore.isSupported || notificationStore.isIOS"
         class="btn btn-sm gap-1"
         :class="isVliveSubscribed ? 'btn-primary' : 'btn-ghost'"
         @click="toggleVliveSub"

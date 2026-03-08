@@ -55,6 +55,10 @@ const notificationStore = useNotificationStore()
 
 const isMusicSubscribed = computed(() => notificationStore.hasSubscription('music'))
 async function toggleMusicSub() {
+  if (!notificationStore.isSupported) {
+    alert('iOS Safari 浏览器不支持直接推送。\n请点击底部“共享”按钮 -> “添加到主屏幕”，然后从桌面打开本网站即可开启推送通知。')
+    return
+  }
   try {
     await notificationStore.toggleSubscription('music')
   } catch (e) {
@@ -619,7 +623,7 @@ watch(() => route.query.page, () => {})
         </a>
 
         <button 
-          v-if="notificationStore.isSupported"
+          v-if="notificationStore.isSupported || notificationStore.isIOS"
           class="btn btn-sm gap-1"
           :class="isMusicSubscribed ? 'btn-primary' : 'btn-ghost'"
           @click="toggleMusicSub"
