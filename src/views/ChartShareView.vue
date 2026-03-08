@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { Upload, Link, Copy, Check, Music, FileText, AlertCircle } from 'lucide-vue-next'
-
-const apiBase = import.meta.env.VITE_API_BASE_URL || ''
+import { request } from '@/utils/request'
 
 const susFile = ref<File | null>(null)
 const bgmFile = ref<File | null>(null)
@@ -64,11 +63,7 @@ async function upload() {
     formData.append('sus', susFile.value)
     formData.append('bgm', bgmFile.value)
 
-    const resp = await fetch(`${apiBase}/api/chart-share`, {
-      method: 'POST',
-      body: formData
-    })
-    const data = await resp.json()
+    const data = await request.post<any>('/api/chart-share', formData)
 
     if (data.success) {
       shareUrl.value = data.url

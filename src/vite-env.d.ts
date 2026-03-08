@@ -6,6 +6,8 @@ interface ImportMetaEnv {
     readonly VITE_CHART_PREVIEW_URL?: string
     readonly VITE_TOOLBOX_OAUTH_BASE_URL?: string
     readonly VITE_TOOLBOX_OAUTH_CLIENT_ID?: string
+    readonly VITE_PROFILE_API_BASE_URL?: string
+    readonly VITE_SUITE_API_BASE_URL?: string
 }
 
 interface ImportMeta {
