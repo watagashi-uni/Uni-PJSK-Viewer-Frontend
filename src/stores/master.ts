@@ -28,6 +28,53 @@ export const useMasterStore = defineStore('master', () => {
      * 初始化：检查版本并决定是否需要更新缓存
      */
     let initPromise: Promise<void> | null = null
+    let versionCheckPromise: Promise<void> | null = null
+
+    /**
+     * 同步服务器版本；如果版本变化，立即清空本地 master 缓存。
+     */
+    async function syncVersion(): Promise<void> {
+        if (versionCheckPromise) {
+            return versionCheckPromise
+        }
+
+        versionCheckPromise = (async () => {
+            const localVersion = await getStoredVersion()
+
+            try {
+                const serverInfo = await getVersion()
+                const serverVersion = serverInfo.dataVersion
+
+                if (localVersion !== serverVersion) {
+                    console.log(`版本更新: ${localVersion} -> ${serverVersion}`)
+                    await clearAllCache()
+                    await setStoredVersion(serverVersion)
+                    cache.value = {}
+                }
+
+                version.value = serverVersion
+            } catch (error) {
+                console.error('同步 master 版本失败:', error)
+
+                if (localVersion) {
+                    version.value = localVersion
+                    return
+                }
+
+                if (version.value) {
+                    return
+                }
+
+                throw error
+            }
+        })()
+
+        try {
+            await versionCheckPromise
+        } finally {
+            versionCheckPromise = null
+        }
+    }
 
     /**
      * 初始化：检查版本并决定是否需要更新缓存
@@ -40,33 +87,7 @@ export const useMasterStore = defineStore('master', () => {
         if (initPromise) return initPromise
 
         initPromise = (async () => {
-            try {
-                // 获取服务器版本
-                const serverInfo = await getVersion()
-                const serverVersion = serverInfo.dataVersion
-
-                // 获取本地版本
-                const localVersion = await getStoredVersion()
-
-                if (localVersion !== serverVersion) {
-                    // 版本不同，清空缓存
-                    console.log(`版本更新: ${localVersion} -> ${serverVersion}`)
-                    await clearAllCache()
-                    await setStoredVersion(serverVersion)
-
-                    // 清空内存缓存（不清除翻译）
-                    cache.value = {}
-                }
-
-                version.value = serverVersion
-            } catch (error) {
-                console.error('初始化 master 版本失败:', error)
-                // 尝试使用本地版本
-                const localVersion = await getStoredVersion()
-                if (localVersion) {
-                    version.value = localVersion
-                }
-            }
+            await syncVersion()
         })()
 
         try {
@@ -82,6 +103,8 @@ export const useMasterStore = defineStore('master', () => {
      * 获取 master 数据（优先使用缓存，防止重复请求）
      */
     async function getMaster<T = any>(name: MasterDataName): Promise<T[]> {
+        await syncVersion()
+
         // 1. 检查内存缓存
         if (cache.value[name]) {
             return cache.value[name] as T[]
@@ -103,7 +126,7 @@ export const useMasterStore = defineStore('master', () => {
 
             // 3.2 从服务器获取
             if (!version.value) {
-                await initialize()
+                await syncVersion()
                 if (!version.value) {
                     throw new Error('Version not initialized. Call initialize() first.')
                 }
