@@ -68,6 +68,11 @@ export default defineConfig({
             handler: 'NetworkOnly',
           },
           {
+            // 版本号检查必须直接走网络，否则 StaleWhileRevalidate 会导致更新晚一拍
+            urlPattern: /^https:\/\/viewer-api\.unipjsk\.com\/api\/version(?:\?.*)?$/i,
+            handler: 'NetworkOnly',
+          },
+          {
             // 翻译 API - 使用 NetworkFirst，确保刷新时拿到最新数据
             urlPattern: /^https:\/\/viewer-api\.unipjsk\.com\/api\/translations\/.*/i,
             handler: 'NetworkFirst',
