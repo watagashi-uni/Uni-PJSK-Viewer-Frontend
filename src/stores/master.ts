@@ -31,6 +31,17 @@ export const useMasterStore = defineStore('master', () => {
     let versionCheckPromise: Promise<void> | null = null
 
     /**
+     * 从本地缓存恢复版本号，保证离线或弱网时仍可读取已缓存的 master 数据。
+     */
+    async function restoreStoredVersion(): Promise<string | undefined> {
+        const localVersion = await getStoredVersion()
+        if (localVersion) {
+            version.value = localVersion
+        }
+        return localVersion
+    }
+
+    /**
      * 同步服务器版本；如果版本变化，立即清空本地 master 缓存。
      */
     async function syncVersion(): Promise<void> {
@@ -77,6 +88,15 @@ export const useMasterStore = defineStore('master', () => {
     }
 
     /**
+     * 在后台检查版本，不阻塞当前页面使用现有缓存。
+     */
+    function checkVersionInBackground(): void {
+        void syncVersion().catch((error) => {
+            console.error('后台检查 master 版本失败:', error)
+        })
+    }
+
+    /**
      * 初始化：检查版本并决定是否需要更新缓存
      */
     async function initialize(): Promise<void> {
@@ -87,6 +107,13 @@ export const useMasterStore = defineStore('master', () => {
         if (initPromise) return initPromise
 
         initPromise = (async () => {
+            const localVersion = await restoreStoredVersion()
+
+            if (localVersion) {
+                checkVersionInBackground()
+                return
+            }
+
             await syncVersion()
         })()
 
@@ -103,10 +130,9 @@ export const useMasterStore = defineStore('master', () => {
      * 获取 master 数据（优先使用缓存，防止重复请求）
      */
     async function getMaster<T = any>(name: MasterDataName): Promise<T[]> {
-        await syncVersion()
-
         // 1. 检查内存缓存
         if (cache.value[name]) {
+            checkVersionInBackground()
             return cache.value[name] as T[]
         }
 
@@ -121,12 +147,13 @@ export const useMasterStore = defineStore('master', () => {
             const cachedData = await getCachedData<T>(name)
             if (cachedData) {
                 cache.value[name] = cachedData
+                checkVersionInBackground()
                 return cachedData
             }
 
             // 3.2 从服务器获取
             if (!version.value) {
-                await syncVersion()
+                await initialize()
                 if (!version.value) {
                     throw new Error('Version not initialized. Call initialize() first.')
                 }
@@ -256,6 +283,7 @@ export const useMasterStore = defineStore('master', () => {
         isReady,
         // 方法
         initialize,
+        checkVersionInBackground,
         getMaster,
         getMasters,
         getTranslations,

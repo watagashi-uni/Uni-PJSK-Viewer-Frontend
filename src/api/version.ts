@@ -11,14 +11,6 @@ export interface VersionInfo {
  * 获取当前 master 数据版本号
  */
 export async function getVersion(): Promise<VersionInfo> {
-    const response = await apiClient.get<VersionInfo>('/api/version', {
-        headers: {
-            'Cache-Control': 'no-cache',
-            Pragma: 'no-cache',
-        },
-        params: {
-            _: Date.now(),
-        },
-    })
+    const response = await apiClient.get<VersionInfo>('/api/version')
     return response.data
 }
