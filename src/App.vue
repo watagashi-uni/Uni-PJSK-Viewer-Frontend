@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { RouterView, useRoute } from 'vue-router'
 import AppNavbar from '@/components/AppNavbar.vue'
 import ToastContainer from '@/components/ToastContainer.vue'
@@ -30,8 +30,16 @@ onMounted(async () => {
   oauthStore.initialize()
   await accountStore.initialize()
   await masterStore.initialize()
+  masterStore.checkVersionInBackground()
   await notificationStore.initialize()
 })
+
+watch(
+  () => route.fullPath,
+  () => {
+    masterStore.checkVersionInBackground()
+  }
+)
 
 async function handleProfileRefresh() {
   if (!accountStore.currentUserId) return
