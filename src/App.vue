@@ -140,6 +140,11 @@ async function handleSuiteRefresh() {
             </RouterLink>
           </li>
           <li>
+            <RouterLink to="/chart-share" active-class="active">
+              <BarChart3 class="w-5 h-5" /> 谱面分享
+            </RouterLink>
+          </li>
+          <li>
             <RouterLink to="/deck-recommend" active-class="active">
               <Zap class="w-5 h-5" /> 自动组队
             </RouterLink>
