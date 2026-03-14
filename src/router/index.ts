@@ -87,6 +87,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '谱面分享' },
     },
     {
+        path: '/chart/s/:id',
+        name: 'ChartShareRedirect',
+        component: () => import('@/views/ChartShareRedirectView.vue'),
+        meta: { title: '谱面分享跳转', fullscreen: true },
+    },
+    {
         path: '/thumbnail',
         name: 'Thumbnail',
         component: () => import('@/views/ThumbnailToolView.vue'),

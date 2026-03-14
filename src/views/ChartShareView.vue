@@ -9,6 +9,59 @@ const isUploading = ref(false)
 const shareUrl = ref('')
 const errorMsg = ref('')
 const copied = ref(false)
+const chartSharePathPrefix = '/chart/s/'
+
+function parseWaveOffsetMs(chartText: string) {
+  const match = chartText.match(/^\s*#WAVEOFFSET\s+([+-]?\d+(?:\.\d+)?)\s*$/im)
+  if (!match) {
+    return 0
+  }
+
+  const seconds = Number(match[1])
+  if (!Number.isFinite(seconds)) {
+    return 0
+  }
+
+  return Math.round(seconds * 1000)
+}
+
+function extractShareId(rawUrl: string) {
+  try {
+    const normalized = new URL(rawUrl, window.location.origin)
+    const susUrl = normalized.searchParams.get('sus')
+    const bgmUrl = normalized.searchParams.get('bgm')
+
+    for (const fileUrl of [susUrl, bgmUrl]) {
+      if (!fileUrl) continue
+      const filePath = new URL(fileUrl, window.location.origin).pathname.split('/').filter(Boolean)
+      if (filePath.length >= 2) {
+        return filePath[filePath.length - 2]
+      }
+    }
+
+    const pathParts = normalized.pathname.split('/').filter(Boolean)
+    if (pathParts.length >= 2) {
+      return pathParts[pathParts.length - 2]
+    }
+
+    return pathParts[pathParts.length - 1] || normalized.searchParams.get('id') || ''
+  } catch {
+    return ''
+  }
+}
+
+function toLocalShareUrl(rawUrl: string, waveOffsetMs = 0) {
+  const shareId = extractShareId(rawUrl)
+  if (!shareId) {
+    return rawUrl
+  }
+
+  const localUrl = new URL(`${chartSharePathPrefix}${encodeURIComponent(shareId)}`, window.location.origin)
+  if (waveOffsetMs !== 0) {
+    localUrl.searchParams.set('offset', String(waveOffsetMs))
+  }
+  return localUrl.toString()
+}
 
 function onSusChange(e: Event) {
   const input = e.target as HTMLInputElement
@@ -59,6 +112,8 @@ async function upload() {
   shareUrl.value = ''
 
   try {
+    const susText = await susFile.value.text()
+    const waveOffsetMs = parseWaveOffsetMs(susText)
     const formData = new FormData()
     formData.append('sus', susFile.value)
     formData.append('bgm', bgmFile.value)
@@ -66,7 +121,7 @@ async function upload() {
     const data = await request.post<any>('/api/chart-share', formData)
 
     if (data.success) {
-      shareUrl.value = data.url
+      shareUrl.value = toLocalShareUrl(data.url || '', waveOffsetMs)
     } else {
       errorMsg.value = data.message || '上传失败'
     }
@@ -102,6 +157,22 @@ async function copyUrl() {
     <p class="text-base-content/60 mb-6">
       上传谱面文件和音频文件，生成可分享的预览链接
     </p>
+
+    <div class="card bg-base-100 shadow-lg mb-4">
+      <div class="card-body flex-row items-center gap-4 p-4">
+        <img
+          src="/img/chartviewsc.jpg"
+          alt="可播放谱面 3D 预览"
+          class="w-28 h-20 rounded-lg object-cover shrink-0"
+        />
+        <div class="min-w-0">
+          <h2 class="card-title text-base leading-snug">支持可播放的 3D 谱面预览</h2>
+          <p class="text-sm text-base-content/70 mt-1">
+            上传 SUS + 音频后，分享出去就是可直接播放的 3D 页面链接。
+          </p>
+        </div>
+      </div>
+    </div>
 
     <!-- 上传表单 -->
     <div class="card bg-base-100 shadow-lg">

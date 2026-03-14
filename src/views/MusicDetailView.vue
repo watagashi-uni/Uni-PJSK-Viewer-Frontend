@@ -84,6 +84,7 @@ const isLoading = ref(true)
 
 const assetsHost = computed(() => settingsStore.assetsHost)
 const chartPreviewHost = import.meta.env.VITE_CHART_PREVIEW_URL || ''
+const chartPlaybackHost = 'https://mmw-chart.unipjsk.com'
 const chartHost = `${chartPreviewHost}/moe/svg`
 
 // ===== 自定义播放器状态 =====
@@ -419,15 +420,11 @@ async function forceDownload(difficulty: string) {
 
 // 打开谱面播放预览
 function openChartPreview(difficulty: string) {
-  if (!chartPreviewHost) {
-    alert('谱面预览服务未配置')
-    return
-  }
   const susUrl = getDownloadUrl(difficulty)
   const bgmUrl = currentAudioUrl.value
   const offset = music.value?.fillerSec ? music.value.fillerSec * 1000 : 0
   
-  const previewUrl = `${chartPreviewHost}/?sus=${encodeURIComponent(susUrl)}&bgm=${encodeURIComponent(bgmUrl)}&offset=${offset}`
+  const previewUrl = `${chartPlaybackHost}/?sus=${encodeURIComponent(susUrl)}&bgm=${encodeURIComponent(bgmUrl)}&offset=${offset}`
   window.open(previewUrl, '_blank', 'width=600,height=800,resizable=yes')
 }
 
@@ -942,11 +939,10 @@ const isExpired = computed(() => {
                    
                   <!-- 谱面播放预览 -->
                   <button 
-                    v-if="chartPreviewHost"
                     class="btn btn-sm btn-block btn-ghost btn-outline h-9 min-h-0 font-normal hover:bg-base-200 whitespace-nowrap"
                     @click="openChartPreview(diff.musicDifficulty)"
                   >
-                    <PlayCircle class="w-4 h-4 shrink-0" /> 谱面播放
+                    <PlayCircle class="w-4 h-4 shrink-0" /> 3D谱面播放
                   </button>
                    
                   <!-- 下载文件 (.sus) -->

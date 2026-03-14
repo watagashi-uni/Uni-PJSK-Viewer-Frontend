@@ -505,6 +505,24 @@ function clearForm() {
     </div>
 
     <footer class="text-center text-sm text-base-content/60 mt-8 space-y-2">
+      <a
+        href="/chart-share"
+        class="card bg-base-100 shadow-lg text-left transition-transform duration-200 hover:-translate-y-1 hover:shadow-xl block"
+      >
+        <div class="card-body flex-row items-center gap-4 p-4">
+          <img
+            src="/img/chartviewsc.jpg"
+            alt="网页分享谱面预览"
+            class="w-28 h-20 rounded-lg object-cover shrink-0"
+          />
+          <div class="min-w-0">
+            <h2 class="card-title text-base leading-snug">想用网页分享能播放的谱面？</h2>
+            <p class="text-sm text-base-content/70 mt-1">
+              点击这里，上传谱面和音频，一键生成可分享的播放链接。
+            </p>
+          </div>
+        </div>
+      </a>
       <p>如浏览器无法保存 PNG，请直接拖动到桌面保存。</p>
       <p>
         模块修改自
