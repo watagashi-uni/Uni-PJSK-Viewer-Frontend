@@ -40,7 +40,11 @@ function extractShareId(rawUrl: string) {
     }
 
     const pathParts = normalized.pathname.split('/').filter(Boolean)
-    if (pathParts.length >= 2) {
+    if (pathParts.length >= 2 && pathParts[pathParts.length - 2] === 's') {
+      return pathParts[pathParts.length - 1]
+    }
+
+    if (pathParts.length >= 4 && pathParts[pathParts.length - 4] === 'api' && pathParts[pathParts.length - 3] === 'chart-share') {
       return pathParts[pathParts.length - 2]
     }
 
