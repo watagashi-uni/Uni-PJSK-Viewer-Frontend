@@ -506,19 +506,19 @@ function clearForm() {
 
     <footer class="text-center text-sm text-base-content/60 mt-8 space-y-2">
       <a
-        href="/chart-share"
+        href="/musics"
         class="card bg-base-100 shadow-lg text-left transition-transform duration-200 hover:-translate-y-1 hover:shadow-xl block"
       >
         <div class="card-body flex-row items-center gap-4 p-4">
           <img
-            src="/img/chartviewsc.jpg"
-            alt="网页分享谱面预览"
+            src="/img/chart.webp"
+            alt="本家 1:1 复刻谱面在线预览"
             class="w-28 h-20 rounded-lg object-cover shrink-0"
           />
           <div class="min-w-0">
-            <h2 class="card-title text-base leading-snug">想用网页分享能播放的谱面？</h2>
+            <h2 class="card-title text-base leading-snug">在线1:1预览本家谱面效果</h2>
             <p class="text-sm text-base-content/70 mt-1">
-              点击这里，上传谱面和音频，一键生成可分享的播放链接。
+              点击这里上传谱面，直接体验在线可播放的 3D 谱面预览。
             </p>
           </div>
         </div>

@@ -317,6 +317,31 @@ onMounted(async () => {
       </RouterLink>
     </div>
 
+    <div class="card bg-base-100 border border-base-200 shadow-sm overflow-hidden">
+      <div class="card-body p-4 md:p-5">
+        <div class="flex flex-col md:flex-row items-center gap-4 md:gap-5">
+          <img
+            src="/img/chart.webp"
+            alt="本家 1:1 复刻谱面在线预览"
+            class="w-44 sm:w-52 md:w-56 rounded-lg object-cover shrink-0 border border-base-200"
+          />
+          <div class="min-w-0 w-full">
+            <h2 class="text-lg md:text-xl font-bold text-base-content">
+              本家 1:1 复刻在线预览
+            </h2>
+            <p class="text-sm text-base-content/70 mt-1">
+              歌曲详情页现已支持可播放的 3D 谱面预览，自动携带曲名、作词作曲编曲、演唱和难度信息。
+            </p>
+            <div class="flex flex-wrap gap-2 mt-3">
+              <RouterLink to="/musics" class="btn btn-sm btn-primary">
+                去歌曲详情体验
+              </RouterLink>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
     <!-- 主体两列内容 -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <!-- 左侧：当前活动 (占 2 列) -->
