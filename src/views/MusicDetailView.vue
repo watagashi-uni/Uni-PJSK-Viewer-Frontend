@@ -66,6 +66,19 @@ interface LimitedTimeMusic {
   endAt: number
 }
 
+type PreviewPayload = {
+  sus: string
+  bgm?: string
+  cover?: string
+  offset?: number
+  title?: string
+  lyricist?: string
+  composer?: string
+  arranger?: string
+  vocal?: string
+  difficulty?: string | number
+}
+
 const route = useRoute()
 const router = useRouter()
 const masterStore = useMasterStore()
@@ -84,7 +97,7 @@ const isLoading = ref(true)
 
 const assetsHost = computed(() => settingsStore.assetsHost)
 const chartPreviewHost = import.meta.env.VITE_CHART_PREVIEW_URL || ''
-const chartPlaybackHost = 'https://mmw-chart.unipjsk.com'
+const chartPlaybackHost = 'https://chartview.unipjsk.com'
 const chartHost = `${chartPreviewHost}/moe/svg`
 
 // ===== 自定义播放器状态 =====
@@ -331,7 +344,7 @@ onBeforeUnmount(() => {
 })
 
 // 获取歌手名称列表
-function getVocalSingers(vocal: MusicVocal): string {
+function getVocalSingers(vocal: MusicVocal, separator = '・'): string {
   return vocal.characters.map(c => {
     if (c.characterType === 'game_character') {
       const char = characters.value.find(ch => ch.id === c.characterId)
@@ -345,7 +358,7 @@ function getVocalSingers(vocal: MusicVocal): string {
       }
     }
     return ''
-  }).filter(Boolean).join('・')
+  }).filter(Boolean).join(separator)
 }
 
 // 难度颜色映射
@@ -419,13 +432,74 @@ async function forceDownload(difficulty: string) {
 }
 
 // 打开谱面播放预览
+function toHttpsUrl(rawUrl: string) {
+  try {
+    const parsed = new URL(rawUrl, window.location.origin)
+    return parsed.protocol === 'https:' ? parsed.toString() : ''
+  } catch {
+    return ''
+  }
+}
+
+function buildPreviewUrl(previewBase: string, payload: PreviewPayload) {
+  if (!payload.sus) throw new Error('sus is required')
+
+  const cfg: Record<string, string | number> = { s: payload.sus }
+  if (payload.bgm) cfg.b = payload.bgm
+  if (payload.cover) cfg.c = payload.cover
+  if (typeof payload.offset === 'number' && Number.isFinite(payload.offset)) cfg.o = payload.offset
+  if (payload.title) cfg.t = payload.title
+  if (payload.lyricist) cfg.ly = payload.lyricist
+  if (payload.composer) cfg.co = payload.composer
+  if (payload.arranger) cfg.ar = payload.arranger
+  if (payload.vocal) cfg.v = payload.vocal
+  if (payload.difficulty !== undefined && payload.difficulty !== null && String(payload.difficulty).trim() !== '') {
+    cfg.d = payload.difficulty
+  }
+
+  const json = JSON.stringify(cfg)
+  const bytes = new TextEncoder().encode(json)
+  let binary = ''
+  for (let i = 0; i < bytes.length; i += 1) {
+    binary += String.fromCharCode(bytes[i] ?? 0)
+  }
+  // chartview 要求 cfg 使用 base64url，不是 encodeURIComponent(JSON)
+  const cfgBase64Url = btoa(binary)
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/g, '')
+
+  return `${previewBase.replace(/\/$/, '')}/preview?cfg=${cfgBase64Url}`
+}
+
 function openChartPreview(difficulty: string) {
-  const susUrl = getDownloadUrl(difficulty)
-  const bgmUrl = currentAudioUrl.value
-  const offset = music.value?.fillerSec ? music.value.fillerSec * 1000 : 0
-  
-  const previewUrl = `${chartPlaybackHost}/?sus=${encodeURIComponent(susUrl)}&bgm=${encodeURIComponent(bgmUrl)}&offset=${offset}`
-  window.open(previewUrl, '_blank', 'width=600,height=800,resizable=yes')
+  const susUrl = toHttpsUrl(getDownloadUrl(difficulty))
+  if (!susUrl || !music.value) {
+    alert('谱面地址无效，请检查资源源设置（需 https）')
+    return
+  }
+
+  const bgmUrl = toHttpsUrl(currentAudioUrl.value)
+  const cover = toHttpsUrl(coverUrl.value)
+  const offset = music.value.fillerSec ? Math.round(music.value.fillerSec * 1000) : 0
+  const vocal = currentVocal.value ? getVocalSingers(currentVocal.value, ', ') : ''
+  const difficultyOrder = ['easy', 'normal', 'hard', 'expert', 'master', 'append', 'eternal']
+  const difficultyIndex = difficultyOrder.indexOf(difficulty.toLowerCase())
+
+  const previewUrl = buildPreviewUrl(chartPlaybackHost, {
+    sus: susUrl,
+    bgm: bgmUrl || undefined,
+    cover: cover || undefined,
+    offset,
+    title: music.value.title,
+    lyricist: music.value.lyricist,
+    composer: music.value.composer,
+    arranger: music.value.arranger,
+    vocal: vocal || undefined,
+    difficulty: difficultyIndex >= 0 ? difficultyIndex : (difficultyLabels[difficulty] || difficulty.toUpperCase()),
+  })
+
+  window.open(previewUrl, '_blank')
 }
 
 // 加载数据
