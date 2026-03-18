@@ -323,14 +323,14 @@ onMounted(async () => {
           <img
             src="/img/chart.webp"
             alt="本家 1:1 复刻谱面在线预览"
-            class="w-44 sm:w-52 md:w-56 rounded-lg object-cover shrink-0 border border-base-200"
+            class="w-full md:w-56 rounded-lg object-cover shrink-0 border border-base-200"
           />
           <div class="min-w-0 w-full">
             <h2 class="text-lg md:text-xl font-bold text-base-content">
-              本家 1:1 复刻在线预览
+              本家 1:1 复刻在线谱面预览
             </h2>
             <p class="text-sm text-base-content/70 mt-1">
-              歌曲详情页现已支持可播放的 3D 谱面预览，自动携带曲名、作词作曲编曲、演唱和难度信息。
+              歌曲详情页现已支持可播放的 3D 谱面预览，欢迎体验。
             </p>
             <div class="flex flex-wrap gap-2 mt-3">
               <RouterLink to="/musics" class="btn btn-sm btn-primary">
