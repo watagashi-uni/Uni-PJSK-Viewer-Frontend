@@ -506,7 +506,7 @@ function clearForm() {
 
     <footer class="text-center text-sm text-base-content/60 mt-8 space-y-2">
       <a
-        href="/musics"
+        href="https://chartview.unipjsk.com/"
         class="card bg-base-100 shadow-lg text-left transition-transform duration-200 hover:-translate-y-1 hover:shadow-xl block"
       >
         <div class="card-body flex-row items-center gap-4 p-4">
