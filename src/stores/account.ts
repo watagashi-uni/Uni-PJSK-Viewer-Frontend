@@ -35,6 +35,14 @@ function normalizeUnixSeconds(timestamp: unknown): number | null {
     return Math.floor(value)
 }
 
+async function restartOAuthAuthorization(userId: string) {
+    const oauthStore = useOAuthStore()
+    const returnTo = `${window.location.pathname}${window.location.search}${window.location.hash}`
+    oauthStore.clearTokensForUser(userId)
+    await oauthStore.startAuthorization(userId, returnTo)
+    throw new Error('正在跳转 OAuth 授权页面...')
+}
+
 async function fetchSuiteByOAuth(userId: string): Promise<any> {
     const oauthStore = useOAuthStore()
     const accountStore = useAccountStore()
@@ -45,7 +53,7 @@ async function fetchSuiteByOAuth(userId: string): Promise<any> {
             return await oauthStore.fetchGameData('jp', 'suite', userId)
         } catch (e: any) {
             if (isOAuthTokenError(e)) {
-                oauthStore.clearTokensForUser(userId)
+                await restartOAuthAuthorization(userId)
             } else {
                 throw e
             }
@@ -70,7 +78,7 @@ async function fetchMysekaiByOAuth(userId: string): Promise<any> {
             return await oauthStore.fetchGameData('jp', 'mysekai', userId)
         } catch (e: any) {
             if (isOAuthTokenError(e)) {
-                oauthStore.clearTokensForUser(userId)
+                await restartOAuthAuthorization(userId)
             } else {
                 throw e
             }
@@ -406,8 +414,7 @@ export const useAccountStore = defineStore('account', () => {
                         throw new Error('用户未上传数据')
                     }
                     if (isOAuthTokenError(e)) {
-                        oauthStore.clearTokensForUser(userId)
-                        // Token 失效时先回退 public API，仅在 public=403 时再触发 OAuth 授权
+                        await restartOAuthAuthorization(userId)
                     } else {
                         throw e
                     }
@@ -461,8 +468,7 @@ export const useAccountStore = defineStore('account', () => {
                     return oauthData
                 } catch (e: any) {
                     if (isOAuthTokenError(e)) {
-                        oauthStore.clearTokensForUser(userId)
-                        // Token 失效时先回退 public API，仅在 public=403 时再触发 OAuth 授权
+                        await restartOAuthAuthorization(userId)
                     } else {
                         throw e
                     }
