@@ -223,7 +223,8 @@ export const useOAuthStore = defineStore('oauth', () => {
         ensureClientId()
         const tokenData = tokensByUserId.value[userId]
         if (!tokenData?.refreshToken) {
-            throw createOAuthError('未找到 refresh_token，请重新授权')
+            clearTokensForUser(userId)
+            throw createOAuthError('未找到 refresh_token，请重新授权', 401, 'invalid_token')
         }
 
         const body = new URLSearchParams()
@@ -270,7 +271,7 @@ export const useOAuthStore = defineStore('oauth', () => {
         }
         const latest = tokensByUserId.value[userId]?.accessToken || ''
         if (!latest) {
-            throw createOAuthError('未获取到 access_token，请重新授权')
+            throw createOAuthError('未获取到 access_token，请重新授权', 401, 'invalid_token')
         }
         return latest
     }
