@@ -468,6 +468,11 @@ function handlePageChange(page: number) {
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
+function resetToFirstPage() {
+  if (currentPage.value === 1) return
+  router.replace({ query: { ...route.query, page: '1' } })
+}
+
 function toggleSort(key: 'publishedAt' | 'id' | 'level') {
   if (sortKey.value === key) {
     sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc'
@@ -534,6 +539,7 @@ onUnmounted(() => {
 // 监听过滤/排序变化 -> 重置显示数量
 watch([searchText, sortKey, sortOrder, resultFilter, filterDifficulty], () => {
   displayedCount.value = 30
+  resetToFirstPage()
   window.scrollTo({ top: 0, behavior: 'auto' })
 })
 
@@ -563,7 +569,15 @@ watch(() => accountStore.currentUserId, () => {
   loadFromCache()
 })
 
-watch(() => route.query.page, () => {})
+watch(totalPages, (pages) => {
+  if (pages <= 0) {
+    resetToFirstPage()
+    return
+  }
+  if (currentPage.value > pages) {
+    router.replace({ query: { ...route.query, page: pages.toString() } })
+  }
+})
 </script>
 
 <template>
