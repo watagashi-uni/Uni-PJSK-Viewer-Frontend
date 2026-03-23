@@ -22,7 +22,8 @@ function isOAuthTokenError(error: any): boolean {
 
     if ([400, 401, 403].includes(status)) return true
     if (oauthError === 'invalid_grant' || oauthError === 'invalid_token') return true
-    if (message.includes('refresh token') || message.includes('invalid_grant') || message.includes('access_token')) return true
+    if (message.includes('refresh token') || message.includes('refresh_token') || message.includes('invalid_grant') || message.includes('access_token')) return true
+    if (message.includes('请重新授权') || message.includes('未找到 refresh_token') || message.includes('未获取到 access_token')) return true
     return false
 }
 
