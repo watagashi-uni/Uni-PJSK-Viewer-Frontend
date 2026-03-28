@@ -11,6 +11,7 @@
     "lint:fix": "eslint . --fix"
   },
   "dependencies": {
+    "@breezystack/lamejs": "^1.2.7",
     "@unhead/vue": "^2.1.4",
     "axios": "^1.13.2",
     "canvas-confetti": "^1.9.4",

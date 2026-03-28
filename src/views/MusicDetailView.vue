@@ -4,6 +4,7 @@ import { useSeoMeta, useHead } from '@unhead/vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
+import { Mp3Encoder } from '@breezystack/lamejs'
 import { 
   Play, Pause, BarChart2, Eye, Download, ChevronLeft, 
   Disc3, Sparkles, Mic, Volume2, VolumeX, SkipBack, SkipForward,
@@ -21,7 +22,8 @@ interface Music {
   composer: string
   arranger: string
   publishedAt: number
-  fillerSec: number
+  fillerSec?: number
+  filterSec?: number
   categories: string[]
   assetbundleName: string
 }
@@ -118,6 +120,17 @@ const pendingAutoPlay = ref(false)  // 待恢复的播放状态
 // 当前选中的声乐
 const currentVocal = computed(() => vocals.value[currentVocalIndex.value] || null)
 
+const audioTrimStartSec = computed(() => {
+  if (!music.value) return 0
+  const filterSec = Number(music.value.filterSec)
+  if (Number.isFinite(filterSec) && filterSec > 0) return filterSec
+
+  const fillerSec = Number(music.value.fillerSec)
+  if (Number.isFinite(fillerSec) && fillerSec > 0) return fillerSec
+
+  return 0
+})
+
 // 音频URL
 const currentAudioUrl = computed(() => {
   if (!currentVocal.value) return ''
@@ -182,10 +195,10 @@ function onLoadedMetadata() {
       // 清除待恢复状态
       pendingSeekTime.value = null
       pendingAutoPlay.value = false
-    } else if (music.value && music.value.fillerSec > 0) {
-      // 首次加载时跳过 fillerSec
-      audioRef.value.currentTime = music.value.fillerSec
-      currentTime.value = music.value.fillerSec
+    } else if (audioTrimStartSec.value > 0) {
+      // 首次加载时跳过头部空白
+      audioRef.value.currentTime = audioTrimStartSec.value
+      currentTime.value = audioTrimStartSec.value
     }
 
     // 设置 Media Session API 以便在系统通知/锁屏中显示歌曲信息
@@ -314,10 +327,19 @@ function skipForward() {
 }
 
 // 下载当前音频
+function sanitizeFileName(name: string): string {
+  return name.replace(/[<>:"/\\|?*\u0000-\u001F]/g, '_').trim()
+}
+
+function buildAudioBaseName(): string {
+  if (!currentVocal.value || !music.value) return 'audio'
+  return sanitizeFileName(`${music.value.title} - ${currentVocal.value.caption}`)
+}
+
 async function downloadAudio() {
   if (!currentVocal.value || !music.value) return
   const url = currentAudioUrl.value
-  const fileName = `${music.value.title} - ${currentVocal.value.caption}.mp3`
+  const fileName = `${buildAudioBaseName()}.mp3`
   
   try {
     const response = await fetch(url)
@@ -334,6 +356,91 @@ async function downloadAudio() {
   } catch (error) {
     console.error('下载失败:', error)
     window.open(url, '_blank')
+  }
+}
+
+function convertFloat32ToInt16(input: Float32Array): Int16Array {
+  const output = new Int16Array(input.length)
+  for (let i = 0; i < input.length; i += 1) {
+    const sample = Math.max(-1, Math.min(1, input[i] ?? 0))
+    output[i] = sample < 0 ? sample * 0x8000 : sample * 0x7fff
+  }
+  return output
+}
+
+function encodeMp3(audioBuffer: AudioBuffer): Blob {
+  const channelCount = Math.min(audioBuffer.numberOfChannels, 2)
+  const sampleRate = audioBuffer.sampleRate
+  const kbps = 192
+  const encoder = new Mp3Encoder(channelCount, sampleRate, kbps)
+  const left = convertFloat32ToInt16(audioBuffer.getChannelData(0))
+  const right = channelCount > 1
+    ? convertFloat32ToInt16(audioBuffer.getChannelData(1))
+    : null
+  const blockSize = 1152
+  const mp3Chunks: ArrayBuffer[] = []
+
+  for (let i = 0; i < left.length; i += blockSize) {
+    const leftChunk = left.subarray(i, i + blockSize)
+    const buffer = channelCount > 1 && right
+      ? encoder.encodeBuffer(leftChunk, right.subarray(i, i + blockSize))
+      : encoder.encodeBuffer(leftChunk)
+
+    if (buffer.length > 0) {
+      mp3Chunks.push(Uint8Array.from(buffer).buffer.slice(0))
+    }
+  }
+
+  const flush = encoder.flush()
+  if (flush.length > 0) {
+    mp3Chunks.push(Uint8Array.from(flush).buffer.slice(0))
+  }
+
+  return new Blob(mp3Chunks, { type: 'audio/mpeg' })
+}
+
+async function downloadTrimmedAudio() {
+  if (!currentVocal.value || !music.value) return
+
+  const trimSec = audioTrimStartSec.value
+  if (trimSec <= 0) {
+    await downloadAudio()
+    return
+  }
+
+  const audioContext = new AudioContext()
+
+  try {
+    const response = await fetch(currentAudioUrl.value)
+    const arrayBuffer = await response.arrayBuffer()
+    const decoded = await audioContext.decodeAudioData(arrayBuffer.slice(0))
+    const startFrame = Math.min(decoded.length, Math.max(0, Math.floor(trimSec * decoded.sampleRate)))
+    const trimmedLength = Math.max(1, decoded.length - startFrame)
+    const trimmedBuffer = audioContext.createBuffer(
+      decoded.numberOfChannels,
+      trimmedLength,
+      decoded.sampleRate
+    )
+
+    for (let channel = 0; channel < decoded.numberOfChannels; channel += 1) {
+      const source = decoded.getChannelData(channel).subarray(startFrame)
+      trimmedBuffer.copyToChannel(source, channel, 0)
+    }
+
+    const mp3Blob = encodeMp3(trimmedBuffer)
+    const blobUrl = URL.createObjectURL(mp3Blob)
+    const link = document.createElement('a')
+    link.href = blobUrl
+    link.download = `${buildAudioBaseName()} (trimmed).mp3`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(blobUrl)
+  } catch (error) {
+    console.error('裁切下载失败:', error)
+    alert('去头部静音音频下载失败，请稍后重试。')
+  } finally {
+    await audioContext.close()
   }
 }
 
@@ -481,7 +588,7 @@ function openChartPreview(difficulty: string) {
 
   const bgmUrl = toHttpsUrl(currentAudioUrl.value)
   const cover = toHttpsUrl(coverUrl.value)
-  const offset = music.value.fillerSec ? Math.round(music.value.fillerSec * 1000) : 0
+  const offset = audioTrimStartSec.value ? Math.round(audioTrimStartSec.value * 1000) : 0
   const vocal = currentVocal.value ? getVocalSingers(currentVocal.value, ', ') : ''
   const difficultyOrder = ['easy', 'normal', 'hard', 'expert', 'master', 'append', 'eternal']
   const difficultyIndex = difficultyOrder.indexOf(difficulty.toLowerCase())
@@ -836,18 +943,31 @@ const isExpired = computed(() => {
                   试听
                 </h2>
                 <div class="flex items-center gap-2">
-                  <span v-if="music.fillerSec > 0" class="text-xs text-base-content/50 bg-base-200/50 px-3 py-1 rounded-full">
+                  <span v-if="audioTrimStartSec > 0" class="text-xs text-base-content/50 bg-base-200/50 px-3 py-1 rounded-full">
                     自动跳过空白
                   </span>
-                  <!-- 下载按钮 -->
-                  <button 
-                    class="btn btn-ghost btn-sm gap-1.5 hover:bg-base-200/50"
-                    :disabled="!currentVocal"
-                    @click="downloadAudio"
-                  >
-                    <Download class="w-4 h-4" />
-                    <span class="hidden sm:inline">下载</span>
-                  </button>
+                  <div class="dropdown dropdown-end">
+                    <button 
+                      tabindex="0"
+                      class="btn btn-ghost btn-sm gap-1.5 hover:bg-base-200/50"
+                      :disabled="!currentVocal"
+                    >
+                      <Download class="w-4 h-4" />
+                      <span class="hidden sm:inline">下载</span>
+                    </button>
+                    <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-20 w-56 p-2 shadow-lg border border-base-200">
+                      <li>
+                        <button :disabled="!currentVocal" @click="downloadAudio">
+                          下载原音频
+                        </button>
+                      </li>
+                      <li>
+                        <button :disabled="!currentVocal || audioTrimStartSec <= 0" @click="downloadTrimmedAudio">
+                          下载去头部静音音频
+                        </button>
+                      </li>
+                    </ul>
+                  </div>
                 </div>
               </div>
 
