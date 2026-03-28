@@ -328,7 +328,13 @@ function skipForward() {
 
 // 下载当前音频
 function sanitizeFileName(name: string): string {
-  return name.replace(/[<>:"/\\|?*\u0000-\u001F]/g, '_').trim()
+  return Array.from(name, (char) => {
+    const code = char.charCodeAt(0)
+    if (code <= 31 || '<>:"/\\|?*'.includes(char)) {
+      return '_'
+    }
+    return char
+  }).join('').trim()
 }
 
 function buildAudioBaseName(): string {
