@@ -274,7 +274,7 @@ function copyMusicTitle() {
               <div
                 class="flex items-baseline gap-[0.4em] w-full" :style="{
                   marginBottom: '-2%',
-                  filter: 'drop-shadow(0 0 10px #ae17ff) drop-shadow(0 0 4px #ae17ff)',
+                  filter: `drop-shadow(0 0 10px ${currentColors.shadow}) drop-shadow(0 0 4px ${currentColors.shadow})`,
                   fontSize: '5.5cqi',
                   letterSpacing: '0.05em' /* <--- 在这里调整 MASTER 和数字的字间距，0em 为默认，越大间距越宽 */
                 }"
