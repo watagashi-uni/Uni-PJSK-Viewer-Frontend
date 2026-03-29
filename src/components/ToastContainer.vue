@@ -67,16 +67,31 @@ function dismissUpdate() {
     <dialog :open="accountStore.suiteNotFoundModalVisible" class="modal modal-bottom sm:modal-middle">
       <div class="modal-box">
         <h3 class="font-bold text-lg">未查询到 Suite 数据</h3>
-        <p class="py-3 text-sm text-base-content/80">
-          Haruki工具箱没有查询到该玩家的数据。你可能需要前往
-          <a
-            href="https://haruki.seiunx.com"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="link link-primary font-medium"
-          >Haruki工具箱</a>
-          先注册账号、绑定游戏账号验证后上传自己的数据，才能使用此功能。不注册验证单纯上传是查不到的
-        </p>
+        <div class="py-3 space-y-3">
+          <p class="text-sm text-base-content/80">
+            Haruki工具箱没有查询到该玩家的数据。你可能需要前往
+            <a
+              href="https://haruki.seiunx.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="link link-primary font-medium"
+            >Haruki工具箱</a>
+            先注册账号、绑定游戏账号验证后上传自己的数据，才能使用此功能。不注册验证单纯上传是查不到的
+          </p>
+          <div class="rounded-lg border border-info/30 bg-info/5 p-3">
+            <p class="text-sm font-medium text-info mb-1">已上传但没有公开？</p>
+            <p class="text-sm text-base-content/70">
+              如果你已经上传了数据但未开启公开访问，可以通过 OAuth 授权来获取你的私有数据。
+            </p>
+            <button
+              v-if="accountStore.currentUserId"
+              class="btn btn-sm btn-info btn-outline mt-2"
+              @click="accountStore.startOAuthForUser(accountStore.currentUserId)"
+            >
+              进行 OAuth 授权
+            </button>
+          </div>
+        </div>
         <div class="modal-action">
           <button class="btn btn-primary" @click="accountStore.dismissSuiteNotFoundModal">我知道了</button>
         </div>
@@ -85,6 +100,7 @@ function dismissUpdate() {
         <button type="button" @click="accountStore.dismissSuiteNotFoundModal">close</button>
       </form>
     </dialog>
+
 
     <!-- Toast 容器 (底部右侧) -->
     <div class="fixed bottom-4 right-4 z-50 flex flex-col gap-3 max-w-sm">

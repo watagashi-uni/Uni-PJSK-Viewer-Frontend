@@ -44,55 +44,6 @@ async function restartOAuthAuthorization(userId: string) {
     throw new Error('正在跳转 OAuth 授权页面...')
 }
 
-async function fetchSuiteByOAuth(userId: string): Promise<any> {
-    const oauthStore = useOAuthStore()
-    const accountStore = useAccountStore()
-    const returnTo = `${window.location.pathname}${window.location.search}${window.location.hash}`
-
-    if (oauthStore.hasTokenForUser(userId)) {
-        try {
-            return await oauthStore.fetchGameData('jp', 'suite', userId)
-        } catch (e: any) {
-            if (isOAuthTokenError(e)) {
-                await restartOAuthAuthorization(userId)
-            } else {
-                throw e
-            }
-        }
-    }
-
-    const shouldAuthorize = await accountStore.requestOAuthConfirm()
-    if (!shouldAuthorize) {
-        throw new Error('未完成 OAuth 授权，无法读取 Suite 数据')
-    }
-    await oauthStore.startAuthorization(userId, returnTo)
-    throw new Error('正在跳转 OAuth 授权页面...')
-}
-
-async function fetchMysekaiByOAuth(userId: string): Promise<any> {
-    const oauthStore = useOAuthStore()
-    const accountStore = useAccountStore()
-    const returnTo = `${window.location.pathname}${window.location.search}${window.location.hash}`
-
-    if (oauthStore.hasTokenForUser(userId)) {
-        try {
-            return await oauthStore.fetchGameData('jp', 'mysekai', userId)
-        } catch (e: any) {
-            if (isOAuthTokenError(e)) {
-                await restartOAuthAuthorization(userId)
-            } else {
-                throw e
-            }
-        }
-    }
-
-    const shouldAuthorize = await accountStore.requestOAuthConfirm()
-    if (!shouldAuthorize) {
-        throw new Error('未完成 OAuth 授权，无法读取 MySekai 数据')
-    }
-    await oauthStore.startAuthorization(userId, returnTo)
-    throw new Error('正在跳转 OAuth 授权页面...')
-}
 
 const dbPromise = openDB('sekai-viewer-db', 1, {
     upgrade(db) {
@@ -431,16 +382,6 @@ export const useAccountStore = defineStore('account', () => {
                         showSuiteNotFoundModal()
                         throw new Error('用户未上传数据')
                     }
-                    if (err.status === 403) {
-                        data = await fetchSuiteByOAuth(userId)
-                        const uploadTime = normalizeUnixSeconds(data.upload_time)
-                        if (uploadTime) {
-                            updateUploadTime(userId, uploadTime)
-                        }
-                        await saveSuiteCache(userId, data)
-                        setSuiteRefreshToast('oauth')
-                        return data
-                    }
                     throw new Error(`HTTP ${err.status}`)
                 }
                 throw err
@@ -481,11 +422,9 @@ export const useAccountStore = defineStore('account', () => {
                 data = await request.getSuite<any>(`/public/jp/mysekai/${userId}`)
             } catch (err: any) {
                 if (err.name === 'RequestError') {
-                    if (err.status === 404) throw new Error('用户未上传 MySekai 数据')
-                    if (err.status === 403) {
-                        data = await fetchMysekaiByOAuth(userId)
-                        await saveMysekaiCache(userId, data)
-                        return data
+                    if (err.status === 404) {
+                        showSuiteNotFoundModal()
+                        throw new Error('用户未上传 MySekai 数据')
                     }
                     throw new Error(`HTTP ${err.status}`)
                 }
@@ -496,6 +435,22 @@ export const useAccountStore = defineStore('account', () => {
         } finally {
             mysekaiRefreshing.value = false
         }
+    }
+
+    async function startOAuthForUser(userId: string) {
+        dismissSuiteNotFoundModal()
+        const oauthStore = useOAuthStore()
+        if (oauthStore.hasTokenForUser(userId)) {
+            // Already has token, just trigger a refresh
+            try {
+                await refreshSuite(userId)
+            } catch {
+                // ignore - the refresh will show its own errors
+            }
+            return
+        }
+        const returnTo = `${window.location.pathname}${window.location.search}${window.location.hash}`
+        await oauthStore.startAuthorization(userId, returnTo)
     }
 
     return {
@@ -533,5 +488,6 @@ export const useAccountStore = defineStore('account', () => {
         refreshProfile,
         refreshSuite,
         refreshMysekai,
+        startOAuthForUser,
     }
 })
