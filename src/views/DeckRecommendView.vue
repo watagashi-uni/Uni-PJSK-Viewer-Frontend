@@ -392,7 +392,6 @@ async function handleCalculate() {
     if (data.type === 'error') {
       const s = String(data.error)
       if (s.includes('404')) errorMsg.value = '玩家数据未上传到指定地点'
-      else if (s.includes('403')) errorMsg.value = '当前账号未授权读取数据，请先完成 OAuth 授权后再试'
       else errorMsg.value = s
       recommend.value = null
       calculating.value = false

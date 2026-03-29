@@ -1239,16 +1239,10 @@ watch(currentUserId, async (newId) => {
                 </p>
               </div>
             </div>
-            <div class="grid gap-3 sm:grid-cols-2">
-              <div class="rounded-xl border border-success/30 bg-success/10 p-4">
-                <p class="text-sm font-medium text-success">已勾选公开访问</p>
-                <p class="text-sm text-base-content/75 mt-1">可直接刷新 Suite，但你的详细数据会对任何人可读取。</p>
+            <div class="rounded-xl border border-info/30 bg-info/10 p-4">
+                <p class="text-sm font-medium text-info">OAuth 私有数据获取</p>
+                <p class="text-sm text-base-content/75 mt-1">上传后的数据默认不公开。刷新 Suite 时会通过 OAuth 授权获取你的私有数据，仅当前浏览器可访问，安全性更高。</p>
               </div>
-              <div class="rounded-xl border border-warning/30 bg-warning/10 p-4">
-                <p class="text-sm font-medium text-warning">未勾选公开访问</p>
-                <p class="text-sm text-base-content/75 mt-1">刷新时走 OAuth 授权，仅当前浏览器可访问，安全性更高。</p>
-              </div>
-            </div>
           </div>
           <div class="modal-action">
             <form method="dialog">
@@ -1511,16 +1505,10 @@ watch(currentUserId, async (newId) => {
               </div>
             </div>
 
-            <div class="grid gap-3 sm:grid-cols-2">
-              <div class="rounded-xl border border-success/30 bg-success/10 p-4">
-                <p class="text-sm font-medium text-success">已勾选公开访问</p>
-                <p class="text-sm text-base-content/75 mt-1">可直接刷新 Suite，但你的详细数据会对任何人可读取。</p>
+            <div class="rounded-xl border border-info/30 bg-info/10 p-4">
+                <p class="text-sm font-medium text-info">OAuth 私有数据获取</p>
+                <p class="text-sm text-base-content/75 mt-1">上传后的数据默认不公开。刷新 Suite 时会通过 OAuth 授权获取你的私有数据，仅当前浏览器可访问，安全性更高。</p>
               </div>
-              <div class="rounded-xl border border-warning/30 bg-warning/10 p-4">
-                <p class="text-sm font-medium text-warning">未勾选公开访问</p>
-                <p class="text-sm text-base-content/75 mt-1">刷新时走 OAuth 授权，仅当前浏览器可访问，安全性更高。</p>
-              </div>
-            </div>
           </div>
         </div>
       </div>
