@@ -20,6 +20,7 @@ interface StoredOAuthToken {
 const TOOLBOX_BASE_URL = (import.meta.env.VITE_TOOLBOX_OAUTH_BASE_URL || 'https://toolbox-api-direct.haruki.seiunx.com').replace(/\/+$/, '')
 const TOKEN_STORAGE_KEY = 'toolbox_oauth_tokens'
 const PENDING_AUTH_KEY = 'toolbox_oauth_pending'
+const OAUTH_SCOPES = ['offline_access', 'game-data:read'] as const
 
 function toBase64Url(input: Uint8Array): string {
     const raw = String.fromCharCode(...input)
@@ -70,9 +71,11 @@ export const useOAuthStore = defineStore('oauth', () => {
             const parsed = JSON.parse(raw) as Record<string, StoredOAuthToken> | StoredOAuthToken
             if (parsed && typeof parsed === 'object' && 'accessToken' in parsed) {
                 // 兼容旧版单 token 存储：暂时挂到 unknown 桶
-                tokensByUserId.value = { unknown: parsed as StoredOAuthToken }
+                tokensByUserId.value = { unknown: normalizeStoredToken(parsed) }
             } else {
-                tokensByUserId.value = parsed || {}
+                tokensByUserId.value = Object.fromEntries(
+                    Object.entries(parsed || {}).map(([userId, token]) => [userId, normalizeStoredToken(token)])
+                )
             }
         } catch {
             clearTokens()
@@ -122,15 +125,27 @@ export const useOAuthStore = defineStore('oauth', () => {
         }
     }
 
+    function normalizeStoredToken(token: Partial<StoredOAuthToken> | null | undefined): StoredOAuthToken {
+        return {
+            accessToken: String(token?.accessToken || ''),
+            refreshToken: String(token?.refreshToken || ''),
+            scope: String(token?.scope || ''),
+            expiresAt: typeof token?.expiresAt === 'number' ? token.expiresAt : null,
+        }
+    }
+
     function saveTokenPayload(userId: string, payload: any) {
+        const previous = normalizeStoredToken(tokensByUserId.value[userId])
         const next: StoredOAuthToken = {
-            accessToken: String(payload.access_token || ''),
-            refreshToken: String(payload.refresh_token || ''),
-            scope: String(payload.scope || ''),
-            expiresAt: null,
+            accessToken: String(payload.access_token || previous.accessToken || ''),
+            refreshToken: String(payload.refresh_token || previous.refreshToken || ''),
+            scope: String(payload.scope || previous.scope || ''),
+            expiresAt: previous.expiresAt,
         }
         if (typeof payload.expires_in === 'number') {
             next.expiresAt = Date.now() + payload.expires_in * 1000
+        } else if (!next.accessToken) {
+            next.expiresAt = null
         }
         tokensByUserId.value[userId] = next
         saveTokensToStorage()
@@ -158,7 +173,7 @@ export const useOAuthStore = defineStore('oauth', () => {
         authUrl.searchParams.set('response_type', 'code')
         authUrl.searchParams.set('client_id', clientId.value)
         authUrl.searchParams.set('redirect_uri', getRedirectUri())
-        authUrl.searchParams.set('scope', 'game-data:read')
+        authUrl.searchParams.set('scope', OAUTH_SCOPES.join(' '))
         authUrl.searchParams.set('state', state)
         authUrl.searchParams.set('code_challenge', codeChallenge)
         authUrl.searchParams.set('code_challenge_method', 'S256')
@@ -241,7 +256,9 @@ export const useOAuthStore = defineStore('oauth', () => {
         const payload = await parseJsonSafe(res)
         if (!res.ok) {
             const desc = payload?.error_description || payload?.message || `刷新 Token 失败 (${res.status})`
-            clearTokensForUser(userId)
+            if (payload?.error === 'invalid_grant' || payload?.error === 'invalid_token') {
+                clearTokensForUser(userId)
+            }
             throw createOAuthError(desc, res.status, payload?.error)
         }
         saveTokenPayload(userId, payload)
@@ -265,7 +282,9 @@ export const useOAuthStore = defineStore('oauth', () => {
         const tokenData = tokensByUserId.value[userId]
         const token = tokenData?.accessToken || ''
         const exp = tokenData?.expiresAt ?? null
-        const shouldRefresh = !token || (exp !== null && Date.now() >= exp - 30_000)
+        const shouldRefresh = !token
+            || (tokenData?.refreshToken && exp === null)
+            || (exp !== null && Date.now() >= exp - 30_000)
         if (shouldRefresh) {
             await refreshAccessTokenOnce(userId)
         }
@@ -276,15 +295,28 @@ export const useOAuthStore = defineStore('oauth', () => {
         return latest
     }
 
-    async function fetchGameData(server: string, dataType: GameDataType, userId: string): Promise<any> {
-        const token = await getValidAccessToken(userId)
+    async function fetchGameDataOnce(server: string, dataType: GameDataType, userId: string, token: string): Promise<Response> {
         const url = `${TOOLBOX_BASE_URL}/api/oauth2/game-data/${encodeURIComponent(server)}/${encodeURIComponent(dataType)}/${encodeURIComponent(userId)}`
-        const res = await fetch(url, {
+        return fetch(url, {
             headers: {
                 Authorization: `Bearer ${token}`,
             },
         })
-        const payload = await parseJsonSafe(res)
+    }
+
+    async function fetchGameData(server: string, dataType: GameDataType, userId: string): Promise<any> {
+        const token = await getValidAccessToken(userId)
+        let res = await fetchGameDataOnce(server, dataType, userId, token)
+        let payload = await parseJsonSafe(res)
+        const shouldRetryWithRefresh = res.status === 401
+            && tokensByUserId.value[userId]?.refreshToken
+            && payload?.error !== 'invalid_grant'
+        if (shouldRetryWithRefresh) {
+            await refreshAccessTokenOnce(userId)
+            const latestToken = tokensByUserId.value[userId]?.accessToken || ''
+            res = await fetchGameDataOnce(server, dataType, userId, latestToken)
+            payload = await parseJsonSafe(res)
+        }
         if (!res.ok) {
             const desc = payload?.error_description || payload?.message || `OAuth 游戏数据请求失败 (${res.status})`
             throw createOAuthError(desc, res.status, payload?.error)
