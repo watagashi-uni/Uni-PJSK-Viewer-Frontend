@@ -15,6 +15,11 @@ const props = withDefaults(defineProps<{
   alt: '',
   lazy: true
 })
+
+const emit = defineEmits<{
+  load: [event: Event]
+  error: [event: Event]
+}>()
 </script>
 
 <template>
@@ -23,5 +28,7 @@ const props = withDefaults(defineProps<{
     :alt="props.alt"
     :loading="props.lazy ? 'lazy' : 'eager'"
     :crossorigin="props.src.startsWith('http') ? 'anonymous' : undefined"
+    @load="emit('load', $event)"
+    @error="emit('error', $event)"
   />
 </template>

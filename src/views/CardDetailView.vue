@@ -687,6 +687,7 @@ onMounted(loadData)
                     :src="`${assetsHost}/startapp/character/member_cutout_trm/${card.assetbundleName}/normal.png`"
                     alt="立绘"
                     class="max-h-[300px] md:max-h-[400px] w-auto max-w-full object-contain"
+                    @error="showNormalCutout = false"
                   />
                 </a>
               </div>
@@ -718,6 +719,7 @@ onMounted(loadData)
                     :src="`${assetsHost}/startapp/character/member_cutout_trm/${card.assetbundleName}/after_training.png`"
                     alt="觉醒立绘"
                     class="max-h-[300px] md:max-h-[400px] w-auto max-w-full object-contain"
+                    @error="showTrainedCutout = false"
                   />
                 </a>
               </div>
