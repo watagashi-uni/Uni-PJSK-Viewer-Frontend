@@ -21,6 +21,49 @@ const EXCEPTION_MAP: Record<string, FuriganaSegment[]> = {
         { text: "！" },
         { text: "本気", ruby: "まじ" },
         { text: "マジック" }
+    ],
+    // 独りんぼエンヴィー / ひとりんぼえんヴぃー
+    // The pronunciation mixes hiragana with katakana ヴぃー, so the anchor chain does not match.
+    "独りんぼエンヴィー": [
+        { text: "独", ruby: "ひと" },
+        { text: "りんぼエンヴィー" }
+    ],
+    // だれかの心臓になれたなら / だれかのしんぞうになれたら
+    // The in-game pronunciation omits one な in the title spelling.
+    "だれかの心臓になれたなら": [
+        { text: "だれかの" },
+        { text: "心臓", ruby: "しんぞう" },
+        { text: "になれたなら" }
+    ],
+    // 腐れ外道とチョコレゐト / くされげどうとちょこれいと
+    // Uses historical kana orthography: ゐ -> い
+    "腐れ外道とチョコレゐト": [
+        { text: "腐", ruby: "くさ" },
+        { text: "れ" },
+        { text: "外道", ruby: "げどう" },
+        { text: "とチョコレゐト" }
+    ],
+    // 白い雪のプリンセスは / しろいゆきのプリンセスは
+    // The title interleaves kanji and okurigana in a way the anchor search misses.
+    "白い雪のプリンセスは": [
+        { text: "白", ruby: "しろ" },
+        { text: "い" },
+        { text: "雪", ruby: "ゆき" },
+        { text: "のプリンセスは" }
+    ],
+    // 夜もすがら君想ふ / よもすがらきみおもう
+    // Uses historical kana orthography: 想ふ -> おもう
+    "夜もすがら君想ふ": [
+        { text: "夜", ruby: "よ" },
+        { text: "もすがら" },
+        { text: "君想", ruby: "きみおも" },
+        { text: "ふ" }
+    ],
+    // 魔法少女とチョコレゐト / まほうしょうじょとちょこれいと
+    // Uses historical kana orthography: ゐ -> い
+    "魔法少女とチョコレゐト": [
+        { text: "魔法少女", ruby: "まほうしょうじょ" },
+        { text: "とチョコレゐト" }
     ]
 }
 
