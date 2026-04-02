@@ -58,6 +58,5 @@ If you want to deploy your own backend, you can refer to [API_README.md](API_REA
 | [Sekai-World/sekai-viewer](https://github.com/Sekai-World/sekai-viewer) | GPL-3.0 |
 | [xfl03/sekai-calculator](https://github.com/xfl03/sekai-calculator) | LGPL-2.1 |
 | [xfl03/33KitFrontend](https://github.com/xfl03/33KitFrontend) | — |
-| [Next-SEKAI/sonolus-next-sekai-editor](https://github.com/Next-SEKAI/sonolus-next-sekai-editor) | MIT |
 | [pjsekai/scores](https://gitlab.com/pjsekai/scores) | [MIT](https://gitlab.com/pjsekai/scores/-/blob/main/LICENSE?ref_type=heads) |
 | [NeuraXmy/lunabot](https://github.com/NeuraXmy/lunabot) | [MIT](https://github.com/NeuraXmy/lunabot/blob/master/LICENSE) |
