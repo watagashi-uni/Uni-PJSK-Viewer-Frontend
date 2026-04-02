@@ -40,7 +40,7 @@ import {
           </p>
           <p>
             <strong>不会上传到本站服务器的内容：</strong><br />
-            账号相关的所有数据、你在页面里的筛选、查看过程、以及大部分本地计算结果，不会被当作你的个人档案长期保存。
+            账号相关的所有数据、你在页面里的筛选、查看过程、以及本地计算结果，均不会上传到本站服务器。
           </p>
           <p class="text-sm text-base-content/60">
             换设备、换浏览器，或者清除缓存后，本地数据不会自动跟着走。你可以在用户页面导出数据自行备份。
@@ -202,47 +202,6 @@ import {
                   <ExternalLink class="w-3 h-3" />
                 </a>
               </p>
-            </div>
-          </div>
-          <!-- Sonolus -->
-          <div class="collapse collapse-arrow bg-base-200">
-            <input type="checkbox" />
-            <div class="collapse-title font-medium">
-              Sonolus Next SEKAI Editor (谱面播放预览)
-            </div>
-            <div class="collapse-content">
-              <p class="text-sm text-base-content/70 mb-2">
-                <a 
-                  href="https://github.com/Next-SEKAI/sonolus-next-sekai-editor" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  class="link link-primary inline-flex items-center gap-1"
-                >
-                  GitHub 项目地址
-                  <ExternalLink class="w-3 h-3" />
-                </a>
-              </p>
-              <pre class="text-xs bg-base-300 p-3 rounded-lg overflow-x-auto whitespace-pre-wrap">MIT License
-
-Copyright (c) 2025 NonSpicyBurrito
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.</pre>
             </div>
           </div>
           <!-- pjsekai.scores -->
