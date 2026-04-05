@@ -1240,9 +1240,9 @@ watch(currentUserId, async (newId) => {
               </div>
             </div>
             <div class="rounded-xl border border-info/30 bg-info/10 p-4">
-                <p class="text-sm font-medium text-info">OAuth 私有数据获取</p>
-                <p class="text-sm text-base-content/75 mt-1">上传后的数据默认不公开。刷新 Suite 时会通过 OAuth 授权获取你的私有数据，仅当前浏览器可访问，安全性更高。</p>
-              </div>
+              <p class="text-sm font-medium text-info">OAuth 私有数据获取</p>
+              <p class="text-sm text-base-content/75 mt-1">上传后的数据默认不公开。刷新 Suite 时会通过 OAuth 授权获取你的私有数据，仅当前浏览器可访问，安全性更高。</p>
+            </div>
           </div>
           <div class="modal-action">
             <form method="dialog">
@@ -1506,9 +1506,9 @@ watch(currentUserId, async (newId) => {
             </div>
 
             <div class="rounded-xl border border-info/30 bg-info/10 p-4">
-                <p class="text-sm font-medium text-info">OAuth 私有数据获取</p>
-                <p class="text-sm text-base-content/75 mt-1">上传后的数据默认不公开。刷新 Suite 时会通过 OAuth 授权获取你的私有数据，仅当前浏览器可访问，安全性更高。</p>
-              </div>
+              <p class="text-sm font-medium text-info">OAuth 私有数据获取</p>
+              <p class="text-sm text-base-content/75 mt-1">上传后的数据默认不公开。刷新 Suite 时会通过 OAuth 授权获取你的私有数据，仅当前浏览器可访问，安全性更高。</p>
+            </div>
           </div>
         </div>
       </div>

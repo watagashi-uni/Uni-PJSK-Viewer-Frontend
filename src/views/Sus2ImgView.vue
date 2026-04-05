@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted, watch, onBeforeUnmount } from 'vue'
-import { Play, Trash2 } from 'lucide-vue-next'
+import { computed, nextTick, ref, onMounted, watch, onBeforeUnmount } from 'vue'
+import { Play, Search, Trash2 } from 'lucide-vue-next'
 import apiClient from '@/api/client'
 import {
   renderSusToPng,
@@ -9,6 +9,12 @@ import {
   type Sus2ImgFrontendResult,
   type Sus2ImgSkin,
 } from 'sekai-sus2img'
+import {
+  analyzeSusConflicts,
+  annotateSvgWithConflict,
+  buildRenderOverlayContext,
+  type ConflictDiagnostic,
+} from '@/utils/susConflictAudit'
 
 const FORM_STORAGE_KEY = 'sus2img-form-data'
 
@@ -42,10 +48,23 @@ const bottomLeftImageDataUrl = ref('')
 const isSubmitting = ref(false)
 const error = ref<string | null>(null)
 const infoMessage = ref<string | null>(null)
+const auditError = ref<string | null>(null)
+const isAnalyzing = ref(false)
+const hasAuditRun = ref(false)
+const isPreparingPreview = ref(false)
 
 const resultData = ref<string | null>(null)
 const resultFormat = ref<RenderFormat>('svg')
 const resultSource = ref<'frontend' | 'backend' | null>(null)
+const resultSvgText = ref<string | null>(null)
+const resultSvgError = ref<string | null>(null)
+const renderedChartText = ref('')
+const renderedRebaseText = ref('')
+const analyzedChartText = ref('')
+const analyzedRebaseText = ref('')
+const diagnostics = ref<ConflictDiagnostic[]>([])
+const selectedConflictId = ref<string | null>(null)
+const svgPreviewContainer = ref<HTMLDivElement | null>(null)
 
 let frontendResult: Sus2ImgFrontendResult | null = null
 
@@ -62,10 +81,127 @@ const setResult = (result: Sus2ImgFrontendResult | BackendResult) => {
   resultData.value = result.url
   resultFormat.value = result.format
   resultSource.value = result.source
+  resultSvgText.value = result.source === 'frontend' && result.format === 'svg' ? result.svgText : null
+  resultSvgError.value = null
 
   if (result.source === 'frontend') {
     frontendResult = result
   }
+}
+
+const selectedConflict = computed(() =>
+  diagnostics.value.find((item) => item.id === selectedConflictId.value) ?? null,
+)
+
+const isHighlightReady = computed(
+  () =>
+    Boolean(resultSvgText.value)
+    && renderedChartText.value === analyzedChartText.value
+    && renderedRebaseText.value === analyzedRebaseText.value,
+)
+
+const renderOverlayState = computed(() => {
+  if (!resultSvgText.value || !renderedChartText.value) {
+    return {
+      context: null,
+      error: null,
+    }
+  }
+
+  const pixelValue = Number(form.value.pixel)
+  const timeHeight = Number.isFinite(pixelValue) && pixelValue > 0 ? Math.floor(pixelValue) : 240
+
+  try {
+    return {
+      context: buildRenderOverlayContext(renderedChartText.value, renderedRebaseText.value, timeHeight),
+      error: null,
+    }
+  } catch (overlayError) {
+    return {
+      context: null,
+      error: overlayError instanceof Error ? overlayError.message : '无法生成定位预览',
+    }
+  }
+})
+
+const renderOverlayContext = computed(() => renderOverlayState.value.context)
+
+const previewErrorMessage = computed(() => resultSvgError.value ?? renderOverlayState.value.error)
+
+const annotatedSvgText = computed(() => {
+  if (!resultSvgText.value) {
+    return null
+  }
+
+  const context = renderOverlayContext.value
+  if (!context) {
+    return resultSvgText.value
+  }
+
+  return annotateSvgWithConflict(
+    resultSvgText.value,
+    context,
+    isHighlightReady.value ? selectedConflict.value : null,
+  )
+})
+
+const diagnosticSummaryText = computed(() => {
+  if (!hasAuditRun.value) {
+    return ''
+  }
+  if (!diagnostics.value.length) {
+    return '未发现会导致本家预览崩溃，或会被本家预览的规则处理的冲突。'
+  }
+
+  const crashCount = diagnostics.value.filter((item) => item.severity === 'crash').length
+  if (!crashCount) {
+    return `共发现 ${diagnostics.value.length} 处会被本家预览的规则处理的重叠冲突。`
+  }
+
+  const dedupCount = diagnostics.value.length - crashCount
+  if (!dedupCount) {
+    return `共发现 ${crashCount} 处冲突，都会导致本家预览崩溃。`
+  }
+
+  return `共发现 ${diagnostics.value.length} 处冲突，其中 ${crashCount} 处会导致本家预览崩溃，另有 ${dedupCount} 处会被本家预览的规则处理。`
+})
+
+const crashDiagnosticCount = computed(
+  () => diagnostics.value.filter((item) => item.severity === 'crash').length,
+)
+
+const dedupDiagnosticCount = computed(
+  () => diagnostics.value.filter((item) => item.severity === 'dedup').length,
+)
+
+const scrollToSelectedConflict = async () => {
+  await nextTick()
+
+  const container = svgPreviewContainer.value
+  if (!container) {
+    return
+  }
+
+  const focus = container.querySelector<SVGGraphicsElement>('#sus-conflict-focus')
+  if (!focus) {
+    return
+  }
+
+  const containerRect = container.getBoundingClientRect()
+  const focusRect = focus.getBoundingClientRect()
+  const targetTop = container.scrollTop + (focusRect.top - containerRect.top) - (container.clientHeight / 2) + (focusRect.height / 2)
+  const targetLeft = container.scrollLeft + (focusRect.left - containerRect.left) - (container.clientWidth / 2) + (focusRect.width / 2)
+
+  container.scrollTo({
+    top: Math.max(0, targetTop),
+    left: Math.max(0, targetLeft),
+    behavior: 'smooth',
+  })
+}
+
+const selectConflict = async (conflictId: string) => {
+  selectedConflictId.value = conflictId
+  await scrollToSelectedConflict()
 }
 
 onMounted(() => {
@@ -90,6 +226,16 @@ watch(
     sessionStorage.setItem(FORM_STORAGE_KEY, JSON.stringify(newVal))
   },
   { deep: true },
+)
+
+watch(
+  [selectedConflictId, annotatedSvgText],
+  () => {
+    if (!selectedConflictId.value || !annotatedSvgText.value || !isHighlightReady.value) {
+      return
+    }
+    void scrollToSelectedConflict()
+  },
 )
 
 function handleFileChange(event: Event) {
@@ -152,6 +298,153 @@ async function getChartText(): Promise<string> {
   }
 
   throw new Error('请提供 SUS 文件内容或上传文件')
+}
+
+async function runAudit(chartText: string) {
+  isAnalyzing.value = true
+  auditError.value = null
+
+  try {
+    const nextDiagnostics = analyzeSusConflicts(chartText)
+    diagnostics.value = nextDiagnostics
+    analyzedChartText.value = chartText
+    analyzedRebaseText.value = form.value.rebase
+    hasAuditRun.value = true
+
+    if (nextDiagnostics.some((item) => item.id === selectedConflictId.value)) {
+      return
+    }
+    selectedConflictId.value = nextDiagnostics[0]?.id ?? null
+  } catch (auditReason) {
+    diagnostics.value = []
+    hasAuditRun.value = true
+    selectedConflictId.value = null
+    auditError.value = auditReason instanceof Error ? auditReason.message : 'note重叠检查失败'
+  } finally {
+    isAnalyzing.value = false
+  }
+}
+
+async function handleAnalyze() {
+  error.value = null
+  infoMessage.value = null
+  auditError.value = null
+
+  try {
+    const chartText = await getChartText()
+    await runAudit(chartText)
+    if (diagnostics.value.length) {
+      await ensureSvgPreview(chartText)
+      if (selectedConflictId.value) {
+        await scrollToSelectedConflict()
+      }
+    }
+  } catch (auditReason) {
+    diagnostics.value = []
+    hasAuditRun.value = false
+    selectedConflictId.value = null
+    auditError.value = auditReason instanceof Error ? auditReason.message : 'note重叠检查失败'
+  }
+}
+
+function buildSvgBackendFormData(chartText: string): FormData {
+  const formData = buildBackendFormData(chartText)
+  formData.set('form', 'svg')
+  return formData
+}
+
+async function renderSvgPreviewViaBackend(chartText: string): Promise<string> {
+  const response = await apiClient.post('/api/sus2img', buildSvgBackendFormData(chartText), {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+    timeout: 100000,
+  })
+
+  const result = response.data
+  if (!result.success || !result.url) {
+    throw new Error(result.error || '生成 SVG 预览失败')
+  }
+
+  const svgResponse = await fetch(result.url)
+  if (!svgResponse.ok) {
+    throw new Error(`载入 SVG 预览失败：HTTP ${svgResponse.status}`)
+  }
+
+  return await svgResponse.text()
+}
+
+async function ensureSvgPreview(chartText: string) {
+  if (
+    resultSvgText.value
+    && renderedChartText.value === chartText
+    && renderedRebaseText.value === form.value.rebase
+  ) {
+    return
+  }
+
+  resultSvgError.value = null
+  isPreparingPreview.value = true
+
+  try {
+    const preview = await renderSusToSvg({
+      sus: chartText,
+      rebase: form.value.rebase,
+      title: form.value.title,
+      artist: form.value.artist,
+      author: form.value.author,
+      difficulty: form.value.difficulty,
+      playlevel: form.value.playlevel,
+      pixel: form.value.pixel,
+      skin: form.value.skin,
+      jacket: bottomLeftImageDataUrl.value || form.value.bottomLeftImageUrl.trim(),
+    })
+
+    resultSvgText.value = preview.svgText
+    renderedChartText.value = chartText
+    renderedRebaseText.value = form.value.rebase
+    revokeSus2ImgResult(preview)
+  } catch (previewError) {
+    const frontendMessage = previewError instanceof Error ? previewError.message : '前端生成 SVG 预览失败'
+
+    try {
+      resultSvgText.value = await renderSvgPreviewViaBackend(chartText)
+      renderedChartText.value = chartText
+      renderedRebaseText.value = form.value.rebase
+      resultSvgError.value = `前端预览失败，已自动回退后端：${frontendMessage}`
+    } catch (backendError) {
+      resultSvgText.value = null
+      resultSvgError.value = backendError instanceof Error ? backendError.message : '生成 SVG 预览失败'
+    }
+  } finally {
+    isPreparingPreview.value = false
+  }
+}
+
+async function loadResultSvgText(result: BackendResult | Sus2ImgFrontendResult) {
+  if (result.source === 'frontend') {
+    resultSvgText.value = result.format === 'svg' ? result.svgText : null
+    resultSvgError.value = null
+    return
+  }
+
+  if (result.format !== 'svg') {
+    resultSvgText.value = null
+    resultSvgError.value = 'PNG 结果不支持在页面内高亮冲突。'
+    return
+  }
+
+  try {
+    const response = await fetch(result.url)
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`)
+    }
+    resultSvgText.value = await response.text()
+    resultSvgError.value = null
+  } catch (svgReason) {
+    resultSvgText.value = null
+    resultSvgError.value = svgReason instanceof Error ? `载入 SVG 预览失败：${svgReason.message}` : '载入 SVG 预览失败'
+  }
 }
 
 function buildBackendFormData(chartText: string): FormData {
@@ -220,10 +513,14 @@ async function handleSubmit() {
 
   try {
     const chartText = await getChartText()
+    await runAudit(chartText)
 
     if (form.value.engine === 'backend') {
       const backendResult = await renderViaBackend(chartText)
       setResult(backendResult)
+      renderedChartText.value = chartText
+      renderedRebaseText.value = form.value.rebase
+      await loadResultSvgText(backendResult)
       if (previewTab && !previewTab.closed) {
         previewTab.location.href = backendResult.url
       } else {
@@ -235,6 +532,9 @@ async function handleSubmit() {
     try {
       const frontend = await renderViaFrontend(chartText)
       setResult(frontend)
+      renderedChartText.value = chartText
+      renderedRebaseText.value = form.value.rebase
+      await loadResultSvgText(frontend)
       if (previewTab && !previewTab.closed) {
         previewTab.location.href = frontend.url
       } else {
@@ -244,6 +544,9 @@ async function handleSubmit() {
       const frontendMessage = frontendError instanceof Error ? frontendError.message : '前端转换失败'
       const backendResult = await renderViaBackend(chartText)
       setResult(backendResult)
+      renderedChartText.value = chartText
+      renderedRebaseText.value = form.value.rebase
+      await loadResultSvgText(backendResult)
       infoMessage.value = `前端转换失败，已自动回退后端：${frontendMessage}`
       if (previewTab && !previewTab.closed) {
         previewTab.location.href = backendResult.url
@@ -282,8 +585,18 @@ function clearForm() {
   bottomLeftImageDataUrl.value = ''
   error.value = null
   infoMessage.value = null
+  auditError.value = null
   resultData.value = null
   resultSource.value = null
+  resultSvgText.value = null
+  resultSvgError.value = null
+  renderedChartText.value = ''
+  renderedRebaseText.value = ''
+  analyzedChartText.value = ''
+  analyzedRebaseText.value = ''
+  diagnostics.value = []
+  selectedConflictId.value = null
+  hasAuditRun.value = false
   resetFrontendResult()
   sessionStorage.removeItem(FORM_STORAGE_KEY)
 }
@@ -494,6 +807,11 @@ function clearForm() {
               <Trash2 class="w-4 h-4" />
               清空
             </button>
+            <button type="button" class="btn btn-outline" :disabled="isAnalyzing || isSubmitting" @click="handleAnalyze">
+              <span v-if="isAnalyzing" class="loading loading-spinner"></span>
+              <Search v-else class="w-4 h-4" />
+              {{ isAnalyzing ? 'note重叠检查中...' : 'note重叠检查' }}
+            </button>
             <button type="submit" class="btn btn-primary btn-wide" :disabled="isSubmitting">
               <span v-if="isSubmitting" class="loading loading-spinner"></span>
               <Play v-else class="w-4 h-4" />
@@ -502,6 +820,105 @@ function clearForm() {
           </div>
         </form>
       </div>
+    </div>
+
+    <div v-if="hasAuditRun || resultSvgText || auditError || resultSvgError" class="mt-8 grid gap-6 xl:grid-cols-[380px_minmax(0,1fr)]">
+      <section class="card bg-base-100 shadow-lg">
+        <div class="card-body gap-4">
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <h2 class="card-title text-lg">note重叠检查结果</h2>
+              <p class="text-sm text-base-content/60 mt-1">{{ diagnosticSummaryText }}</p>
+            </div>
+            <span v-if="diagnostics.length" class="badge badge-primary badge-outline">{{ diagnostics.length }}</span>
+          </div>
+
+          <div v-if="crashDiagnosticCount" class="alert alert-error">
+            <span>发现 {{ crashDiagnosticCount }} 处会导致本家预览崩溃的写法，请优先处理。</span>
+          </div>
+
+          <div v-else-if="dedupDiagnosticCount" class="alert alert-warning">
+            <span>发现 {{ dedupDiagnosticCount }} 处会被本家预览的规则去重或隐藏的冲突。</span>
+          </div>
+
+          <div v-if="auditError" class="alert alert-error">
+            <span>{{ auditError }}</span>
+          </div>
+
+          <div v-else-if="hasAuditRun && !diagnostics.length" class="alert alert-success">
+            <span>当前谱面没有发现会导致本家预览崩溃，或会被本家预览的规则隐藏的冲突。</span>
+          </div>
+
+          <div v-else class="space-y-3 max-h-[70vh] overflow-auto pr-1">
+            <button
+              v-for="item in diagnostics"
+              :key="item.id"
+              type="button"
+              class="w-full text-left rounded-xl border px-4 py-3 transition-colors"
+              :class="[
+                item.severity === 'crash'
+                  ? (item.id === selectedConflictId
+                    ? 'border-error bg-error/10 shadow-[0_0_0_1px_rgba(220,38,38,0.15)]'
+                    : 'border-error/40 bg-error/5 hover:border-error hover:bg-error/10')
+                  : (item.id === selectedConflictId
+                    ? 'border-warning bg-warning/10'
+                    : 'border-base-300 hover:border-warning/50 hover:bg-base-200/70'),
+              ]"
+              @click="selectConflict(item.id)"
+            >
+              <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <div class="flex flex-wrap items-center gap-2">
+                    <div class="font-semibold text-sm">{{ item.title }}</div>
+                    <span
+                      class="badge badge-sm shrink-0"
+                      :class="item.severity === 'crash' ? 'badge-error' : 'badge-warning badge-outline'"
+                    >
+                      {{ item.severity === 'crash' ? '会崩溃' : '会被处理' }}
+                    </span>
+                  </div>
+                  <div class="text-xs text-base-content/60 mt-1">{{ item.positionText }} · {{ item.trackText }}</div>
+                </div>
+                <span class="badge badge-outline shrink-0">{{ item.measure }}</span>
+              </div>
+              <p
+                class="text-sm mt-2 leading-6"
+                :class="item.severity === 'crash' ? 'text-error' : 'text-base-content/70'"
+              >
+                {{ item.summary }}
+              </p>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section class="card bg-base-100 shadow-lg">
+        <div class="card-body gap-4">
+          <div>
+            <h2 class="card-title text-lg">SVG 高亮预览</h2>
+            <p class="text-sm text-base-content/60 mt-1">
+              {{ isHighlightReady ? '点击左侧冲突后会自动定位到对应位置。' : '定位高亮只会作用在最近一次生成且与当前检查结果一致的 SVG 上。' }}
+            </p>
+          </div>
+
+          <div v-if="isPreparingPreview" class="alert alert-info">
+            <span>检测到冲突，正在生成 SVG 预览并定位到对应位置，请稍候...</span>
+          </div>
+
+          <div v-if="previewErrorMessage" class="alert alert-warning">
+            <span>{{ previewErrorMessage }}</span>
+          </div>
+
+          <div v-else-if="!annotatedSvgText && !isPreparingPreview" class="alert">
+            <span>检查到冲突后会自动生成 SVG，并在这里显示定位高亮结果。</span>
+          </div>
+
+          <div v-else-if="annotatedSvgText" ref="svgPreviewContainer" class="h-[58vh] overflow-auto rounded-xl border border-base-300 bg-white p-4 scroll-smooth">
+            <!-- eslint-disable-next-line vue/no-v-html -->
+            <div class="inline-block min-w-full [&_svg]:max-w-none" v-html="annotatedSvgText"></div>
+          </div>
+        </div>
+      </section>
     </div>
 
     <footer class="text-center text-sm text-base-content/60 mt-8 space-y-2">
