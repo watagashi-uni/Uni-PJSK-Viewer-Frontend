@@ -9,6 +9,9 @@
     "paths": {
       "@/*": [
         "src/*"
+      ],
+      "moesekai-calculator": [
+        "src/vendor/moesekai-calculator/index.d.ts"
       ]
     },
     /* Linting */

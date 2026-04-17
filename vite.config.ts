@@ -147,6 +147,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src'),
+      'moesekai-calculator': resolve(__dirname, 'src/vendor/moesekai-calculator/index.mjs'),
     },
   },
   build: {
