@@ -807,8 +807,6 @@ class CardEventCalculator {
     }
 }
 
-const VIRTUAL_SINGER_MIN_ID = 21;
-const VIRTUAL_SINGER_MAX_ID = 26;
 class CardBloomEventCalculator {
     dataProvider;
     constructor(dataProvider) {
@@ -817,8 +815,7 @@ class CardBloomEventCalculator {
     async getCardSupportDeckBonus(userCard, card, units, { eventId = 0, worldBloomEventTurn, worldBloomSupportUnit, specialCharacterId = 0 }) {
         if (worldBloomSupportUnit === undefined)
             return undefined;
-        const isVirtualSinger = card.characterId >= VIRTUAL_SINGER_MIN_ID && card.characterId <= VIRTUAL_SINGER_MAX_ID;
-        if (!isVirtualSinger && !units.includes(worldBloomSupportUnit)) {
+        if (!units.includes(worldBloomSupportUnit)) {
             return undefined;
         }
         const worldBloomSupportDeckBonusKey = worldBloomEventTurn === 1
