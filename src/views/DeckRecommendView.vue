@@ -58,6 +58,7 @@ interface DeckCardResult {
   level: number
   skillLevel: number
   masterRank: number
+  defaultImage?: 'original' | 'special_training' | string
   power: {
     base: number
     areaItemBonus: number
@@ -71,6 +72,7 @@ interface DeckCardResult {
   skill: {
     scoreUp: number
     lifeRecovery: number
+    isPreTrainingSkill?: boolean
   }
 }
 
@@ -93,6 +95,7 @@ interface RecommendDeckResult {
 // ==================== 状态 ====================
 const userId = ref('')
 const mode = ref<'1' | '2'>('2') // 1=挑战, 2=活动
+const calculatorEngine = ref<'moesekai' | '33'>('moesekai')
 
 
 const selectedEventId = ref<number | null>(null)
@@ -213,6 +216,11 @@ onMounted(async () => {
     if (savedUid) userId.value = savedUid
   }
 
+  const savedEngine = localStorage.getItem('deckRecommend_engine')
+  if (savedEngine === '33' || savedEngine === 'moesekai') {
+    calculatorEngine.value = savedEngine
+  }
+
   try {
     if (!masterStore.isReady) await masterStore.initialize()
 
@@ -305,6 +313,7 @@ async function handleCalculate() {
   if (!userId.value) { errorMsg.value = '请选择绑定的账号'; return }
   const uid = userId.value
   localStorage.setItem('deckRecommend_userId', uid)
+  localStorage.setItem('deckRecommend_engine', calculatorEngine.value)
 
   if (!selectedMusic.value || !selectedDifficulty.value) { errorMsg.value = '请选择歌曲和难度'; return }
   if (mode.value === '1' && !selectedCharacter.value) { errorMsg.value = '请选择角色'; return }
@@ -410,6 +419,7 @@ async function handleCalculate() {
   }
 
   const args: Record<string, unknown> = {
+    engine: calculatorEngine.value,
     mode: mode.value,
     userId: userId.value,
     music: JSON.parse(JSON.stringify(selectedMusic.value)), // 同样去除 music 的 proxy
@@ -435,6 +445,12 @@ function getCardForResult(cardId: number): CardData | undefined {
 
 function isNormalCard(rarity: string): boolean {
   return ['rarity_1', 'rarity_2', 'rarity_birthday'].includes(rarity)
+}
+
+function getDeckCardTrained(card: CardData, deckCard: DeckCardResult): boolean {
+  if (deckCard.defaultImage === 'original') return false
+  if (deckCard.defaultImage === 'special_training') return true
+  return !isNormalCard(card.cardRarityType)
 }
 
 const rarityList = [
@@ -479,6 +495,31 @@ const rarityList = [
           </div>
 
           <!-- 模式 -->
+          <div class="form-control">
+            <label class="label"><span class="label-text font-medium">组卡引擎</span></label>
+            <div class="flex gap-2 flex-wrap">
+              <button
+                class="btn btn-sm"
+                :class="calculatorEngine === 'moesekai' ? 'btn-primary' : 'btn-ghost'"
+                @click="calculatorEngine = 'moesekai'"
+              >
+                Moesekai
+              </button>
+              <button
+                class="btn btn-sm"
+                :class="calculatorEngine === '33' ? 'btn-primary' : 'btn-ghost'"
+                @click="calculatorEngine = '33'"
+              >
+                33
+              </button>
+            </div>
+            <label class="label">
+              <span class="label-text-alt text-base-content/60">
+                {{ calculatorEngine === 'moesekai' ? '新版算法，支持 BFES 花前花后技能等增强逻辑' : '旧版 3-3.dev / sekai-calculator 逻辑' }}
+              </span>
+            </label>
+          </div>
+
           <div class="form-control">
             <label class="label"><span class="label-text font-medium">模式</span></label>
             <div class="flex gap-2">
@@ -691,7 +732,7 @@ const rarityList = [
                       >
                         <SekaiCard
                           :card="getCardForResult(dc.cardId)!"
-                          :trained="!isNormalCard(getCardForResult(dc.cardId)!.cardRarityType)"
+                          :trained="getDeckCardTrained(getCardForResult(dc.cardId)!, dc)"
                           :deck-card="dc"
                         />
                       </RouterLink>
@@ -716,8 +757,10 @@ const rarityList = [
       </div>
 
       <div class="text-center text-xs opacity-70 pb-2">
-        本页面修改自
+        本页面支持
         <a href="https://3-3.dev/sekai/deck-recommend" target="_blank" class="link font-medium">3-3.dev</a>
+        与
+        <a href="https://github.com/moe-sekai/Moesekai/tree/main/refer/re_sekai-calculator" target="_blank" class="link font-medium">Moesekai re_sekai-calculator</a>
       </div>
     </template>
   </div>

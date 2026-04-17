@@ -17,6 +17,7 @@ interface DeckCardInfo {
   cardId: number
   level?: number
   masterRank?: number
+  defaultImage?: string
   power?: {
     base: number
     areaItemBonus: number
@@ -27,6 +28,7 @@ interface DeckCardInfo {
   skill?: {
     scoreUp: number
     lifeRecovery: number
+    isPreTrainingSkill?: boolean
   }
 }
 
@@ -97,6 +99,9 @@ const tooltipText = computed(() => {
   }
   if (props.deckCard.skill) {
     parts.push(`加分${props.deckCard.skill.scoreUp}`)
+    if (props.deckCard.skill.isPreTrainingSkill) {
+      parts.push('花前技能')
+    }
   }
   if (props.deckCard.eventBonus) {
     parts.push(`活动${props.deckCard.eventBonus}`)
