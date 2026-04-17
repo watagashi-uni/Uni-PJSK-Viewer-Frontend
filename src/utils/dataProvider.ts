@@ -43,9 +43,15 @@ export class WorkerProxyDataProvider implements DataProvider {
         const staticPath = STATIC_MASTER_DATA_PATHS[requestKey]
         if (staticPath) {
             const start = performance.now()
-            const res = await apiClient.get<T[]>(staticPath)
+            const res = await fetch(staticPath, {
+                credentials: 'same-origin',
+            })
+            if (!res.ok) {
+                throw new Error(`Failed to fetch static master data: ${requestKey} (${res.status})`)
+            }
+            const data = await res.json() as T[]
             this.dataFetchDuration += performance.now() - start
-            return res.data
+            return data
         }
 
         const start = performance.now()
