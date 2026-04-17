@@ -1,6 +1,12 @@
 import type { DataProvider, MusicMeta } from 'sekai-calculator'
 import apiClient from '@/api/client'
 
+const STATIC_MASTER_DATA_PATHS: Partial<Record<string, string>> = {
+    worldBloomSupportDeckBonusesWL1: '/data/worldBloomSupportDeckBonusesWL1.json',
+    worldBloomSupportDeckBonusesWL2: '/data/worldBloomSupportDeckBonusesWL2.json',
+    worldBloomSupportDeckBonusesWL3: '/data/worldBloomSupportDeckBonusesWL3.json',
+}
+
 /**
  * Worker 端代理 DataProvider
  * 当需要数据时，向主线程发送请求，并等待主线程返回数据。
@@ -33,6 +39,14 @@ export class WorkerProxyDataProvider implements DataProvider {
         // ingameNodes 兼容性处理：如果请求 ingameNodes，实际去请求 ingameNotes
         // 主线程 masterStore 会处理具体的获取逻辑
         const requestKey = key === 'ingameNodes' ? 'ingameNotes' : key
+
+        const staticPath = STATIC_MASTER_DATA_PATHS[requestKey]
+        if (staticPath) {
+            const start = performance.now()
+            const res = await apiClient.get<T[]>(staticPath)
+            this.dataFetchDuration += performance.now() - start
+            return res.data
+        }
 
         const start = performance.now()
         return new Promise<T[]>((resolve, reject) => {
