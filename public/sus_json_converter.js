@@ -975,6 +975,44 @@
     );
   }
 
+  function tapSlotKey(ticks, lane) {
+    return `${ticks}:${lane}`;
+  }
+
+  function reserveTapSlot(occupiedTapSlots, note) {
+    if (!occupiedTapSlots) return;
+    occupiedTapSlots.add(tapSlotKey(note.ticks, note.laneStart + 2));
+  }
+
+  function isVisibleRelaySlideNote(note) {
+    return note.noteBaseType === 5 || note.category === 2;
+  }
+
+  function withVisibleRelayAttachmentSlot(note, occupiedTapSlots) {
+    if (!occupiedTapSlots) return note;
+    const lane = note.laneStart + 2;
+    if (!occupiedTapSlots.has(tapSlotKey(note.ticks, lane))) {
+      reserveTapSlot(occupiedTapSlots, note);
+      return note;
+    }
+
+    const width = note.laneEnd - note.laneStart + 1;
+    const maxLaneStart = Math.max(0, 12 - width);
+    const candidates = [];
+    for (let laneStart = 0; laneStart <= maxLaneStart; laneStart += 1) {
+      candidates.push(laneStart);
+    }
+    candidates.sort((a, b) => Math.abs(a - note.laneStart) - Math.abs(b - note.laneStart));
+    const laneStart = candidates.find(
+      (candidate) => !occupiedTapSlots.has(tapSlotKey(note.ticks, candidate + 2))
+    );
+    if (laneStart === undefined) return note;
+
+    const placed = { ...note, laneStart, laneEnd: laneStart + width - 1 };
+    reserveTapSlot(occupiedTapSlots, placed);
+    return placed;
+  }
+
   function buildChains(notes) {
     const byId = new Map(notes.map((note) => [note.id, note]));
     const visited = new Set();
@@ -1018,20 +1056,49 @@
     }
   }
 
-  function jsonNoteToSusConnected(groups, ticksPerMeasure, note, channel, isLast, chainDecoration) {
+  function connectedNoteAddsTap(note, slideType) {
+    const base = note.noteBaseType;
+    return (
+      (slideType === 3 && isVisibleRelaySlideNote(note)) ||
+      base === 3 ||
+      note.category === 3 ||
+      base === 8 ||
+      base === 11 ||
+      base === 9 ||
+      base === 12 ||
+      (note.type && (base === 1 || base === 2))
+    );
+  }
+
+  function jsonNoteToSusConnected(
+    groups,
+    ticksPerMeasure,
+    note,
+    channel,
+    isLast,
+    chainDecoration,
+    occupiedTapSlots
+  ) {
     const base = note.noteBaseType;
     const decoration = chainDecoration || note.category === 9 || base === 10 || base === 13;
     let slideType = 3;
 
     if (base === 2 || base === 8 || base === 9 || base === 10) slideType = 1;
     else if (base === 1 || base === 3 || base === 11 || base === 12 || base === 13) slideType = 2;
-    else if (base === 6) slideType = 5;
+    else if (base === 6 || base === 14 || note.category === 11) slideType = 5;
     else if (base === 5) slideType = 3;
     if (isLast) slideType = 2;
 
-    addSlide(groups, ticksPerMeasure, note, channel, decoration, slideType);
+    const outputNote =
+      slideType === 3 && isVisibleRelaySlideNote(note)
+        ? withVisibleRelayAttachmentSlot(note, occupiedTapSlots)
+        : note;
 
-    if (base === 3 || note.category === 3) {
+    addSlide(groups, ticksPerMeasure, outputNote, channel, decoration, slideType);
+
+    if (slideType === 3 && (base === 5 || note.category === 2)) {
+      addTap(groups, ticksPerMeasure, outputNote, 3);
+    } else if (base === 3 || note.category === 3) {
       addDirectional(groups, ticksPerMeasure, note, directionToDirectional(note.direction));
       if (note.type) addTap(groups, ticksPerMeasure, note, 2);
     } else if (base === 8 || base === 11 || base === 9 || base === 12) {
@@ -1098,6 +1165,24 @@
       (a, b) => a.ticks - b.ticks || a.laneStart - b.laneStart || a.id - b.id
     );
     const { chains, connectedIds } = buildChains(notes);
+    const occupiedTapSlots = new Set();
+    for (const chain of chains) {
+      for (const note of chain) {
+        const base = note.noteBaseType;
+        let slideType = 3;
+        if (base === 2 || base === 8 || base === 9 || base === 10) slideType = 1;
+        else if (base === 1 || base === 3 || base === 11 || base === 12 || base === 13)
+          slideType = 2;
+        else if (base === 6 || base === 14 || note.category === 11) slideType = 5;
+        else if (base === 5) slideType = 3;
+        if (!isVisibleRelaySlideNote(note) && connectedNoteAddsTap(note, slideType)) {
+          reserveTapSlot(occupiedTapSlots, note);
+        }
+      }
+    }
+    for (const note of notes) {
+      if (!connectedIds.has(note.id)) reserveTapSlot(occupiedTapSlots, note);
+    }
     const channelAvailableAt = new Array(36).fill(Number.NEGATIVE_INFINITY);
     for (const chain of chains) {
       const startTick = chain[0]?.ticks ?? 0;
@@ -1122,7 +1207,8 @@
           note,
           channel,
           index === chain.length - 1,
-          chainDecoration
+          chainDecoration,
+          occupiedTapSlots
         );
       }
     }

@@ -139,7 +139,7 @@ interface ChartSusUploadResponse {
 const GAME_API_HOST = 'https://api.unipjsk.com'
 const GAME_SCORE_BLOB_FULL_BASE = '/blob/custom-music-score/full'
 const CHART_PLAYBACK_HOST = 'https://chartview.unipjsk.com'
-const CONVERTER_CACHE_KEY = 'custom-score-maker-20260430-slide-prefix-fix-v4'
+const CONVERTER_CACHE_KEY = 'custom-score-maker-20260430-decoration-path-v6'
 const CONVERTER_SCRIPT_URL = `/sus_json_converter.js?cacheKey=${encodeURIComponent(CONVERTER_CACHE_KEY)}`
 
 const masterStore = useMasterStore()
@@ -613,6 +613,29 @@ function writeFlatPreviewLoading(previewTab: Window | null) {
   previewTab.focus()
 }
 
+function write3dPreviewLoading(previewTab: Window | null) {
+  if (!previewTab || previewTab.closed) return
+
+  previewTab.document.title = '正在生成 3D 预览链接...'
+  previewTab.document.body.innerHTML = `
+    <div style="min-height:100vh;display:grid;place-items:center;background:#1a1a2e;color:#fff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+      <div style="text-align:center;">
+        <div style="font-size:20px;font-weight:700;margin-bottom:8px;">正在生成 3D 预览链接</div>
+        <div style="font-size:14px;color:rgba(255,255,255,.65);">请稍候，链接生成完成后会自动跳转。</div>
+      </div>
+    </div>
+  `
+  previewTab.focus()
+}
+
+function navigatePreviewTarget(previewTab: Window | null, url: string) {
+  if (previewTab && !previewTab.closed) {
+    previewTab.location.href = url
+    return
+  }
+  window.location.href = url
+}
+
 async function prepareScore(score: DisplayScore, renderPreview = true): Promise<boolean> {
   isFetchingScore.value = true
   scoreTaskLabel.value = '下载谱面中'
@@ -746,18 +769,25 @@ async function buildChartPreviewUrl(score: DisplayScore, susText: string) {
 }
 
 async function open3dPreview(score: DisplayScore) {
+  const previewTab = window.open('', '_blank')
+  write3dPreviewLoading(previewTab)
+
   if (selectedScore.value?.key !== score.key || !selectedSus.value) {
     await prepareScore(score, false)
   }
-  if (!selectedSus.value) return
+  if (!selectedSus.value) {
+    if (previewTab && !previewTab.closed) previewTab.close()
+    return
+  }
 
   previewInfo.value = ''
   scoreError.value = ''
   scoreTaskLabel.value = '生成 3D 预览链接中'
   try {
     const previewUrl = await buildChartPreviewUrl(score, selectedSus.value)
-    window.open(previewUrl, '_blank')
+    navigatePreviewTarget(previewTab, previewUrl)
   } catch (reason) {
+    if (previewTab && !previewTab.closed) previewTab.close()
     scoreError.value = reason instanceof Error ? reason.message : '3D 预览链接生成失败'
   } finally {
     scoreTaskLabel.value = ''
