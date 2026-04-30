@@ -139,7 +139,7 @@ interface ChartSusUploadResponse {
 const GAME_API_HOST = 'https://api.unipjsk.com'
 const GAME_SCORE_BLOB_FULL_BASE = '/blob/custom-music-score/full'
 const CHART_PLAYBACK_HOST = 'https://chartview.unipjsk.com'
-const CONVERTER_CACHE_KEY = 'custom-score-maker-20260430-slide-end-fix-v2'
+const CONVERTER_CACHE_KEY = 'custom-score-maker-20260430-slide-prefix-fix-v4'
 const CONVERTER_SCRIPT_URL = `/sus_json_converter.js?cacheKey=${encodeURIComponent(CONVERTER_CACHE_KEY)}`
 
 const masterStore = useMasterStore()
