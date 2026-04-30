@@ -816,6 +816,10 @@ function selectTab(tab: FeedTab) {
       </div>
     </div>
 
+    <div class="alert alert-warning shadow-sm text-sm">
+      <span>游戏内自制的谱面预览暂不成熟，长条节点会出错，仅供参考</span>
+    </div>
+
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-1.5 bg-base-200/50 p-1.5 rounded-xl shadow-inner border border-base-200">
       <button
         class="flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 px-2 sm:px-4 rounded-lg text-xs sm:text-sm font-medium transition-all whitespace-nowrap"
