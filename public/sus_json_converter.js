@@ -1018,7 +1018,7 @@
     }
   }
 
-  function jsonNoteToSusConnected(groups, ticksPerMeasure, note, channel) {
+  function jsonNoteToSusConnected(groups, ticksPerMeasure, note, channel, isLast) {
     const base = note.noteBaseType;
     const decoration = note.category === 9 || base === 10 || base === 13;
     let slideType = 3;
@@ -1027,6 +1027,7 @@
     else if (base === 1 || base === 3 || base === 11 || base === 12 || base === 13) slideType = 2;
     else if (base === 6) slideType = 5;
     else if (base === 5) slideType = 3;
+    if (isLast) slideType = 2;
 
     addSlide(groups, ticksPerMeasure, note, channel, decoration, slideType);
 
@@ -1101,8 +1102,9 @@
     for (const chain of chains) {
       const channel = nextChannel % 36;
       nextChannel += 1;
-      for (const note of chain) {
-        jsonNoteToSusConnected(groups, ticksPerMeasure, note, channel);
+      for (let index = 0; index < chain.length; index += 1) {
+        const note = chain[index];
+        jsonNoteToSusConnected(groups, ticksPerMeasure, note, channel, index === chain.length - 1);
       }
     }
 
