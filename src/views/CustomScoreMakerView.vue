@@ -139,8 +139,8 @@ interface ChartSusUploadResponse {
 const GAME_API_HOST = 'https://api.unipjsk.com'
 const GAME_SCORE_BLOB_FULL_BASE = '/blob/custom-music-score/full'
 const CHART_PLAYBACK_HOST = 'https://chartview.unipjsk.com'
-const CONVERTER_VERSION = 'custom-score-maker-20260430-bpm-measure-fix'
-const CONVERTER_SCRIPT_URL = `/sus_json_converter.js?v=${encodeURIComponent(CONVERTER_VERSION)}`
+const CONVERTER_CACHE_KEY = 'custom-score-maker-20260430-slide-end-fix-v2'
+const CONVERTER_SCRIPT_URL = `/sus_json_converter.js?cacheKey=${encodeURIComponent(CONVERTER_CACHE_KEY)}`
 
 const masterStore = useMasterStore()
 const settingsStore = useSettingsStore()
@@ -178,6 +178,7 @@ const vocals = ref<MusicVocal[]>([])
 
 let svgRenderResult: Sus2ImgFrontendResult | null = null
 let converterPromise: Promise<void> | null = null
+let converterPromiseCacheKey = ''
 
 const assetsHost = computed(() => settingsStore.assetsHost.replace(/\/+$/, ''))
 const translations = toRef(masterStore, 'translations')
@@ -384,10 +385,12 @@ async function decodeScoreBase64(base64Text: string) {
 }
 
 function loadSusConverter() {
-  if (window.SekaiSusJsonConverter && window.SekaiSusJsonConverterVersion === CONVERTER_VERSION) {
+  if (window.SekaiSusJsonConverter && window.SekaiSusJsonConverterVersion === CONVERTER_CACHE_KEY) {
     return Promise.resolve()
   }
-  if (converterPromise) return converterPromise
+  if (converterPromise && converterPromiseCacheKey === CONVERTER_CACHE_KEY) return converterPromise
+  converterPromise = null
+  converterPromiseCacheKey = CONVERTER_CACHE_KEY
 
   converterPromise = new Promise<void>((resolve, reject) => {
     const script = document.createElement('script')
@@ -395,7 +398,7 @@ function loadSusConverter() {
     script.async = true
     script.onload = () => {
       if (window.SekaiSusJsonConverter) {
-        window.SekaiSusJsonConverterVersion = CONVERTER_VERSION
+        window.SekaiSusJsonConverterVersion = CONVERTER_CACHE_KEY
         resolve()
       } else {
         reject(new Error('SUS 转换器加载后未注册'))
