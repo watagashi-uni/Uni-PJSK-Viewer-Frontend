@@ -979,6 +979,24 @@
     return `${ticks}:${lane}`;
   }
 
+  function noteSlotKey(note) {
+    return `${note.ticks}:${note.laneStart + 2}:${note.laneEnd - note.laneStart + 1}`;
+  }
+
+  function downgradeCriticalTapType(tapType) {
+    if (tapType === 2) return 1;
+    if (tapType === 6) return 5;
+    if (tapType === 8) return 7;
+    return tapType;
+  }
+
+  function upgradeCriticalTapType(tapType) {
+    if (tapType === 1) return 2;
+    if (tapType === 5) return 6;
+    if (tapType === 7) return 8;
+    return tapType;
+  }
+
   function reserveTapSlot(occupiedTapSlots, note) {
     if (!occupiedTapSlots) return;
     occupiedTapSlots.add(tapSlotKey(note.ticks, note.laneStart + 2));
@@ -986,6 +1004,10 @@
 
   function isVisibleRelaySlideNote(note) {
     return note.noteBaseType === 5 || note.category === 2;
+  }
+
+  function chainHasCurveLine(chain) {
+    return chain.some((note) => Number(note.noteLineType || 0) !== 0);
   }
 
   function withVisibleRelayAttachmentSlot(note, occupiedTapSlots) {
@@ -1042,24 +1064,44 @@
     return { chains, connectedIds: visited };
   }
 
-  function jsonNoteToSusStandalone(groups, ticksPerMeasure, note) {
+  function standaloneTapType(note, connectedSlideSlots, criticalSlideSlots) {
+    const tapType = tapTypeFromJson(note);
+    if (criticalSlideSlots?.has(noteSlotKey(note))) {
+      return upgradeCriticalTapType(tapType);
+    }
+    if (connectedSlideSlots?.has(noteSlotKey(note))) {
+      return downgradeCriticalTapType(tapType);
+    }
+    return tapType;
+  }
+
+  function jsonNoteToSusStandalone(groups, ticksPerMeasure, note, connectedSlideSlots, criticalSlideSlots) {
     if (note.noteBaseType === 3 || note.category === 3) {
-      addTap(groups, ticksPerMeasure, note, tapTypeFromJson(note));
+      addTap(groups, ticksPerMeasure, note, standaloneTapType(note, connectedSlideSlots, criticalSlideSlots));
       addDirectional(groups, ticksPerMeasure, note, directionToDirectional(note.direction));
     } else if (note.noteBaseType === 11 || note.category === 4) {
-      addTap(groups, ticksPerMeasure, note, tapTypeFromJson(note));
+      addTap(groups, ticksPerMeasure, note, standaloneTapType(note, connectedSlideSlots, criticalSlideSlots));
     } else if (note.noteBaseType === 4 || note.category === 8) {
-      addTap(groups, ticksPerMeasure, note, 6);
+      addTap(
+        groups,
+        ticksPerMeasure,
+        note,
+        criticalSlideSlots?.has(noteSlotKey(note))
+          ? 6
+          : connectedSlideSlots?.has(noteSlotKey(note))
+            ? 5
+            : 6
+      );
       addDirectional(groups, ticksPerMeasure, note, 1);
     } else {
-      addTap(groups, ticksPerMeasure, note, tapTypeFromJson(note));
+      addTap(groups, ticksPerMeasure, note, standaloneTapType(note, connectedSlideSlots, criticalSlideSlots));
     }
   }
 
-  function connectedNoteAddsTap(note, slideType) {
+  function connectedNoteAddsTap(note, slideType, visibleRelayAsAttachment) {
     const base = note.noteBaseType;
     return (
-      (slideType === 3 && isVisibleRelaySlideNote(note)) ||
+      (slideType === 3 && visibleRelayAsAttachment && isVisibleRelaySlideNote(note)) ||
       base === 3 ||
       note.category === 3 ||
       base === 8 ||
@@ -1077,7 +1119,10 @@
     channel,
     isLast,
     chainDecoration,
-    occupiedTapSlots
+    visibleRelayAsAttachment,
+    occupiedTapSlots,
+    deferredCriticalTaps,
+    criticalSlideSlots
   ) {
     const base = note.noteBaseType;
     const decoration = chainDecoration || note.category === 9 || base === 10 || base === 13;
@@ -1090,13 +1135,16 @@
     if (isLast) slideType = 2;
 
     const outputNote =
-      slideType === 3 && isVisibleRelaySlideNote(note)
+      slideType === 3 && visibleRelayAsAttachment && isVisibleRelaySlideNote(note)
         ? withVisibleRelayAttachmentSlot(note, occupiedTapSlots)
         : note;
 
     addSlide(groups, ticksPerMeasure, outputNote, channel, decoration, slideType);
 
-    if (slideType === 3 && (base === 5 || note.category === 2)) {
+    if (decoration && note.type && (base === 10 || base === 13)) {
+      deferredCriticalTaps?.push(outputNote);
+      criticalSlideSlots?.add(noteSlotKey(outputNote));
+    } else if (slideType === 3 && visibleRelayAsAttachment && (base === 5 || note.category === 2)) {
       addTap(groups, ticksPerMeasure, outputNote, 3);
     } else if (base === 3 || note.category === 3) {
       addDirectional(groups, ticksPerMeasure, note, directionToDirectional(note.direction));
@@ -1165,8 +1213,18 @@
       (a, b) => a.ticks - b.ticks || a.laneStart - b.laneStart || a.id - b.id
     );
     const { chains, connectedIds } = buildChains(notes);
+    const deferredCriticalTaps = [];
+    const criticalSlideSlots = new Set();
+    const connectedSlideSlots = new Set();
+    const standaloneTapSlots = new Set();
+    for (const chain of chains) {
+      for (const note of chain) {
+        connectedSlideSlots.add(noteSlotKey(note));
+      }
+    }
     const occupiedTapSlots = new Set();
     for (const chain of chains) {
+      const visibleRelayAsAttachment = chainHasCurveLine(chain);
       for (const note of chain) {
         const base = note.noteBaseType;
         let slideType = 3;
@@ -1175,13 +1233,19 @@
           slideType = 2;
         else if (base === 6 || base === 14 || note.category === 11) slideType = 5;
         else if (base === 5) slideType = 3;
-        if (!isVisibleRelaySlideNote(note) && connectedNoteAddsTap(note, slideType)) {
+        if (
+          !(visibleRelayAsAttachment && isVisibleRelaySlideNote(note)) &&
+          connectedNoteAddsTap(note, slideType, visibleRelayAsAttachment)
+        ) {
           reserveTapSlot(occupiedTapSlots, note);
         }
       }
     }
     for (const note of notes) {
-      if (!connectedIds.has(note.id)) reserveTapSlot(occupiedTapSlots, note);
+      if (!connectedIds.has(note.id)) {
+        reserveTapSlot(occupiedTapSlots, note);
+        standaloneTapSlots.add(noteSlotKey(note));
+      }
     }
     const channelAvailableAt = new Array(36).fill(Number.NEGATIVE_INFINITY);
     for (const chain of chains) {
@@ -1197,8 +1261,14 @@
       channelAvailableAt[channel] = Math.max(channelAvailableAt[channel], endTick);
       const chainDecoration = chain.some((note) => {
         const base = note.noteBaseType;
-        return note.category === 9 || base === 10 || base === 13;
+        return (
+          note.category === 9 ||
+          base === 10 ||
+          base === 13 ||
+          ((base === 9 || base === 12) && note.category === 5)
+        );
       });
+      const visibleRelayAsAttachment = chainHasCurveLine(chain);
       for (let index = 0; index < chain.length; index += 1) {
         const note = chain[index];
         jsonNoteToSusConnected(
@@ -1208,14 +1278,28 @@
           channel,
           index === chain.length - 1,
           chainDecoration,
-          occupiedTapSlots
+          visibleRelayAsAttachment,
+          occupiedTapSlots,
+          deferredCriticalTaps,
+          criticalSlideSlots
         );
       }
     }
 
     for (const note of notes) {
       if (!connectedIds.has(note.id)) {
-        jsonNoteToSusStandalone(groups, ticksPerMeasure, note);
+        jsonNoteToSusStandalone(
+          groups,
+          ticksPerMeasure,
+          note,
+          connectedSlideSlots,
+          criticalSlideSlots
+        );
+      }
+    }
+    for (const note of deferredCriticalTaps) {
+      if (!standaloneTapSlots.has(noteSlotKey(note))) {
+        addTap(groups, ticksPerMeasure, note, 8);
       }
     }
 

@@ -139,7 +139,7 @@ interface ChartSusUploadResponse {
 const GAME_API_HOST = 'https://api.unipjsk.com'
 const GAME_SCORE_BLOB_FULL_BASE = '/blob/custom-music-score/full'
 const CHART_PLAYBACK_HOST = 'https://chartview.unipjsk.com'
-const CONVERTER_CACHE_KEY = 'custom-score-maker-20260430-decoration-path-v6'
+const CONVERTER_CACHE_KEY = 'custom-score-maker-20260430-critical-color-v10'
 const CONVERTER_SCRIPT_URL = `/sus_json_converter.js?cacheKey=${encodeURIComponent(CONVERTER_CACHE_KEY)}`
 
 const masterStore = useMasterStore()
@@ -162,6 +162,7 @@ const scores = ref<DisplayScore[]>([])
 
 const selectedScore = ref<DisplayScore | null>(null)
 const selectedSus = ref('')
+const selectedSusConverterKey = ref('')
 const selectedSvg = ref('')
 const selectedPreviewUrl = ref('')
 const isFetchingScore = ref(false)
@@ -508,6 +509,7 @@ async function loadFeed() {
   scores.value = []
   selectedScore.value = null
   selectedSus.value = ''
+  selectedSusConverterKey.value = ''
   selectedSvg.value = ''
   revokeSvgResult()
 
@@ -666,6 +668,7 @@ async function prepareScore(score: DisplayScore, renderPreview = true): Promise<
 
     selectedScore.value = score
     selectedSus.value = sus
+    selectedSusConverterKey.value = CONVERTER_CACHE_KEY
 
     if (renderPreview) {
       await renderFlatPreview(score, sus)
@@ -772,7 +775,11 @@ async function open3dPreview(score: DisplayScore) {
   const previewTab = window.open('', '_blank')
   write3dPreviewLoading(previewTab)
 
-  if (selectedScore.value?.key !== score.key || !selectedSus.value) {
+  if (
+    selectedScore.value?.key !== score.key ||
+    !selectedSus.value ||
+    selectedSusConverterKey.value !== CONVERTER_CACHE_KEY
+  ) {
     await prepareScore(score, false)
   }
   if (!selectedSus.value) {
