@@ -1018,9 +1018,9 @@
     }
   }
 
-  function jsonNoteToSusConnected(groups, ticksPerMeasure, note, channel, isLast) {
+  function jsonNoteToSusConnected(groups, ticksPerMeasure, note, channel, isLast, chainDecoration) {
     const base = note.noteBaseType;
-    const decoration = note.category === 9 || base === 10 || base === 13;
+    const decoration = chainDecoration || note.category === 9 || base === 10 || base === 13;
     let slideType = 3;
 
     if (base === 2 || base === 8 || base === 9 || base === 10) slideType = 1;
@@ -1098,13 +1098,32 @@
       (a, b) => a.ticks - b.ticks || a.laneStart - b.laneStart || a.id - b.id
     );
     const { chains, connectedIds } = buildChains(notes);
-    let nextChannel = 0;
+    const channelAvailableAt = new Array(36).fill(Number.NEGATIVE_INFINITY);
     for (const chain of chains) {
-      const channel = nextChannel % 36;
-      nextChannel += 1;
+      const startTick = chain[0]?.ticks ?? 0;
+      const endTick = chain[chain.length - 1]?.ticks ?? startTick;
+      let channel = channelAvailableAt.findIndex((availableAt) => availableAt < startTick);
+      if (channel === -1) {
+        channel = channelAvailableAt.reduce(
+          (best, availableAt, index) => (availableAt < channelAvailableAt[best] ? index : best),
+          0
+        );
+      }
+      channelAvailableAt[channel] = Math.max(channelAvailableAt[channel], endTick);
+      const chainDecoration = chain.some((note) => {
+        const base = note.noteBaseType;
+        return note.category === 9 || base === 10 || base === 13;
+      });
       for (let index = 0; index < chain.length; index += 1) {
         const note = chain[index];
-        jsonNoteToSusConnected(groups, ticksPerMeasure, note, channel, index === chain.length - 1);
+        jsonNoteToSusConnected(
+          groups,
+          ticksPerMeasure,
+          note,
+          channel,
+          index === chain.length - 1,
+          chainDecoration
+        );
       }
     }
 
