@@ -10,8 +10,8 @@ const zoom = ref(100)
 
 // 从 sessionStorage 获取预览数据
 onMounted(() => {
-  const data = sessionStorage.getItem('sus2img-preview-data')
-  const format = sessionStorage.getItem('sus2img-preview-format')
+  const data = sessionStorage.getItem('sus2img-preview-data') || localStorage.getItem('sus2img-preview-data')
+  const format = sessionStorage.getItem('sus2img-preview-format') || localStorage.getItem('sus2img-preview-format')
   
   if (data && format) {
     imageData.value = data

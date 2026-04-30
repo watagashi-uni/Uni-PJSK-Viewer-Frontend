@@ -81,6 +81,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '谱面转图片' },
     },
     {
+        path: '/custom-score-maker',
+        name: 'CustomScoreMaker',
+        component: () => import('@/views/CustomScoreMakerView.vue'),
+        meta: { title: '谱面Maker' },
+    },
+    {
         path: '/chart-share',
         name: 'ChartShare',
         component: () => import('@/views/ChartShareView.vue'),
