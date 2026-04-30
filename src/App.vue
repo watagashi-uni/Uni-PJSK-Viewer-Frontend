@@ -140,6 +140,11 @@ async function handleSuiteRefresh() {
             </RouterLink>
           </li>
           <li>
+            <RouterLink to="/custom-score-maker" active-class="active">
+              <Music class="w-5 h-5" /> 谱面Maker
+            </RouterLink>
+          </li>
+          <li>
             <RouterLink to="/deck-recommend" active-class="active">
               <Zap class="w-5 h-5" /> 自动组队
             </RouterLink>
