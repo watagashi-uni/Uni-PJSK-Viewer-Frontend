@@ -894,11 +894,40 @@
     };
   }
 
-  function addSusObject(groups, ticksPerMeasure, tick, header, code) {
+  function addSusObject(groups, ticksPerMeasure, tick, header, code, options = {}) {
+    const duplicate = Boolean(options.duplicate);
+    const sortPriority = Number(options.sortPriority ?? 0);
     const { bar, tick: tickInMeasure } = tickToBarTick(tick, ticksPerMeasure);
-    const key = `${bar}:${header}`;
-    if (!groups.has(key)) groups.set(key, { bar, header, items: [] });
-    groups.get(key).items.push({ tick: tickInMeasure, code });
+    let variant = 0;
+
+    while (true) {
+      const key = `${bar}:${header}:${variant}`;
+      if (!groups.has(key)) {
+        groups.set(key, {
+          bar,
+          header,
+          variant,
+          sortPriority,
+          items: [{ tick: tickInMeasure, code }],
+        });
+        return;
+      }
+
+      const group = groups.get(key);
+      const existing = group.items.find((item) => item.tick === tickInMeasure);
+      if (!existing) {
+        group.items.push({ tick: tickInMeasure, code });
+        return;
+      }
+
+      if (duplicate) {
+        variant += 1;
+        continue;
+      }
+
+      existing.code = code;
+      return;
+    }
   }
 
   function buildSusData(items, ticksPerMeasure) {
@@ -937,7 +966,7 @@
     return fallback;
   }
 
-  function addTap(groups, ticksPerMeasure, note, tapType) {
+  function addTap(groups, ticksPerMeasure, note, tapType, options = {}) {
     const lane = note.laneStart + 2;
     const width = note.laneEnd - note.laneStart + 1;
     addSusObject(
@@ -945,7 +974,8 @@
       ticksPerMeasure,
       note.ticks,
       `1${toBase36(lane)}`,
-      `${toBase36(tapType)}${toBase36(width)}`
+      `${toBase36(tapType)}${toBase36(width)}`,
+      options
     );
   }
 
@@ -1010,6 +1040,41 @@
     return chain.some((note) => Number(note.noteLineType || 0) !== 0);
   }
 
+  function isHiddenHeadSlideChain(chain, standaloneTapSlots) {
+    const first = chain[0];
+    const last = chain[chain.length - 1];
+    if (!first || !last) return false;
+
+    return (
+      first.noteBaseType === 9 &&
+      last.noteBaseType === 12 &&
+      last.category === 5 &&
+      standaloneTapSlots?.has(noteSlotKey(first))
+    );
+  }
+
+  function isDecorationSlideChain(chain, standaloneTapSlots) {
+    if (
+      chain.some((note) => {
+        const base = note.noteBaseType;
+        return note.category === 9 || base === 10 || base === 13;
+      })
+    ) {
+      return true;
+    }
+
+    const first = chain[0];
+    const last = chain[chain.length - 1];
+    if (!first || !last) return false;
+
+    return (
+      first.noteBaseType === 9 &&
+      last.noteBaseType === 12 &&
+      last.category === 5 &&
+      !isHiddenHeadSlideChain(chain, standaloneTapSlots)
+    );
+  }
+
   function withVisibleRelayAttachmentSlot(note, occupiedTapSlots) {
     if (!occupiedTapSlots) return note;
     const lane = note.laneStart + 2;
@@ -1064,8 +1129,11 @@
     return { chains, connectedIds: visited };
   }
 
-  function standaloneTapType(note, connectedSlideSlots, criticalSlideSlots) {
+  function standaloneTapType(note, connectedSlideSlots, criticalSlideSlots, hiddenHeadSlideSlots) {
     const tapType = tapTypeFromJson(note);
+    if (hiddenHeadSlideSlots?.has(noteSlotKey(note))) {
+      return tapType;
+    }
     if (criticalSlideSlots?.has(noteSlotKey(note))) {
       return upgradeCriticalTapType(tapType);
     }
@@ -1075,12 +1143,34 @@
     return tapType;
   }
 
-  function jsonNoteToSusStandalone(groups, ticksPerMeasure, note, connectedSlideSlots, criticalSlideSlots) {
+  function jsonNoteToSusStandalone(
+    groups,
+    ticksPerMeasure,
+    note,
+    connectedSlideSlots,
+    criticalSlideSlots,
+    hiddenHeadSlideSlots
+  ) {
+    const hiddenHeadStandalone = hiddenHeadSlideSlots?.has(noteSlotKey(note));
+    const tapOptions = hiddenHeadStandalone ? { duplicate: true, sortPriority: 1 } : undefined;
+
     if (note.noteBaseType === 3 || note.category === 3) {
-      addTap(groups, ticksPerMeasure, note, standaloneTapType(note, connectedSlideSlots, criticalSlideSlots));
+      addTap(
+        groups,
+        ticksPerMeasure,
+        note,
+        standaloneTapType(note, connectedSlideSlots, criticalSlideSlots, hiddenHeadSlideSlots),
+        tapOptions
+      );
       addDirectional(groups, ticksPerMeasure, note, directionToDirectional(note.direction));
     } else if (note.noteBaseType === 11 || note.category === 4) {
-      addTap(groups, ticksPerMeasure, note, standaloneTapType(note, connectedSlideSlots, criticalSlideSlots));
+      addTap(
+        groups,
+        ticksPerMeasure,
+        note,
+        standaloneTapType(note, connectedSlideSlots, criticalSlideSlots, hiddenHeadSlideSlots),
+        tapOptions
+      );
     } else if (note.noteBaseType === 4 || note.category === 8) {
       addTap(
         groups,
@@ -1090,11 +1180,18 @@
           ? 6
           : connectedSlideSlots?.has(noteSlotKey(note))
             ? 5
-            : 6
+            : 6,
+        tapOptions
       );
       addDirectional(groups, ticksPerMeasure, note, 1);
     } else {
-      addTap(groups, ticksPerMeasure, note, standaloneTapType(note, connectedSlideSlots, criticalSlideSlots));
+      addTap(
+        groups,
+        ticksPerMeasure,
+        note,
+        standaloneTapType(note, connectedSlideSlots, criticalSlideSlots, hiddenHeadSlideSlots),
+        tapOptions
+      );
     }
   }
 
@@ -1216,6 +1313,7 @@
     const deferredCriticalTaps = [];
     const criticalSlideSlots = new Set();
     const connectedSlideSlots = new Set();
+    const hiddenHeadSlideSlots = new Set();
     const standaloneTapSlots = new Set();
     for (const chain of chains) {
       for (const note of chain) {
@@ -1249,6 +1347,11 @@
     }
     const channelAvailableAt = new Array(36).fill(Number.NEGATIVE_INFINITY);
     for (const chain of chains) {
+      if (isHiddenHeadSlideChain(chain, standaloneTapSlots)) {
+        hiddenHeadSlideSlots.add(noteSlotKey(chain[0]));
+      }
+    }
+    for (const chain of chains) {
       const startTick = chain[0]?.ticks ?? 0;
       const endTick = chain[chain.length - 1]?.ticks ?? startTick;
       let channel = channelAvailableAt.findIndex((availableAt) => availableAt < startTick);
@@ -1259,15 +1362,7 @@
         );
       }
       channelAvailableAt[channel] = Math.max(channelAvailableAt[channel], endTick);
-      const chainDecoration = chain.some((note) => {
-        const base = note.noteBaseType;
-        return (
-          note.category === 9 ||
-          base === 10 ||
-          base === 13 ||
-          ((base === 9 || base === 12) && note.category === 5)
-        );
-      });
+      const chainDecoration = isDecorationSlideChain(chain, standaloneTapSlots);
       const visibleRelayAsAttachment = chainHasCurveLine(chain);
       for (let index = 0; index < chain.length; index += 1) {
         const note = chain[index];
@@ -1293,7 +1388,8 @@
           ticksPerMeasure,
           note,
           connectedSlideSlots,
-          criticalSlideSlots
+          criticalSlideSlots,
+          hiddenHeadSlideSlots
         );
       }
     }
@@ -1307,9 +1403,17 @@
       .map((group) => ({
         bar: group.bar,
         header: group.header,
+        sortPriority: group.sortPriority ?? 0,
+        variant: group.variant ?? 0,
         data: buildSusData(group.items, ticksPerMeasure),
       }))
-      .sort((a, b) => a.bar - b.bar || a.header.localeCompare(b.header));
+      .sort(
+        (a, b) =>
+          a.bar - b.bar ||
+          a.sortPriority - b.sortPriority ||
+          a.header.localeCompare(b.header) ||
+          a.variant - b.variant
+      );
 
     for (const line of groupLines) {
       lines.push(`#${String(line.bar).padStart(3, "0")}${line.header}: ${line.data}`);
