@@ -139,7 +139,7 @@ interface ChartSusUploadResponse {
 const GAME_API_HOST = 'https://api.unipjsk.com'
 const GAME_SCORE_BLOB_FULL_BASE = '/blob/custom-music-score/full'
 const CHART_PLAYBACK_HOST = 'https://chartview.unipjsk.com'
-const CONVERTER_CACHE_KEY = 'custom-score-maker-20260430-critical-color-v10'
+const CONVERTER_CACHE_KEY = 'custom-score-maker-20260502-hidden-head-order-v14'
 const CONVERTER_SCRIPT_URL = `/sus_json_converter.js?cacheKey=${encodeURIComponent(CONVERTER_CACHE_KEY)}`
 
 const masterStore = useMasterStore()
@@ -180,6 +180,8 @@ const vocals = ref<MusicVocal[]>([])
 let svgRenderResult: Sus2ImgFrontendResult | null = null
 let converterPromise: Promise<void> | null = null
 let converterPromiseCacheKey = ''
+let feedRequestSerial = 0
+let feedAbortController: AbortController | null = null
 
 const assetsHost = computed(() => settingsStore.assetsHost.replace(/\/+$/, ''))
 const translations = toRef(masterStore, 'translations')
@@ -237,7 +239,9 @@ const endpointPath = computed(() => {
 
 onMounted(async () => {
   await loadMasterData()
-  await loadFeed()
+  if (activeTab.value !== 'search') {
+    await loadFeed()
+  }
 })
 
 function revokeSvgResult() {
@@ -504,6 +508,10 @@ function normalizeFeed(data: FeedResponse) {
 }
 
 async function loadFeed() {
+  const requestId = ++feedRequestSerial
+  feedAbortController?.abort()
+  feedAbortController = new AbortController()
+
   error.value = ''
   scoreError.value = ''
   scores.value = []
@@ -515,6 +523,14 @@ async function loadFeed() {
 
 
   if (activeTab.value === 'search' && searchMode.value === 'id' && !searchScoreId.value.trim()) {
+    isLoading.value = false
+    feedAbortController = null
+    return
+  }
+
+  if (activeTab.value === 'search' && searchMode.value === 'music' && !searchMusicId.value.trim()) {
+    isLoading.value = false
+    feedAbortController = null
     return
   }
 
@@ -529,6 +545,7 @@ async function loadFeed() {
       if (searchDifficulty.value) {
         list = list.filter(m => m.musicDifficultyType?.toLowerCase() === searchDifficulty.value)
       }
+      if (requestId !== feedRequestSerial) return
       scores.value = list.map((master): DisplayScore => {
         const musicId = master.musicId
         const music = musicById.value.get(musicId)
@@ -560,12 +577,15 @@ async function loadFeed() {
       return
     }
 
-    const response = await fetch(`${GAME_API_HOST}${endpointPath.value}`)
+    const response = await fetch(`${GAME_API_HOST}${endpointPath.value}`, {
+      signal: feedAbortController.signal,
+    })
     if (!response.ok) {
       if (response.status === 404) throw new Error('未找到该谱面')
       throw new Error(`请求失败：HTTP ${response.status}`)
     }
     const data = await response.json()
+    if (requestId !== feedRequestSerial) return
     if (activeTab.value === 'search' && searchMode.value === 'id') {
       if (data && typeof data === 'object' && 'userCustomMusicScoreInfoJson' in data && 'userCustomMusicScoreId' in (data.userCustomMusicScoreInfoJson as any)) {
         scores.value = normalizeFeed({ userCustomMusicScorePublishedList: [data.userCustomMusicScoreInfoJson] } as any)
@@ -576,9 +596,14 @@ async function loadFeed() {
       scores.value = normalizeFeed(data as FeedResponse)
     }
   } catch (reason) {
+    if (requestId !== feedRequestSerial) return
+    if (reason instanceof DOMException && reason.name === 'AbortError') return
     error.value = reason instanceof Error ? reason.message : '加载谱面列表失败'
   } finally {
-    isLoading.value = false
+    if (requestId === feedRequestSerial) {
+      isLoading.value = false
+      feedAbortController = null
+    }
   }
 }
 
@@ -811,10 +836,17 @@ function searchById() {
   if (!searchScoreId.value.trim()) return
   activeTab.value = 'search'
   searchMode.value = 'id'
-  loadFeed()
+  void loadFeed()
 }
 
 function selectTab(tab: FeedTab) {
+  feedRequestSerial += 1
+  feedAbortController?.abort()
+  feedAbortController = null
+  isLoading.value = false
+  error.value = ''
+  scores.value = []
+
   if (activeTab.value === tab) {
     if (tab === 'search') searchMode.value = 'music'
     return
@@ -822,6 +854,9 @@ function selectTab(tab: FeedTab) {
   activeTab.value = tab
   if (tab === 'ranking') {
     rankingMode.value = rankingMode.value || 'total'
+  }
+  if (tab === 'search') {
+    return
   }
   void loadFeed()
 }
