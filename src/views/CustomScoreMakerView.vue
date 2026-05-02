@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, toRef } from 'vue'
 import { BarChart3, Eye, Heart, Music2, Play, PlayCircle, RefreshCw, Search, Sparkles, Copy } from 'lucide-vue-next'
-import { renderSusToSvg, revokeSus2ImgResult, type Sus2ImgFrontendResult } from 'sekai-sus2img'
+import { renderCustomScoreJsonToSvg, revokeSus2ImgResult, type Sus2ImgFrontendResult } from '@/vendor/sekai-sus2img'
+import AlertBanner from '@/components/AlertBanner.vue'
 import AssetImage from '@/components/AssetImage.vue'
 import apiClient from '@/api/client'
 import { useMasterStore } from '@/stores/master'
@@ -141,6 +142,7 @@ const GAME_SCORE_BLOB_FULL_BASE = '/blob/custom-music-score/full'
 const CHART_PLAYBACK_HOST = 'https://chartview.unipjsk.com'
 const CONVERTER_CACHE_KEY = 'custom-score-maker-20260502-hidden-head-order-v14'
 const CONVERTER_SCRIPT_URL = `/sus_json_converter.js?cacheKey=${encodeURIComponent(CONVERTER_CACHE_KEY)}`
+const THREE_D_NOTICE_STORAGE_KEY = 'custom-score-maker-3d-preview-notice-dismissed'
 
 const masterStore = useMasterStore()
 const settingsStore = useSettingsStore()
@@ -162,6 +164,7 @@ const scores = ref<DisplayScore[]>([])
 
 const selectedScore = ref<DisplayScore | null>(null)
 const selectedSus = ref('')
+const selectedScoreJson = ref<unknown | null>(null)
 const selectedSusConverterKey = ref('')
 const selectedSvg = ref('')
 const selectedPreviewUrl = ref('')
@@ -170,6 +173,8 @@ const isRenderingPreview = ref(false)
 const scoreError = ref('')
 const previewInfo = ref('')
 const scoreTaskLabel = ref('')
+const isThreeDNoticeDismissed = ref(localStorage.getItem(THREE_D_NOTICE_STORAGE_KEY) === '1')
+const threeDConfirmScore = ref<DisplayScore | null>(null)
 
 const officialCreators = ref<OfficialCreator[]>([])
 const officialProfiles = ref<OfficialCreatorProfile[]>([])
@@ -249,6 +254,11 @@ function revokeSvgResult() {
     revokeSus2ImgResult(svgRenderResult)
     svgRenderResult = null
   }
+}
+
+function dismissThreeDNotice() {
+  isThreeDNoticeDismissed.value = true
+  localStorage.setItem(THREE_D_NOTICE_STORAGE_KEY, '1')
 }
 
 function formatNumber(value: number | undefined) {
@@ -517,6 +527,7 @@ async function loadFeed() {
   scores.value = []
   selectedScore.value = null
   selectedSus.value = ''
+  selectedScoreJson.value = null
   selectedSusConverterKey.value = ''
   selectedSvg.value = ''
   revokeSvgResult()
@@ -693,10 +704,11 @@ async function prepareScore(score: DisplayScore, renderPreview = true): Promise<
 
     selectedScore.value = score
     selectedSus.value = sus
+    selectedScoreJson.value = scoreJson
     selectedSusConverterKey.value = CONVERTER_CACHE_KEY
 
     if (renderPreview) {
-      await renderFlatPreview(score, sus)
+      await renderFlatPreview(score)
     }
     return true
   } catch (reason) {
@@ -708,8 +720,8 @@ async function prepareScore(score: DisplayScore, renderPreview = true): Promise<
   }
 }
 
-async function renderFlatPreview(score: DisplayScore, susText = selectedSus.value) {
-  if (!susText) return
+async function renderFlatPreview(score: DisplayScore, scoreJson = selectedScoreJson.value) {
+  if (!scoreJson) return
   isRenderingPreview.value = true
   scoreTaskLabel.value = '生成平面预览中'
   selectedSvg.value = ''
@@ -717,13 +729,14 @@ async function renderFlatPreview(score: DisplayScore, susText = selectedSus.valu
   revokeSvgResult()
 
   try {
-    const result = await renderSusToSvg({
-      sus: susText,
+    const result = await renderCustomScoreJsonToSvg({
+      scoreJson,
       title: score.title,
       artist: score.musicTitle,
       author: score.creatorName,
       difficulty: score.musicDifficultyType.toUpperCase(),
       playlevel: String(score.playLevel || ''),
+      songId: score.musicId,
       pixel: '220',
       skin: 'custom01',
       jacket: getJacketUrl(score),
@@ -826,6 +839,20 @@ async function open3dPreview(score: DisplayScore) {
   }
 }
 
+function request3dPreview(score: DisplayScore) {
+  threeDConfirmScore.value = score
+}
+
+function cancel3dPreview() {
+  threeDConfirmScore.value = null
+}
+
+function confirm3dPreview() {
+  const score = threeDConfirmScore.value
+  threeDConfirmScore.value = null
+  if (score) void open3dPreview(score)
+}
+
 function copyScoreId(id: string) {
   navigator.clipboard.writeText(id).catch(err => {
     console.error('Failed to copy ID:', err)
@@ -888,9 +915,9 @@ function selectTab(tab: FeedTab) {
       </div>
     </div>
 
-    <div class="alert alert-warning shadow-sm text-sm">
-      <span>游戏内自制的谱面预览暂不成熟，长条节点会出错，仅供参考</span>
-    </div>
+    <AlertBanner v-if="!isThreeDNoticeDismissed" type="warning" dismissible @dismiss="dismissThreeDNotice">
+      <span class="text-sm">3D 自制谱面预览暂不成熟，长条、trace、无头判等效果可能不准确。核对谱面时建议优先使用平面预览。</span>
+    </AlertBanner>
 
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-1.5 bg-base-200/50 p-1.5 rounded-xl shadow-inner border border-base-200">
       <button
@@ -1159,7 +1186,7 @@ function selectTab(tab: FeedTab) {
                   <Eye class="w-3.5 h-3.5" />
                   平面预览
                 </button>
-                <button class="btn btn-sm btn-primary gap-1.5 rounded-lg shadow-sm" :disabled="isFetchingScore" @click="open3dPreview(score)">
+                <button class="btn btn-sm btn-primary gap-1.5 rounded-lg shadow-sm" :disabled="isFetchingScore" @click="request3dPreview(score)">
                   <PlayCircle class="w-3.5 h-3.5" />
                   3D预览
                 </button>
@@ -1169,5 +1196,25 @@ function selectTab(tab: FeedTab) {
         </div>
       </div>
     </div>
+
+    <dialog class="modal modal-bottom sm:modal-middle" :class="{ 'modal-open': Boolean(threeDConfirmScore) }">
+      <div class="modal-box">
+        <h3 class="text-lg font-bold">打开 3D 自制谱面预览？</h3>
+        <div class="py-4 space-y-2 text-sm text-base-content/75">
+          <p>推荐优先使用平面预览，它直接读取自制谱面数据，目前更适合核对谱面细节。</p>
+          <p>3D 预览仍在适配自制谱面，长条、trace、无头判等效果可能出现明显偏差，仅建议作为临时参考。</p>
+        </div>
+        <div class="modal-action">
+          <button class="btn btn-ghost" type="button" @click="cancel3dPreview">取消</button>
+          <button class="btn btn-primary gap-1.5" type="button" @click="confirm3dPreview">
+            <PlayCircle class="w-4 h-4" />
+            仍然打开
+          </button>
+        </div>
+      </div>
+      <form method="dialog" class="modal-backdrop" @click="cancel3dPreview">
+        <button type="button">close</button>
+      </form>
+    </dialog>
   </div>
 </template>

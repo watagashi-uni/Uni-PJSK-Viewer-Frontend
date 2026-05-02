@@ -1,5 +1,5 @@
-import { applyRebase } from 'sekai-sus2img/src/rebase'
-import { parseSusText } from 'sekai-sus2img/src/parser'
+import { applyRebase } from '@/vendor/sekai-sus2img/rebase'
+import { parseSusText } from '@/vendor/sekai-sus2img/parser'
 
 type FlickType = 'none' | 'default' | 'left' | 'right'
 type NoteType = 'tap' | 'hold' | 'holdMid' | 'holdEnd'

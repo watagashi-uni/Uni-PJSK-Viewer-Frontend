@@ -8,7 +8,7 @@ import {
   revokeSus2ImgResult,
   type Sus2ImgFrontendResult,
   type Sus2ImgSkin,
-} from 'sekai-sus2img'
+} from '@/vendor/sekai-sus2img'
 import {
   analyzeSusConflicts,
   annotateSvgWithConflict,
