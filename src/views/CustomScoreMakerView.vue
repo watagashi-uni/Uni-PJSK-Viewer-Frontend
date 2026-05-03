@@ -409,33 +409,57 @@ function mergeUserScore(item: UserScoreItem): DisplayScore {
   }
 }
 
+function mergeOfficialMasterScore(master: OfficialCreator, stat?: OfficialScoreStat): DisplayScore {
+  const musicId = master.musicId
+  const music = musicById.value.get(musicId)
+  const profile = officialProfileById.value.get(master.customMusicScoreOfficialCreatorProfileId)
+  const tagIds = [master.tagId1, master.tagId2, master.tagId3].filter((id): id is number => typeof id === 'number')
+
+  return {
+    key: `official:${master.scoreId}`,
+    source: 'official',
+    customMusicScoreId: master.scoreId,
+    title: master.title || `官方指定谱面 ${master.scoreId}`,
+    creatorName: profile?.name || '官方指定创作者',
+    musicId,
+    musicTitle: music?.title ?? (musicId ? `Music ${musicId}` : '未知歌曲'),
+    jacketAssetbundleName: music?.assetbundleName,
+    musicDifficultyType: master.musicDifficultyType ?? 'append',
+    playLevel: master.playLevel ?? 0,
+    description: master.description || '',
+    tagIds,
+    publishedAt: master.publishedStartAt,
+    reviewCount: stat?.reviewCount ?? 0,
+    playCount: stat?.playCount ?? 0,
+    fullComboRate: stat?.fullComboRate ?? 0,
+    customMusicScoreSearchSortValue: stat?.customMusicScoreSearchSortValue ?? 0,
+    previewStartTimeSec: master.previewStartTimeSec,
+    isDerivativeAllowed: master.isDerivativeAllowed,
+  }
+}
+
 function mergeOfficialScore(item: OfficialScoreStat): DisplayScore {
   const master = officialCreatorByScoreId.value.get(item.customMusicScoreId)
-  const musicId = master?.musicId ?? 0
-  const music = musicById.value.get(musicId)
-  const profile = master ? officialProfileById.value.get(master.customMusicScoreOfficialCreatorProfileId) : null
-  const tagIds = [master?.tagId1, master?.tagId2, master?.tagId3].filter((id): id is number => typeof id === 'number')
+  if (master) {
+    return mergeOfficialMasterScore(master, item)
+  }
 
   return {
     key: `official:${item.customMusicScoreId}`,
     source: 'official',
     customMusicScoreId: item.customMusicScoreId,
-    title: master?.title || `官方指定谱面 ${item.customMusicScoreId}`,
-    creatorName: profile?.name || '官方指定创作者',
-    musicId,
-    musicTitle: music?.title ?? (musicId ? `Music ${musicId}` : '未知歌曲'),
-    jacketAssetbundleName: music?.assetbundleName,
-    musicDifficultyType: master?.musicDifficultyType ?? 'append',
-    playLevel: master?.playLevel ?? 0,
-    description: master?.description || '',
-    tagIds,
-    publishedAt: master?.publishedStartAt,
+    title: `官方指定谱面 ${item.customMusicScoreId}`,
+    creatorName: '官方指定创作者',
+    musicId: 0,
+    musicTitle: '未知歌曲',
+    musicDifficultyType: 'append',
+    playLevel: 0,
+    description: '',
+    tagIds: [],
     reviewCount: item.reviewCount ?? 0,
     playCount: item.playCount ?? 0,
     fullComboRate: item.fullComboRate ?? 0,
     customMusicScoreSearchSortValue: item.customMusicScoreSearchSortValue ?? 9999,
-    previewStartTimeSec: master?.previewStartTimeSec,
-    isDerivativeAllowed: master?.isDerivativeAllowed,
   }
 }
 
@@ -488,35 +512,17 @@ async function loadFeed() {
         list = list.filter(m => m.musicDifficultyType?.toLowerCase() === searchDifficulty.value)
       }
       if (requestId !== feedRequestSerial) return
-      scores.value = list.map((master): DisplayScore => {
-        const musicId = master.musicId
-        const music = musicById.value.get(musicId)
-        const profile = officialProfileById.value.get(master.customMusicScoreOfficialCreatorProfileId)
-        const tagIds = [master.tagId1, master.tagId2, master.tagId3].filter((id): id is number => typeof id === 'number')
-
-        return {
-          key: `official:${master.scoreId}`,
-          source: 'official',
-          customMusicScoreId: master.scoreId,
-          title: master.title || `官方指定谱面 ${master.scoreId}`,
-          creatorName: profile?.name || '官方指定创作者',
-          musicId,
-          musicTitle: music?.title ?? (musicId ? `Music ${musicId}` : '未知歌曲'),
-          jacketAssetbundleName: music?.assetbundleName,
-          musicDifficultyType: master.musicDifficultyType ?? 'append',
-          playLevel: master.playLevel ?? 0,
-          description: master.description || '',
-          tagIds,
-          publishedAt: master.publishedStartAt,
-          reviewCount: 0,
-          playCount: 0,
-          fullComboRate: 0,
-          customMusicScoreSearchSortValue: 0,
-          previewStartTimeSec: master.previewStartTimeSec,
-          isDerivativeAllowed: master.isDerivativeAllowed,
-        }
-      }).sort((a, b) => (b.publishedAt || 0) - (a.publishedAt || 0))
+      scores.value = list.map((master) => mergeOfficialMasterScore(master)).sort((a, b) => (b.publishedAt || 0) - (a.publishedAt || 0))
       return
+    }
+
+    if (activeTab.value === 'search' && searchMode.value === 'id') {
+      const officialMaster = officialCreatorByScoreId.value.get(searchScoreId.value.trim())
+      if (officialMaster) {
+        if (requestId !== feedRequestSerial) return
+        scores.value = [mergeOfficialMasterScore(officialMaster)]
+        return
+      }
     }
 
     const response = await fetch(`${GAME_API_HOST}${endpointPath.value}`, {
@@ -1046,7 +1052,7 @@ function selectTab(tab: FeedTab) {
                   <span class="badge badge-sm font-bold border-none shadow-sm text-white" :class="difficultyClass(score.musicDifficultyType)">
                     {{ score.musicDifficultyType.toUpperCase() }} {{ score.playLevel || '' }}
                   </span>
-                  <button v-if="score.source === 'user'" class="btn btn-xs btn-ghost gap-1 px-1.5 h-6 min-h-6 ml-auto opacity-50 hover:opacity-100" @click.stop="copyScoreId(score.customMusicScoreId)">
+                  <button class="btn btn-xs btn-ghost gap-1 px-1.5 h-6 min-h-6 ml-auto opacity-50 hover:opacity-100" @click.stop="copyScoreId(score.customMusicScoreId)">
                     <Copy class="w-3 h-3" /> 复制ID
                   </button>
                 </div>
