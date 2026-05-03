@@ -142,6 +142,7 @@ const scores = ref<DisplayScore[]>([])
 
 const selectedScore = ref<DisplayScore | null>(null)
 const selectedScoreJson = ref<unknown | null>(null)
+const selectedScoreJsonText = ref('')
 const selectedSvg = ref('')
 const selectedPreviewUrl = ref('')
 const isFetchingScore = ref(false)
@@ -458,6 +459,7 @@ async function loadFeed() {
   scores.value = []
   selectedScore.value = null
   selectedScoreJson.value = null
+  selectedScoreJsonText.value = ''
   selectedSvg.value = ''
   revokeSvgResult()
 
@@ -596,19 +598,26 @@ function write3dPreviewLoading(previewTab: Window | null) {
 }
 
 async function ensureScoreJson(score: DisplayScore) {
-  if (selectedScore.value?.key === score.key && selectedScoreJson.value) {
-    return selectedScoreJson.value
+  const jsonText = await ensureScoreJsonText(score)
+  const scoreJson = JSON.parse(jsonText)
+  selectedScoreJson.value = scoreJson
+  return scoreJson
+}
+
+async function ensureScoreJsonText(score: DisplayScore) {
+  if (selectedScore.value?.key === score.key && selectedScoreJsonText.value) {
+    return selectedScoreJsonText.value
   }
 
   const base64Text = await fetchScoreBase64(score)
   scoreTaskLabel.value = '解压谱面中'
   const jsonText = await decodeScoreBase64(base64Text)
-  const scoreJson = JSON.parse(jsonText)
 
   selectedScore.value = score
-  selectedScoreJson.value = scoreJson
+  selectedScoreJson.value = null
+  selectedScoreJsonText.value = jsonText
 
-  return scoreJson
+  return jsonText
 }
 
 async function renderJsonFlatPreview(score: DisplayScore, scoreJson = selectedScoreJson.value) {
@@ -740,9 +749,9 @@ async function open3dPreview(score: DisplayScore) {
   scoreError.value = ''
   isFetchingScore.value = true
   try {
-    const scoreJson = await ensureScoreJson(score)
+    const scoreJsonText = await ensureScoreJsonText(score)
     scoreTaskLabel.value = '生成 3D 预览链接中'
-    postChartPreviewPayload(previewTab, buildChartPreviewPayload(score, scoreJson))
+    postChartPreviewPayload(previewTab, buildChartPreviewPayload(score, scoreJsonText))
   } catch (reason) {
     if (previewTab && !previewTab.closed) previewTab.close()
     scoreError.value = reason instanceof Error ? reason.message : '3D 预览链接生成失败'
