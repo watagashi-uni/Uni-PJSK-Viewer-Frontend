@@ -694,6 +694,7 @@ function buildChartPreviewPayload(score: DisplayScore, scoreJson: unknown) {
   const music = musicById.value.get(score.musicId)
   const vocal = vocals.value.find((item) => item.musicId === score.musicId)
   const offsetSec = Number(music?.filterSec || music?.fillerSec || 0)
+  const vocalText = [vocal?.caption, `譜: ${score.creatorName}`].filter(Boolean).join(' ')
   const requestId = typeof crypto !== 'undefined' && 'randomUUID' in crypto
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random().toString(36).slice(2)}`
@@ -710,7 +711,7 @@ function buildChartPreviewPayload(score: DisplayScore, scoreJson: unknown) {
     lyricist: music?.lyricist || null,
     composer: music?.composer || null,
     arranger: music?.arranger || null,
-    vocal: vocal?.caption || null,
+    vocal: vocalText || null,
   }
 }
 
