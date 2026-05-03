@@ -13,8 +13,6 @@ import {
 import AssetImage from '@/components/AssetImage.vue'
 import type { EventData, MusicData } from '@/types/master'
 
-const FRONTEND_VERSION = '2.7.0'
-
 const masterStore = useMasterStore()
 const accountStore = useAccountStore()
 const settingsStore = useSettingsStore()
@@ -22,7 +20,6 @@ const assetsHost = computed(() => settingsStore.assetsHost)
 
 const dataVersion = ref<string>('加载中...')
 const assetVersion = ref<string>('加载中...')
-const appVersion = ref<string>('加载中...')
 const isLoading = ref(true)
 
 const themesList = [
@@ -207,11 +204,9 @@ onMounted(async () => {
       masterStore.getMaster<Gacha>('gachas'),
       masterStore.getMaster<any>('cards')
     ])
-    
-    // 设置版本信息
+
     dataVersion.value = versionRes.dataVersion || '未知'
     assetVersion.value = versionRes.assetVersion || '未知'
-    appVersion.value = versionRes.appVersion || '未知'
     
     // 设置数据 (events 需要倒序)
     events.value = eventsData.sort((a, b) => b.id - a.id)
@@ -220,6 +215,7 @@ onMounted(async () => {
   } catch (e) {
     console.error('加载首页数据失败:', e)
     dataVersion.value = '获取失败'
+    assetVersion.value = '获取失败'
   } finally {
     isLoading.value = false
   }
@@ -237,7 +233,7 @@ onMounted(async () => {
             Uni PJSK Viewer
           </h1>
           <p class="text-base-content/60 text-xs sm:text-sm mt-1 truncate">
-            v{{ FRONTEND_VERSION }} • Data: {{ dataVersion }} • Asset: {{ assetVersion }}
+            Data: {{ dataVersion }} • Asset: {{ assetVersion }}
           </p>
         </div>
         
@@ -330,11 +326,14 @@ onMounted(async () => {
               本家 1:1 复刻在线谱面预览
             </h2>
             <p class="text-sm text-base-content/70 mt-1">
-              歌曲详情页现已支持可播放的 3D 谱面预览，欢迎体验。
+              歌曲详情页现已支持可播放的 3D 谱面预览，并支持游戏内谱面Maker自制谱预览，欢迎体验。
             </p>
             <div class="flex flex-wrap gap-2 mt-3">
               <RouterLink to="/musics" class="btn btn-sm btn-primary">
                 去歌曲详情体验
+              </RouterLink>
+              <RouterLink to="/custom-score-maker" class="btn btn-sm btn-secondary btn-outline">
+                去谱面Maker页面体验
               </RouterLink>
             </div>
           </div>
