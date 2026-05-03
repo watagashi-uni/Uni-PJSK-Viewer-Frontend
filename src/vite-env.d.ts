@@ -1,6 +1,8 @@
 /// <reference types="vite/client" />
 /// <reference types="vite-plugin-pwa/vue" />
 
+declare const __BUILD_DATE__: string
+
 interface ImportMetaEnv {
     readonly VITE_API_BASE_URL?: string
     readonly VITE_CHART_PREVIEW_URL?: string
