@@ -90,6 +90,7 @@ interface MusicMaster {
 
 interface MusicVocal {
   musicId: number
+  musicVocalType?: string
   caption: string
   assetbundleName: string
 }
@@ -692,7 +693,7 @@ async function openFlatPreview(score: DisplayScore) {
 
 function buildChartPreviewPayload(score: DisplayScore, scoreJson: unknown) {
   const music = musicById.value.get(score.musicId)
-  const vocal = vocals.value.find((item) => item.musicId === score.musicId)
+  const vocal = selectDefaultVocalForMusic(score.musicId)
   const offsetSec = Number(music?.filterSec || music?.fillerSec || 0)
   const vocalText = [vocal?.caption, `譜: ${score.creatorName}`].filter(Boolean).join(' ')
   const requestId = typeof crypto !== 'undefined' && 'randomUUID' in crypto
@@ -713,6 +714,15 @@ function buildChartPreviewPayload(score: DisplayScore, scoreJson: unknown) {
     arranger: music?.arranger || null,
     vocal: vocalText || null,
   }
+}
+
+function selectDefaultVocalForMusic(musicId: number) {
+  const musicVocals = vocals.value.filter((item) => item.musicId === musicId)
+  if (settingsStore.defaultVocal === 'sekai') {
+    const sekaiVocal = musicVocals.find((item) => item.musicVocalType === 'sekai' || item.caption.includes('セカイ'))
+    return sekaiVocal || musicVocals[0] || null
+  }
+  return musicVocals[0] || null
 }
 
 function postChartPreviewPayload(previewTab: Window | null, payload: ReturnType<typeof buildChartPreviewPayload>) {
