@@ -4,6 +4,7 @@
 interface ImportMetaEnv {
     readonly VITE_API_BASE_URL?: string
     readonly VITE_CHART_PREVIEW_URL?: string
+    readonly VITE_CUSTOM_SCORE_3D_PREVIEW_URL?: string
     readonly VITE_TOOLBOX_OAUTH_BASE_URL?: string
     readonly VITE_TOOLBOX_OAUTH_CLIENT_ID?: string
     readonly VITE_PROFILE_API_BASE_URL?: string

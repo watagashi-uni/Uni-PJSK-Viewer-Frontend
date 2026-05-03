@@ -2,21 +2,10 @@
 import { computed, onMounted, ref, toRef } from 'vue'
 import { BarChart3, Eye, Heart, Music2, Play, PlayCircle, RefreshCw, Search, Sparkles, Copy } from 'lucide-vue-next'
 import { renderCustomScoreJsonToSvg, revokeSus2ImgResult, type Sus2ImgFrontendResult } from '@/vendor/sekai-sus2img'
-import AlertBanner from '@/components/AlertBanner.vue'
 import AssetImage from '@/components/AssetImage.vue'
-import apiClient from '@/api/client'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
 import { toRomaji } from '@/utils/kanaToRomaji'
-
-declare global {
-  interface Window {
-    SekaiSusJsonConverter?: {
-      jsonToSus: (scoreJson: unknown, options?: Record<string, unknown>) => string
-    }
-    SekaiSusJsonConverterVersion?: string
-  }
-}
 
 type FeedTab = 'ranking' | 'new' | 'search' | 'official_all'
 type RankingMode = 'daily' | 'total'
@@ -129,20 +118,9 @@ interface DisplayScore {
   isDerivativeAllowed?: boolean
 }
 
-interface ChartSusUploadResponse {
-  success: boolean
-  id?: string
-  path?: string
-  url?: string
-  message?: string
-}
-
 const GAME_API_HOST = 'https://api.unipjsk.com'
 const GAME_SCORE_BLOB_FULL_BASE = '/blob/custom-music-score/full'
-const CHART_PLAYBACK_HOST = 'https://chartview.unipjsk.com'
-const CONVERTER_CACHE_KEY = 'custom-score-maker-20260502-hidden-head-order-v14'
-const CONVERTER_SCRIPT_URL = `/sus_json_converter.js?cacheKey=${encodeURIComponent(CONVERTER_CACHE_KEY)}`
-const THREE_D_NOTICE_STORAGE_KEY = 'custom-score-maker-3d-preview-notice-dismissed'
+const CHART_PLAYBACK_HOST = import.meta.env.VITE_CUSTOM_SCORE_3D_PREVIEW_URL || 'https://chartview.unipjsk.com'
 
 const masterStore = useMasterStore()
 const settingsStore = useSettingsStore()
@@ -163,9 +141,7 @@ const error = ref('')
 const scores = ref<DisplayScore[]>([])
 
 const selectedScore = ref<DisplayScore | null>(null)
-const selectedSus = ref('')
 const selectedScoreJson = ref<unknown | null>(null)
-const selectedSusConverterKey = ref('')
 const selectedSvg = ref('')
 const selectedPreviewUrl = ref('')
 const isFetchingScore = ref(false)
@@ -173,8 +149,6 @@ const isRenderingPreview = ref(false)
 const scoreError = ref('')
 const previewInfo = ref('')
 const scoreTaskLabel = ref('')
-const isThreeDNoticeDismissed = ref(localStorage.getItem(THREE_D_NOTICE_STORAGE_KEY) === '1')
-const threeDConfirmScore = ref<DisplayScore | null>(null)
 
 const officialCreators = ref<OfficialCreator[]>([])
 const officialProfiles = ref<OfficialCreatorProfile[]>([])
@@ -183,8 +157,6 @@ const musics = ref<MusicMaster[]>([])
 const vocals = ref<MusicVocal[]>([])
 
 let svgRenderResult: Sus2ImgFrontendResult | null = null
-let converterPromise: Promise<void> | null = null
-let converterPromiseCacheKey = ''
 let feedRequestSerial = 0
 let feedAbortController: AbortController | null = null
 
@@ -254,11 +226,6 @@ function revokeSvgResult() {
     revokeSus2ImgResult(svgRenderResult)
     svgRenderResult = null
   }
-}
-
-function dismissThreeDNotice() {
-  isThreeDNoticeDismissed.value = true
-  localStorage.setItem(THREE_D_NOTICE_STORAGE_KEY, '1')
 }
 
 function formatNumber(value: number | undefined) {
@@ -353,15 +320,6 @@ function getMusicJacketUrl(music: MusicMaster) {
   return `${assetsHost.value}/startapp/music/jacket/${music.assetbundleName}/${music.assetbundleName}.png`
 }
 
-function bytesToBase64(bytes: Uint8Array) {
-  let binary = ''
-  const chunkSize = 0x8000
-  for (let i = 0; i < bytes.length; i += chunkSize) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize))
-  }
-  return btoa(binary)
-}
-
 function base64ToBytes(base64Text: string) {
   const normalized = base64Text
     .trim()
@@ -397,33 +355,6 @@ async function decodeScoreBase64(base64Text: string) {
     decoded = bytes
   }
   return new TextDecoder().decode(decoded)
-}
-
-function loadSusConverter() {
-  if (window.SekaiSusJsonConverter && window.SekaiSusJsonConverterVersion === CONVERTER_CACHE_KEY) {
-    return Promise.resolve()
-  }
-  if (converterPromise && converterPromiseCacheKey === CONVERTER_CACHE_KEY) return converterPromise
-  converterPromise = null
-  converterPromiseCacheKey = CONVERTER_CACHE_KEY
-
-  converterPromise = new Promise<void>((resolve, reject) => {
-    const script = document.createElement('script')
-    script.src = CONVERTER_SCRIPT_URL
-    script.async = true
-    script.onload = () => {
-      if (window.SekaiSusJsonConverter) {
-        window.SekaiSusJsonConverterVersion = CONVERTER_CACHE_KEY
-        resolve()
-      } else {
-        reject(new Error('SUS 转换器加载后未注册'))
-      }
-    }
-    script.onerror = () => reject(new Error('SUS 转换器加载失败'))
-    document.head.appendChild(script)
-  })
-
-  return converterPromise
 }
 
 async function loadMasterData() {
@@ -526,9 +457,7 @@ async function loadFeed() {
   scoreError.value = ''
   scores.value = []
   selectedScore.value = null
-  selectedSus.value = ''
   selectedScoreJson.value = null
-  selectedSusConverterKey.value = ''
   selectedSvg.value = ''
   revokeSvgResult()
 
@@ -666,61 +595,23 @@ function write3dPreviewLoading(previewTab: Window | null) {
   previewTab.focus()
 }
 
-function navigatePreviewTarget(previewTab: Window | null, url: string) {
-  if (previewTab && !previewTab.closed) {
-    previewTab.location.href = url
-    return
+async function ensureScoreJson(score: DisplayScore) {
+  if (selectedScore.value?.key === score.key && selectedScoreJson.value) {
+    return selectedScoreJson.value
   }
-  window.location.href = url
+
+  const base64Text = await fetchScoreBase64(score)
+  scoreTaskLabel.value = '解压谱面中'
+  const jsonText = await decodeScoreBase64(base64Text)
+  const scoreJson = JSON.parse(jsonText)
+
+  selectedScore.value = score
+  selectedScoreJson.value = scoreJson
+
+  return scoreJson
 }
 
-async function prepareScore(score: DisplayScore, renderPreview = true): Promise<boolean> {
-  isFetchingScore.value = true
-  scoreTaskLabel.value = '下载谱面中'
-  scoreError.value = ''
-  previewInfo.value = ''
-  revokeSvgResult()
-  selectedSvg.value = ''
-  selectedPreviewUrl.value = ''
-
-  try {
-    await loadSusConverter()
-    const base64Text = await fetchScoreBase64(score)
-    scoreTaskLabel.value = '解压谱面中'
-    const jsonText = await decodeScoreBase64(base64Text)
-    scoreTaskLabel.value = '转换 SUS 中'
-    const scoreJson = JSON.parse(jsonText)
-    const converter = window.SekaiSusJsonConverter
-    if (!converter) {
-      throw new Error('SUS 转换器不可用')
-    }
-
-    const sus = converter.jsonToSus(scoreJson, {
-      title: score.title,
-      artist: score.musicTitle,
-      designer: score.creatorName,
-      songId: score.musicId,
-    })
-
-    selectedScore.value = score
-    selectedSus.value = sus
-    selectedScoreJson.value = scoreJson
-    selectedSusConverterKey.value = CONVERTER_CACHE_KEY
-
-    if (renderPreview) {
-      await renderFlatPreview(score)
-    }
-    return true
-  } catch (reason) {
-    scoreError.value = reason instanceof Error ? reason.message : '谱面转换失败'
-    return false
-  } finally {
-    isFetchingScore.value = false
-    scoreTaskLabel.value = ''
-  }
-}
-
-async function renderFlatPreview(score: DisplayScore, scoreJson = selectedScoreJson.value) {
+async function renderJsonFlatPreview(score: DisplayScore, scoreJson = selectedScoreJson.value) {
   if (!scoreJson) return
   isRenderingPreview.value = true
   scoreTaskLabel.value = '生成平面预览中'
@@ -759,8 +650,19 @@ async function openFlatPreview(score: DisplayScore) {
     return
   }
   writeFlatPreviewLoading(previewTab)
-  const ok = await prepareScore(score, true)
-  if (!ok || !selectedSvg.value) {
+  isFetchingScore.value = true
+  scoreError.value = ''
+  previewInfo.value = ''
+  try {
+    await ensureScoreJson(score)
+    await renderJsonFlatPreview(score)
+  } catch (reason) {
+    scoreError.value = reason instanceof Error ? reason.message : '平面预览生成失败'
+  } finally {
+    isFetchingScore.value = false
+  }
+
+  if (!selectedSvg.value) {
     if (previewTab && !previewTab.closed) {
       previewTab.close()
     }
@@ -771,86 +673,83 @@ async function openFlatPreview(score: DisplayScore) {
   }
 }
 
-async function uploadSusForPreview(susText: string) {
-  const response = await apiClient.post<ChartSusUploadResponse>('/api/chart-sus', { sus: susText })
-  const data = response.data
-  const path = data.path || data.url
-  if (!data.success || !path) {
-    throw new Error(data.message || 'SUS 临时链接生成失败')
-  }
-  return new URL(path, apiClient.defaults.baseURL || window.location.origin).toString()
-}
-
-async function buildChartPreviewUrl(score: DisplayScore, susText: string) {
+function buildChartPreviewPayload(score: DisplayScore, scoreJson: unknown) {
   const music = musicById.value.get(score.musicId)
   const vocal = vocals.value.find((item) => item.musicId === score.musicId)
-  const susUrl = await uploadSusForPreview(susText)
   const offsetSec = Number(music?.filterSec || music?.fillerSec || 0)
+  const requestId = typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}`
 
-  const cfg: Record<string, string | number> = {
-    s: susUrl,
-    t: score.title,
-    d: score.musicDifficultyType.toUpperCase(),
+  return {
+    type: 'sekai-mmw-preview:load',
+    requestId,
+    customScoreJson: scoreJson,
+    title: score.title,
+    difficulty: score.musicDifficultyType.toUpperCase(),
+    bgm: vocal ? `${assetsHost.value}/ondemand/music/long/${vocal.assetbundleName}/${vocal.assetbundleName}.mp3` : null,
+    cover: score.jacketAssetbundleName ? getJacketUrl(score) : null,
+    rawOffsetMs: offsetSec > 0 ? Math.round(offsetSec * 1000) : null,
+    lyricist: music?.lyricist || null,
+    composer: music?.composer || null,
+    arranger: music?.arranger || null,
+    vocal: vocal?.caption || null,
   }
-  if (vocal) cfg.b = `${assetsHost.value}/ondemand/music/long/${vocal.assetbundleName}/${vocal.assetbundleName}.mp3`
-  if (score.jacketAssetbundleName) cfg.c = getJacketUrl(score)
-  if (offsetSec > 0) cfg.o = Math.round(offsetSec * 1000)
-  if (music?.lyricist) cfg.ly = music.lyricist
-  if (music?.composer) cfg.co = music.composer
-  if (music?.arranger) cfg.ar = music.arranger
-  if (vocal?.caption) cfg.v = vocal.caption
+}
 
-  const bytes = new TextEncoder().encode(JSON.stringify(cfg))
-  const cfgBase64Url = bytesToBase64(bytes)
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/g, '')
+function postChartPreviewPayload(previewTab: Window | null, payload: ReturnType<typeof buildChartPreviewPayload>) {
+  if (!previewTab || previewTab.closed) {
+    throw new Error('3D 预览窗口打开失败')
+  }
+  const previewBase = CHART_PLAYBACK_HOST.replace(/\/+$/, '')
+  const targetOrigin = new URL(previewBase).origin
+  let retryTimer: number | null = null
+  let timeoutTimer: number | null = null
 
-  return `${CHART_PLAYBACK_HOST}/preview?cfg=${cfgBase64Url}`
+  const cleanup = () => {
+    window.removeEventListener('message', handleReady)
+    if (retryTimer !== null) window.clearInterval(retryTimer)
+    if (timeoutTimer !== null) window.clearTimeout(timeoutTimer)
+  }
+  const send = () => {
+    if (previewTab.closed) return
+    try {
+      previewTab.postMessage(payload, targetOrigin)
+    } catch {
+      // The window may still be on about:blank while Safari/Chrome navigates.
+    }
+  }
+  const handleReady = (event: MessageEvent) => {
+    if (event.source !== previewTab || event.origin !== targetOrigin) return
+    if ((event.data as { type?: string } | null)?.type !== 'sekai-mmw-preview:ready') return
+    send()
+    cleanup()
+  }
+
+  window.addEventListener('message', handleReady)
+  previewTab.location.href = `${previewBase}/preview?post=1`
+  retryTimer = window.setInterval(send, 800)
+  timeoutTimer = window.setTimeout(cleanup, 60000)
 }
 
 async function open3dPreview(score: DisplayScore) {
   const previewTab = window.open('', '_blank')
   write3dPreviewLoading(previewTab)
 
-  if (
-    selectedScore.value?.key !== score.key ||
-    !selectedSus.value ||
-    selectedSusConverterKey.value !== CONVERTER_CACHE_KEY
-  ) {
-    await prepareScore(score, false)
-  }
-  if (!selectedSus.value) {
-    if (previewTab && !previewTab.closed) previewTab.close()
-    return
-  }
-
   previewInfo.value = ''
   scoreError.value = ''
-  scoreTaskLabel.value = '生成 3D 预览链接中'
+  isFetchingScore.value = true
   try {
-    const previewUrl = await buildChartPreviewUrl(score, selectedSus.value)
-    navigatePreviewTarget(previewTab, previewUrl)
+    const scoreJson = await ensureScoreJson(score)
+    scoreTaskLabel.value = '生成 3D 预览链接中'
+    postChartPreviewPayload(previewTab, buildChartPreviewPayload(score, scoreJson))
   } catch (reason) {
     if (previewTab && !previewTab.closed) previewTab.close()
     scoreError.value = reason instanceof Error ? reason.message : '3D 预览链接生成失败'
   } finally {
+    isFetchingScore.value = false
     scoreTaskLabel.value = ''
   }
-}
-
-function request3dPreview(score: DisplayScore) {
-  threeDConfirmScore.value = score
-}
-
-function cancel3dPreview() {
-  threeDConfirmScore.value = null
-}
-
-function confirm3dPreview() {
-  const score = threeDConfirmScore.value
-  threeDConfirmScore.value = null
-  if (score) void open3dPreview(score)
 }
 
 function copyScoreId(id: string) {
@@ -914,10 +813,6 @@ function selectTab(tab: FeedTab) {
         </button>
       </div>
     </div>
-
-    <AlertBanner v-if="!isThreeDNoticeDismissed" type="warning" dismissible @dismiss="dismissThreeDNotice">
-      <span class="text-sm">3D 自制谱面预览暂不成熟，长条、trace、无头判等效果可能不准确。核对谱面时建议优先使用平面预览。</span>
-    </AlertBanner>
 
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-1.5 bg-base-200/50 p-1.5 rounded-xl shadow-inner border border-base-200">
       <button
@@ -1186,7 +1081,7 @@ function selectTab(tab: FeedTab) {
                   <Eye class="w-3.5 h-3.5" />
                   平面预览
                 </button>
-                <button class="btn btn-sm btn-primary gap-1.5 rounded-lg shadow-sm" :disabled="isFetchingScore" @click="request3dPreview(score)">
+                <button class="btn btn-sm btn-primary gap-1.5 rounded-lg shadow-sm" :disabled="isFetchingScore" @click="open3dPreview(score)">
                   <PlayCircle class="w-3.5 h-3.5" />
                   3D预览
                 </button>
@@ -1196,25 +1091,5 @@ function selectTab(tab: FeedTab) {
         </div>
       </div>
     </div>
-
-    <dialog class="modal modal-bottom sm:modal-middle" :class="{ 'modal-open': Boolean(threeDConfirmScore) }">
-      <div class="modal-box">
-        <h3 class="text-lg font-bold">打开 3D 自制谱面预览？</h3>
-        <div class="py-4 space-y-2 text-sm text-base-content/75">
-          <p>推荐优先使用平面预览，它直接读取自制谱面数据，目前更适合核对谱面细节。</p>
-          <p>3D 预览仍在适配自制谱面，长条、trace、无头判等效果可能出现明显偏差，仅建议作为临时参考。</p>
-        </div>
-        <div class="modal-action">
-          <button class="btn btn-ghost" type="button" @click="cancel3dPreview">取消</button>
-          <button class="btn btn-primary gap-1.5" type="button" @click="confirm3dPreview">
-            <PlayCircle class="w-4 h-4" />
-            仍然打开
-          </button>
-        </div>
-      </div>
-      <form method="dialog" class="modal-backdrop" @click="cancel3dPreview">
-        <button type="button">close</button>
-      </form>
-    </dialog>
   </div>
 </template>
