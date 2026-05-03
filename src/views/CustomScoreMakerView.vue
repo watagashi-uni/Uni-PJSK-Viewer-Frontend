@@ -92,7 +92,19 @@ interface MusicVocal {
   musicId: number
   musicVocalType?: string
   caption: string
+  characters: { characterType: string; characterId: number }[]
   assetbundleName: string
+}
+
+interface Character {
+  id: number
+  firstName?: string
+  givenName: string
+}
+
+interface OutsideCharacter {
+  id: number
+  name: string
 }
 
 interface DisplayScore {
@@ -158,6 +170,8 @@ const officialProfiles = ref<OfficialCreatorProfile[]>([])
 const tags = ref<CustomMusicScoreTag[]>([])
 const musics = ref<MusicMaster[]>([])
 const vocals = ref<MusicVocal[]>([])
+const characters = ref<Character[]>([])
+const outsideCharacters = ref<OutsideCharacter[]>([])
 
 let svgRenderResult: Sus2ImgFrontendResult | null = null
 let feedRequestSerial = 0
@@ -365,18 +379,22 @@ async function loadMasterData() {
   isMasterLoading.value = true
   try {
     masterStore.getTranslations().catch((reason) => console.error('加载翻译失败:', reason))
-    const [creatorData, profileData, tagData, musicData, vocalData] = await Promise.all([
+    const [creatorData, profileData, tagData, musicData, vocalData, characterData, outsideCharacterData] = await Promise.all([
       masterStore.getMaster<OfficialCreator>('customMusicScoreOfficialCreators'),
       masterStore.getMaster<OfficialCreatorProfile>('customMusicScoreOfficialCreatorProfiles'),
       masterStore.getMaster<CustomMusicScoreTag>('customMusicScoreTags'),
       masterStore.getMaster<MusicMaster>('musics'),
       masterStore.getMaster<MusicVocal>('musicVocals'),
+      masterStore.getMaster<Character>('gameCharacters'),
+      masterStore.getMaster<OutsideCharacter>('outsideCharacters'),
     ])
     officialCreators.value = creatorData
     officialProfiles.value = profileData
     tags.value = tagData
     musics.value = musicData
     vocals.value = vocalData
+    characters.value = characterData
+    outsideCharacters.value = outsideCharacterData
   } catch (reason) {
     error.value = reason instanceof Error ? reason.message : '加载 masterdata 失败'
   } finally {
@@ -695,7 +713,7 @@ function buildChartPreviewPayload(score: DisplayScore, scoreJson: unknown) {
   const music = musicById.value.get(score.musicId)
   const vocal = selectDefaultVocalForMusic(score.musicId)
   const offsetSec = Number(music?.filterSec || music?.fillerSec || 0)
-  const vocalText = [vocal?.caption, `譜: ${score.creatorName}`].filter(Boolean).join(' ')
+  const vocalText = [vocal ? getVocalSingers(vocal, ', ') : '', `譜：${score.creatorName}`].filter(Boolean).join('  ')
   const requestId = typeof crypto !== 'undefined' && 'randomUUID' in crypto
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random().toString(36).slice(2)}`
@@ -723,6 +741,19 @@ function selectDefaultVocalForMusic(musicId: number) {
     return sekaiVocal || musicVocals[0] || null
   }
   return musicVocals[0] || null
+}
+
+function getVocalSingers(vocal: MusicVocal, separator = '・'): string {
+  return vocal.characters.map((item) => {
+    if (item.characterType === 'game_character') {
+      const character = characters.value.find((candidate) => candidate.id === item.characterId)
+      if (character) return `${character.firstName || ''}${character.givenName}`
+    } else if (item.characterType === 'outside_character') {
+      const outsideCharacter = outsideCharacters.value.find((candidate) => candidate.id === item.characterId)
+      if (outsideCharacter) return outsideCharacter.name
+    }
+    return ''
+  }).filter(Boolean).join(separator)
 }
 
 function postChartPreviewPayload(previewTab: Window | null, payload: ReturnType<typeof buildChartPreviewPayload>) {
