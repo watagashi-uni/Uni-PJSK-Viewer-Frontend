@@ -150,6 +150,7 @@ const isRenderingPreview = ref(false)
 const scoreError = ref('')
 const previewInfo = ref('')
 const scoreTaskLabel = ref('')
+const copyMessage = ref('')
 
 const officialCreators = ref<OfficialCreator[]>([])
 const officialProfiles = ref<OfficialCreatorProfile[]>([])
@@ -160,6 +161,7 @@ const vocals = ref<MusicVocal[]>([])
 let svgRenderResult: Sus2ImgFrontendResult | null = null
 let feedRequestSerial = 0
 let feedAbortController: AbortController | null = null
+let copyMessageTimer: number | null = null
 
 const assetsHost = computed(() => settingsStore.assetsHost.replace(/\/+$/, ''))
 const translations = toRef(masterStore, 'translations')
@@ -768,9 +770,19 @@ async function open3dPreview(score: DisplayScore) {
 }
 
 function copyScoreId(id: string) {
-  navigator.clipboard.writeText(id).catch(err => {
-    console.error('Failed to copy ID:', err)
-  })
+  navigator.clipboard.writeText(id)
+    .then(() => {
+      copyMessage.value = `已复制谱面 ID：${id}`
+      if (copyMessageTimer !== null) window.clearTimeout(copyMessageTimer)
+      copyMessageTimer = window.setTimeout(() => {
+        copyMessage.value = ''
+        copyMessageTimer = null
+      }, 1800)
+    })
+    .catch((err) => {
+      console.error('Failed to copy ID:', err)
+      scoreError.value = '复制 ID 失败，请检查浏览器剪贴板权限。'
+    })
 }
 
 function searchById() {
@@ -805,6 +817,12 @@ function selectTab(tab: FeedTab) {
 
 <template>
   <div class="space-y-5">
+    <div v-if="copyMessage" class="toast toast-end toast-bottom z-[200]">
+      <div class="alert alert-success shadow-lg text-sm">
+        <span>{{ copyMessage }}</span>
+      </div>
+    </div>
+
     <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
       <div>
         <h1 class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary">谱面Maker</h1>
