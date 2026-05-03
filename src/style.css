@@ -370,6 +370,18 @@ html {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
+[data-theme="jirai"] :is(.card, .collapse, .dropdown-content) .bg-base-200,
+[data-theme="jirai"] :is(.card, .collapse, .dropdown-content) .bg-base-200\/30,
+[data-theme="jirai"] :is(.card, .collapse, .dropdown-content) .bg-base-200\/50,
+[data-theme="jirai"] :is(.card, .collapse, .dropdown-content) .bg-base-200\/60,
+[data-theme="jirai"] :is(.card, .collapse, .dropdown-content) .bg-base-200\/70 {
+  background-color: rgba(18, 13, 20, 0.68);
+}
+
+[data-theme="jirai"] :is(.card, .collapse, .dropdown-content) :is(.border-base-200, .border-base-200\/50, .border-base-300) {
+  border-color: rgba(255, 133, 161, 0.2);
+}
+
 /* Theme-consistent alert styles for Jirai */
 [data-theme="jirai"] .alert.alert-warning {
   background: linear-gradient(135deg, rgba(92, 64, 27, 0.72) 0%, rgba(122, 84, 30, 0.62) 100%);
