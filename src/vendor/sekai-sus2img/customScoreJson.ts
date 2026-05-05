@@ -121,6 +121,8 @@ const lineTypeToDirectional = (lineType: unknown): number => {
 
 const tapTypeFromJson = (note: Record<string, unknown>, fallback = TapType.TAP): number => {
     const base = Number(note.noteBaseType)
+    const category = Number(note.category)
+    if (category === 6) return note.type ? TapType.CRITICAL_TREND : TapType.TREND
     if (base === 11) return note.type ? TapType.CRITICAL_TREND : TapType.TREND
     if (base === 8) return note.type ? TapType.CRITICAL : TapType.TAP
     if (base === 9 || base === 12) return note.type ? TapType.CRITICAL_CANCEL : TapType.CANCEL
