@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, onMounted, watch, onBeforeUnmount } from 'vue'
-import { Play, Search, Trash2 } from 'lucide-vue-next'
+import { Download, FileImage, Play, Search, Trash2 } from 'lucide-vue-next'
 import apiClient from '@/api/client'
 import {
   renderCustomScoreJsonToPng,
@@ -56,12 +56,15 @@ const auditError = ref<string | null>(null)
 const isAnalyzing = ref(false)
 const hasAuditRun = ref(false)
 const isPreparingPreview = ref(false)
+const isDownloadingPng = ref(false)
 
 const resultData = ref<string | null>(null)
 const resultFormat = ref<RenderFormat>('svg')
 const resultSource = ref<'frontend' | 'backend' | null>(null)
 const resultSvgText = ref<string | null>(null)
 const resultSvgError = ref<string | null>(null)
+const downloadError = ref<string | null>(null)
+const downloadMessage = ref<string | null>(null)
 const renderedChartText = ref('')
 const renderedRebaseText = ref('')
 const analyzedChartText = ref('')
@@ -85,8 +88,10 @@ const setResult = (result: Sus2ImgFrontendResult | BackendResult) => {
   resultData.value = result.url
   resultFormat.value = result.format
   resultSource.value = result.source
-  resultSvgText.value = result.source === 'frontend' && result.format === 'svg' ? result.svgText : null
+  resultSvgText.value = result.source === 'frontend' ? result.svgText : null
   resultSvgError.value = null
+  downloadError.value = null
+  downloadMessage.value = null
 
   if (result.source === 'frontend') {
     frontendResult = result
@@ -134,6 +139,32 @@ const renderOverlayState = computed(() => {
 const renderOverlayContext = computed(() => renderOverlayState.value.context)
 
 const previewErrorMessage = computed(() => resultSvgError.value ?? renderOverlayState.value.error)
+
+const resultBaseFileName = computed(() => {
+  const rawName = form.value.title.trim() || 'sus2img-chart'
+  const normalized = rawName
+    .replace(/[\\/:*?"<>|]+/g, '-')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  return normalized || 'sus2img-chart'
+})
+
+const hasDownloadableResult = computed(() => Boolean(resultData.value || resultSvgText.value))
+
+const canDownloadSvg = computed(() => Boolean(resultSvgText.value) || (resultFormat.value === 'svg' && Boolean(resultData.value)))
+
+const canDownloadPng = computed(() => Boolean(resultSvgText.value) || (resultFormat.value === 'png' && Boolean(resultData.value)))
+
+const resultDownloadDescription = computed(() => {
+  if (!resultSource.value) {
+    return ''
+  }
+
+  const sourceText = resultSource.value === 'frontend' ? '前端' : '后端'
+  const formatText = resultFormat.value.toUpperCase()
+  return `最近一次由${sourceText}生成，输出格式为 ${formatText}。`
+})
 
 const annotatedSvgText = computed(() => {
   if (!resultSvgText.value) {
@@ -222,6 +253,8 @@ const resetRenderState = () => {
   resultSource.value = null
   resultSvgText.value = null
   resultSvgError.value = null
+  downloadError.value = null
+  downloadMessage.value = null
   renderedChartText.value = ''
   renderedRebaseText.value = ''
   resetFrontendResult()
@@ -473,7 +506,7 @@ async function ensureSvgPreview(chartText: string) {
 
 async function loadResultSvgText(result: BackendResult | Sus2ImgFrontendResult) {
   if (result.source === 'frontend') {
-    resultSvgText.value = result.format === 'svg' ? result.svgText : null
+    resultSvgText.value = result.svgText
     resultSvgError.value = null
     return
   }
@@ -494,6 +527,152 @@ async function loadResultSvgText(result: BackendResult | Sus2ImgFrontendResult) 
   } catch (svgReason) {
     resultSvgText.value = null
     resultSvgError.value = svgReason instanceof Error ? `载入 SVG 预览失败：${svgReason.message}` : '载入 SVG 预览失败'
+  }
+}
+
+function triggerBlobDownload(blob: Blob, fileName: string) {
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = fileName
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
+}
+
+async function fetchResultBlob(): Promise<Blob> {
+  if (!resultData.value) {
+    throw new Error('没有可下载的生成结果')
+  }
+
+  const response = await fetch(resultData.value)
+  if (!response.ok) {
+    throw new Error(`下载生成结果失败：HTTP ${response.status}`)
+  }
+
+  return await response.blob()
+}
+
+function parseSvgLength(value: string | null): number | null {
+  if (!value) {
+    return null
+  }
+
+  const parsed = Number.parseFloat(value)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null
+}
+
+function getSvgCanvasSize(svgText: string): { width: number; height: number } {
+  if (frontendResult?.width && frontendResult.height) {
+    return {
+      width: frontendResult.width,
+      height: frontendResult.height,
+    }
+  }
+
+  const document = new DOMParser().parseFromString(svgText, 'image/svg+xml')
+  const svgElement = document.documentElement
+  const width = parseSvgLength(svgElement.getAttribute('width'))
+  const height = parseSvgLength(svgElement.getAttribute('height'))
+
+  if (width && height) {
+    return { width, height }
+  }
+
+  const viewBox = svgElement.getAttribute('viewBox')?.trim().split(/\s+/).map(Number)
+  const viewBoxWidth = viewBox?.[2]
+  const viewBoxHeight = viewBox?.[3]
+  if (
+    viewBox?.length === 4
+    && viewBox.every(Number.isFinite)
+    && typeof viewBoxWidth === 'number'
+    && typeof viewBoxHeight === 'number'
+    && viewBoxWidth > 0
+    && viewBoxHeight > 0
+  ) {
+    return {
+      width: viewBoxWidth,
+      height: viewBoxHeight,
+    }
+  }
+
+  throw new Error('无法从 SVG 中读取图片尺寸')
+}
+
+async function svgTextToPngBlob(svgText: string): Promise<Blob> {
+  const { width, height } = getSvgCanvasSize(svgText)
+  const svgBlob = new Blob([svgText], { type: 'image/svg+xml;charset=utf-8' })
+  const svgUrl = URL.createObjectURL(svgBlob)
+
+  try {
+    const image = new Image()
+    image.decoding = 'async'
+    await new Promise<void>((resolve, reject) => {
+      image.onload = () => resolve()
+      image.onerror = () => reject(new Error('SVG 转 PNG 时图片载入失败'))
+      image.src = svgUrl
+    })
+
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.ceil(width)
+    canvas.height = Math.ceil(height)
+    const context = canvas.getContext('2d')
+    if (!context) {
+      throw new Error('浏览器不支持 Canvas 导出')
+    }
+
+    context.drawImage(image, 0, 0)
+
+    const pngBlob = await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob((blob) => {
+        if (blob) {
+          resolve(blob)
+          return
+        }
+        reject(new Error('浏览器导出 PNG 失败'))
+      }, 'image/png')
+    })
+
+    return pngBlob
+  } finally {
+    URL.revokeObjectURL(svgUrl)
+  }
+}
+
+async function downloadSvgResult() {
+  downloadError.value = null
+  downloadMessage.value = null
+
+  try {
+    const blob = resultSvgText.value
+      ? new Blob([resultSvgText.value], { type: 'image/svg+xml;charset=utf-8' })
+      : await fetchResultBlob()
+    triggerBlobDownload(blob, `${resultBaseFileName.value}.svg`)
+    downloadMessage.value = 'SVG 下载已开始'
+  } catch (downloadReason) {
+    downloadError.value = downloadReason instanceof Error ? downloadReason.message : 'SVG 下载失败'
+  }
+}
+
+async function downloadPngResult() {
+  downloadError.value = null
+  downloadMessage.value = null
+  isDownloadingPng.value = true
+
+  try {
+    const blob = frontendResult?.format === 'png'
+      ? frontendResult.blob
+      : resultFormat.value === 'png' && !resultSvgText.value
+        ? await fetchResultBlob()
+        : await svgTextToPngBlob(resultSvgText.value ?? '')
+
+    triggerBlobDownload(blob, `${resultBaseFileName.value}.png`)
+    downloadMessage.value = 'PNG 下载已开始'
+  } catch (downloadReason) {
+    downloadError.value = downloadReason instanceof Error ? downloadReason.message : 'PNG 下载失败'
+  } finally {
+    isDownloadingPng.value = false
   }
 }
 
@@ -913,6 +1092,40 @@ function clearForm() {
         </form>
       </div>
     </div>
+
+    <section v-if="hasDownloadableResult" class="card bg-base-100 shadow-lg mt-6">
+      <div class="card-body gap-4">
+        <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h2 class="card-title text-lg">生成结果下载</h2>
+            <p class="text-sm text-base-content/60 mt-1">{{ resultDownloadDescription }}</p>
+          </div>
+          <span v-if="resultSource" class="badge badge-outline shrink-0">
+            {{ resultSource === 'frontend' ? '前端生成' : '后端生成' }}
+          </span>
+        </div>
+
+        <div class="flex flex-wrap gap-3">
+          <button type="button" class="btn btn-outline btn-primary" :disabled="!canDownloadSvg" @click="downloadSvgResult">
+            <Download class="w-4 h-4" />
+            下载 SVG
+          </button>
+          <button type="button" class="btn btn-outline btn-secondary" :disabled="!canDownloadPng || isDownloadingPng" @click="downloadPngResult">
+            <span v-if="isDownloadingPng" class="loading loading-spinner loading-sm"></span>
+            <FileImage v-else class="w-4 h-4" />
+            {{ isDownloadingPng ? '正在生成 PNG...' : '下载 PNG' }}
+          </button>
+        </div>
+
+        <div v-if="downloadMessage" class="alert alert-success">
+          <span>{{ downloadMessage }}</span>
+        </div>
+
+        <div v-if="downloadError" class="alert alert-error">
+          <span>{{ downloadError }}</span>
+        </div>
+      </div>
+    </section>
 
     <div v-if="!isJsonInput && (hasAuditRun || auditError || (hasAuditRun && (resultSvgText || resultSvgError)))" class="mt-8 grid gap-6 xl:grid-cols-[380px_minmax(0,1fr)]">
       <section class="card bg-base-100 shadow-lg">
