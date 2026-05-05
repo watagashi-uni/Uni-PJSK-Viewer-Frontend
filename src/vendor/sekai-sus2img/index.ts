@@ -22,6 +22,7 @@ export interface Sus2ImgRenderInput {
 
 export interface CustomScoreJsonRenderInput {
     scoreJson: unknown
+    rebase?: string
     title?: string
     artist?: string
     author?: string
@@ -166,7 +167,7 @@ const createCustomScoreJsonScore = (
 } => {
     const assetBase = resolveAssetBase(runtimeOptions?.assetOrigin)
     const skin = input.skin ?? 'custom01'
-    const score = scoreFromCustomScoreJson(input.scoreJson, {
+    const parsedScore = scoreFromCustomScoreJson(input.scoreJson, {
         title: input.title ?? '',
         artist: input.artist ?? '',
         author: input.author ?? '',
@@ -175,6 +176,8 @@ const createCustomScoreJsonScore = (
         songId: input.songId ?? '',
         ticksPerBeat: input.ticksPerBeat,
     })
+    const rebaseInput = parseRebaseJson(input.rebase ?? '')
+    const score = input.rebase?.trim() ? applyRebase(parsedScore, rebaseInput) : parsedScore
 
     score.meta.jacket = resolveJacketPath(assetBase, input.jacket)
 
@@ -372,6 +375,26 @@ export const renderCustomScoreJsonToSvg = async (
         format: 'svg',
         url,
         blob,
+        width,
+        height,
+        svgText,
+    }
+}
+
+export const renderCustomScoreJsonToPng = async (
+    input: CustomScoreJsonRenderInput,
+    runtimeOptions?: Sus2ImgRuntimeOptions,
+): Promise<Sus2ImgFrontendResult> => {
+    const { svgText: rawSvgText, width, height } = customScoreJsonToSvgPayload(input, runtimeOptions)
+    const svgText = await inlineSvgImages(rawSvgText)
+    const pngBlob = await (runtimeOptions?.pngRenderer ?? defaultPngRenderer)(svgText, width, height)
+    const url = URL.createObjectURL(pngBlob)
+
+    return {
+        source: 'frontend',
+        format: 'png',
+        url,
+        blob: pngBlob,
         width,
         height,
         svgText,

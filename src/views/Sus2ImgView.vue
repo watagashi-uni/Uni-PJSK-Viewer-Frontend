@@ -3,6 +3,8 @@ import { computed, nextTick, ref, onMounted, watch, onBeforeUnmount } from 'vue'
 import { Play, Search, Trash2 } from 'lucide-vue-next'
 import apiClient from '@/api/client'
 import {
+  renderCustomScoreJsonToPng,
+  renderCustomScoreJsonToSvg,
   renderSusToPng,
   renderSusToSvg,
   revokeSus2ImgResult,
@@ -20,6 +22,7 @@ const FORM_STORAGE_KEY = 'sus2img-form-data'
 
 type RenderEngine = 'frontend' | 'backend'
 type RenderFormat = 'svg' | 'png'
+type ChartInputType = 'sus' | 'json'
 
 type BackendResult = {
   source: 'backend'
@@ -28,6 +31,7 @@ type BackendResult = {
 }
 
 const form = ref({
+  inputType: 'sus' as ChartInputType,
   chart: '',
   rebase: '',
   title: '',
@@ -93,15 +97,18 @@ const selectedConflict = computed(() =>
   diagnostics.value.find((item) => item.id === selectedConflictId.value) ?? null,
 )
 
+const isJsonInput = computed(() => form.value.inputType === 'json')
+
 const isHighlightReady = computed(
   () =>
-    Boolean(resultSvgText.value)
+    !isJsonInput.value
+    && Boolean(resultSvgText.value)
     && renderedChartText.value === analyzedChartText.value
     && renderedRebaseText.value === analyzedRebaseText.value,
 )
 
 const renderOverlayState = computed(() => {
-  if (!resultSvgText.value || !renderedChartText.value) {
+  if (isJsonInput.value || !resultSvgText.value || !renderedChartText.value) {
     return {
       context: null,
       error: null,
@@ -199,6 +206,27 @@ const scrollToSelectedConflict = async () => {
   })
 }
 
+const resetAuditState = () => {
+  auditError.value = null
+  isAnalyzing.value = false
+  isPreparingPreview.value = false
+  analyzedChartText.value = ''
+  analyzedRebaseText.value = ''
+  diagnostics.value = []
+  selectedConflictId.value = null
+  hasAuditRun.value = false
+}
+
+const resetRenderState = () => {
+  resultData.value = null
+  resultSource.value = null
+  resultSvgText.value = null
+  resultSvgError.value = null
+  renderedChartText.value = ''
+  renderedRebaseText.value = ''
+  resetFrontendResult()
+}
+
 const selectConflict = async (conflictId: string) => {
   selectedConflictId.value = conflictId
   await scrollToSelectedConflict()
@@ -235,6 +263,18 @@ watch(
       return
     }
     void scrollToSelectedConflict()
+  },
+)
+
+watch(
+  () => form.value.inputType,
+  (inputType) => {
+    chartFile.value = null
+    resetAuditState()
+    resetRenderState()
+    if (inputType === 'json' && form.value.engine === 'backend') {
+      form.value.engine = 'frontend'
+    }
   },
 )
 
@@ -297,10 +337,15 @@ async function getChartText(): Promise<string> {
     return await chartFile.value.text()
   }
 
-  throw new Error('请提供 SUS 文件内容或上传文件')
+  throw new Error(isJsonInput.value ? '请提供 JSON 谱面内容或上传文件' : '请提供 SUS 文件内容或上传文件')
 }
 
 async function runAudit(chartText: string) {
+  if (isJsonInput.value) {
+    resetAuditState()
+    return
+  }
+
   isAnalyzing.value = true
   auditError.value = null
 
@@ -329,6 +374,11 @@ async function handleAnalyze() {
   error.value = null
   infoMessage.value = null
   auditError.value = null
+
+  if (isJsonInput.value) {
+    resetAuditState()
+    return
+  }
 
   try {
     const chartText = await getChartText()
@@ -463,6 +513,10 @@ function buildBackendFormData(chartText: string): FormData {
 }
 
 async function renderViaBackend(chartText: string): Promise<BackendResult> {
+  if (isJsonInput.value) {
+    throw new Error('JSON 谱面仅支持前端生成')
+  }
+
   const response = await apiClient.post('/api/sus2img', buildBackendFormData(chartText), {
     headers: {
       'Content-Type': 'multipart/form-data',
@@ -482,11 +536,17 @@ async function renderViaBackend(chartText: string): Promise<BackendResult> {
   }
 }
 
+function parseCustomScoreJson(chartText: string): unknown {
+  try {
+    return JSON.parse(chartText)
+  } catch {
+    throw new Error('JSON 谱面内容不是合法 JSON')
+  }
+}
+
 async function renderViaFrontend(chartText: string): Promise<Sus2ImgFrontendResult> {
   const bottomLeftImage = bottomLeftImageDataUrl.value || form.value.bottomLeftImageUrl.trim()
-  const input = {
-    sus: chartText,
-    rebase: form.value.rebase,
+  const commonInput = {
     title: form.value.title,
     artist: form.value.artist,
     author: form.value.author,
@@ -495,6 +555,26 @@ async function renderViaFrontend(chartText: string): Promise<Sus2ImgFrontendResu
     pixel: form.value.pixel,
     skin: form.value.skin,
     jacket: bottomLeftImage,
+  }
+
+  if (isJsonInput.value) {
+    const input = {
+      ...commonInput,
+      scoreJson: parseCustomScoreJson(chartText),
+      rebase: form.value.rebase,
+    }
+
+    if (form.value.format === 'png') {
+      return await renderCustomScoreJsonToPng(input)
+    }
+
+    return await renderCustomScoreJsonToSvg(input)
+  }
+
+  const input = {
+    ...commonInput,
+    sus: chartText,
+    rebase: form.value.rebase,
   }
 
   if (form.value.format === 'png') {
@@ -513,9 +593,8 @@ async function handleSubmit() {
 
   try {
     const chartText = await getChartText()
-    await runAudit(chartText)
 
-    if (form.value.engine === 'backend') {
+    if (!isJsonInput.value && form.value.engine === 'backend') {
       const backendResult = await renderViaBackend(chartText)
       setResult(backendResult)
       renderedChartText.value = chartText
@@ -541,6 +620,10 @@ async function handleSubmit() {
         window.open(frontend.url, '_blank')
       }
     } catch (frontendError) {
+      if (isJsonInput.value) {
+        throw frontendError
+      }
+
       const frontendMessage = frontendError instanceof Error ? frontendError.message : '前端转换失败'
       const backendResult = await renderViaBackend(chartText)
       setResult(backendResult)
@@ -566,6 +649,7 @@ async function handleSubmit() {
 
 function clearForm() {
   form.value = {
+    inputType: 'sus',
     chart: '',
     rebase: '',
     title: '',
@@ -585,19 +669,8 @@ function clearForm() {
   bottomLeftImageDataUrl.value = ''
   error.value = null
   infoMessage.value = null
-  auditError.value = null
-  resultData.value = null
-  resultSource.value = null
-  resultSvgText.value = null
-  resultSvgError.value = null
-  renderedChartText.value = ''
-  renderedRebaseText.value = ''
-  analyzedChartText.value = ''
-  analyzedRebaseText.value = ''
-  diagnostics.value = []
-  selectedConflictId.value = null
-  hasAuditRun.value = false
-  resetFrontendResult()
+  resetAuditState()
+  resetRenderState()
   sessionStorage.removeItem(FORM_STORAGE_KEY)
 }
 
@@ -605,21 +678,37 @@ function clearForm() {
 
 <template>
   <div class="max-w-4xl mx-auto">
-    <h1 class="text-2xl font-bold text-center text-primary mb-2">SUS 谱面转图片</h1>
-    <p class="text-center text-base-content/60 text-sm mb-6">粘贴SUS 和 上传文件 二选一即可</p>
+    <h1 class="text-2xl font-bold text-center text-primary mb-2">SUS / JSON 谱面转图片</h1>
+    <p class="text-center text-base-content/60 text-sm mb-6">粘贴谱面内容和上传文件二选一即可，支持 SUS / JSON</p>
 
     <div class="card bg-base-100 shadow-lg animate-fade-in-up">
       <div class="card-body">
         <form class="space-y-6" @submit.prevent="handleSubmit">
+          <div class="form-control">
+            <label class="label">
+              <span class="label-text font-medium">输入类型</span>
+            </label>
+            <div class="flex gap-4 flex-wrap">
+              <label class="label cursor-pointer gap-2">
+                <input v-model="form.inputType" type="radio" value="sus" class="radio radio-primary" />
+                <span class="label-text">SUS</span>
+              </label>
+              <label class="label cursor-pointer gap-2">
+                <input v-model="form.inputType" type="radio" value="json" class="radio radio-primary" />
+                <span class="label-text">JSON</span>
+              </label>
+            </div>
+          </div>
+
           <div class="grid md:grid-cols-2 gap-4">
             <div class="form-control w-full">
               <label class="label">
-                <span class="label-text font-medium">SUS 内容</span>
+                <span class="label-text font-medium">{{ isJsonInput ? 'JSON 谱面内容' : 'SUS 内容' }}</span>
               </label>
               <textarea
                 v-model="form.chart"
                 class="textarea textarea-bordered h-40 font-mono text-sm w-full"
-                placeholder="在此粘贴 SUS 文件内容"
+                :placeholder="isJsonInput ? '在此粘贴 JSON 谱面内容' : '在此粘贴 SUS 文件内容'"
               ></textarea>
             </div>
             <div class="form-control w-full">
@@ -775,7 +864,7 @@ function clearForm() {
                   <span class="label-text">前端（极速）</span>
                 </label>
                 <label class="label cursor-pointer gap-2">
-                  <input v-model="form.engine" type="radio" value="backend" class="radio radio-primary" />
+                  <input v-model="form.engine" type="radio" value="backend" class="radio radio-primary" :disabled="isJsonInput" />
                   <span class="label-text">后端（兼容）</span>
                 </label>
               </div>
@@ -784,12 +873,15 @@ function clearForm() {
 
           <div class="form-control w-full">
             <label class="label">
-              <span class="label-text font-medium">上传 SUS 文件（可选，和上方SUS二选一即可）</span>
+              <span class="label-text font-medium">
+                上传{{ isJsonInput ? ' JSON' : ' SUS' }}文件（可选，和上方内容二选一即可）
+              </span>
             </label>
             <input
+              :key="form.inputType"
               type="file"
               class="file-input file-input-bordered w-full"
-              accept=".sus,.txt"
+              :accept="isJsonInput ? '.json,.txt' : '.sus,.txt'"
               @change="handleFileChange"
             />
           </div>
@@ -807,7 +899,7 @@ function clearForm() {
               <Trash2 class="w-4 h-4" />
               清空
             </button>
-            <button type="button" class="btn btn-outline" :disabled="isAnalyzing || isSubmitting" @click="handleAnalyze">
+            <button v-if="!isJsonInput" type="button" class="btn btn-outline" :disabled="isAnalyzing || isSubmitting" @click="handleAnalyze">
               <span v-if="isAnalyzing" class="loading loading-spinner"></span>
               <Search v-else class="w-4 h-4" />
               {{ isAnalyzing ? 'note重叠检查中...' : 'note重叠检查' }}
@@ -822,7 +914,7 @@ function clearForm() {
       </div>
     </div>
 
-    <div v-if="hasAuditRun || resultSvgText || auditError || resultSvgError" class="mt-8 grid gap-6 xl:grid-cols-[380px_minmax(0,1fr)]">
+    <div v-if="!isJsonInput && (hasAuditRun || auditError || (hasAuditRun && (resultSvgText || resultSvgError)))" class="mt-8 grid gap-6 xl:grid-cols-[380px_minmax(0,1fr)]">
       <section class="card bg-base-100 shadow-lg">
         <div class="card-body gap-4">
           <div class="flex items-start justify-between gap-3">
