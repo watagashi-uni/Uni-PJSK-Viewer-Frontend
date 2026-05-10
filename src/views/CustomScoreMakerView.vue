@@ -1346,10 +1346,9 @@ function selectTab(tab: FeedTab) {
       </div>
     </div>
 
-    <div v-if="authorOverlayOpen" class="fixed inset-0 z-[180] bg-base-300/70 backdrop-blur-sm">
-      <div class="h-full overflow-y-auto p-3 sm:p-6">
-        <div class="mx-auto max-w-6xl rounded-2xl border border-base-200 bg-base-100 shadow-2xl">
-          <div class="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-base-200 bg-base-100/95 p-4 backdrop-blur">
+    <div v-if="authorOverlayOpen" class="fixed inset-0 z-[180] bg-base-300/70 p-3 backdrop-blur-sm sm:p-6">
+      <div class="mx-auto flex h-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-base-200 bg-base-100 shadow-2xl">
+          <div class="z-10 shrink-0 flex items-center justify-between gap-3 border-b border-base-200 bg-base-100/95 p-4 backdrop-blur">
             <div class="min-w-0">
               <p class="text-xs font-bold uppercase tracking-wide text-base-content/45">作者投稿</p>
               <h2 class="truncate text-xl font-extrabold">{{ authorProfile?.name || '作者投稿一览' }}</h2>
@@ -1359,7 +1358,7 @@ function selectTab(tab: FeedTab) {
             </button>
           </div>
 
-          <div class="space-y-5 p-4 sm:p-6">
+          <div class="min-h-0 flex-1 space-y-5 overflow-y-auto p-4 sm:p-6">
             <div v-if="authorLoading" class="flex items-center justify-center gap-3 rounded-xl border border-base-200 bg-base-200/35 py-12 text-primary">
               <span class="loading loading-spinner loading-md"></span>
               <span class="text-sm font-medium">正在加载作者投稿</span>
@@ -1371,9 +1370,9 @@ function selectTab(tab: FeedTab) {
 
             <template v-else>
               <div class="grid items-start gap-4 lg:grid-cols-[360px_minmax(0,1fr)]">
-                <section class="rounded-xl border border-base-200 bg-base-200/30 p-4">
-                  <div class="flex items-start gap-4">
-                    <div class="h-16 w-16 shrink-0 overflow-hidden rounded-full border-2 border-primary/20 bg-base-200 shadow-sm">
+                <section class="rounded-xl border border-base-200 bg-base-200/30 p-3">
+                  <div class="grid grid-cols-[3.5rem_minmax(0,1fr)] items-start gap-1.5">
+                    <div class="h-14 w-14 shrink-0 overflow-hidden rounded-full border-2 border-primary/20 bg-base-200 shadow-sm">
                       <AssetImage
                         v-if="getAuthorCardUrl(authorProfile)"
                         :src="getAuthorCardUrl(authorProfile)"
@@ -1383,29 +1382,27 @@ function selectTab(tab: FeedTab) {
                         <User class="h-7 w-7" />
                       </div>
                     </div>
-                    <div class="min-w-0 flex-1">
-                      <h3 class="truncate text-lg font-bold">{{ authorProfile?.name || '未知作者' }}</h3>
-                      <p v-if="authorProfile?.userProfile?.twitterId" class="mt-1 truncate text-xs text-base-content/60">@{{ authorProfile.userProfile.twitterId }}</p>
-                    </div>
-                  </div>
-
-                  <div class="mt-4 flex items-center gap-1 h-8">
-                    <template v-for="i in 3" :key="i">
-                      <div v-if="getAuthorHonor(i)" class="h-full min-w-0 shrink">
-                        <SekaiProfileHonor
-                          :data="getAuthorHonor(i)!"
-                          :force-sub="i !== 1"
-                          :user-honor-missions="authorProfile?.userHonorMissions || []"
-                          class="block h-full w-auto max-w-full"
-                        />
+                    <div class="grid h-14 min-w-0 grid-rows-[1.75rem_1.5rem] gap-1">
+                      <h3 class="ml-1 flex min-w-0 items-center truncate text-lg font-bold leading-none">{{ authorProfile?.name || '未知作者' }}</h3>
+                      <div class="flex h-6 min-w-0 items-center gap-1">
+                        <template v-for="i in 3" :key="i">
+                          <div v-if="getAuthorHonor(i)" class="h-full min-w-0 shrink">
+                            <SekaiProfileHonor
+                              :data="getAuthorHonor(i)!"
+                              :force-sub="i !== 1"
+                              :user-honor-missions="authorProfile?.userHonorMissions || []"
+                              class="block h-full w-auto max-w-full"
+                            />
+                          </div>
+                          <img
+                            v-else
+                            :src="i === 1 ? '/honor/frame_degree_m_1.png' : '/honor/frame_degree_s_1.png'"
+                            class="h-full w-auto opacity-40"
+                            alt="empty honor"
+                          />
+                        </template>
                       </div>
-                      <img
-                        v-else
-                        :src="i === 1 ? '/honor/frame_degree_m_1.png' : '/honor/frame_degree_s_1.png'"
-                        class="h-full w-auto opacity-40"
-                        alt="empty honor"
-                      />
-                    </template>
+                    </div>
                   </div>
 
                   <p class="mt-4 whitespace-pre-wrap rounded-lg bg-base-100/70 p-3 text-sm text-base-content/70">
@@ -1414,19 +1411,19 @@ function selectTab(tab: FeedTab) {
                   </p>
                 </section>
 
-                <section class="grid grid-cols-1 items-start gap-3 sm:grid-cols-3">
-                  <div class="rounded-xl border border-base-200 bg-base-200/30 p-4">
-                    <div class="text-2xl font-extrabold text-primary">{{ formatNumber(authorScores.length) }}</div>
+                <section class="grid grid-cols-3 items-start gap-2 sm:gap-3">
+                  <div class="rounded-xl border border-base-200 bg-base-200/30 p-3 sm:p-4">
+                    <div class="text-xl font-extrabold text-primary sm:text-2xl">{{ formatNumber(authorScores.length) }}</div>
                     <div class="mt-1 text-xs font-medium text-base-content/50">投稿</div>
                   </div>
-                  <div class="rounded-xl border border-base-200 bg-base-200/30 p-4">
-                    <div class="text-2xl font-extrabold text-secondary">{{ formatNumber(authorTotalReviews) }}</div>
+                  <div class="rounded-xl border border-base-200 bg-base-200/30 p-3 sm:p-4">
+                    <div class="text-xl font-extrabold text-secondary sm:text-2xl">{{ formatNumber(authorTotalReviews) }}</div>
                     <div class="mt-1 flex items-center gap-1 text-xs font-medium text-base-content/50">
                       <Heart class="h-3 w-3" /> 喜欢
                     </div>
                   </div>
-                  <div class="rounded-xl border border-base-200 bg-base-200/30 p-4">
-                    <div class="text-2xl font-extrabold">{{ formatNumber(authorTotalPlays) }}</div>
+                  <div class="rounded-xl border border-base-200 bg-base-200/30 p-3 sm:p-4">
+                    <div class="text-xl font-extrabold sm:text-2xl">{{ formatNumber(authorTotalPlays) }}</div>
                     <div class="mt-1 flex items-center gap-1 text-xs font-medium text-base-content/50">
                       <Play class="h-3 w-3" /> 游玩
                     </div>
@@ -1499,7 +1496,6 @@ function selectTab(tab: FeedTab) {
               </div>
             </template>
           </div>
-        </div>
       </div>
     </div>
   </div>
