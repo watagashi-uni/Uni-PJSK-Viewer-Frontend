@@ -87,6 +87,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '谱面Maker' },
     },
     {
+        path: '/custom-score-maker/preview-bridge',
+        name: 'CustomScorePreviewBridge',
+        component: () => import('@/views/CustomScorePreviewBridgeView.vue'),
+        meta: { title: '正在生成预览', fullscreen: true },
+    },
+    {
         path: '/chart-share',
         name: 'ChartShare',
         component: () => import('@/views/ChartShareView.vue'),
