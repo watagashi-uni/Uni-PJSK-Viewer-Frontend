@@ -690,34 +690,17 @@ async function fetchScoreBase64(score: DisplayScore) {
   return await response.text()
 }
 
-function writeFlatPreviewLoading(previewTab: Window | null) {
-  if (!previewTab || previewTab.closed) return
-
-  previewTab.document.title = '正在生成平面预览...'
-  previewTab.document.body.innerHTML = `
-    <div style="min-height:100vh;display:grid;place-items:center;background:#1a1a2e;color:#fff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
-      <div style="text-align:center;">
-        <div style="font-size:20px;font-weight:700;margin-bottom:8px;">正在生成平面预览</div>
-        <div style="font-size:14px;color:rgba(255,255,255,.65);">请稍候，生成完成后会自动显示。</div>
-      </div>
-    </div>
-  `
-  previewTab.focus()
+function openPreviewBridge(kind: 'flat' | '3d') {
+  const url = new URL('/custom-score-maker/preview-bridge', window.location.origin)
+  url.searchParams.set('kind', kind)
+  const previewTab = window.open(url.toString(), '_blank')
+  previewTab?.focus()
+  return previewTab
 }
 
-function write3dPreviewLoading(previewTab: Window | null) {
+function replacePreviewTab(previewTab: Window | null, url: string) {
   if (!previewTab || previewTab.closed) return
-
-  previewTab.document.title = '正在生成 3D 预览链接...'
-  previewTab.document.body.innerHTML = `
-    <div style="min-height:100vh;display:grid;place-items:center;background:#1a1a2e;color:#fff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
-      <div style="text-align:center;">
-        <div style="font-size:20px;font-weight:700;margin-bottom:8px;">正在生成 3D 预览链接</div>
-        <div style="font-size:14px;color:rgba(255,255,255,.65);">请稍候，链接生成完成后会自动跳转。</div>
-      </div>
-    </div>
-  `
-  previewTab.focus()
+  previewTab.location.replace(url)
 }
 
 async function ensureScoreJson(score: DisplayScore) {
@@ -776,12 +759,11 @@ async function renderJsonFlatPreview(score: DisplayScore, scoreJson = selectedSc
 }
 
 async function openFlatPreview(score: DisplayScore) {
-  const previewTab = window.open('', '_blank')
+  const previewTab = openPreviewBridge('flat')
   if (!previewTab) {
     scoreError.value = '浏览器拦截了新窗口，请允许弹窗后再试。'
     return
   }
-  writeFlatPreviewLoading(previewTab)
   isFetchingScore.value = true
   scoreError.value = ''
   previewInfo.value = ''
@@ -800,9 +782,7 @@ async function openFlatPreview(score: DisplayScore) {
     }
     return
   }
-  if (previewTab && !previewTab.closed && selectedPreviewUrl.value) {
-    previewTab.location.replace(selectedPreviewUrl.value)
-  }
+  replacePreviewTab(previewTab, selectedPreviewUrl.value)
 }
 
 function buildChartPreviewPayload(score: DisplayScore, scoreJson: unknown) {
@@ -871,7 +851,7 @@ function postChartPreviewPayload(previewTab: Window | null, payload: ReturnType<
     try {
       previewTab.postMessage(payload, targetOrigin)
     } catch {
-      // The window may still be on about:blank while Safari/Chrome navigates.
+      // The bridge window may still be navigating to the cross-origin preview.
     }
   }
   const handleReady = (event: MessageEvent) => {
@@ -882,14 +862,17 @@ function postChartPreviewPayload(previewTab: Window | null, payload: ReturnType<
   }
 
   window.addEventListener('message', handleReady)
-  previewTab.location.replace(`${previewBase}/preview?post=1`)
+  replacePreviewTab(previewTab, `${previewBase}/preview?post=1`)
   retryTimer = window.setInterval(send, 800)
   timeoutTimer = window.setTimeout(cleanup, 60000)
 }
 
 async function open3dPreview(score: DisplayScore) {
-  const previewTab = window.open('', '_blank')
-  write3dPreviewLoading(previewTab)
+  const previewTab = openPreviewBridge('3d')
+  if (!previewTab) {
+    scoreError.value = '浏览器拦截了新窗口，请允许弹窗后再试。'
+    return
+  }
 
   previewInfo.value = ''
   scoreError.value = ''
