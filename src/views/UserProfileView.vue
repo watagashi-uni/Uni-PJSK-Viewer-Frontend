@@ -207,6 +207,19 @@ function saveAccounts() {
   accountStore.save()
 }
 
+function getJpUserRegisterTime(userId: string): bigint | null {
+  if (!/^\d+$/.test(userId) || userId.length <= 3) return null
+  const passTime = BigInt(userId.slice(0, -3)) / 1024n / 4096n
+  return 1600218000n + passTime
+}
+
+function verifyJpUserId(userId: string): boolean {
+  const registerTime = getJpUserRegisterTime(userId)
+  if (registerTime === null) return false
+  const now = BigInt(Math.floor(Date.now() / 1000))
+  return registerTime > 1601438400n && registerTime < now
+}
+
 function loadProfileData() {
   if (!currentUserId.value) {
     profileData.value = null
@@ -224,6 +237,10 @@ async function addAccount() {
   const uid = newUserIdInput.value.trim()
   if (!uid) {
     errorMsg.value = '请输入用户ID'
+    return
+  }
+  if (!verifyJpUserId(uid)) {
+    errorMsg.value = '请使用正确的数字ID'
     return
   }
   if (accounts.value.some(a => a.userId === uid)) {
@@ -1134,6 +1151,7 @@ watch(currentUserId, async (newId) => {
               <input
                 v-model="newUserIdInput"
                 type="text"
+                inputmode="numeric"
                 placeholder="输入用户ID"
                 class="input input-bordered w-full"
                 @keyup.enter="addAccount"
