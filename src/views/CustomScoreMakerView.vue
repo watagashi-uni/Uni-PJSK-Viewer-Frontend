@@ -1,15 +1,16 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, toRef } from 'vue'
-import { BarChart3, Eye, Heart, Music2, Play, PlayCircle, RefreshCw, Search, Sparkles, Copy } from 'lucide-vue-next'
+import { BarChart3, Copy, Eye, Heart, Music2, Play, PlayCircle, RefreshCw, Search, Sparkles, User, X } from 'lucide-vue-next'
 import { renderCustomScoreJsonToSvg, revokeSus2ImgResult, type Sus2ImgFrontendResult } from '@/vendor/sekai-sus2img'
 import AssetImage from '@/components/AssetImage.vue'
+import SekaiProfileHonor from '@/components/SekaiProfileHonor.vue'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
 import { toRomaji } from '@/utils/kanaToRomaji'
 
 type FeedTab = 'ranking' | 'new' | 'search' | 'official_all'
 type RankingMode = 'daily' | 'total'
-type SearchOrder = 'new_arrival' | 'review_count' | 'review_count_daily'
+type SearchOrder = 'new_arrival' | 'review_count' | 'review_count_daily' | 'popular_daily' | 'high_difficulty' | 'random'
 type ScoreSource = 'user' | 'official'
 
 interface FeedResponse {
@@ -24,7 +25,7 @@ interface UserScoreItem {
     userCustomMusicScorePath?: string
   }
   userCustomMusicScoreId: string
-  userId: number
+  userId: string | number
   userName: string
   musicId: number
   customMusicScoreTags?: number[]
@@ -37,6 +38,8 @@ interface UserScoreItem {
   reviewCount?: number
   playCount?: number
   fullComboRate?: number
+  favoriteCount?: number
+  bookmarkCount?: number
   customMusicScoreSearchSortValue?: number
 }
 
@@ -88,6 +91,11 @@ interface MusicMaster {
   filterSec?: number
 }
 
+interface CardMaster {
+  id: number
+  assetbundleName: string
+}
+
 interface MusicVocal {
   musicId: number
   musicVocalType?: string
@@ -114,7 +122,7 @@ interface DisplayScore {
   userCustomMusicScorePath?: string
   title: string
   creatorName: string
-  creatorUserId?: number
+  creatorUserId?: string
   musicId: number
   musicTitle: string
   jacketAssetbundleName?: string
@@ -126,9 +134,46 @@ interface DisplayScore {
   reviewCount: number
   playCount: number
   fullComboRate: number
+  favoriteCount: number
   customMusicScoreSearchSortValue: number
   previewStartTimeSec?: number
   isDerivativeAllowed?: boolean
+}
+
+interface AuthorUserCard {
+  cardId: number
+  level?: number
+  masterRank?: number
+  specialTrainingStatus?: string
+  defaultImage?: string
+}
+
+interface AuthorProfileHonor {
+  seq: number
+  profileHonorType: string
+  honorId: number
+  honorLevel: number
+  bondsHonorViewType: string
+  bondsHonorWordId: number
+}
+
+interface AuthorProfile {
+  name: string
+  userCard?: AuthorUserCard
+  userProfile?: {
+    userId: string | number
+    word?: string
+    twitterId?: string
+    profileImageType?: string
+  }
+  userProfileHonors?: AuthorProfileHonor[]
+  userHonorMissions?: Array<{ honorMissionType: string; progress: number }>
+  isMysekaiOwnerAcceptVisitForFriend?: boolean
+  userPlayerFrames?: unknown[]
+}
+
+interface AuthorResponse extends FeedResponse {
+  userCustomMusicScoreAuthorProfile?: AuthorProfile
 }
 
 const GAME_API_HOST = 'https://api.unipjsk.com'
@@ -148,6 +193,8 @@ const musicSearchResults = ref<MusicMaster[]>([])
 const selectedSearchMusic = ref<MusicMaster | null>(null)
 const searchOrder = ref<SearchOrder>('new_arrival')
 const searchDifficulty = ref('')
+const rankingLevelMin = ref('26')
+const rankingLevelMax = ref('36')
 const isLoading = ref(false)
 const isMasterLoading = ref(false)
 const error = ref('')
@@ -169,9 +216,17 @@ const officialCreators = ref<OfficialCreator[]>([])
 const officialProfiles = ref<OfficialCreatorProfile[]>([])
 const tags = ref<CustomMusicScoreTag[]>([])
 const musics = ref<MusicMaster[]>([])
+const cards = ref<CardMaster[]>([])
 const vocals = ref<MusicVocal[]>([])
 const characters = ref<Character[]>([])
 const outsideCharacters = ref<OutsideCharacter[]>([])
+
+const authorOverlayOpen = ref(false)
+const authorProfile = ref<AuthorProfile | null>(null)
+const authorScores = ref<DisplayScore[]>([])
+const authorLoading = ref(false)
+const authorError = ref('')
+const authorSelectedId = ref<string | null>(null)
 
 let svgRenderResult: Sus2ImgFrontendResult | null = null
 let feedRequestSerial = 0
@@ -204,6 +259,37 @@ const musicById = computed(() => {
   for (const item of musics.value) map.set(item.id, item)
   return map
 })
+
+const cardById = computed(() => {
+  const map = new Map<number, CardMaster>()
+  for (const item of cards.value) map.set(item.id, item)
+  return map
+})
+
+const rankingLevelRange = computed(() => {
+  const minText = String(rankingLevelMin.value ?? '').trim()
+  const maxText = String(rankingLevelMax.value ?? '').trim()
+  const min = minText ? Number(minText) : null
+  const max = maxText ? Number(maxText) : null
+  return {
+    min: Number.isFinite(min) ? min : null,
+    max: Number.isFinite(max) ? max : null,
+  }
+})
+
+const displayedScores = computed(() => {
+  if (activeTab.value !== 'ranking') return scores.value
+  const { min, max } = rankingLevelRange.value
+  if (min === null && max === null) return scores.value
+  return scores.value.filter((score) => {
+    if (min !== null && score.playLevel < min) return false
+    if (max !== null && score.playLevel > max) return false
+    return true
+  })
+})
+
+const authorTotalReviews = computed(() => authorScores.value.reduce((sum, score) => sum + score.reviewCount, 0))
+const authorTotalPlays = computed(() => authorScores.value.reduce((sum, score) => sum + score.playCount, 0))
 
 const endpointPath = computed(() => {
   if (activeTab.value === 'official_all') return ''
@@ -375,15 +461,21 @@ async function decodeScoreBase64(base64Text: string) {
   return new TextDecoder().decode(decoded)
 }
 
+async function parseGameApiJson(response: Response) {
+  const text = await response.text()
+  return JSON.parse(text.replace(/"userId"\s*:\s*(\d{16,})/g, '"userId":"$1"'))
+}
+
 async function loadMasterData() {
   isMasterLoading.value = true
   try {
     masterStore.getTranslations().catch((reason) => console.error('加载翻译失败:', reason))
-    const [creatorData, profileData, tagData, musicData, vocalData, characterData, outsideCharacterData] = await Promise.all([
+    const [creatorData, profileData, tagData, musicData, cardData, vocalData, characterData, outsideCharacterData] = await Promise.all([
       masterStore.getMaster<OfficialCreator>('customMusicScoreOfficialCreators'),
       masterStore.getMaster<OfficialCreatorProfile>('customMusicScoreOfficialCreatorProfiles'),
       masterStore.getMaster<CustomMusicScoreTag>('customMusicScoreTags'),
       masterStore.getMaster<MusicMaster>('musics'),
+      masterStore.getMaster<CardMaster>('cards'),
       masterStore.getMaster<MusicVocal>('musicVocals'),
       masterStore.getMaster<Character>('gameCharacters'),
       masterStore.getMaster<OutsideCharacter>('outsideCharacters'),
@@ -392,6 +484,7 @@ async function loadMasterData() {
     officialProfiles.value = profileData
     tags.value = tagData
     musics.value = musicData
+    cards.value = cardData
     vocals.value = vocalData
     characters.value = characterData
     outsideCharacters.value = outsideCharacterData
@@ -412,7 +505,7 @@ function mergeUserScore(item: UserScoreItem): DisplayScore {
     userCustomMusicScorePath: item.userCustomMusicScoreInfoJson?.userCustomMusicScorePath,
     title: item.userCustomMusicScoreInfoJson?.title || `自制谱面 ${item.userCustomMusicScoreId}`,
     creatorName: item.userName,
-    creatorUserId: item.userId,
+    creatorUserId: String(item.userId),
     musicId,
     musicTitle: music?.title ?? `Music ${musicId}`,
     jacketAssetbundleName: music?.assetbundleName,
@@ -424,6 +517,7 @@ function mergeUserScore(item: UserScoreItem): DisplayScore {
     reviewCount: item.reviewCount ?? 0,
     playCount: item.playCount ?? 0,
     fullComboRate: item.fullComboRate ?? 0,
+    favoriteCount: item.favoriteCount ?? item.bookmarkCount ?? 0,
     customMusicScoreSearchSortValue: item.customMusicScoreSearchSortValue ?? 9999,
     previewStartTimeSec: item.previewStartTimeSec,
     isDerivativeAllowed: item.isDerivativeAllowed,
@@ -453,6 +547,7 @@ function mergeOfficialMasterScore(master: OfficialCreator, stat?: OfficialScoreS
     reviewCount: stat?.reviewCount ?? 0,
     playCount: stat?.playCount ?? 0,
     fullComboRate: stat?.fullComboRate ?? 0,
+    favoriteCount: 0,
     customMusicScoreSearchSortValue: stat?.customMusicScoreSearchSortValue ?? 0,
     previewStartTimeSec: master.previewStartTimeSec,
     isDerivativeAllowed: master.isDerivativeAllowed,
@@ -480,6 +575,7 @@ function mergeOfficialScore(item: OfficialScoreStat): DisplayScore {
     reviewCount: item.reviewCount ?? 0,
     playCount: item.playCount ?? 0,
     fullComboRate: item.fullComboRate ?? 0,
+    favoriteCount: 0,
     customMusicScoreSearchSortValue: item.customMusicScoreSearchSortValue ?? 9999,
   }
 }
@@ -553,7 +649,7 @@ async function loadFeed() {
       if (response.status === 404) throw new Error('未找到该谱面')
       throw new Error(`请求失败：HTTP ${response.status}`)
     }
-    const data = await response.json()
+    const data = await parseGameApiJson(response)
     if (requestId !== feedRequestSerial) return
     if (activeTab.value === 'search' && searchMode.value === 'id') {
       if (data && typeof data === 'object' && 'userCustomMusicScoreInfoJson' in data && 'userCustomMusicScoreId' in (data.userCustomMusicScoreInfoJson as any)) {
@@ -705,7 +801,7 @@ async function openFlatPreview(score: DisplayScore) {
     return
   }
   if (previewTab && !previewTab.closed && selectedPreviewUrl.value) {
-    previewTab.location.href = selectedPreviewUrl.value
+    previewTab.location.replace(selectedPreviewUrl.value)
   }
 }
 
@@ -786,7 +882,7 @@ function postChartPreviewPayload(previewTab: Window | null, payload: ReturnType<
   }
 
   window.addEventListener('message', handleReady)
-  previewTab.location.href = `${previewBase}/preview?post=1`
+  previewTab.location.replace(`${previewBase}/preview?post=1`)
   retryTimer = window.setInterval(send, 800)
   timeoutTimer = window.setTimeout(cleanup, 60000)
 }
@@ -825,6 +921,70 @@ function copyScoreId(id: string) {
       console.error('Failed to copy ID:', err)
       scoreError.value = '复制 ID 失败，请检查浏览器剪贴板权限。'
     })
+}
+
+function setRankingMode(mode: RankingMode) {
+  if (rankingMode.value === mode) return
+  rankingMode.value = mode
+  void loadFeed()
+}
+
+function clearRankingLevelFilter() {
+  rankingLevelMin.value = ''
+  rankingLevelMax.value = ''
+}
+
+function getAuthorHonor(seq: number) {
+  return authorProfile.value?.userProfileHonors?.find((honor) => honor.seq === seq) || null
+}
+
+function getAuthorCardUrl(profile: AuthorProfile | null) {
+  const userCard = profile?.userCard
+  if (!userCard?.cardId) return ''
+  const card = cardById.value.get(userCard.cardId)
+  if (!card?.assetbundleName) return ''
+  const trained = userCard.specialTrainingStatus === 'done'
+    || userCard.defaultImage === 'special_training'
+    || userCard.defaultImage === 'training'
+  return `${assetsHost.value}/startapp/thumbnail/chara/${card.assetbundleName}_${trained ? 'after_training' : 'normal'}.png`
+}
+
+function closeAuthorOverlay() {
+  authorOverlayOpen.value = false
+  authorProfile.value = null
+  authorScores.value = []
+  authorError.value = ''
+  authorSelectedId.value = null
+}
+
+async function openAuthorOverlay(score: DisplayScore) {
+  if (score.source !== 'user' || !score.creatorUserId) return
+  authorOverlayOpen.value = true
+  authorLoading.value = true
+  authorError.value = ''
+  authorSelectedId.value = score.creatorUserId
+  authorProfile.value = null
+  authorScores.value = []
+
+  try {
+    if (!musics.value.length || !cards.value.length) {
+      await loadMasterData()
+    }
+    const response = await fetch(`${GAME_API_HOST}/api/user/{user_id}/custom-music-score/published/search/author/${encodeURIComponent(String(score.creatorUserId))}`)
+    if (!response.ok) {
+      throw new Error(`作者投稿加载失败：HTTP ${response.status}`)
+    }
+    const data = await parseGameApiJson(response) as AuthorResponse
+    authorProfile.value = data.userCustomMusicScoreAuthorProfile ?? {
+      name: score.creatorName,
+      userProfile: { userId: score.creatorUserId },
+    }
+    authorScores.value = normalizeFeed({ userCustomMusicScorePublishedList: data.userCustomMusicScorePublishedList ?? [] })
+  } catch (reason) {
+    authorError.value = reason instanceof Error ? reason.message : '作者投稿加载失败'
+  } finally {
+    authorLoading.value = false
+  }
 }
 
 function searchById() {
@@ -928,10 +1088,38 @@ function selectTab(tab: FeedTab) {
       <div class="card-body p-4 sm:p-6 gap-4">
         <div v-if="activeTab === 'ranking'" class="flex flex-wrap items-center justify-between gap-3">
           <div class="join shadow-sm">
-            <button class="btn btn-sm join-item" :class="{ 'btn-primary': rankingMode === 'daily', 'bg-base-200 border-none hover:bg-base-300': rankingMode !== 'daily' }" @click="rankingMode = 'daily'">日排行榜</button>
-            <button class="btn btn-sm join-item" :class="{ 'btn-primary': rankingMode === 'total', 'bg-base-200 border-none hover:bg-base-300': rankingMode !== 'total' }" @click="rankingMode = 'total'">综合排行榜</button>
+            <button class="btn btn-sm join-item" :class="{ 'btn-primary': rankingMode === 'daily', 'bg-base-200 border-none hover:bg-base-300': rankingMode !== 'daily' }" @click="setRankingMode('daily')">日排行榜</button>
+            <button class="btn btn-sm join-item" :class="{ 'btn-primary': rankingMode === 'total', 'bg-base-200 border-none hover:bg-base-300': rankingMode !== 'total' }" @click="setRankingMode('total')">综合排行榜</button>
           </div>
-          <div class="flex items-center gap-2">
+          <div class="flex flex-wrap items-center gap-2">
+            <div class="flex items-center gap-2 rounded-lg border border-base-200 bg-base-200/40 px-2 py-1 shadow-sm">
+              <span class="text-xs font-medium text-base-content/60 whitespace-nowrap">难度筛选</span>
+              <input
+                v-model="rankingLevelMin"
+                type="text"
+                inputmode="numeric"
+                placeholder="最低"
+                class="input input-bordered input-sm h-8 min-h-8 w-16 bg-base-100 px-2 text-center font-mono"
+                aria-label="最低难度"
+              />
+              <span class="text-base-content/35">-</span>
+              <input
+                v-model="rankingLevelMax"
+                type="text"
+                inputmode="numeric"
+                placeholder="最高"
+                class="input input-bordered input-sm h-8 min-h-8 w-16 bg-base-100 px-2 text-center font-mono"
+                aria-label="最高难度"
+              />
+              <button
+                class="btn btn-ghost btn-xs h-8 min-h-8 px-2"
+                :disabled="!String(rankingLevelMin).trim() && !String(rankingLevelMax).trim()"
+                title="清除难度筛选"
+                @click="clearRankingLevelFilter"
+              >
+                <X class="h-3.5 w-3.5" />
+              </button>
+            </div>
             <select v-model="searchDifficulty" class="select select-bordered select-sm w-28 sm:w-32 shadow-sm focus:ring-2 focus:ring-primary/20 transition-all" @change="loadFeed">
               <option value="">所有难度</option>
               <option value="easy">Easy</option>
@@ -1075,7 +1263,7 @@ function selectTab(tab: FeedTab) {
         </div>
       </div>
 
-      <div v-else-if="!scores.length" class="card bg-base-100 shadow-sm border border-base-200">
+      <div v-else-if="!displayedScores.length" class="card bg-base-100 shadow-sm border border-base-200">
         <div class="card-body items-center py-16 text-center">
           <div class="w-16 h-16 rounded-full bg-base-200 flex items-center justify-center mx-auto mb-4">
             <Music2 class="w-8 h-8 text-base-content/30" />
@@ -1086,7 +1274,7 @@ function selectTab(tab: FeedTab) {
 
       <div v-else class="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div
-          v-for="(score, index) in scores"
+          v-for="(score, index) in displayedScores"
           :key="score.key"
           class="card bg-base-100 shadow-sm border border-base-200 hover:shadow-md hover:border-primary/30 transition-all duration-300 group"
           :class="{ 'ring-2 ring-primary ring-offset-2 ring-offset-base-100': selectedScore?.key === score.key }"
@@ -1120,7 +1308,15 @@ function selectTab(tab: FeedTab) {
                 <p class="text-xs text-base-content/60 truncate" :title="score.musicTitle + ' · ' + score.creatorName">
                   <span class="font-medium text-base-content/80">{{ score.musicTitle }}</span>
                   <span class="mx-1.5 opacity-40">|</span>
-                  <span>{{ score.creatorName }}</span>
+                  <button
+                    v-if="score.source === 'user'"
+                    class="link link-hover inline-flex items-center gap-1 align-baseline font-medium text-primary"
+                    @click.stop="openAuthorOverlay(score)"
+                  >
+                    <User class="h-3 w-3" />
+                    {{ score.creatorName }}
+                  </button>
+                  <span v-else>{{ score.creatorName }}</span>
                 </p>
                 <p v-if="score.description" class="text-base-content/70 line-clamp-2 text-xs mt-2 leading-relaxed bg-base-200/50 p-2 rounded-lg">{{ score.description }}</p>
               </div>
@@ -1166,5 +1362,170 @@ function selectTab(tab: FeedTab) {
         </div>
       </div>
     </div>
+
+    <div v-if="authorOverlayOpen" class="fixed inset-0 z-[180] bg-base-300/70 backdrop-blur-sm">
+      <div class="h-full overflow-y-auto p-3 sm:p-6">
+        <div class="mx-auto max-w-6xl rounded-2xl border border-base-200 bg-base-100 shadow-2xl">
+          <div class="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-base-200 bg-base-100/95 p-4 backdrop-blur">
+            <div class="min-w-0">
+              <p class="text-xs font-bold uppercase tracking-wide text-base-content/45">作者投稿</p>
+              <h2 class="truncate text-xl font-extrabold">{{ authorProfile?.name || '作者投稿一览' }}</h2>
+            </div>
+            <button class="btn btn-sm btn-circle btn-ghost" title="关闭" @click="closeAuthorOverlay">
+              <X class="h-5 w-5" />
+            </button>
+          </div>
+
+          <div class="space-y-5 p-4 sm:p-6">
+            <div v-if="authorLoading" class="flex items-center justify-center gap-3 rounded-xl border border-base-200 bg-base-200/35 py-12 text-primary">
+              <span class="loading loading-spinner loading-md"></span>
+              <span class="text-sm font-medium">正在加载作者投稿</span>
+            </div>
+
+            <div v-else-if="authorError" class="alert alert-error text-sm">
+              <span>{{ authorError }}</span>
+            </div>
+
+            <template v-else>
+              <div class="grid items-start gap-4 lg:grid-cols-[360px_minmax(0,1fr)]">
+                <section class="rounded-xl border border-base-200 bg-base-200/30 p-4">
+                  <div class="flex items-start gap-4">
+                    <div class="h-16 w-16 shrink-0 overflow-hidden rounded-full border-2 border-primary/20 bg-base-200 shadow-sm">
+                      <AssetImage
+                        v-if="getAuthorCardUrl(authorProfile)"
+                        :src="getAuthorCardUrl(authorProfile)"
+                        class="h-full w-full object-cover"
+                      />
+                      <div v-else class="grid h-full w-full place-items-center text-base-content/30">
+                        <User class="h-7 w-7" />
+                      </div>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                      <h3 class="truncate text-lg font-bold">{{ authorProfile?.name || '未知作者' }}</h3>
+                      <p v-if="authorProfile?.userProfile?.twitterId" class="mt-1 truncate text-xs text-base-content/60">@{{ authorProfile.userProfile.twitterId }}</p>
+                    </div>
+                  </div>
+
+                  <div class="mt-4 flex items-center gap-1 h-8">
+                    <template v-for="i in 3" :key="i">
+                      <div v-if="getAuthorHonor(i)" class="h-full min-w-0 shrink">
+                        <SekaiProfileHonor
+                          :data="getAuthorHonor(i)!"
+                          :force-sub="i !== 1"
+                          :user-honor-missions="authorProfile?.userHonorMissions || []"
+                          class="block h-full w-auto max-w-full"
+                        />
+                      </div>
+                      <img
+                        v-else
+                        :src="i === 1 ? '/honor/frame_degree_m_1.png' : '/honor/frame_degree_s_1.png'"
+                        class="h-full w-auto opacity-40"
+                        alt="empty honor"
+                      />
+                    </template>
+                  </div>
+
+                  <p class="mt-4 whitespace-pre-wrap rounded-lg bg-base-100/70 p-3 text-sm text-base-content/70">
+                    <template v-if="authorProfile?.userProfile?.word">{{ authorProfile.userProfile.word }}</template>
+                    <span v-else class="text-base-content/40">暂无签名</span>
+                  </p>
+                </section>
+
+                <section class="grid grid-cols-1 items-start gap-3 sm:grid-cols-3">
+                  <div class="rounded-xl border border-base-200 bg-base-200/30 p-4">
+                    <div class="text-2xl font-extrabold text-primary">{{ formatNumber(authorScores.length) }}</div>
+                    <div class="mt-1 text-xs font-medium text-base-content/50">投稿</div>
+                  </div>
+                  <div class="rounded-xl border border-base-200 bg-base-200/30 p-4">
+                    <div class="text-2xl font-extrabold text-secondary">{{ formatNumber(authorTotalReviews) }}</div>
+                    <div class="mt-1 flex items-center gap-1 text-xs font-medium text-base-content/50">
+                      <Heart class="h-3 w-3" /> 喜欢
+                    </div>
+                  </div>
+                  <div class="rounded-xl border border-base-200 bg-base-200/30 p-4">
+                    <div class="text-2xl font-extrabold">{{ formatNumber(authorTotalPlays) }}</div>
+                    <div class="mt-1 flex items-center gap-1 text-xs font-medium text-base-content/50">
+                      <Play class="h-3 w-3" /> 游玩
+                    </div>
+                  </div>
+                </section>
+              </div>
+
+              <div v-if="!authorScores.length" class="rounded-xl border border-base-200 bg-base-200/30 py-12 text-center text-sm text-base-content/50">
+                暂无投稿
+              </div>
+
+              <div v-else class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <div
+                  v-for="score in authorScores"
+                  :key="score.key"
+                  class="rounded-xl border border-base-200 bg-base-100 p-4 shadow-sm transition-all hover:border-primary/30 hover:shadow-md"
+                >
+                  <div class="flex gap-4">
+                    <img
+                      v-if="getJacketUrl(score)"
+                      :src="getJacketUrl(score)"
+                      :alt="score.musicTitle"
+                      class="h-20 w-20 shrink-0 rounded-lg object-cover shadow-sm"
+                      loading="lazy"
+                    />
+                    <div class="min-w-0 flex-1">
+                      <div class="mb-1.5 flex flex-wrap items-center gap-1.5">
+                        <span class="badge badge-sm font-bold text-white" :class="difficultyClass(score.musicDifficultyType)">
+                          {{ score.musicDifficultyType.toUpperCase() }} {{ score.playLevel || '' }}
+                        </span>
+                        <button class="btn btn-xs btn-ghost ml-auto h-6 min-h-6 gap-1 px-1.5 opacity-60 hover:opacity-100" @click.stop="copyScoreId(score.customMusicScoreId)">
+                          <Copy class="h-3 w-3" /> 复制ID
+                        </button>
+                      </div>
+                      <h3 class="truncate font-bold" :title="score.title">{{ score.title }}</h3>
+                      <p class="truncate text-xs text-base-content/55" :title="score.musicTitle">{{ score.musicTitle }}</p>
+                      <p v-if="score.description" class="mt-2 line-clamp-2 rounded-lg bg-base-200/45 p-2 text-xs text-base-content/70">{{ score.description }}</p>
+                    </div>
+                  </div>
+
+                  <div class="mt-3 grid grid-cols-3 gap-2">
+                    <div class="rounded-lg bg-base-200/45 p-2 text-center">
+                      <div class="font-bold text-primary/90">{{ formatNumber(score.reviewCount) }}</div>
+                      <div class="text-[10px] text-base-content/50">喜欢</div>
+                    </div>
+                    <div class="rounded-lg bg-base-200/45 p-2 text-center">
+                      <div class="font-bold text-secondary/90">{{ formatNumber(score.playCount) }}</div>
+                      <div class="text-[10px] text-base-content/50">游玩</div>
+                    </div>
+                    <div class="rounded-lg bg-base-200/45 p-2 text-center">
+                      <div class="font-bold text-accent/90">{{ formatPercent(score.fullComboRate) }}</div>
+                      <div class="text-[10px] text-base-content/50">FC率</div>
+                    </div>
+                  </div>
+
+                  <div class="mt-3 flex items-center justify-between border-t border-base-200/70 pt-3">
+                    <div class="text-[10px] font-medium text-base-content/40">{{ formatDate(score.publishedAt) }}</div>
+                    <div class="flex gap-2">
+                      <button class="btn btn-xs btn-outline gap-1.5 rounded-lg" :disabled="isFetchingScore" @click="openFlatPreview(score)">
+                        <Eye class="h-3.5 w-3.5" />
+                        平面预览
+                      </button>
+                      <button class="btn btn-xs btn-primary gap-1.5 rounded-lg" :disabled="isFetchingScore" @click="open3dPreview(score)">
+                        <PlayCircle class="h-3.5 w-3.5" />
+                        3D预览
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
+
+<style scoped>
+:deep(.sekai-honor),
+:deep(.sekai-honor-bonds) {
+  width: auto !important;
+  height: 100% !important;
+}
+</style>
