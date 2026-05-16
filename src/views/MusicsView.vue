@@ -516,8 +516,10 @@ function isExpired(musicId: number): boolean {
 
 const diffColors: Record<string, string> = {
   easy: '#6EE1D6', normal: '#34DDFF', hard: '#FBCC26',
-  expert: '#EA5B75', master: '#C656EA', append: '#EE78DC',
+  expert: '#EA5B75', master: '#C656EA', append: '#ab9fef',
 }
+
+const appendDifficultyGradient = 'linear-gradient(135deg, #ab9fef, #e192d7)'
 
 const diffLabels: Record<string, string> = {
   easy: 'EAS', normal: 'NOR', hard: 'HRD',
@@ -525,6 +527,26 @@ const diffLabels: Record<string, string> = {
 }
 
 const allDifficulties = ['easy', 'normal', 'hard', 'expert', 'master', 'append']
+
+function diffBackgroundStyle(difficulty: string) {
+  return {
+    background: difficulty === 'append' ? appendDifficultyGradient : (diffColors[difficulty] || '#9ca3af'),
+    color: ['easy', 'normal', 'hard'].includes(difficulty) ? 'black' : 'white',
+  }
+}
+
+function diffTextStyle(difficulty: string) {
+  if (difficulty === 'append') {
+    return {
+      background: appendDifficultyGradient,
+      backgroundClip: 'text',
+      WebkitBackgroundClip: 'text',
+      color: 'transparent',
+      textShadow: '0 0 8px rgba(171,159,239,0.35)',
+    }
+  }
+  return { color: diffColors[difficulty] }
+}
 
 onMounted(() => {
   loadData()
@@ -805,7 +827,7 @@ watch(totalPages, (pages) => {
                 <div class="flex items-center gap-2 text-xs">
                   <span 
                     class="px-1.5 py-0.5 rounded text-[10px] font-bold"
-                    :style="{ backgroundColor: diffColors[entry.difficulty], color: ['easy','normal','hard'].includes(entry.difficulty) ? 'black' : 'white' }"
+                    :style="diffBackgroundStyle(entry.difficulty)"
                   >
                     {{ diffLabels[entry.difficulty] }} {{ entry.playLevel.toFixed(1) }}
                   </span>
@@ -831,7 +853,7 @@ watch(totalPages, (pages) => {
       <div v-else-if="viewMode === 'level'" :class="{ 'animate-fade-in-up': enableHeavyAnimation }">
         <!-- 总体进度条 -->
         <div v-if="showUserResults && hasSuiteData && levelStats" class="flex flex-wrap gap-4 items-center bg-base-100 p-3 mb-4 rounded-lg shadow-sm border border-base-200/50">
-          <div class="font-bold border-r border-base-200 pr-4 drop-shadow-sm flex items-center gap-1 text-base sm:text-lg" :style="{ color: diffColors[selectedDiffType] }">
+          <div class="font-bold border-r border-base-200 pr-4 drop-shadow-sm flex items-center gap-1 text-base sm:text-lg" :style="diffTextStyle(selectedDiffType)">
             {{ diffLabels[selectedDiffType] }} 的完成度
           </div>
           <div class="flex items-center gap-1">
@@ -867,7 +889,7 @@ watch(totalPages, (pages) => {
           >
             <div
               class="px-3 py-0.5 rounded-full text-white font-black text-xl shadow-sm tracking-tighter"
-              :style="{ backgroundColor: diffColors[selectedDiffType] }"
+              :style="diffBackgroundStyle(selectedDiffType)"
             >
               {{ group.level.toFixed(0) }}
             </div>
@@ -934,7 +956,7 @@ watch(totalPages, (pages) => {
                 <th>曲名</th>
                 <th
                   v-for="d in allDifficulties" :key="d" class="text-center w-20 lg:w-24"
-                  :style="{ color: diffColors[d] }"
+                  :style="diffTextStyle(d)"
                 >
                   {{ diffLabels[d] }}
                 </th>
@@ -1021,7 +1043,7 @@ watch(totalPages, (pages) => {
               <div class="grid grid-cols-6 gap-0.5 mt-auto">
                 <div v-for="d in allDifficulties" :key="d" class="flex flex-col items-center justify-center bg-base-200/50 rounded p-0.5">
                   <template v-if="musicDifficultiesMap[music.id]?.[d] !== undefined">
-                    <span class="text-[10px] leading-none font-bold mb-0.5" :style="{ color: diffColors[d] }">{{ musicDifficultiesMap[music.id]?.[d] }}</span>
+                    <span class="text-[10px] leading-none font-bold mb-0.5" :style="diffTextStyle(d)">{{ musicDifficultiesMap[music.id]?.[d] }}</span>
                     <template v-if="showUserResults">
                       <img
                         v-if="musicResultsMap[music.id]?.[d] === 'AP'"
@@ -1158,7 +1180,7 @@ watch(totalPages, (pages) => {
             <div class="flex items-center gap-2">
               <span 
                 class="px-2 py-0.5 rounded text-xs font-bold leading-none"
-                :style="{ backgroundColor: diffColors[entry.difficulty], color: ['easy','normal','hard'].includes(entry.difficulty) ? 'black' : 'white' }"
+                :style="diffBackgroundStyle(entry.difficulty)"
               >
                 {{ diffLabels[entry.difficulty] }} {{ entry.playLevel.toFixed(1) }}
               </span>

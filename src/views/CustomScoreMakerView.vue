@@ -352,14 +352,21 @@ function formatDate(timestamp?: number) {
   })
 }
 
-function difficultyClass(difficulty: string) {
+const difficultyColors: Record<string, string> = {
+  easy: '#6EE1D6',
+  normal: '#34DDFF',
+  hard: '#FBCC26',
+  expert: '#EA5B75',
+  master: '#C656EA',
+  append: 'linear-gradient(135deg, #ab9fef, #e192d7)',
+}
+
+function difficultyStyle(difficulty: string) {
   const key = difficulty.toLowerCase()
-  if (key === 'expert') return 'badge-error'
-  if (key === 'master') return 'badge-secondary'
-  if (key === 'append') return 'badge-accent'
-  if (key === 'hard') return 'badge-warning'
-  if (key === 'normal') return 'badge-info'
-  return 'badge-success'
+  return {
+    background: difficultyColors[key] || '#9ca3af',
+    color: ['easy', 'normal', 'hard'].includes(key) ? '#111827' : '#ffffff',
+  }
 }
 
 function getTagNames(score: DisplayScore) {
@@ -1272,7 +1279,7 @@ function selectTab(tab: FeedTab) {
                   class="w-24 h-24 rounded-xl object-cover shadow-sm group-hover:scale-105 transition-transform duration-300"
                   loading="lazy"
                 />
-                <div class="absolute -top-2 -left-2 badge badge-neutral shadow-sm font-mono border-none">{{ index + 1 }}</div>
+                <div v-if="activeTab === 'ranking'" class="absolute -top-2 -left-2 badge badge-neutral shadow-sm font-mono border-none">{{ index + 1 }}</div>
               </div>
               
               <div class="min-w-0 flex-1 flex flex-col">
@@ -1280,7 +1287,7 @@ function selectTab(tab: FeedTab) {
                   <span class="badge badge-sm border-none shadow-sm" :class="score.source === 'official' ? 'bg-primary/10 text-primary' : 'bg-base-200 text-base-content/70'">
                     {{ score.source === 'official' ? '官方' : '自制' }}
                   </span>
-                  <span class="badge badge-sm font-bold border-none shadow-sm text-white" :class="difficultyClass(score.musicDifficultyType)">
+                  <span class="badge badge-sm font-bold border-none shadow-sm" :style="difficultyStyle(score.musicDifficultyType)">
                     {{ score.musicDifficultyType.toUpperCase() }} {{ score.playLevel || '' }}
                   </span>
                   <button class="btn btn-xs btn-ghost gap-1 px-1.5 h-6 min-h-6 ml-auto opacity-50 hover:opacity-100" @click.stop="copyScoreId(score.customMusicScoreId)">
@@ -1451,7 +1458,7 @@ function selectTab(tab: FeedTab) {
                     />
                     <div class="min-w-0 flex-1">
                       <div class="mb-1.5 flex flex-wrap items-center gap-1.5">
-                        <span class="badge badge-sm font-bold text-white" :class="difficultyClass(score.musicDifficultyType)">
+                        <span class="badge badge-sm font-bold border-none" :style="difficultyStyle(score.musicDifficultyType)">
                           {{ score.musicDifficultyType.toUpperCase() }} {{ score.playLevel || '' }}
                         </span>
                         <button class="btn btn-xs btn-ghost ml-auto h-6 min-h-6 gap-1 px-1.5 opacity-60 hover:opacity-100" @click.stop="copyScoreId(score.customMusicScoreId)">
