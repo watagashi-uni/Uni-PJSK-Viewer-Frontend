@@ -127,18 +127,20 @@ const currentLevel = computed(() => {
   return diff ? diff.playLevel : 0
 })
 
-const difficultyColors: Record<string, { bg: string, text: string, shadow: string }> = {
+const difficultyColors: Record<string, { bg: string, text: string, shadow: string, gradient?: string }> = {
   easy: { bg: '#6EE1D6', text: 'text-[#6EE1D6]', shadow: 'rgba(110,225,214,0.8)' },
   normal: { bg: '#34DDFF', text: 'text-[#34DDFF]', shadow: 'rgba(52,221,255,0.8)' },
   hard: { bg: '#FBCC26', text: 'text-[#FBCC26]', shadow: 'rgba(251,204,38,0.8)' },
   expert: { bg: '#EA5B75', text: 'text-[#EA5B75]', shadow: 'rgba(234,91,117,0.8)' },
   master: { bg: '#C656EA', text: 'text-[#C656EA]', shadow: 'rgba(198,86,234,0.8)' },
-  append: { bg: '#EE78DC', text: 'text-[#EE78DC]', shadow: 'rgba(238,120,220,0.8)' },
+  append: { bg: '#ab9fef', text: 'text-[#d58ce0]', shadow: 'rgba(225,146,215,0.8)', gradient: 'linear-gradient(135deg, #ab9fef, #e192d7)' },
 }
 
 const currentColors = computed(() => {
   return difficultyColors[selectedDifficulty.value] || difficultyColors['master'] || { bg: '#C656EA', text: 'text-[#C656EA]', shadow: 'rgba(198,86,234,0.8)' }
 })
+
+const currentDifficultyBackground = computed(() => currentColors.value.gradient || currentColors.value.bg)
 
 // 重置变换
 function resetTransform() {
@@ -250,7 +252,7 @@ function copyMusicTitle() {
               <!-- 偏移旋转底色块（中心旋转） -->
               <div 
                 class="absolute inset-0 rounded-sm" 
-                :style="{ backgroundColor: currentColors.bg, transform: 'rotate(-4deg)', transformOrigin: 'center center' }"
+                :style="{ background: currentDifficultyBackground, transform: 'rotate(-4deg)', transformOrigin: 'center center' }"
               />
               <div 
                 class="absolute inset-0 bg-black/40 blur-sm rounded-sm"

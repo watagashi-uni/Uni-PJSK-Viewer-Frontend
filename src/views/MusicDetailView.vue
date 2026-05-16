@@ -474,14 +474,16 @@ function getVocalSingers(vocal: MusicVocal, separator = '・'): string {
   }).filter(Boolean).join(separator)
 }
 
+const appendDifficultyGradient = 'linear-gradient(135deg, #ab9fef, #e192d7)'
+
 // 难度颜色映射
 const difficultyColors: Record<string, string> = {
-  easy: 'bg-[#6EE1D6] border-[#6EE1D6]',
-  normal: 'bg-[#34DDFF] border-[#34DDFF]',
-  hard: 'bg-[#FBCC26] border-[#FBCC26]',
-  expert: 'bg-[#EA5B75] border-[#EA5B75]',
-  master: 'bg-[#C656EA] border-[#C656EA]',
-  append: 'bg-[#EE78DC] border-[#EE78DC]',
+  easy: '#6EE1D6',
+  normal: '#34DDFF',
+  hard: '#FBCC26',
+  expert: '#EA5B75',
+  master: '#C656EA',
+  append: appendDifficultyGradient,
 }
 
 const difficultyLabels: Record<string, string> = {
@@ -491,6 +493,16 @@ const difficultyLabels: Record<string, string> = {
   expert: 'EXPERT',
   master: 'MASTER',
   append: 'APPEND',
+}
+
+function difficultyBadgeStyle(difficulty: string) {
+  const bg = difficultyColors[difficulty] || '#9ca3af'
+  return { background: bg }
+}
+
+function difficultyCardStyle(difficulty: string) {
+  const bg = difficultyColors[difficulty] || '#9ca3af'
+  return { background: bg }
 }
 
 // 封面图片 URL (startapp)
@@ -1111,47 +1123,49 @@ const isExpired = computed(() => {
               <div 
                 v-for="diff in difficulties" 
                 :key="diff.id"
-                class="relative flex flex-col items-center bg-base-100 rounded-xl shadow-sm border-t-4 p-2 sm:p-4 transition-all hover:shadow-md hover:-translate-y-1"
-                :class="(difficultyColors[diff.musicDifficulty] || 'bg-gray-400 border-gray-400').split(' ')[1]"
+                class="rounded-xl shadow-sm transition-all hover:shadow-md hover:-translate-y-1"
+                :style="difficultyCardStyle(diff.musicDifficulty)"
               >
-                <!-- 难度标签 -->
-                <div 
-                  class="badge text-white font-bold mb-3 border-none px-4 py-3"
-                  :class="(difficultyColors[diff.musicDifficulty] || 'bg-gray-400 border-gray-400').split(' ')[0]"
-                >
-                  {{ difficultyLabels[diff.musicDifficulty] }}
-                </div>
-                
-                <!-- 等级与各种数 -->
-                <div class="text-3xl font-black text-base-content mb-1 tracking-tight">{{ diff.playLevel }}</div>
-                <div class="text-xs text-base-content/50 font-medium uppercase tracking-wide mb-4 whitespace-nowrap">{{ diff.totalNoteCount }} COMBO</div>
+                <div class="flex h-full flex-col items-center rounded-[calc(0.75rem-4px)] bg-base-100 p-2 sm:p-4 mt-1">
+                  <!-- 难度标签 -->
+                  <div 
+                    class="badge text-white font-bold mb-3 border-none px-4 py-3"
+                    :style="difficultyBadgeStyle(diff.musicDifficulty)"
+                  >
+                    {{ difficultyLabels[diff.musicDifficulty] }}
+                  </div>
+                  
+                  <!-- 等级与各种数 -->
+                  <div class="text-3xl font-black text-base-content mb-1 tracking-tight">{{ diff.playLevel }}</div>
+                  <div class="text-xs text-base-content/50 font-medium uppercase tracking-wide mb-4 whitespace-nowrap">{{ diff.totalNoteCount }} COMBO</div>
 
-                <!-- 按钮组 -->
-                <div class="w-full space-y-2 mt-auto">
-                  <!-- 预览 (External SVG) -->
-                  <a 
-                    :href="`${chartHost}/${music.id}/${diff.musicDifficulty}.svg`" 
-                    target="_blank"
-                    class="btn btn-sm btn-block btn-ghost btn-outline h-9 min-h-0 font-normal hover:bg-base-200 whitespace-nowrap"
-                  >
-                    <Eye class="w-4 h-4 shrink-0" /> 谱面预览
-                  </a>
-                   
-                  <!-- 谱面播放预览 -->
-                  <button 
-                    class="btn btn-sm btn-block btn-ghost btn-outline h-9 min-h-0 font-normal hover:bg-base-200 whitespace-nowrap"
-                    @click="openChartPreview(diff.musicDifficulty)"
-                  >
-                    <PlayCircle class="w-4 h-4 shrink-0" /> 3D谱面播放
-                  </button>
-                   
-                  <!-- 下载文件 (.sus) -->
-                  <button 
-                    class="btn btn-sm btn-block btn-ghost btn-outline h-9 min-h-0 font-normal hover:bg-base-200 whitespace-nowrap"
-                    @click="forceDownload(diff.musicDifficulty)"
-                  >
-                    <Download class="w-4 h-4 shrink-0" /> 谱面下载
-                  </button>
+                  <!-- 按钮组 -->
+                  <div class="w-full space-y-2 mt-auto">
+                    <!-- 预览 (External SVG) -->
+                    <a 
+                      :href="`${chartHost}/${music.id}/${diff.musicDifficulty}.svg`" 
+                      target="_blank"
+                      class="btn btn-sm btn-block btn-ghost btn-outline h-9 min-h-0 font-normal hover:bg-base-200 whitespace-nowrap"
+                    >
+                      <Eye class="w-4 h-4 shrink-0" /> 谱面预览
+                    </a>
+                    
+                    <!-- 谱面播放预览 -->
+                    <button 
+                      class="btn btn-sm btn-block btn-ghost btn-outline h-9 min-h-0 font-normal hover:bg-base-200 whitespace-nowrap"
+                      @click="openChartPreview(diff.musicDifficulty)"
+                    >
+                      <PlayCircle class="w-4 h-4 shrink-0" /> 3D谱面播放
+                    </button>
+                    
+                    <!-- 下载文件 (.sus) -->
+                    <button 
+                      class="btn btn-sm btn-block btn-ghost btn-outline h-9 min-h-0 font-normal hover:bg-base-200 whitespace-nowrap"
+                      @click="forceDownload(diff.musicDifficulty)"
+                    >
+                      <Download class="w-4 h-4 shrink-0" /> 谱面下载
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
