@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { computed, ref, onMounted, onUnmounted, watch } from 'vue'
 import { useMasterStore } from '@/stores/master'
 import SekaiCard from '@/components/SekaiCard.vue'
 import SekaiProfileHonor from '@/components/SekaiProfileHonor.vue'
@@ -9,23 +9,68 @@ import type { EventData, CardData } from '@/types/master'
 
 const masterStore = useMasterStore()
 
+interface CharacterData {
+  id: number
+  firstName?: string
+  givenName: string
+  unit: string
+}
+
+interface WorldBloomData {
+  id: number
+  eventId: number
+  gameCharacterId: number
+  worldBloomChapterType: string
+  chapterNo: number
+  chapterStartAt: number
+  aggregateAt: number
+}
+
 // 状态
 const activeTab = ref<'top100' | 'borders'>('top100')
 const isLoading = ref(false)
 const eventId = ref<number | null>(null)
 const eventName = ref('')
+const currentEvent = ref<EventData | null>(null)
 const lastUpdate = ref<number>(0)
+const currentTime = ref(Date.now())
+const selectedWorldBloomCharacterId = ref<number | null>(null)
 
 // 数据
 const top100Data = ref<any[]>([])
 const borderData = ref<any[]>([])
+const top100ChapterData = ref<Record<number, any[]>>({})
+const borderChapterData = ref<Record<number, any[]>>({})
 const cardsMap = ref<Record<number, any>>({})
+const charactersMap = ref<Record<number, CharacterData>>({})
+const worldBloomChapters = ref<WorldBloomData[]>([])
 const top100Error = ref('')
 const borderError = ref('')
+let timeTimer: number | undefined
+
+const isWorldBloomEvent = computed(() => currentEvent.value?.eventType === 'world_bloom' && worldBloomChapters.value.length > 0)
+
+const rankingRows = computed(() => {
+  if (!selectedWorldBloomCharacterId.value) {
+    return activeTab.value === 'top100' ? top100Data.value : borderData.value
+  }
+
+  const dataMap = activeTab.value === 'top100' ? top100ChapterData.value : borderChapterData.value
+  return dataMap[selectedWorldBloomCharacterId.value] || []
+})
+
+const currentError = computed(() => activeTab.value === 'top100' ? top100Error.value : borderError.value)
 
 // 初始化
 onMounted(async () => {
+  timeTimer = window.setInterval(() => {
+    currentTime.value = Date.now()
+  }, 60 * 1000)
   await initData()
+})
+
+onUnmounted(() => {
+  if (timeTimer) window.clearInterval(timeTimer)
 })
 
 async function initData() {
@@ -53,14 +98,31 @@ async function initData() {
     }
 
     if (targetEvent) {
+      currentEvent.value = targetEvent
       eventId.value = targetEvent.id
       eventName.value = targetEvent.name
       
-      // 预加载卡片数据以便渲染
-      const cards = await masterStore.getMaster<CardData>('cards')
+      // 预加载卡片和角色数据以便渲染
+      const [cards, characters] = await Promise.all([
+        masterStore.getMaster<CardData>('cards'),
+        masterStore.getMaster<CharacterData>('gameCharacters'),
+      ])
       cards.forEach(c => {
         cardsMap.value[c.id] = c
       })
+      characters.forEach(c => {
+        charactersMap.value[c.id] = c
+      })
+
+      if (targetEvent.eventType === 'world_bloom') {
+        const worldBlooms = await masterStore.getMaster<WorldBloomData>('worldBlooms')
+        worldBloomChapters.value = worldBlooms
+          .filter(wb => wb.eventId === targetEvent.id && wb.worldBloomChapterType === 'game_character')
+          .sort((a, b) => a.chapterNo - b.chapterNo)
+      } else {
+        worldBloomChapters.value = []
+        selectedWorldBloomCharacterId.value = null
+      }
 
       // 加载首屏数据 (Top 100)
       if (activeTab.value === 'top100') {
@@ -102,9 +164,11 @@ async function fetchTop100() {
     const data = await request.getProfile<any>(`/api/user/%7Buser_id%7D/event/${eventId.value}/ranking?rankingViewType=top100`)
     if (data.rankings) {
       top100Data.value = data.rankings
+      top100ChapterData.value = parseWorldBloomChapterRankings(data.userWorldBloomChapterRankings, 'rankings')
     } else {
       console.warn('Unknown Top 100 data format:', data)
       top100Data.value = []
+      top100ChapterData.value = {}
     }
     lastUpdate.value = Date.now()
   } catch (e) {
@@ -124,9 +188,11 @@ async function fetchBorders() {
     const data = await request.getProfile<any>(`/api/event/${eventId.value}/ranking-border`)
     if (data.borderRankings) {
       borderData.value = data.borderRankings.sort((a: any, b: any) => a.rank - b.rank)
+      borderChapterData.value = parseWorldBloomChapterRankings(data.userWorldBloomChapterRankingBorders, 'borderRankings')
     } else {
       console.warn('Unknown Border data format:', data)
       borderData.value = []
+      borderChapterData.value = {}
     }
     lastUpdate.value = Date.now()
   } catch (e) {
@@ -145,6 +211,37 @@ function getCardInfo(cardId: number) {
     assetbundleName: '', 
     attr: 'cool' 
   }
+}
+
+function parseWorldBloomChapterRankings(chapters: any[] | undefined, rankingKey: string) {
+  if (!Array.isArray(chapters)) return {}
+
+  return chapters.reduce<Record<number, any[]>>((acc, chapter) => {
+    const characterId = Number(chapter?.gameCharacterId)
+    const rankings = chapter?.[rankingKey]
+    if (characterId && Array.isArray(rankings)) {
+      acc[characterId] = rankingKey === 'borderRankings'
+        ? [...rankings].sort((a: any, b: any) => a.rank - b.rank)
+        : rankings
+    }
+    return acc
+  }, {})
+}
+
+function getCharacterName(characterId: number) {
+  const character = charactersMap.value[characterId]
+  if (!character) return `角色 ${characterId}`
+  return `${character.firstName || ''}${character.givenName}`
+}
+
+function getCharacterIcon(characterId: number) {
+  if (characterId <= 20) return `/img/chr_ts/chr_ts_90_${characterId}.png`
+  if (characterId === 21) return '/img/chr_ts/chr_ts_90_21.png'
+  return `/img/chr_ts/chr_ts_90_${characterId}_2.png`
+}
+
+function isChapterOngoing(chapter: WorldBloomData) {
+  return currentTime.value >= chapter.chapterStartAt && currentTime.value <= chapter.aggregateAt
 }
 
 // Helper: 格式化分数
@@ -209,23 +306,71 @@ function getHonor(honors: any[], seq: number) {
       </a>
     </div>
 
+    <!-- World Link character rankings -->
+    <div v-if="isWorldBloomEvent" class="bg-base-100 p-3 rounded-xl shadow-sm">
+      <div class="flex gap-2 overflow-x-auto pb-1">
+        <button
+          class="btn btn-sm h-auto min-h-12 shrink-0 gap-2 px-3"
+          :class="selectedWorldBloomCharacterId === null ? 'btn-primary' : 'btn-ghost'"
+          @click="selectedWorldBloomCharacterId = null"
+        >
+          <span
+            class="grid w-8 h-8 place-items-center rounded-full text-xs font-bold ring-1"
+            :class="selectedWorldBloomCharacterId === null ? 'bg-primary-content text-primary ring-primary-content/40' : 'bg-base-200 text-base-content/70 ring-base-300'"
+          >
+            ALL
+          </span>
+          <span class="flex flex-col items-start leading-tight">
+            <span>综合</span>
+            <span class="text-[10px] font-normal opacity-80">总榜</span>
+          </span>
+        </button>
+        <button
+          v-for="chapter in worldBloomChapters"
+          :key="chapter.id"
+          class="btn btn-sm h-auto min-h-12 shrink-0 gap-2 px-2"
+          :class="selectedWorldBloomCharacterId === chapter.gameCharacterId ? 'btn-primary' : 'btn-ghost'"
+          @click="selectedWorldBloomCharacterId = chapter.gameCharacterId"
+        >
+          <span class="relative">
+            <img
+              :src="getCharacterIcon(chapter.gameCharacterId)"
+              class="w-8 h-8 rounded-full object-cover ring-1"
+              :class="isChapterOngoing(chapter) ? 'ring-success ring-2' : 'ring-base-300'"
+              :alt="getCharacterName(chapter.gameCharacterId)"
+            />
+            <span
+              class="absolute -bottom-1 -right-1 badge badge-xs border-none px-1"
+              :class="isChapterOngoing(chapter) ? 'badge-success text-success-content' : selectedWorldBloomCharacterId === chapter.gameCharacterId ? 'badge-primary-content text-primary' : 'badge-neutral'"
+            >
+              {{ chapter.chapterNo }}
+            </span>
+          </span>
+          <span class="flex flex-col items-start leading-tight">
+            <span>{{ getCharacterName(chapter.gameCharacterId) }}</span>
+            <span v-if="isChapterOngoing(chapter)" class="text-[10px] font-normal opacity-80">进行中</span>
+          </span>
+        </button>
+      </div>
+    </div>
+
     <!-- Unified Table View -->
     <div class="bg-base-100 rounded-xl shadow-sm overflow-hidden min-h-[300px]">
       <!-- Error State -->
-      <div v-if="activeTab === 'top100' ? top100Error : borderError" class="p-8 text-center text-error">
-        {{ activeTab === 'top100' ? top100Error : borderError }}
+      <div v-if="currentError" class="p-8 text-center text-error">
+        {{ currentError }}
       </div>
       
       <!-- Empty State -->
-      <div v-else-if="(activeTab === 'top100' ? top100Data : borderData).length === 0 && !isLoading" class="p-8 text-center text-base-content/60">
+      <div v-else-if="rankingRows.length === 0 && !isLoading" class="p-8 text-center text-base-content/60">
         暂无数据
       </div>
       
       <!-- Mobile List View -->
       <div class="md:hidden space-y-3 p-4">
         <div 
-          v-for="row in (activeTab === 'top100' ? top100Data : borderData)" 
-          :key="row.rank" 
+          v-for="row in rankingRows" 
+          :key="`${selectedWorldBloomCharacterId || 'overall'}-${row.rank}`" 
           class="bg-base-100 p-3 rounded-lg border border-base-200 shadow-sm"
         >
           <!-- Top Row: Rank & Score -->
@@ -294,7 +439,7 @@ function getHonor(honors: any[], seq: number) {
             </tr>
           </thead>
           <tbody>
-            <tr v-for="row in (activeTab === 'top100' ? top100Data : borderData)" :key="row.rank">
+            <tr v-for="row in rankingRows" :key="`${selectedWorldBloomCharacterId || 'overall'}-${row.rank}`">
               <td class="text-center font-bold text-lg font-mono">#{{ row.rank }}</td>
               <td>
                 <div class="flex items-start gap-4">
