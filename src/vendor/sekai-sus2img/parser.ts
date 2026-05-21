@@ -15,11 +15,18 @@ type SpeedDefinitionItem = {
     speed: number
 }
 
+type VolumeDefinitionItem = {
+    bar: number
+    tick: number
+    volume: number
+}
+
 type ParsedItem =
     | { kind: 'meta'; value: Meta }
     | { kind: 'ticksPerBeat'; value: number }
     | { kind: 'speedControl'; value: number | null }
     | { kind: 'speedDefinition'; id: number; items: SpeedDefinitionItem[] }
+    | { kind: 'volumeDefinition'; items: VolumeDefinitionItem[] }
     | { kind: 'event'; value: Event }
     | { kind: 'bpmDefinition'; id: number; bpm: Fraction }
     | { kind: 'bpmReference'; bar: Fraction; id: number }
@@ -108,9 +115,71 @@ const parseMetaValue = (value: string): string | number => {
     return trimmed
 }
 
-const parseScoreData = (data: string): Array<{ beat: Fraction; pair: string }> => {
+const sanitizeSpeedRatio = (value: number): number => {
+    if (!Number.isFinite(value) || value <= 0) {
+        return 1
+    }
+    return value
+}
+
+const visibleSpeedRatio = (value: number): number | null => {
+    const speedRatio = sanitizeSpeedRatio(value)
+    return Math.abs(speedRatio - 1) > 0.0001 ? speedRatio : null
+}
+
+const parseScoreData = (data: string): Array<{ beat: Fraction; pair: string; speedRatio: number }> => {
     const cleaned = data.trim()
-    const result: Array<{ beat: Fraction; pair: string }> = []
+    const result: Array<{ beat: Fraction; pair: string; speedRatio: number }> = []
+
+    if (cleaned.includes(',')) {
+        const cells: Array<{ pair: string; speedRatio: number }> = []
+        let i = 0
+
+        while (i < cleaned.length) {
+            while (i < cleaned.length && /\s/u.test(cleaned[i])) {
+                i += 1
+            }
+
+            if (i + 1 >= cleaned.length) {
+                break
+            }
+
+            const pair = cleaned.slice(i, i + 2)
+            i += 2
+
+            let speedRatio = 1
+            if (i < cleaned.length && cleaned[i] === ',') {
+                i += 1
+                const speedStart = i
+                while (i < cleaned.length && !/\s/u.test(cleaned[i]) && cleaned[i] !== ',') {
+                    i += 1
+                }
+
+                if (i > speedStart) {
+                    speedRatio = Number(cleaned.slice(speedStart, i))
+                }
+            }
+
+            cells.push({ pair, speedRatio: sanitizeSpeedRatio(speedRatio) })
+
+            while (i < cleaned.length && (/\s/u.test(cleaned[i]) || cleaned[i] === ',')) {
+                i += 1
+            }
+        }
+
+        for (let i = 0; i < cells.length; i += 1) {
+            const cell = cells[i]
+            if (cell.pair !== '00') {
+                result.push({
+                    beat: new Fraction(i, cells.length),
+                    pair: cell.pair,
+                    speedRatio: cell.speedRatio,
+                })
+            }
+        }
+
+        return result
+    }
 
     for (let i = 0; i + 1 < cleaned.length; i += 2) {
         const pair = cleaned.slice(i, i + 2)
@@ -118,11 +187,47 @@ const parseScoreData = (data: string): Array<{ beat: Fraction; pair: string }> =
             result.push({
                 beat: new Fraction(i, cleaned.length),
                 pair,
+                speedRatio: 1,
             })
         }
     }
 
     return result
+}
+
+const parseTimedValueDefinitions = (data: string): Array<{ bar: number; tick: number; value: number }> => {
+    const text = maybeUnquote(data)
+    const list: Array<{ bar: number; tick: number; value: number }> = []
+
+    if (!text.length) {
+        return list
+    }
+
+    for (const rawSegment of text.split(',')) {
+        const segment = rawSegment.trim()
+        if (!segment.length) {
+            continue
+        }
+
+        const match = segment.match(/(\d+)'(\d+):(\S+)/)
+        if (!match) {
+            continue
+        }
+
+        const value = Number(match[3])
+        if (!Number.isFinite(value)) {
+            continue
+        }
+
+        list.push({
+            bar: Number(match[1]),
+            tick: Number(match[2]),
+            value,
+        })
+    }
+
+    list.sort((a, b) => (a.bar === b.bar ? a.tick - b.tick : a.bar - b.bar))
+    return list
 }
 
 const parseMetaItems = (header: string, data: string): ParsedItem[] => {
@@ -203,30 +308,11 @@ const parseScoreItems = (header: string, data: string): ParsedItem[] => {
     match = header.match(/^TIL(..)$/)
     if (match) {
         const id = Number.parseInt(match[1], 36)
-        const text = maybeUnquote(data)
-        const list: SpeedDefinitionItem[] = []
-
-        if (text.length) {
-            for (const rawSegment of text.split(',')) {
-                const segment = rawSegment.trim()
-                if (!segment.length) {
-                    continue
-                }
-
-                const m = segment.match(/(\d+)'(\d+):(\S+)/)
-                if (!m) {
-                    continue
-                }
-
-                list.push({
-                    bar: Number(m[1]),
-                    tick: Number(m[2]),
-                    speed: Number(m[3]),
-                })
-            }
-        }
-
-        list.sort((a, b) => (a.bar === b.bar ? a.tick - b.tick : a.bar - b.bar))
+        const list = parseTimedValueDefinitions(data).map((item) => ({
+            bar: item.bar,
+            tick: item.tick,
+            speed: item.value,
+        }))
 
         items.push({
             kind: 'speedDefinition',
@@ -236,11 +322,23 @@ const parseScoreItems = (header: string, data: string): ParsedItem[] => {
         return items
     }
 
+    if (header.startsWith('VOLUME')) {
+        items.push({
+            kind: 'volumeDefinition',
+            items: parseTimedValueDefinitions(data).map((item) => ({
+                bar: item.bar,
+                tick: item.tick,
+                volume: item.value,
+            })),
+        })
+        return items
+    }
+
     match = header.match(/^(\d\d\d)1(.)$/)
     if (match) {
         const bar = Number(match[1])
         const lane = Number.parseInt(match[2], 36)
-        for (const { beat, pair } of parseScoreData(data)) {
+        for (const { beat, pair, speedRatio } of parseScoreData(data)) {
             items.push({
                 kind: 'note',
                 value: new Tap({
@@ -248,6 +346,7 @@ const parseScoreItems = (header: string, data: string): ParsedItem[] => {
                     lane,
                     width: Number.parseInt(pair[1], 36),
                     type: Number.parseInt(pair[0], 36),
+                    speed: visibleSpeedRatio(speedRatio),
                 }),
             })
         }
@@ -259,7 +358,7 @@ const parseScoreItems = (header: string, data: string): ParsedItem[] => {
         const bar = Number(match[1])
         const lane = Number.parseInt(match[2], 36)
         const channel = Number.parseInt(match[3], 36)
-        for (const { beat, pair } of parseScoreData(data)) {
+        for (const { beat, pair, speedRatio } of parseScoreData(data)) {
             items.push({
                 kind: 'note',
                 value: new Slide({
@@ -267,6 +366,7 @@ const parseScoreItems = (header: string, data: string): ParsedItem[] => {
                     lane,
                     width: Number.parseInt(pair[1], 36),
                     type: Number.parseInt(pair[0], 36),
+                    speed: visibleSpeedRatio(speedRatio),
                     channel,
                     decoration: false,
                 }),
@@ -279,7 +379,7 @@ const parseScoreItems = (header: string, data: string): ParsedItem[] => {
     if (match) {
         const bar = Number(match[1])
         const lane = Number.parseInt(match[2], 36)
-        for (const { beat, pair } of parseScoreData(data)) {
+        for (const { beat, pair, speedRatio } of parseScoreData(data)) {
             items.push({
                 kind: 'note',
                 value: new Directional({
@@ -287,6 +387,7 @@ const parseScoreItems = (header: string, data: string): ParsedItem[] => {
                     lane,
                     width: Number.parseInt(pair[1], 36),
                     type: Number.parseInt(pair[0], 36),
+                    speed: visibleSpeedRatio(speedRatio),
                 }),
             })
         }
@@ -298,7 +399,7 @@ const parseScoreItems = (header: string, data: string): ParsedItem[] => {
         const bar = Number(match[1])
         const lane = Number.parseInt(match[2], 36)
         const channel = Number.parseInt(match[3], 36)
-        for (const { beat, pair } of parseScoreData(data)) {
+        for (const { beat, pair, speedRatio } of parseScoreData(data)) {
             items.push({
                 kind: 'note',
                 value: new Slide({
@@ -306,6 +407,7 @@ const parseScoreItems = (header: string, data: string): ParsedItem[] => {
                     lane,
                     width: Number.parseInt(pair[1], 36),
                     type: Number.parseInt(pair[0], 36),
+                    speed: visibleSpeedRatio(speedRatio),
                     channel,
                     decoration: true,
                 }),
@@ -360,6 +462,20 @@ export const parseSusText = (content: string): Score => {
                                 }),
                             )
                         }
+                    }
+                    break
+
+                case 'volumeDefinition':
+                    for (const item of parsedItem.items) {
+                        const bar = new Fraction(item.bar).add(
+                            new Fraction(item.tick, score.ticksPerBeat * 4),
+                        )
+                        score.events.push(
+                            new Event({
+                                bar,
+                                seVolume: item.volume,
+                            }),
+                        )
                     }
                     break
 

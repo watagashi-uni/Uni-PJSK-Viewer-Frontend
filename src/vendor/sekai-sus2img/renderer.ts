@@ -63,6 +63,19 @@ const DEFAULT_STYLE = `.bar-line {
     text-anchor: end;
 }
 
+.note-speed-text {
+    font-size: 10px;
+    font-weight: 900;
+    font-family: Avenir;
+    fill: #ffffff;
+    stroke: #303030;
+    stroke-width: 2;
+    paint-order: stroke;
+    text-anchor: middle;
+    dominant-baseline: middle;
+    pointer-events: none;
+}
+
 .lyric-text {
     font-size: 12px;
     font-family: "Hiragino Kaku Gothic Pro", sans-serif;
@@ -195,6 +208,19 @@ const WHITE_STYLE = `.bar-line {
     text-anchor: end;
 }
 
+.note-speed-text {
+    font-size: 10px;
+    font-weight: 900;
+    font-family: Avenir;
+    fill: #303030;
+    stroke: #ffffff;
+    stroke-width: 2;
+    paint-order: stroke;
+    text-anchor: middle;
+    dominant-baseline: middle;
+    pointer-events: none;
+}
+
 .lyric-text {
     font-size: 12px;
     font-family: Avenir;
@@ -323,6 +349,21 @@ const formatBar = (bar: Fraction): string => {
     return `${Number(n.toFixed(4))}`
 }
 
+const formatSpeedRatio = (speedRatio: number): string => `${fmt(speedRatio)}x`
+
+const getNoteSpeedRatio = (note: Tap | Directional | Slide): number | null => {
+    if (note.speed) {
+        return note.speed
+    }
+    if (note instanceof Directional) {
+        return note.tap?.speed ?? null
+    }
+    if (note instanceof Slide) {
+        return note.tap?.speed ?? note.directional?.speed ?? note.directional?.tap?.speed ?? null
+    }
+    return null
+}
+
 const cloneEvent = (event: Event): Event =>
     new Event({
         bar: event.bar,
@@ -330,6 +371,7 @@ const cloneEvent = (event: Event): Event =>
         barLength: event.barLength,
         sentenceLength: event.sentenceLength,
         speed: event.speed,
+        seVolume: event.seVolume,
         section: event.section,
         text: event.text,
     })
@@ -598,6 +640,15 @@ class SentenceRenderer {
                 r(y - h / 2),
             )}" width="${fmt(r(w))}" height="${fmt(r(h))}" />`,
         )
+
+        const speedRatio = getNoteSpeedRatio(note)
+        if (speedRatio) {
+            this.noteImages.push(
+                `<text x="${fmt(r(x + w / 2))}" y="${fmt(r(y))}" class="note-speed-text">${escapeXml(
+                    formatSpeedRatio(speedRatio),
+                )}</text>`,
+            )
+        }
     }
 
     private addFlickImage(note: Directional | Slide) {
@@ -761,8 +812,18 @@ class SentenceRenderer {
                 parts.push(
                     `<text x="${fmt(r(this.drawing.laneWidth * this.drawing.nLanes + this.drawing.lanePadding - 2))}" y="${fmt(
                         r(eventY - 2),
-                    )}" class="speed-text">${escapeXml(`${event.speed}x`)}</text>`,
+                    )}" class="speed-text">${escapeXml(formatSpeedRatio(event.speed))}</text>`,
                 )
+            }
+
+            const hasEventText = Boolean(
+                event.bpm ||
+                    event.barLength ||
+                    event.section ||
+                    event.text ||
+                    event.seVolume !== null,
+            )
+            if (event.speed && !hasEventText) {
                 continue
             }
 
@@ -773,7 +834,14 @@ class SentenceRenderer {
                 printEvents.push(cloneEvent(event))
             }
 
-            const special = Boolean(event.bpm || event.barLength || event.speed || event.section || event.text)
+            const special = Boolean(
+                event.bpm ||
+                    event.barLength ||
+                    event.speed ||
+                    event.seVolume !== null ||
+                    event.section ||
+                    event.text,
+            )
             parts.push(
                 `<line x1="${fmt(r(0))}" y1="${fmt(r(eventY))}" x2="${fmt(r(this.drawing.lanePadding))}" y2="${fmt(
                     r(eventY),
@@ -792,6 +860,7 @@ class SentenceRenderer {
                     : null,
                 event.bpm ? `${fmt(event.bpm.toNumber())} BPM` : null,
                 event.barLength ? `${fmt(event.barLength.toNumber())}/4` : null,
+                event.seVolume !== null ? `SE ${fmt(event.seVolume)}` : null,
                 event.section,
                 event.text,
             ]
@@ -802,7 +871,14 @@ class SentenceRenderer {
                 continue
             }
 
-            const special = Boolean(event.bpm || event.barLength || event.speed || event.section || event.text)
+            const special = Boolean(
+                event.bpm ||
+                    event.barLength ||
+                    event.speed ||
+                    event.seVolume !== null ||
+                    event.section ||
+                    event.text,
+            )
             const y =
                 this.drawing.timeHeight * this.drawing.score.getTimeDelta(event.bar, this.barStop) +
                 this.drawing.timePadding

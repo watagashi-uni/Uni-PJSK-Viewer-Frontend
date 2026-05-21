@@ -14,6 +14,7 @@ export type RebaseEventInput = {
     bpm?: number | string
     barLength?: number | string
     sentenceLength?: number
+    seVolume?: number
     section?: string
     text?: string
 }
@@ -46,6 +47,7 @@ export const loadRebase = (value: RebaseInput | null | undefined): LoadedRebase 
                 bpm: event.bpm,
                 barLength: event.barLength,
                 sentenceLength: event.sentenceLength,
+                seVolume: event.seVolume,
                 section: event.section,
                 text: event.text,
             }),
@@ -106,7 +108,7 @@ export const applyRebase = (source: Score, input: RebaseInput): Score => {
 
     score.events = score.events.concat(
         source.events
-            .filter((event) => Boolean(event.speed || event.text))
+            .filter((event) => Boolean(event.speed || event.seVolume !== null || event.text))
             .map(
                 (event) =>
                     new Event({
@@ -115,6 +117,7 @@ export const applyRebase = (source: Score, input: RebaseInput): Score => {
                         barLength: event.barLength,
                         sentenceLength: event.sentenceLength,
                         speed: event.speed,
+                        seVolume: event.seVolume,
                         section: event.section,
                         text: event.text,
                     }),

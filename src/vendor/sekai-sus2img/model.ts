@@ -64,6 +64,7 @@ export class Event {
     barLength: Fraction | null
     sentenceLength: number | null
     speed: number | null
+    seVolume: number | null
     section: string | null
     text: string | null
 
@@ -73,6 +74,7 @@ export class Event {
         barLength?: Fraction | number | string | null
         sentenceLength?: number | null
         speed?: number | null
+        seVolume?: number | null
         section?: string | null
         text?: string | null
     }) {
@@ -81,6 +83,7 @@ export class Event {
         this.barLength = fractionOrNull(values.barLength)
         this.sentenceLength = values.sentenceLength ?? null
         this.speed = values.speed ?? null
+        this.seVolume = values.seVolume ?? null
         this.section = values.section ?? null
         this.text = values.text ?? null
     }
@@ -88,12 +91,13 @@ export class Event {
     merge(other: Event): Event {
         return new Event({
             bar: other.bar,
-            bpm: (other.bpm || this.bpm) ?? null,
-            barLength: (other.barLength || this.barLength) ?? null,
-            sentenceLength: (other.sentenceLength || this.sentenceLength) ?? null,
-            speed: (other.speed || this.speed) ?? null,
-            section: (other.section || this.section) ?? null,
-            text: (other.text || this.text) ?? null,
+            bpm: (other.bpm ?? this.bpm) ?? null,
+            barLength: (other.barLength ?? this.barLength) ?? null,
+            sentenceLength: (other.sentenceLength ?? this.sentenceLength) ?? null,
+            speed: (other.speed ?? this.speed) ?? null,
+            seVolume: (other.seVolume ?? this.seVolume) ?? null,
+            section: (other.section ?? this.section) ?? null,
+            text: (other.text ?? this.text) ?? null,
         })
     }
 
@@ -104,6 +108,7 @@ export class Event {
             barLength: this.barLength,
             sentenceLength: this.sentenceLength,
             speed: this.speed,
+            seVolume: this.seVolume,
             section: this.section,
             text: this.text,
         })
