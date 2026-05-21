@@ -188,20 +188,19 @@ const diagnosticSummaryText = computed(() => {
     return ''
   }
   if (!diagnostics.value.length) {
-    return '未发现会导致本家预览崩溃，或会被本家预览的规则处理的冲突。'
+    return '未发现会导致本家预览崩溃、渲染 bug，或会被本家预览的规则处理的冲突。'
   }
 
   const crashCount = diagnostics.value.filter((item) => item.severity === 'crash').length
-  if (!crashCount) {
-    return `共发现 ${diagnostics.value.length} 处会被本家预览的规则处理的重叠冲突。`
-  }
+  const renderBugCount = diagnostics.value.filter((item) => item.severity === 'render_bug').length
+  const dedupCount = diagnostics.value.filter((item) => item.severity === 'dedup').length
+  const parts = [
+    crashCount ? `${crashCount} 处会导致本家预览崩溃` : '',
+    renderBugCount ? `${renderBugCount} 处会导致渲染 bug` : '',
+    dedupCount ? `${dedupCount} 处会被本家预览的规则处理` : '',
+  ].filter(Boolean)
 
-  const dedupCount = diagnostics.value.length - crashCount
-  if (!dedupCount) {
-    return `共发现 ${crashCount} 处冲突，都会导致本家预览崩溃。`
-  }
-
-  return `共发现 ${diagnostics.value.length} 处冲突，其中 ${crashCount} 处会导致本家预览崩溃，另有 ${dedupCount} 处会被本家预览的规则处理。`
+  return `共发现 ${diagnostics.value.length} 处冲突，其中 ${parts.join('，另有 ')}。`
 })
 
 const crashDiagnosticCount = computed(
@@ -210,6 +209,10 @@ const crashDiagnosticCount = computed(
 
 const dedupDiagnosticCount = computed(
   () => diagnostics.value.filter((item) => item.severity === 'dedup').length,
+)
+
+const renderBugDiagnosticCount = computed(
+  () => diagnostics.value.filter((item) => item.severity === 'render_bug').length,
 )
 
 const scrollToSelectedConflict = async () => {
@@ -1142,7 +1145,11 @@ function clearForm() {
             <span>发现 {{ crashDiagnosticCount }} 处会导致本家预览崩溃的写法，请优先处理。</span>
           </div>
 
-          <div v-else-if="dedupDiagnosticCount" class="alert alert-warning">
+          <div v-if="renderBugDiagnosticCount" class="alert alert-warning">
+            <span>发现 {{ renderBugDiagnosticCount }} 处会导致本家预览渲染 bug 的 guide 重合。</span>
+          </div>
+
+          <div v-else-if="dedupDiagnosticCount && !crashDiagnosticCount" class="alert alert-warning">
             <span>发现 {{ dedupDiagnosticCount }} 处会被本家预览的规则去重或隐藏的冲突。</span>
           </div>
 
@@ -1151,7 +1158,7 @@ function clearForm() {
           </div>
 
           <div v-else-if="hasAuditRun && !diagnostics.length" class="alert alert-success">
-            <span>当前谱面没有发现会导致本家预览崩溃，或会被本家预览的规则隐藏的冲突。</span>
+            <span>当前谱面没有发现会导致本家预览崩溃、渲染 bug，或会被本家预览的规则隐藏的冲突。</span>
           </div>
 
           <div v-else class="space-y-3 max-h-[70vh] overflow-auto pr-1">
@@ -1165,9 +1172,13 @@ function clearForm() {
                   ? (item.id === selectedConflictId
                     ? 'border-error bg-error/10 shadow-[0_0_0_1px_rgba(220,38,38,0.15)]'
                     : 'border-error/40 bg-error/5 hover:border-error hover:bg-error/10')
-                  : (item.id === selectedConflictId
-                    ? 'border-warning bg-warning/10'
-                    : 'border-base-300 hover:border-warning/50 hover:bg-base-200/70'),
+                  : item.severity === 'render_bug'
+                    ? (item.id === selectedConflictId
+                      ? 'border-warning bg-warning/10 shadow-[0_0_0_1px_rgba(245,158,11,0.15)]'
+                      : 'border-warning/50 bg-warning/5 hover:border-warning hover:bg-warning/10')
+                    : (item.id === selectedConflictId
+                      ? 'border-warning bg-warning/10'
+                      : 'border-base-300 hover:border-warning/50 hover:bg-base-200/70'),
               ]"
               @click="selectConflict(item.id)"
             >
@@ -1179,7 +1190,7 @@ function clearForm() {
                       class="badge badge-sm shrink-0"
                       :class="item.severity === 'crash' ? 'badge-error' : 'badge-warning badge-outline'"
                     >
-                      {{ item.severity === 'crash' ? '会崩溃' : '会被处理' }}
+                      {{ item.severity === 'crash' ? '会崩溃' : item.severity === 'render_bug' ? '渲染 bug' : '会被处理' }}
                     </span>
                   </div>
                   <div class="text-xs text-base-content/60 mt-1">{{ item.positionText }} · {{ item.trackText }}</div>
@@ -1188,7 +1199,7 @@ function clearForm() {
               </div>
               <p
                 class="text-sm mt-2 leading-6"
-                :class="item.severity === 'crash' ? 'text-error' : 'text-base-content/70'"
+                :class="item.severity === 'crash' ? 'text-error' : item.severity === 'render_bug' ? 'text-warning' : 'text-base-content/70'"
               >
                 {{ item.summary }}
               </p>

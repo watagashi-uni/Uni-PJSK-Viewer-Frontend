@@ -76,6 +76,11 @@ type HoldNote = {
   endType: HoldNoteType
 }
 
+type ParsedHoldNode = ParsedSlideNote & {
+  holdIndex: number
+  isGuide: boolean
+}
+
 type AuditScore = {
   notes: Map<number, AuditNote>
   holdNotes: Map<number, HoldNote>
@@ -95,7 +100,7 @@ export type ConflictMarker = {
 export type ConflictDiagnostic = {
   id: string
   category: 'tap_overlap' | 'hold_coverage' | 'visible_overlap' | 'hold_relay_same_time' | 'hold_node_exact_overlap'
-  severity: 'dedup' | 'crash'
+  severity: 'dedup' | 'crash' | 'render_bug'
   title: string
   summary: string
   measure: number
@@ -537,14 +542,15 @@ const makeDiagnostic = (
 
 const makeSlideNodeDiagnostic = (
   category: ConflictDiagnostic['category'],
-  first: ParsedSlideNote,
-  second: ParsedSlideNote,
+  first: ParsedSlideNote | ParsedHoldNode,
+  second: ParsedSlideNote | ParsedHoldNode,
   title: string,
   summary: string,
+  severity: ConflictDiagnostic['severity'] = 'crash',
 ): ConflictDiagnostic => ({
   id: `${category}-${first.sourceOrder}-${second.sourceOrder}`,
   category,
-  severity: 'crash',
+  severity,
   title,
   summary,
   measure: first.measure,
@@ -592,6 +598,21 @@ const buildAuditScore = (sus: ParsedSus): { score: AuditScore; diagnostics: Conf
 
   const crashDiagnosticIds = new Set<string>()
 
+  const reportNodeDiagnostic = (
+    category: ConflictDiagnostic['category'],
+    first: ParsedSlideNote | ParsedHoldNode,
+    second: ParsedSlideNote | ParsedHoldNode,
+    title: string,
+    summary: string,
+    severity: ConflictDiagnostic['severity'] = 'crash',
+  ): void => {
+    const diagnostic = makeSlideNodeDiagnostic(category, first, second, title, summary, severity)
+    if (!crashDiagnosticIds.has(diagnostic.id)) {
+      crashDiagnosticIds.add(diagnostic.id)
+      diagnostics.push(diagnostic)
+    }
+  }
+
   for (const slide of sus.slides) {
     const relayNodes = slide
       .filter((note) => note.type === 3 || note.type === 5)
@@ -606,26 +627,57 @@ const buildAuditScore = (sus: ParsedSus): { score: AuditScore; diagnostics: Conf
         continue
       }
 
-      const diagnostic = makeSlideNodeDiagnostic(
+      reportNodeDiagnostic(
         'hold_relay_same_time',
         current,
         next,
         '会导致本家预览崩溃：同一长条中继点同刻',
         '同一根长条上存在两个处于完全同一时间的中继点，不管可见还是不可见，都可能让本家预览直接崩溃。',
       )
-      if (!crashDiagnosticIds.has(diagnostic.id)) {
-        crashDiagnosticIds.add(diagnostic.id)
-        diagnostics.push(diagnostic)
-      }
     }
   }
 
-  const holdNodes = sus.slides.flatMap((slide, holdIndex) =>
-    slide.map((note) => ({
-      ...note,
-      holdIndex,
-    })),
-  )
+  for (const guide of sus.guides) {
+    const relayNodes = guide
+      .filter((note) => note.type === 3 || note.type === 5)
+      .sort((left, right) =>
+        left.tick === right.tick ? left.sourceOrder - right.sourceOrder : left.tick - right.tick,
+      )
+
+    for (let index = 0; index < relayNodes.length - 1; index += 1) {
+      const current = relayNodes[index]
+      const next = relayNodes[index + 1]
+      if (!current || !next || current.tick !== next.tick) {
+        continue
+      }
+
+      reportNodeDiagnostic(
+        'hold_relay_same_time',
+        current,
+        next,
+        '会导致渲染 bug：同一 guide 中继点同刻',
+        '同一根 guide 上存在两个处于完全同一时间的中继点，可能导致本家预览渲染异常。',
+        'render_bug',
+      )
+    }
+  }
+
+  const holdNodes: ParsedHoldNode[] = [
+    ...sus.slides.flatMap((slide, holdIndex) =>
+      slide.map((note) => ({
+        ...note,
+        holdIndex,
+        isGuide: false,
+      })),
+    ),
+    ...sus.guides.flatMap((guide, guideIndex) =>
+      guide.map((note) => ({
+        ...note,
+        holdIndex: sus.slides.length + guideIndex,
+        isGuide: true,
+      })),
+    ),
+  ]
 
   for (let leftIndex = 0; leftIndex < holdNodes.length; leftIndex += 1) {
     const left = holdNodes[leftIndex]
@@ -650,17 +702,17 @@ const buildAuditScore = (sus: ParsedSus): { score: AuditScore; diagnostics: Conf
 
       const first = left.sourceOrder <= right.sourceOrder ? left : right
       const second = left.sourceOrder <= right.sourceOrder ? right : left
-      const diagnostic = makeSlideNodeDiagnostic(
+      const hasGuide = first.isGuide || second.isGuide
+      reportNodeDiagnostic(
         'hold_node_exact_overlap',
         first,
         second,
-        '会导致本家预览崩溃：不同长条节点完全重合',
-        '两根不同长条的节点在同一时间、同一轨道范围完全重合，这类写法可能让本家预览直接崩溃。',
+        hasGuide ? '会导致渲染 bug：guide 节点完全重合' : '会导致本家预览崩溃：不同长条节点完全重合',
+        hasGuide
+          ? 'guide 节点与另一根长条或 guide 的节点在同一时间、同一轨道范围完全重合，可能导致本家预览渲染异常。'
+          : '两根不同长条的节点在同一时间、同一轨道范围完全重合，这类写法可能让本家预览直接崩溃。',
+        hasGuide ? 'render_bug' : 'crash',
       )
-      if (!crashDiagnosticIds.has(diagnostic.id)) {
-        crashDiagnosticIds.add(diagnostic.id)
-        diagnostics.push(diagnostic)
-      }
     }
   }
 
@@ -1098,7 +1150,12 @@ const buildAuditScore = (sus: ParsedSus): { score: AuditScore; diagnostics: Conf
 
   diagnostics.sort((left, right) => {
     if (left.severity !== right.severity) {
-      return left.severity === 'crash' ? -1 : 1
+      const severityOrder: Record<ConflictDiagnostic['severity'], number> = {
+        crash: 0,
+        render_bug: 1,
+        dedup: 2,
+      }
+      return severityOrder[left.severity] - severityOrder[right.severity]
     }
     return left.sortTick === right.sortTick ? left.sortLane - right.sortLane : left.sortTick - right.sortTick
   })
