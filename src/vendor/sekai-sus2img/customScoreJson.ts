@@ -19,6 +19,19 @@ const toNumber = (value: unknown, fallback = 0): number => {
     return Number.isFinite(numeric) ? numeric : fallback
 }
 
+const sanitizeSpeedRatio = (value: unknown): number => {
+    const speedRatio = Number(value)
+    if (!Number.isFinite(speedRatio) || speedRatio <= 0) {
+        return 1
+    }
+    return speedRatio
+}
+
+const noteSpeedRatio = (note: Record<string, unknown>): number | null => {
+    const speedRatio = sanitizeSpeedRatio(note.speedRatio)
+    return Math.abs(speedRatio - 1) > 0.0001 ? speedRatio : null
+}
+
 const noteLane = (note: Record<string, unknown>): number => toNumber(note.laneStart) + 2
 
 const noteWidth = (note: Record<string, unknown>): number =>
@@ -179,6 +192,7 @@ const makeTap = (
         lane: noteLane(laneNote),
         width: noteWidth(laneNote),
         type,
+        speed: noteSpeedRatio(note),
     })
 
 const makeDirectional = (
@@ -193,6 +207,7 @@ const makeDirectional = (
         lane: noteLane(laneNote),
         width: noteWidth(laneNote),
         type,
+        speed: noteSpeedRatio(note),
         tap,
     })
 
@@ -440,6 +455,10 @@ export const scoreFromCustomScoreJson = (
         const bar = tickToBar(event.ticks)
         if (Number(event.eventType) === 0) {
             score.events.push(new Event({ bar, bpm: toNumber(event.changeValue, 120) }))
+        } else if (Number(event.eventType) === 1) {
+            score.events.push(new Event({ bar, speed: toNumber(event.changeValue, 1) }))
+        } else if (Number(event.eventType) === 2) {
+            score.events.push(new Event({ bar, seVolume: toNumber(event.changeValue, 1) }))
         } else if (Number(event.eventType) === 3) {
             score.events.push(new Event({ bar, barLength: timeSignatureToBeatLength(event.changeValue) }))
         }
@@ -522,6 +541,7 @@ export const scoreFromCustomScoreJson = (
                 lane: noteLane(outputNote),
                 width: noteWidth(outputNote),
                 type: slideType,
+                speed: noteSpeedRatio(note),
                 channel,
                 decoration,
             })
