@@ -1,6 +1,7 @@
-import apiClient from './client'
+import { versionApiClient } from './client'
+import { applyApiEndpointFromVersion, type ApiEndpointPayload } from './endpoint'
 
-export interface VersionInfo {
+export interface VersionInfo extends ApiEndpointPayload {
     dataVersion: string
     assetVersion: string
     appVersion: string
@@ -12,7 +13,8 @@ export interface VersionInfo {
  * 获取当前 master 数据版本号
  */
 export async function getVersion(): Promise<VersionInfo> {
-    const response = await apiClient.get<VersionInfo>('/api/version')
+    const response = await versionApiClient.get<VersionInfo>('/api/version')
+    applyApiEndpointFromVersion(response.data)
     return response.data
 }
 

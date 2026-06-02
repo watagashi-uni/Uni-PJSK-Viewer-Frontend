@@ -37,7 +37,7 @@ VITE_TOOLBOX_OAUTH_CLIENT_ID=uni-viewer-public
 ```
 
 Variable notes:
-- `VITE_API_BASE_URL`: backend API base URL (master/version/chart-share/sus2img etc.)
+- `VITE_API_BASE_URL`: fixed version API base URL. Other viewer backend requests use the `apiEndpoint` value returned by `GET /api/version`, falling back to this value if missing.
 - `VITE_CHART_PREVIEW_URL`: chart preview service URL used in music detail page
 - `VITE_TOOLBOX_OAUTH_BASE_URL`: Haruki toolbox OAuth server base URL
 - `VITE_TOOLBOX_OAUTH_CLIENT_ID`: OAuth client id for toolbox game-data read access; the server-side client should allow both `game-data:read` and `offline_access` so the browser can keep a refresh token
