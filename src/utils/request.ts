@@ -1,3 +1,5 @@
+import { resolveApiUrl } from '@/api/endpoint'
+
 export class RequestError extends Error {
     status: number;
     constructor(status: number, message: string) {
@@ -17,7 +19,6 @@ async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
 
 const profileBase = (import.meta.env.VITE_PROFILE_API_BASE_URL || '').replace(/\/+$/, '')
 const suiteBase = (import.meta.env.VITE_SUITE_API_BASE_URL || '').replace(/\/+$/, '')
-const defaultBase = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '')
 
 export const request = {
     getProfile<T = any>(path: string, options?: RequestInit) {
@@ -30,14 +31,16 @@ export const request = {
         return fetchJson<T>(`${suiteBase}${normalizedPath}`, options)
     },
 
-    get<T = any>(path: string, options?: RequestInit) {
-        const normalizedPath = path.startsWith('/') ? path : `/${path}`
-        return fetchJson<T>(`${defaultBase}${normalizedPath}`, options)
+    async get<T = any>(path: string, options?: RequestInit) {
+        return fetchJson<T>(await resolveApiUrl(path), options)
     },
 
-    post<T = any>(path: string, body?: BodyInit | null, options?: RequestInit) {
-        const normalizedPath = path.startsWith('/') ? path : `/${path}`
-        return fetchJson<T>(`${defaultBase}${normalizedPath}`, { ...options, method: 'POST', body })
+    async post<T = any>(path: string, body?: BodyInit | null, options?: RequestInit) {
+        return fetchJson<T>(await resolveApiUrl(path), { ...options, method: 'POST', body })
+    },
+
+    async fetchApi(path: string, options?: RequestInit) {
+        return fetch(await resolveApiUrl(path), options)
     },
 
     fetchRaw(url: string, options?: RequestInit) {

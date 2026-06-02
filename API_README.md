@@ -4,7 +4,7 @@
 
 ## Base URL
 
-Set via frontend env variable:
+Version API base URL is fixed by frontend env variable:
 
 - `VITE_API_BASE_URL`
 
@@ -12,6 +12,17 @@ Examples:
 
 - Production: `https://viewer-api.unipjsk.com`
 - Local: `http://127.0.0.1:5000`
+
+All non-version API requests use the endpoint returned by `GET /api/version`.
+Return a dedicated `apiEndpoint` key to override their base URL:
+
+```json
+{
+  "apiEndpoint": "https://viewer-api.unipjsk.com"
+}
+```
+
+If `apiEndpoint` is missing or invalid, the frontend falls back to `VITE_API_BASE_URL`.
 
 ## CORS
 
@@ -36,7 +47,8 @@ Response example:
 {
   "dataVersion": "6.3.5.11",
   "assetVersion": "6.3.5.10",
-  "appVersion": "6.3.5"
+  "appVersion": "6.3.5",
+  "apiEndpoint": "https://viewer-api.unipjsk.com"
 }
 ```
 

@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
+import { resolveApiUrl } from '@/api/endpoint'
 
 const route = useRoute()
 const chartPreviewHost = 'https://mmw-chart.unipjsk.com'
-const chartFileHost = 'https://charts-preview.unipjsk.com'
+const targetUrl = ref('')
 
 const shareId = computed(() => String(route.params.id || '').trim())
 const waveOffsetMs = computed(() => {
@@ -13,19 +14,20 @@ const waveOffsetMs = computed(() => {
   return Number.isFinite(parsed) ? parsed : 0
 })
 
-const targetUrl = computed(() => {
+async function buildTargetUrl() {
   if (!shareId.value) return ''
 
   const target = new URL('/', chartPreviewHost)
-  target.searchParams.set('sus', `${chartFileHost}/api/chart-share/${encodeURIComponent(shareId.value)}/chart.sus`)
-  target.searchParams.set('bgm', `${chartFileHost}/api/chart-share/${encodeURIComponent(shareId.value)}/bgm.mp3`)
+  target.searchParams.set('sus', await resolveApiUrl(`/api/chart-share/${encodeURIComponent(shareId.value)}/chart.sus`))
+  target.searchParams.set('bgm', await resolveApiUrl(`/api/chart-share/${encodeURIComponent(shareId.value)}/bgm.mp3`))
   if (waveOffsetMs.value !== 0) {
     target.searchParams.set('offset', String(-waveOffsetMs.value))
   }
   return target.toString()
-})
+}
 
-onMounted(() => {
+onMounted(async () => {
+  targetUrl.value = await buildTargetUrl()
   if (targetUrl.value) {
     window.location.replace(targetUrl.value)
   }

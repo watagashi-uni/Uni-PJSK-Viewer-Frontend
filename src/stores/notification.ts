@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { request } from '@/utils/request'
 
 export const useNotificationStore = defineStore('notification', () => {
     const isSupported = ref(false)
@@ -14,7 +15,7 @@ export const useNotificationStore = defineStore('notification', () => {
 
     async function checkLocation() {
         try {
-            const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/location`)
+            const res = await request.fetchApi('/api/location')
             const text = await res.text()
             isChina.value = (text.trim() === '1')
         } catch {
@@ -74,7 +75,7 @@ export const useNotificationStore = defineStore('notification', () => {
         const registration = await navigator.serviceWorker.ready
 
         // 获取 VAPID
-        const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/push/vapid-key`)
+        const res = await request.fetchApi('/api/push/vapid-key')
         if (!res.ok) throw new Error('Failed to get VAPID key')
         const { publicKey } = await res.json()
 
@@ -91,7 +92,7 @@ export const useNotificationStore = defineStore('notification', () => {
         }
 
         // 发到后端
-        const subscribeRes = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/push/subscribe`, {
+        const subscribeRes = await request.fetchApi('/api/push/subscribe', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -119,7 +120,7 @@ export const useNotificationStore = defineStore('notification', () => {
         const subscription = await registration.pushManager.getSubscription()
 
         if (subscription) {
-            await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/push/unsubscribe`, {
+            await request.fetchApi('/api/push/unsubscribe', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ endpoint: subscription.endpoint })
@@ -173,7 +174,7 @@ export const useNotificationStore = defineStore('notification', () => {
         const subscription = await registration.pushManager.getSubscription()
         if (!subscription) throw new Error('Not subscribed')
 
-        await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/push/test`, {
+        await request.fetchApi('/api/push/test', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

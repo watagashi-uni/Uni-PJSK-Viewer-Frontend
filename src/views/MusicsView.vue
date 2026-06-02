@@ -12,6 +12,7 @@ import Pagination from '@/components/Pagination.vue'
 import AssetImage from '@/components/AssetImage.vue'
 import { toRomaji } from '@/utils/kanaToRomaji'
 import AccountSelector from '@/components/AccountSelector.vue'
+import { request } from '@/utils/request'
 
 interface Music {
   id: number
@@ -427,7 +428,7 @@ const paginatedMusics = computed(() => {
 
 async function loadPjskb30() {
   try {
-    const resp = await fetch((import.meta.env.VITE_API_BASE_URL || '') + '/api/pjskb30')
+    const resp = await request.fetchApi('/api/pjskb30')
     if (!resp.ok) return
     const text = await resp.text()
     const map = new Map<string, number>()
