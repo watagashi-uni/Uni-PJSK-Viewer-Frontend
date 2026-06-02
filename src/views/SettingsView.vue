@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useSettingsStore } from '@/stores/settings'
 import { useMasterStore } from '@/stores/master'
 import { useNotificationStore } from '@/stores/notification'
@@ -78,7 +78,21 @@ const assetsHostOptions = [
   { value: settingsStore.ASSETS_HOST_GLOBAL, label: '海外源', desc: 'https://assets.unipjsk.com/' },
 ]
 
+const assetSourceNotice = computed(() => {
+  if (!settingsStore.cnAssetsPolicyLoaded) {
+    return '正在确认当前版本是否允许使用国内源，确认前资源会使用海外源。'
+  }
 
+  if (!settingsStore.cnAssetsAllowed) {
+    return '当前版本未开放国内源，资源会强制使用海外源，并忽略已保存的国内源设置。'
+  }
+
+  return '国内源已由当前版本开放，可按访问环境选择源站。'
+})
+
+function isAssetsHostOptionDisabled(value: string): boolean {
+  return value === settingsStore.ASSETS_HOST_CN && !settingsStore.cnAssetsAllowed
+}
 
 async function handleClearCache() {
   if (!confirm('确定要清空本地缓存吗？这将删除所有已缓存的数据，下次访问时需要重新下载。')) {
@@ -222,6 +236,7 @@ async function handleClearTranslationCache() {
               :key="option.value"
               class="btn btn-sm"
               :class="settingsStore.assetsHost === option.value ? 'btn-primary' : 'btn-ghost'"
+              :disabled="isAssetsHostOptionDisabled(option.value)"
               @click="settingsStore.setAssetsHost(option.value)"
             >
               {{ option.label }}
@@ -231,6 +246,14 @@ async function handleClearTranslationCache() {
           <p class="text-xs text-base-content/50">
             国内源：适合大陆地区访问 ｜ 海外源：Cloudflare CDN，适合海外地区访问
           </p>
+          <div
+            class="alert py-2 mt-3 text-xs"
+            :class="settingsStore.cnAssetsAllowed ? 'alert-info' : 'alert-warning'"
+          >
+            <AlertTriangle v-if="!settingsStore.cnAssetsAllowed" class="w-4 h-4 shrink-0" />
+            <Database v-else class="w-4 h-4 shrink-0" />
+            <span>{{ assetSourceNotice }}</span>
+          </div>
         </div>
       </div>
 
