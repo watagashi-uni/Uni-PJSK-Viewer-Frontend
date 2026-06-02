@@ -5,6 +5,7 @@ export interface VersionInfo {
     assetVersion: string
     appVersion: string
     updatedAt: string
+    enableCnAssets?: boolean
 }
 
 /**
@@ -13,4 +14,8 @@ export interface VersionInfo {
 export async function getVersion(): Promise<VersionInfo> {
     const response = await apiClient.get<VersionInfo>('/api/version')
     return response.data
+}
+
+export function isCnAssetsEnabled(versionInfo: VersionInfo): boolean {
+    return versionInfo.enableCnAssets === true
 }

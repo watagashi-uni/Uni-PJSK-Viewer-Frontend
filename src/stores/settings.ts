@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import apiClient from '@/api/client'
+import { getVersion, isCnAssetsEnabled } from '@/api/version'
 
 export const useSettingsStore = defineStore('settings', () => {
     const ASSETS_HOST_CN = 'https://assets-direct.unipjsk.com'
@@ -16,8 +17,20 @@ export const useSettingsStore = defineStore('settings', () => {
 
     // 默认 vocal 设置: 'sekai' | 'virtual_singer'
     const defaultVocal = ref<string>('sekai')
-    // 资源域名（默认国内源）
-    const assetsHost = ref<string>(ASSETS_HOST_CN)
+    const preferredAssetsHost = ref<string>(ASSETS_HOST_GLOBAL)
+    const cnAssetsAllowed = ref(false)
+    const cnAssetsPolicyLoaded = ref(false)
+    const assetsHost = computed(() => {
+        if (preferredAssetsHost.value === ASSETS_HOST_CN && !cnAssetsAllowed.value) {
+            return ASSETS_HOST_GLOBAL
+        }
+
+        return allowedAssetsHosts.has(preferredAssetsHost.value)
+            ? preferredAssetsHost.value
+            : ASSETS_HOST_GLOBAL
+    })
+
+    let cnAssetsPolicyPromise: Promise<void> | null = null
 
     // 应用主题
     function applyTheme(newTheme: string) {
@@ -46,8 +59,40 @@ export const useSettingsStore = defineStore('settings', () => {
         defaultVocal.value = vocal
     }
 
+    function normalizeAssetsHost(host: string, fallback = ASSETS_HOST_GLOBAL): string {
+        return allowedAssetsHosts.has(host) ? host : fallback
+    }
+
     function setAssetsHost(host: string) {
-        assetsHost.value = allowedAssetsHosts.has(host) ? host : ASSETS_HOST_CN
+        const normalizedHost = normalizeAssetsHost(host)
+
+        if (normalizedHost === ASSETS_HOST_CN && !cnAssetsAllowed.value) {
+            preferredAssetsHost.value = ASSETS_HOST_GLOBAL
+            return
+        }
+
+        preferredAssetsHost.value = normalizedHost
+    }
+
+    function syncCnAssetsPolicy(): Promise<void> {
+        if (cnAssetsPolicyPromise) {
+            return cnAssetsPolicyPromise
+        }
+
+        cnAssetsPolicyPromise = (async () => {
+            try {
+                const versionInfo = await getVersion()
+                cnAssetsAllowed.value = isCnAssetsEnabled(versionInfo)
+            } catch (error) {
+                console.error('Failed to load asset source policy:', error)
+                cnAssetsAllowed.value = false
+            } finally {
+                cnAssetsPolicyLoaded.value = true
+                cnAssetsPolicyPromise = null
+            }
+        })()
+
+        return cnAssetsPolicyPromise
     }
 
     // 初始化：从 localStorage 恢复状态
@@ -80,25 +125,31 @@ export const useSettingsStore = defineStore('settings', () => {
 
         if (isCrawler) {
             console.log('Crawler detected, forcing global asset host.');
-            assetsHost.value = ASSETS_HOST_GLOBAL;
+            preferredAssetsHost.value = ASSETS_HOST_GLOBAL;
         } else {
             const savedAssetsHost = localStorage.getItem('settings_assetsHost')
             if (savedAssetsHost && allowedAssetsHosts.has(savedAssetsHost)) {
-                assetsHost.value = savedAssetsHost
+                preferredAssetsHost.value = savedAssetsHost
             } else {
-                assetsHost.value = ASSETS_HOST_CN // 默认设为国内，再发请求验证
+                preferredAssetsHost.value = ASSETS_HOST_GLOBAL
                 apiClient.get('/api/location')
                     .then(res => {
+                        if (localStorage.getItem('settings_assetsHost')) {
+                            return
+                        }
+
                         const hostToSet = res.data.isChina ? ASSETS_HOST_CN : ASSETS_HOST_GLOBAL;
-                        assetsHost.value = hostToSet;
+                        preferredAssetsHost.value = hostToSet;
                         localStorage.setItem('settings_assetsHost', hostToSet);
                     })
                     .catch(err => {
                         console.error('Failed to detect location:', err);
-                        localStorage.setItem('settings_assetsHost', ASSETS_HOST_CN);
+                        localStorage.setItem('settings_assetsHost', ASSETS_HOST_GLOBAL);
                     })
             }
         }
+
+        void syncCnAssetsPolicy()
 
         // 监听系统主题变化
         window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
@@ -134,7 +185,7 @@ export const useSettingsStore = defineStore('settings', () => {
         localStorage.setItem('settings_defaultVocal', value)
     })
 
-    watch(assetsHost, (value) => {
+    watch(preferredAssetsHost, (value) => {
         localStorage.setItem('settings_assetsHost', value)
     })
 
@@ -145,12 +196,16 @@ export const useSettingsStore = defineStore('settings', () => {
         maskSpoilers,
         theme,
         defaultVocal,
+        preferredAssetsHost,
         assetsHost,
+        cnAssetsAllowed,
+        cnAssetsPolicyLoaded,
         initialize,
         toggleSpoilers,
         toggleMaskSpoilers,
         setTheme,
         setDefaultVocal,
         setAssetsHost,
+        syncCnAssetsPolicy,
     }
 })
