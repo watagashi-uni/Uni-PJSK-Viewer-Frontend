@@ -350,7 +350,10 @@ const parseSusTextForAudit = (content: string): ParsedSus => {
     }
 
     const parsedLine = parseLine(measureOffset, line)
-    if (parsedLine.header.length !== 5 && parsedLine.header.length !== 6) {
+    if (
+      (parsedLine.header.length !== 5 && parsedLine.header.length !== 6)
+      || !isDigitString(parsedLine.header.slice(0, 3))
+    ) {
       continue
     }
 
