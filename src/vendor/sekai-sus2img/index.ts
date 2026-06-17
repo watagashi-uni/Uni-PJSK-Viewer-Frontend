@@ -1,9 +1,9 @@
 // @ts-nocheck
 import { Score } from './model'
-import { parseSusText } from './parser'
 import { applyRebase } from './rebase'
 import { renderScoreToSvg } from './renderer'
 import { scoreFromCustomScoreJson } from './customScoreJson'
+import { convertSusToCustomScoreJson } from './susToJsonWasm'
 
 export type Sus2ImgSkin = 'custom01' | 'custom02'
 
@@ -125,38 +125,6 @@ const parseRebaseJson = (text: string): Record<string, unknown> => {
     return parsed as RebaseInput
 }
 
-const createScore = (input: Sus2ImgRenderInput, runtimeOptions?: Sus2ImgRuntimeOptions): {
-    score: Score
-    noteHost: string
-    pixel: number
-} => {
-    const score = parseSusText(input.sus)
-    const rebaseInput = parseRebaseJson(input.rebase ?? '')
-    const rebased = input.rebase?.trim() ? applyRebase(score, rebaseInput) : score
-
-    const assetBase = resolveAssetBase(runtimeOptions?.assetOrigin)
-    const skin = input.skin ?? 'custom01'
-
-    rebased.meta.difficulty = input.difficulty ?? ''
-    rebased.meta.artist = input.artist ?? ''
-    rebased.meta.jacket = resolveJacketPath(assetBase, input.jacket)
-    rebased.meta.title = input.title ?? ''
-
-    let playlevel = `${input.playlevel ?? ''} 創作譜面`
-    if ((input.author ?? '').trim()) {
-        playlevel += ` by ${input.author?.trim()}`
-    }
-    rebased.meta.playlevel = playlevel
-
-    const pixel = normalizePixel(input.pixel)
-
-    return {
-        score: rebased,
-        noteHost: joinAssetPath(assetBase, `static/notes_new/${skin}`),
-        pixel,
-    }
-}
-
 const createCustomScoreJsonScore = (
     input: CustomScoreJsonRenderInput,
     runtimeOptions?: Sus2ImgRuntimeOptions,
@@ -191,23 +159,6 @@ const createCustomScoreJsonScore = (
         score,
         noteHost: joinAssetPath(assetBase, `static/notes_new/${skin}`),
         pixel: normalizePixel(input.pixel),
-    }
-}
-
-const toSvgPayload = (
-    input: Sus2ImgRenderInput,
-    runtimeOptions?: Sus2ImgRuntimeOptions,
-): { svgText: string; width: number; height: number } => {
-    const { score, noteHost, pixel } = createScore(input, runtimeOptions)
-    const rendered = renderScoreToSvg(score, {
-        noteHost,
-        noteSize: 18,
-        timeHeight: pixel,
-    })
-    return {
-        svgText: rendered.svg,
-        width: rendered.width,
-        height: rendered.height,
     }
 }
 
@@ -341,24 +292,16 @@ const defaultPngRenderer = async (svgText: string, width: number, height: number
     }
 }
 
+const susToCustomScoreJsonInput = async (input: Sus2ImgRenderInput): Promise<CustomScoreJsonRenderInput> => ({
+    ...input,
+    scoreJson: await convertSusToCustomScoreJson(input.sus),
+})
+
 export const renderSusToSvg = async (
     input: Sus2ImgRenderInput,
     runtimeOptions?: Sus2ImgRuntimeOptions,
 ): Promise<Sus2ImgFrontendResult> => {
-    const { svgText: rawSvgText, width, height } = toSvgPayload(input, runtimeOptions)
-    const svgText = await inlineSvgImages(rawSvgText)
-    const blob = new Blob([svgText], { type: 'image/svg+xml;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-
-    return {
-        source: 'frontend',
-        format: 'svg',
-        url,
-        blob,
-        width,
-        height,
-        svgText,
-    }
+    return renderCustomScoreJsonToSvg(await susToCustomScoreJsonInput(input), runtimeOptions)
 }
 
 export const renderCustomScoreJsonToSvg = async (
@@ -405,20 +348,7 @@ export const renderSusToPng = async (
     input: Sus2ImgRenderInput,
     runtimeOptions?: Sus2ImgRuntimeOptions,
 ): Promise<Sus2ImgFrontendResult> => {
-    const { svgText: rawSvgText, width, height } = toSvgPayload(input, runtimeOptions)
-    const svgText = await inlineSvgImages(rawSvgText)
-    const pngBlob = await (runtimeOptions?.pngRenderer ?? defaultPngRenderer)(svgText, width, height)
-    const url = URL.createObjectURL(pngBlob)
-
-    return {
-        source: 'frontend',
-        format: 'png',
-        url,
-        blob: pngBlob,
-        width,
-        height,
-        svgText,
-    }
+    return renderCustomScoreJsonToPng(await susToCustomScoreJsonInput(input), runtimeOptions)
 }
 
 export const revokeSus2ImgResult = (result: { url?: string | null } | null | undefined) => {
