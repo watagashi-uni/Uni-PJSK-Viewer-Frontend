@@ -1066,6 +1066,9 @@ function clearForm() {
               :accept="isJsonInput ? '.json,.txt' : '.sus,.txt'"
               @change="handleFileChange"
             />
+            <div v-if="!isJsonInput" class="alert alert-info mt-3 py-3 text-sm">
+              <span>sus转图片工具已完全还原游戏读取逻辑，会自动去重和一些其他重叠处理操作</span>
+            </div>
           </div>
 
           <div v-if="error" class="alert alert-error">

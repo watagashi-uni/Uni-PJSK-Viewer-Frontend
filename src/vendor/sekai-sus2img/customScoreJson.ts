@@ -281,6 +281,8 @@ const connectedNoteAddsTap = (
         (slideType === SlideType.RELAY && visibleRelayAsAttachment && isVisibleRelaySlideNote(note)) ||
         base === 3 ||
         Number(note.category) === 3 ||
+        base === 4 ||
+        Number(note.category) === 8 ||
         base === 8 ||
         base === 11 ||
         base === 9 ||
@@ -292,6 +294,7 @@ const connectedNoteAddsTap = (
 const standaloneTapType = (
     note: Record<string, unknown>,
     connectedSlideSlots: Set<string>,
+    decorationSlideSlots: Set<string>,
     _criticalSlideSlots: Set<string>,
     hiddenHeadSlideSlots: Set<string>,
 ): number => {
@@ -299,6 +302,7 @@ const standaloneTapType = (
     if (tapType === TapType.TREND || tapType === TapType.CRITICAL_TREND) return tapType
     if (hiddenHeadSlideSlots.has(noteSlotKey(note))) return tapType
     if (connectedSlideSlots.has(noteSlotKey(note))) return downgradeCriticalTapType(tapType)
+    if (decorationSlideSlots.has(noteSlotKey(note))) return tapType
     return tapType
 }
 
@@ -332,6 +336,7 @@ const addStandaloneNote = (
     note: Record<string, unknown>,
     tickToBar: TickToBar,
     connectedSlideSlots: Set<string>,
+    decorationSlideSlots: Set<string>,
     criticalSlideSlots: Set<string>,
     hiddenHeadSlideSlots: Set<string>,
 ) => {
@@ -339,7 +344,7 @@ const addStandaloneNote = (
         const tap = makeTap(
             note,
             tickToBar,
-            standaloneTapType(note, connectedSlideSlots, criticalSlideSlots, hiddenHeadSlideSlots),
+            standaloneTapType(note, connectedSlideSlots, decorationSlideSlots, criticalSlideSlots, hiddenHeadSlideSlots),
         )
         score.notes.push(makeDirectional(note, tickToBar, directionToDirectional(note.direction), note, tap))
         return
@@ -360,7 +365,7 @@ const addStandaloneNote = (
         makeTap(
             note,
             tickToBar,
-            standaloneTapType(note, connectedSlideSlots, criticalSlideSlots, hiddenHeadSlideSlots),
+            standaloneTapType(note, connectedSlideSlots, decorationSlideSlots, criticalSlideSlots, hiddenHeadSlideSlots),
         ),
     )
 }
@@ -386,9 +391,13 @@ const attachConnectedNote = (
     } else if (slide.type === SlideType.RELAY && isVisibleRelayAttachment(note)) {
         slide.tap = makeTap(note, tickToBar, TapType.FLICK, outputNote)
     } else if (base === 3 || Number(note.category) === 3) {
-        const tap = note.type ? makeTap(note, tickToBar, TapType.CRITICAL, outputNote) : null
+        const tap = makeTap(note, tickToBar, tapTypeFromJson(note), outputNote)
         slide.directional = makeDirectional(note, tickToBar, directionToDirectional(note.direction), outputNote, tap)
-        if (tap) slide.tap = tap
+        slide.tap = tap
+    } else if (base === 4 || Number(note.category) === 8) {
+        const tap = makeTap(note, tickToBar, tapTypeFromJson(note), outputNote)
+        slide.directional = makeDirectional(note, tickToBar, directionToDirectional(note.direction), outputNote, tap)
+        slide.tap = tap
     } else if (base === 8 || base === 11 || base === 9 || base === 12) {
         slide.tap = makeTap(note, tickToBar, tapTypeFromJson(note), outputNote)
     } else if (note.type && (base === 1 || base === 2)) {
@@ -420,6 +429,24 @@ const removeAdjacentVisibleRelayDuplicates = (
     }
     return filtered
 }
+
+const isSkippedHiddenConnectionNote = (note: Record<string, unknown>): boolean => {
+    const base = Number(note.noteBaseType)
+    return (
+        note.isSkip === true &&
+        (base === 6 || base === 14 || Number(note.category) === 11) &&
+        note.previousConnectionId !== -1 &&
+        note.nextConnectionId !== -1
+    )
+}
+
+const normalizeRenderChain = (
+    chain: Array<Record<string, unknown>>,
+): Array<Record<string, unknown>> =>
+    removeAdjacentVisibleRelayDuplicates(chain).filter((note) => !isSkippedHiddenConnectionNote(note))
+
+const isRenderableNote = (note: Record<string, unknown>): boolean =>
+    Number(note.noteBaseType) !== 7 && Number(note.category) !== 12
 
 export interface CustomScoreJsonRenderInputMeta {
     title?: string
@@ -464,22 +491,26 @@ export const scoreFromCustomScoreJson = (
         }
     }
 
-    const notes = [...(rawScore?.NoteList || [])].sort(
+    const notes = [...(rawScore?.NoteList || [])].filter(isRenderableNote).sort(
         (a, b) => toNumber(a.ticks) - toNumber(b.ticks) || toNumber(a.laneStart) - toNumber(b.laneStart) || toNumber(a.id) - toNumber(b.id),
     )
     const { chains, connectedIds } = buildChains(notes)
     const connectedSlideSlots = new Set<string>()
+    const decorationSlideSlots = new Set<string>()
     const criticalSlideSlots = new Set<string>()
     const hiddenHeadSlideSlots = new Set<string>()
     const standaloneTapSlots = new Set<string>()
     const occupiedTapSlots = new Set<string>()
 
-    for (const chain of chains) {
-        for (const note of chain) connectedSlideSlots.add(noteSlotKey(note))
+    for (const rawChain of chains) {
+        const chain = normalizeRenderChain(rawChain)
+        const slots = isDecorationSlideChain(chain) ? decorationSlideSlots : connectedSlideSlots
+        for (const note of chain) slots.add(noteSlotKey(note))
     }
 
     for (const rawChain of chains) {
-        const chain = removeAdjacentVisibleRelayDuplicates(rawChain)
+        const chain = normalizeRenderChain(rawChain)
+        if (chain.length < 2) continue
         const visibleRelayAsAttachment = chainHasCurveLine(chain)
         for (let index = 0; index < chain.length; index += 1) {
             const note = chain[index]
@@ -508,7 +539,8 @@ export const scoreFromCustomScoreJson = (
 
     const channelAvailableAt = new Array(36).fill(Number.NEGATIVE_INFINITY)
     for (const rawChain of chains) {
-        const chain = removeAdjacentVisibleRelayDuplicates(rawChain)
+        const chain = normalizeRenderChain(rawChain)
+        if (chain.length < 2) continue
         const startTick = toNumber(chain[0]?.ticks)
         const endTick = toNumber(chain[chain.length - 1]?.ticks, startTick)
         let channel = channelAvailableAt.findIndex((availableAt) => availableAt < startTick)
@@ -581,6 +613,7 @@ export const scoreFromCustomScoreJson = (
                 note,
                 tickToBar,
                 connectedSlideSlots,
+                decorationSlideSlots,
                 criticalSlideSlots,
                 hiddenHeadSlideSlots,
             )
