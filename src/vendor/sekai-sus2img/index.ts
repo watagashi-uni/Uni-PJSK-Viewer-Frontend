@@ -5,6 +5,8 @@ import { renderScoreToSvg } from './renderer'
 import { scoreFromCustomScoreJson } from './customScoreJson'
 import { convertSusToCustomScoreJson } from './susToJsonWasm'
 
+export { analyzeSusConflicts, type ConflictDiagnostic } from '@/utils/susConflictAudit'
+
 export type Sus2ImgSkin = 'custom01' | 'custom02'
 
 export interface Sus2ImgRenderInput {

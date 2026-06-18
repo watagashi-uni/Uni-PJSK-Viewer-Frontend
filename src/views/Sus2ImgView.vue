@@ -8,14 +8,14 @@ import {
   renderSusToPng,
   renderSusToSvg,
   revokeSus2ImgResult,
+  analyzeSusConflicts,
   type Sus2ImgFrontendResult,
   type Sus2ImgSkin,
+  type ConflictDiagnostic,
 } from '@/vendor/sekai-sus2img'
 import {
-  analyzeSusConflicts,
   annotateSvgWithConflict,
   buildRenderOverlayContext,
-  type ConflictDiagnostic,
 } from '@/utils/susConflictAudit'
 
 const FORM_STORAGE_KEY = 'sus2img-form-data'
@@ -188,7 +188,7 @@ const diagnosticSummaryText = computed(() => {
     return ''
   }
   if (!diagnostics.value.length) {
-    return '未发现会导致本家预览崩溃、渲染 bug，或会被本家预览的规则处理的冲突。'
+    return '未发现会导致游戏 SUS 导入合并、导出清理、预览崩溃或渲染 bug 的冲突。'
   }
 
   const crashCount = diagnostics.value.filter((item) => item.severity === 'crash').length
@@ -197,7 +197,7 @@ const diagnosticSummaryText = computed(() => {
   const parts = [
     crashCount ? `${crashCount} 处会导致本家预览崩溃` : '',
     renderBugCount ? `${renderBugCount} 处会导致渲染 bug` : '',
-    dedupCount ? `${dedupCount} 处会被本家预览的规则处理` : '',
+    dedupCount ? `${dedupCount} 处会被游戏 SUS 导入合并或导出清理` : '',
   ].filter(Boolean)
 
   return `共发现 ${diagnostics.value.length} 处冲突，其中 ${parts.join('，另有 ')}。`
@@ -1153,7 +1153,7 @@ function clearForm() {
           </div>
 
           <div v-else-if="dedupDiagnosticCount && !crashDiagnosticCount" class="alert alert-warning">
-            <span>发现 {{ dedupDiagnosticCount }} 处会被本家预览的规则去重或隐藏的冲突。</span>
+            <span>发现 {{ dedupDiagnosticCount }} 处会被游戏 SUS 导入合并或导出清理的冲突。</span>
           </div>
 
           <div v-if="auditError" class="alert alert-error">
@@ -1161,7 +1161,7 @@ function clearForm() {
           </div>
 
           <div v-else-if="hasAuditRun && !diagnostics.length" class="alert alert-success">
-            <span>当前谱面没有发现会导致本家预览崩溃、渲染 bug，或会被本家预览的规则隐藏的冲突。</span>
+            <span>当前谱面没有发现会导致游戏 SUS 导入合并、导出清理、预览崩溃或渲染 bug 的冲突。</span>
           </div>
 
           <div v-else class="space-y-3 max-h-[70vh] overflow-auto pr-1">

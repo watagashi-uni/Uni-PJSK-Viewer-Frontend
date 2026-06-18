@@ -2,9 +2,6 @@ import { applyRebase } from '@/vendor/sekai-sus2img/rebase'
 import { parseSusText } from '@/vendor/sekai-sus2img/parser'
 
 type FlickType = 'none' | 'default' | 'left' | 'right'
-type NoteType = 'tap' | 'hold' | 'holdMid' | 'holdEnd'
-type HoldStepType = 'normal' | 'hidden' | 'skip'
-type HoldNoteType = 'normal' | 'hidden' | 'guide'
 
 type SusDataLine = {
   header: string
@@ -19,8 +16,11 @@ type ParsedSusNote = {
   slotTotal: number
   bar: number
   lane: number
+  importLane: number
   width: number
   type: number
+  longNo: number
+  laneType: number
   sourceOrder: number
 }
 
@@ -38,6 +38,7 @@ type ParsedBarLength = {
 }
 
 type ParsedSus = {
+  rawNotes: ParsedSusNote[]
   taps: ParsedSusNote[]
   directionals: ParsedSusNote[]
   slides: ParsedSlideNote[][]
@@ -45,45 +46,9 @@ type ParsedSus = {
   barlengths: ParsedBarLength[]
 }
 
-type AuditNote = {
-  id: number
-  type: NoteType
-  parentId: number
-  tick: number
-  lane: number
-  susLane: number
-  width: number
-  critical: boolean
-  friction: boolean
-  flick: FlickType
-  sourceOrder: number
-  measure: number
-  slotIndex: number
-  slotTotal: number
-  bar: number
-}
-
-type HoldStep = {
-  id: number
-  type: HoldStepType
-}
-
-type HoldNote = {
-  start: HoldStep
-  steps: HoldStep[]
-  end: number
-  startType: HoldNoteType
-  endType: HoldNoteType
-}
-
 type ParsedHoldNode = ParsedSlideNote & {
   holdIndex: number
   isGuide: boolean
-}
-
-type AuditScore = {
-  notes: Map<number, AuditNote>
-  holdNotes: Map<number, HoldNote>
 }
 
 type MarkerRole = 'kept' | 'suppressed' | 'source'
@@ -99,7 +64,15 @@ export type ConflictMarker = {
 
 export type ConflictDiagnostic = {
   id: string
-  category: 'tap_overlap' | 'hold_coverage' | 'visible_overlap' | 'hold_relay_same_time' | 'hold_node_exact_overlap'
+  category:
+    | 'tap_overlap'
+    | 'hold_coverage'
+    | 'visible_overlap'
+    | 'hold_relay_same_time'
+    | 'hold_node_exact_overlap'
+    | 'import_slot_merge'
+    | 'single_note_cleanup'
+    | 'ambiguous_overlap'
   severity: 'dedup' | 'crash' | 'render_bug'
   title: string
   summary: string
@@ -134,9 +107,6 @@ export type RenderOverlayContext = {
   totalHeight: number
   sentenceLayouts: RenderSentenceLayout[]
 }
-
-const MIN_LANE = 0
-const MAX_LANE = 11
 
 const DEFAULT_LANE_WIDTH = 16
 const DEFAULT_LANE_PADDING = 40
@@ -272,7 +242,27 @@ const getNoteStream = (stream: ParsedSlideNote[]): ParsedSlideNote[][] => {
   return result
 }
 
-const noteKey = (note: { tick: number; lane: number }): string => `${note.tick}-${note.lane}`
+const getImportLane = (laneNo: string): number => {
+  switch (laneNo) {
+    case '2': return 0
+    case '3': return 1
+    case '4': return 2
+    case '5': return 3
+    case '6': return 4
+    case '7': return 5
+    case '8': return 6
+    case '9': return 7
+    case 'a': return 8
+    case 'b': return 9
+    case 'c': return 10
+    case 'd': return 11
+    case 'f': return 13
+    case 'e': return -2
+    default: return -1
+  }
+}
+
+const parseSusHexDigit = (value: string): number => /^[0-9a-f]$/u.test(value) ? Number.parseInt(value, 16) : -1
 
 const getPositionText = (measure: number, slotIndex: number, slotTotal: number): string => {
   if (slotIndex === 0) {
@@ -289,31 +279,6 @@ const getTrackText = (lane: number, width: number): string => {
   const start = lane + 1
   const end = lane + width
   return width > 1 ? `轨道 ${start}-${end}` : `轨道 ${start}`
-}
-
-const noteKindLabel = (note: AuditNote): string => {
-  if (note.type === 'hold') {
-    return 'Hold 起点'
-  }
-  if (note.type === 'holdMid') {
-    return 'Hold 中继'
-  }
-  if (note.type === 'holdEnd') {
-    if (note.flick) {
-      return 'Hold Flick 终点'
-    }
-    return 'Hold 终点'
-  }
-  if (note.friction) {
-    return note.critical ? 'Critical Trace' : 'Trace'
-  }
-  if (note.flick !== 'none') {
-    return note.critical ? 'Critical Flick' : 'Flick'
-  }
-  if (note.critical) {
-    return 'Critical Tap'
-  }
-  return 'Tap'
 }
 
 const parseSusTextForAudit = (content: string): ParsedSus => {
@@ -374,6 +339,7 @@ const parseSusTextForAudit = (content: string): ParsedSus => {
 
   const bars = getBars(barlengths, ticksPerBeat)
   const sus: ParsedSus = {
+    rawNotes: [],
     taps: [],
     directionals: [],
     slides: [],
@@ -384,49 +350,55 @@ const parseSusTextForAudit = (content: string): ParsedSus => {
   const slideStreams = new Map<number, ParsedSlideNote[]>()
   const guideStreams = new Map<number, ParsedSlideNote[]>()
 
-  const appendNotes = (line: SusDataLine): ParsedSusNote[] => {
+  const appendNotes = (line: SusDataLine, laneType: number, longNo: number): ParsedSusNote[] => {
     const notes: ParsedSusNote[] = []
     for (let index = 0; index + 1 < line.data.length; index += 2) {
       if (line.data[index] === '0' && line.data[index + 1] === '0') {
         continue
       }
 
+      const sourceOrder = nextSourceOrder++
+      const laneChar = line.header.slice(4, 5).toLowerCase()
       notes.push({
         tick: getTicks(bars, line.measure, index, line.data.length),
         measure: line.measure,
         slotIndex: index,
         slotTotal: line.data.length,
         bar: line.measure + index / line.data.length,
-        lane: Number.parseInt(line.header.slice(4, 5), 36),
+        lane: Number.parseInt(laneChar, 36),
+        importLane: getImportLane(laneChar),
         width: Number.parseInt(line.data.slice(index + 1, index + 2), 36),
         type: Number.parseInt(line.data.slice(index, index + 1), 36),
-        sourceOrder: nextSourceOrder++,
+        longNo,
+        laneType,
+        sourceOrder,
       })
     }
+    sus.rawNotes.push(...notes)
     return notes
   }
 
   for (const line of noteLines) {
     const { header } = line
     if (header.length === 5 && header[3] === '1') {
-      sus.taps.push(...appendNotes(line))
+      sus.taps.push(...appendNotes(line, 1, -1))
       continue
     }
     if (header.length === 5 && header[3] === '5') {
-      sus.directionals.push(...appendNotes(line))
+      sus.directionals.push(...appendNotes(line, 5, -1))
       continue
     }
     if (header.length === 6 && header[3] === '3') {
-      const channel = Number.parseInt(header.slice(5, 6), 36)
+      const channel = parseSusHexDigit(header.slice(5, 6).toLowerCase())
       const stream = slideStreams.get(channel) ?? []
-      stream.push(...appendNotes(line))
+      stream.push(...appendNotes(line, 3, channel))
       slideStreams.set(channel, stream)
       continue
     }
     if (header.length === 6 && header[3] === '9') {
-      const channel = Number.parseInt(header.slice(5, 6), 36)
+      const channel = parseSusHexDigit(header.slice(5, 6).toLowerCase())
       const stream = guideStreams.get(channel) ?? []
-      stream.push(...appendNotes(line))
+      stream.push(...appendNotes(line, 9, channel))
       guideStreams.set(channel, stream)
     }
   }
@@ -440,108 +412,6 @@ const parseSusTextForAudit = (content: string): ParsedSus => {
 
   return sus
 }
-
-const notesOverlapWithSharedSide = (left: AuditNote, right: AuditNote): boolean => {
-  if (left.tick !== right.tick) {
-    return false
-  }
-
-  const leftStart = left.lane
-  const leftEnd = left.lane + left.width
-  const rightStart = right.lane
-  const rightEnd = right.lane + right.width
-  return leftStart < rightEnd && rightStart < leftEnd && (leftStart === rightStart || leftEnd === rightEnd)
-}
-
-const sortHoldSteps = (score: AuditScore, hold: HoldNote): void => {
-  hold.steps.sort((left, right) => {
-    const leftNote = score.notes.get(left.id)
-    const rightNote = score.notes.get(right.id)
-    if (!leftNote || !rightNote) {
-      return 0
-    }
-    return leftNote.tick === rightNote.tick ? leftNote.lane - rightNote.lane : leftNote.tick - rightNote.tick
-  })
-}
-
-const isTapCandidateForOverlapDedup = (note: AuditNote): boolean => note.type === 'tap' && !note.friction
-
-const isVisibleHoldMid = (
-  score: AuditScore,
-  holdStepTypesById: Map<number, HoldStepType>,
-  note: AuditNote,
-): boolean => {
-  if (note.type !== 'holdMid') {
-    return false
-  }
-  const hold = score.holdNotes.get(note.parentId)
-  if (!hold || hold.startType === 'guide' || hold.endType === 'guide') {
-    return false
-  }
-  return holdStepTypesById.get(note.id) === 'normal'
-}
-
-const isVisibleHoldStart = (score: AuditScore, note: AuditNote): boolean => {
-  if (note.type !== 'hold') {
-    return false
-  }
-  return score.holdNotes.get(note.id)?.startType === 'normal'
-}
-
-const isVisibleNote = (score: AuditScore, holdStepTypesById: Map<number, HoldStepType>, note: AuditNote): boolean => {
-  if (note.type === 'tap') {
-    return true
-  }
-  if (note.type === 'hold') {
-    return score.holdNotes.get(note.id)?.startType === 'normal'
-  }
-  if (note.type === 'holdEnd') {
-    return score.holdNotes.get(note.parentId)?.endType === 'normal'
-  }
-  if (note.type === 'holdMid') {
-    const hold = score.holdNotes.get(note.parentId)
-    return Boolean(hold && hold.startType !== 'guide' && hold.endType !== 'guide' && holdStepTypesById.get(note.id) === 'normal')
-  }
-  return false
-}
-
-const makeDiagnostic = (
-  category: ConflictDiagnostic['category'],
-  severity: ConflictDiagnostic['severity'],
-  target: AuditNote,
-  source: AuditNote,
-  title: string,
-  summary: string,
-): ConflictDiagnostic => ({
-  id: `${category}-${source.id}-${target.id}`,
-  category,
-  severity,
-  title,
-  summary,
-  measure: target.measure,
-  positionText: getPositionText(target.measure, target.slotIndex, target.slotTotal),
-  trackText: getTrackText(target.lane, target.width),
-  markers: [
-    {
-      id: `source-${source.id}`,
-      role: 'source',
-      label: source.id === target.id ? '当前音符' : `保留: ${noteKindLabel(source)}`,
-      bar: source.bar,
-      susLane: source.susLane,
-      width: source.width,
-    },
-    {
-      id: `target-${target.id}`,
-      role: source.id === target.id ? 'source' : 'suppressed',
-      label: source.id === target.id ? noteKindLabel(target) : `被隐藏: ${noteKindLabel(target)}`,
-      bar: target.bar,
-      susLane: target.susLane,
-      width: target.width,
-    },
-  ],
-  sortTick: target.tick,
-  sortLane: target.lane,
-})
 
 const makeSlideNodeDiagnostic = (
   category: ConflictDiagnostic['category'],
@@ -581,23 +451,520 @@ const makeSlideNodeDiagnostic = (
   sortLane: first.lane - 2,
 })
 
-const buildAuditScore = (sus: ParsedSus): { score: AuditScore; diagnostics: ConflictDiagnostic[] } => {
-  const score: AuditScore = {
-    notes: new Map<number, AuditNote>(),
-    holdNotes: new Map<number, HoldNote>(),
+type ImportCategory =
+  | 'Normal'
+  | 'Long'
+  | 'Connection'
+  | 'Flick'
+  | 'Friction'
+  | 'FrictionHide'
+  | 'FrictionLong'
+  | 'FrictionHideLong'
+  | 'FrictionFlick'
+  | 'Guide'
+  | 'GuideEnd'
+  | 'GuideHidden'
+  | 'Hidden'
+  | 'Skip'
+
+type ImportNoteInfo = {
+  bar: number
+  barProgress: number
+  tick: number
+  importLane: number
+  width: number
+  category: ImportCategory
+  critical: boolean
+  flick: FlickType
+  lineType: 'linear' | 'easeIn' | 'easeOut'
+  speedRatio: number
+  longNo: number
+  isSkip: boolean
+  source: ParsedSusNote
+  updateSources: ParsedSusNote[]
+  guideDict: boolean
+}
+
+type ImportDictionary = Map<string, ImportNoteInfo>
+
+const importSlotKey = (note: { tick: number; importLane: number }): string => `${note.tick}:${note.importLane}`
+
+const importCategoryLabel = (category: ImportCategory): string => {
+  switch (category) {
+    case 'Long': return 'Hold 头'
+    case 'Connection': return 'Hold 可视中继'
+    case 'Hidden': return 'Hold 隐藏中继'
+    case 'Guide': return 'Guide 头'
+    case 'GuideEnd': return 'Guide 尾'
+    case 'GuideHidden': return 'Guide 隐藏节点'
+    case 'Flick': return 'Flick'
+    case 'Friction': return 'Trace'
+    case 'FrictionHide': return 'Hidden Trace'
+    case 'FrictionLong': return 'Trace Hold'
+    case 'FrictionHideLong': return 'Hidden Trace Hold'
+    case 'FrictionFlick': return 'Trace Flick'
+    case 'Skip': return 'Skip 标记'
+    default: return 'Tap'
   }
+}
+
+const noteInfoLabel = (note: ImportNoteInfo): string => {
+  const critical = note.critical ? 'Critical ' : ''
+  return `${critical}${importCategoryLabel(note.category)}`
+}
+
+const parsedNoteLabel = (note: ParsedSusNote, category: ImportCategory): string => {
+  const critical =
+    (note.laneType === 1 && (note.type === 2 || note.type === 6 || note.type === 8))
+      ? 'Critical '
+      : ''
+  return `${critical}${importCategoryLabel(category)}`
+}
+
+const isGuideCategory = (category: ImportCategory): boolean =>
+  category === 'Guide' || category === 'GuideEnd' || category === 'GuideHidden'
+
+const isLongOrGuideStructural = (category: ImportCategory): boolean =>
+  category === 'Long'
+  || category === 'Connection'
+  || category === 'Hidden'
+  || category === 'Guide'
+  || category === 'GuideEnd'
+  || category === 'GuideHidden'
+  || category === 'FrictionLong'
+  || category === 'FrictionHideLong'
+
+const isSingleCleanupCategory = (category: ImportCategory): boolean =>
+  category === 'Hidden'
+
+const isHoldOrGuideEndpoint = (note: ImportNoteInfo): boolean => {
+  if (note.guideDict) {
+    return false
+  }
+  if (note.longNo === -1) {
+    return false
+  }
+  return note.category !== 'Connection' && note.category !== 'Hidden' && note.category !== 'Skip'
+}
+
+const laneOverlapsInclusive = (
+  left: { importLane: number; width: number },
+  right: { importLane: number; width: number },
+): boolean => {
+  const leftStart = Math.max(0, Math.min(11, left.importLane))
+  const leftEnd = Math.max(0, Math.min(11, left.importLane + left.width - 1))
+  const rightStart = Math.max(0, Math.min(11, right.importLane))
+  const rightEnd = Math.max(0, Math.min(11, right.importLane + right.width - 1))
+  return Math.min(leftStart, leftEnd) <= Math.max(rightStart, rightEnd)
+    && Math.min(rightStart, rightEnd) <= Math.max(leftStart, leftEnd)
+}
+
+const makeImportMarker = (
+  role: MarkerRole,
+  idPrefix: string,
+  label: string,
+  note: ParsedSusNote | ImportNoteInfo,
+): ConflictMarker => {
+  const source = 'source' in note ? note.source : note
+  const importLane = 'importLane' in note ? note.importLane : source.importLane
+  return {
+    id: `${idPrefix}-${source.sourceOrder}`,
+    role,
+    label,
+    bar: source.bar,
+    susLane: importLane + 2,
+    width: 'width' in note ? note.width : source.width,
+  }
+}
+
+const makeImportDiagnostic = (
+  category: ConflictDiagnostic['category'],
+  severity: ConflictDiagnostic['severity'],
+  target: ParsedSusNote | ImportNoteInfo,
+  source: ParsedSusNote | ImportNoteInfo,
+  title: string,
+  summary: string,
+): ConflictDiagnostic => {
+  const targetSource = 'source' in target ? target.source : target
+  const sourceSource = 'source' in source ? source.source : source
+  const targetLane = 'importLane' in target ? target.importLane : targetSource.importLane
+  const targetWidth = 'width' in target ? target.width : targetSource.width
+  return {
+    id: `${category}-${sourceSource.sourceOrder}-${targetSource.sourceOrder}`,
+    category,
+    severity,
+    title,
+    summary,
+    measure: targetSource.measure,
+    positionText: getPositionText(targetSource.measure, targetSource.slotIndex, targetSource.slotTotal),
+    trackText: getTrackText(targetLane, targetWidth),
+    markers: [
+      makeImportMarker('source', 'source', '已存在', source),
+      makeImportMarker('suppressed', 'target', '合并/覆盖', target),
+    ],
+    sortTick: targetSource.tick,
+    sortLane: targetLane,
+  }
+}
+
+const cloneNoteInfo = (note: ImportNoteInfo): ImportNoteInfo => ({
+  ...note,
+  updateSources: [...note.updateSources],
+})
+
+const updateNoteInfo = (current: ImportNoteInfo, incoming: ImportNoteInfo): void => {
+  if (incoming.category !== 'Normal') {
+    if (incoming.category === 'Long' && current.category === 'Friction') {
+      current.category = 'FrictionLong'
+    } else if (incoming.category === 'Flick' && current.category === 'Friction') {
+      current.category = 'FrictionFlick'
+    } else if (incoming.category === 'Long' && current.category === 'FrictionHide') {
+      current.category = 'FrictionHideLong'
+    } else {
+      current.category = incoming.category
+    }
+  }
+  if (incoming.critical) {
+    current.critical = true
+  }
+  if (incoming.flick !== 'none') {
+    current.flick = incoming.flick
+  }
+  if (incoming.lineType !== 'linear') {
+    current.lineType = incoming.lineType
+  }
+  if (incoming.speedRatio !== 1) {
+    current.speedRatio = incoming.speedRatio
+  }
+  if (incoming.longNo !== -1) {
+    current.longNo = incoming.longNo
+  }
+  current.updateSources.push(incoming.source)
+}
+
+const shouldReportImportMerge = (current: ImportNoteInfo, incoming: ImportNoteInfo): boolean => {
+  if (current.width !== incoming.width) {
+    return true
+  }
+  if (current.longNo !== -1 && incoming.longNo !== -1 && current.longNo !== incoming.longNo) {
+    return true
+  }
+  if (
+    isLongOrGuideStructural(current.category)
+    && isLongOrGuideStructural(incoming.category)
+    && current.category !== 'Skip'
+    && incoming.category !== 'Skip'
+  ) {
+    return true
+  }
+  return false
+}
+
+const importCategoryForSusNote = (note: ParsedSusNote): ImportCategory | null => {
+  if (note.longNo === -1 && note.laneType === 1) {
+    switch (note.type) {
+      case 1:
+      case 2: return 'Normal'
+      case 3: return 'Skip'
+      case 5:
+      case 6: return 'Friction'
+      case 7:
+      case 8: return 'FrictionHide'
+      default: return null
+    }
+  }
+  if (note.longNo === -1 && note.laneType === 5) {
+    switch (note.type) {
+      case 1:
+      case 3:
+      case 4: return 'Flick'
+      case 2:
+      case 5:
+      case 6: return 'Normal'
+      default: return null
+    }
+  }
+  if (note.longNo !== -1 && note.laneType === 3) {
+    switch (note.type) {
+      case 1: return 'Long'
+      case 2: return 'Normal'
+      case 3: return 'Connection'
+      case 5: return 'Hidden'
+      default: return null
+    }
+  }
+  if (note.longNo !== -1 && note.laneType === 9) {
+    switch (note.type) {
+      case 1: return 'Guide'
+      case 2: return 'GuideEnd'
+      case 3:
+      case 5: return 'GuideHidden'
+      default: return null
+    }
+  }
+  return null
+}
+
+const importNoteInfoFromSusNote = (note: ParsedSusNote, category: ImportCategory, guideDict: boolean): ImportNoteInfo => {
+  const flick: FlickType =
+    note.laneType === 5 && note.type === 3
+      ? 'left'
+      : note.laneType === 5 && note.type === 4
+        ? 'right'
+        : note.laneType === 5 && note.type === 1
+          ? 'default'
+          : 'none'
+  const lineType =
+    note.laneType === 5 && note.type === 2
+      ? 'easeIn'
+      : note.laneType === 5 && (note.type === 5 || note.type === 6)
+        ? 'easeOut'
+        : 'linear'
+  return {
+    bar: note.measure,
+    barProgress: note.slotTotal > 0 ? note.slotIndex / note.slotTotal : 0,
+    tick: note.tick,
+    importLane: note.importLane,
+    width: note.width,
+    category,
+    critical: note.laneType === 1 && (note.type === 2 || note.type === 6 || note.type === 8),
+    flick,
+    lineType,
+    speedRatio: 1,
+    longNo: note.longNo,
+    isSkip: category === 'Skip',
+    source: note,
+    updateSources: [note],
+    guideDict,
+  }
+}
+
+const addToImportDictionary = (
+  dict: ImportDictionary,
+  incoming: ImportNoteInfo,
+  diagnostics: ConflictDiagnostic[],
+): ImportNoteInfo => {
+  const key = importSlotKey(incoming)
+  const current = dict.get(key)
+  if (!current) {
+    dict.set(key, cloneNoteInfo(incoming))
+    return incoming
+  }
+
+  if (shouldReportImportMerge(current, incoming)) {
+    const widthText = current.width !== incoming.width
+      ? `；游戏会保留先进入槽位的宽度 ${current.width}，后续宽度 ${incoming.width} 不会重新开一个 note`
+      : ''
+    const longNoText = current.longNo !== -1 && incoming.longNo !== -1 && current.longNo !== incoming.longNo
+      ? `；两个 long/guide channel 分别是 ${current.longNo.toString(16)} 和 ${incoming.longNo.toString(16)}`
+      : ''
+    diagnostics.push(
+      makeImportDiagnostic(
+        'import_slot_merge',
+        'dedup',
+        incoming.source,
+        current,
+        'SUS 导入槽位合并',
+        `${parsedNoteLabel(incoming.source, incoming.category)} 与已存在的 ${noteInfoLabel(current)} 在同一时刻、同一 laneStart 导入槽位，游戏会合并到同一个 NoteInfo，不会生成两个独立 note${widthText}${longNoText}。`,
+      ),
+    )
+  }
+
+  updateNoteInfo(current, incoming)
+  return current
+}
+
+const applyGuideInheritance = (target: ImportNoteInfo, inherited: ImportNoteInfo | undefined): void => {
+  if (!inherited) {
+    return
+  }
+  if (inherited.critical) {
+    target.critical = true
+  }
+  if (inherited.flick !== 'none') {
+    target.flick = inherited.flick
+  }
+  if (inherited.lineType !== 'linear') {
+    target.lineType = inherited.lineType
+  }
+}
+
+const isValidImportNote = (note: ParsedSusNote): boolean =>
+  note.width >= 1
+  && note.width <= 14
+  && note.importLane >= 0
+  && note.width + note.importLane < 13
+
+const buildImportDictionaries = (sus: ParsedSus): {
+  normalDict: ImportDictionary
+  guideDict: ImportDictionary
+  diagnostics: ConflictDiagnostic[]
+} => {
   const diagnostics: ConflictDiagnostic[] = []
+  const normalDict: ImportDictionary = new Map()
+  const guideDict: ImportDictionary = new Map()
 
-  let nextId = 1
+  const rawNotes = [...sus.rawNotes].sort((left, right) => left.sourceOrder - right.sourceOrder)
+  for (const note of rawNotes) {
+    if (!isValidImportNote(note)) {
+      continue
+    }
+    const category = importCategoryForSusNote(note)
+    if (!category) {
+      continue
+    }
 
-  const flicks = new Map<string, FlickType>()
-  const criticals = new Set<string>()
-  const stepIgnore = new Set<string>()
-  const easeIns = new Set<string>()
-  const easeOuts = new Set<string>()
-  const slideKeys = new Set<string>()
-  const frictions = new Set<string>()
-  const hiddenHolds = new Set<string>()
+    if (!isGuideCategory(category)) {
+      const normalIncoming = importNoteInfoFromSusNote(note, category, false)
+      addToImportDictionary(normalDict, normalIncoming, diagnostics)
+    }
+
+    const inherited = normalDict.get(importSlotKey(note))
+    if (isGuideCategory(category)) {
+      const guideIncoming = importNoteInfoFromSusNote(note, category, true)
+      applyGuideInheritance(guideIncoming, inherited)
+      addToImportDictionary(guideDict, guideIncoming, diagnostics)
+    } else {
+      const guideCurrent = guideDict.get(importSlotKey(note))
+      if (guideCurrent) {
+        const guideUpdate = importNoteInfoFromSusNote(note, category, true)
+        if (shouldReportImportMerge(guideCurrent, guideUpdate)) {
+          diagnostics.push(
+            makeImportDiagnostic(
+              'import_slot_merge',
+              'dedup',
+              guideUpdate.source,
+              guideCurrent,
+              'Guide 导入槽位被普通 note 更新',
+              `${parsedNoteLabel(guideUpdate.source, guideUpdate.category)} 与已存在的 ${noteInfoLabel(guideCurrent)} 位于同一 guide 导入槽位，游戏会更新 guide 的属性，不会生成额外 guide 节点。`,
+            ),
+          )
+        }
+        updateNoteInfo(guideCurrent, guideUpdate)
+      }
+    }
+  }
+
+  return { normalDict, guideDict, diagnostics }
+}
+
+const findConnectedImportNotes = (notes: ImportNoteInfo[]): Set<ImportNoteInfo> => {
+  const connected = new Set<ImportNoteInfo>()
+  const byLongNo = new Map<string, ImportNoteInfo[]>()
+
+  for (const note of notes) {
+    if (note.longNo === -1) {
+      continue
+    }
+    const key = `${note.guideDict ? 'guide' : 'normal'}:${note.longNo}`
+    const list = byLongNo.get(key) ?? []
+    list.push(note)
+    byLongNo.set(key, list)
+  }
+
+  for (const list of byLongNo.values()) {
+    const sorted = [...list].sort((left, right) =>
+      left.tick === right.tick ? left.source.sourceOrder - right.source.sourceOrder : left.tick - right.tick,
+    )
+    const hasRoot = sorted.some((note) =>
+      note.guideDict ? note.category === 'Guide' : note.category === 'Long' || note.category === 'FrictionLong' || note.category === 'FrictionHideLong',
+    )
+    if (!hasRoot || sorted.length < 2) {
+      continue
+    }
+    for (const note of sorted) {
+      connected.add(note)
+    }
+  }
+
+  return connected
+}
+
+const buildGameImportDiagnostics = (sus: ParsedSus): ConflictDiagnostic[] => {
+  const { normalDict, guideDict, diagnostics } = buildImportDictionaries(sus)
+  const finalNotes = [...normalDict.values(), ...guideDict.values()]
+  const connectedNotes = findConnectedImportNotes(finalNotes)
+  const diagnosticIds = new Set(diagnostics.map((diagnostic) => diagnostic.id))
+
+  const pushDiagnostic = (diagnostic: ConflictDiagnostic): void => {
+    if (diagnosticIds.has(diagnostic.id)) {
+      return
+    }
+    diagnosticIds.add(diagnostic.id)
+    diagnostics.push(diagnostic)
+  }
+
+  for (const note of finalNotes) {
+    if (!isSingleCleanupCategory(note.category) || connectedNotes.has(note)) {
+      continue
+    }
+    const cover = finalNotes.find((other) =>
+      other !== note
+      && connectedNotes.has(other)
+      && other.tick === note.tick
+      && laneOverlapsInclusive(note, other),
+    )
+    if (!cover) {
+      continue
+    }
+    pushDiagnostic(
+      makeImportDiagnostic(
+        'single_note_cleanup',
+        'dedup',
+        note,
+        cover,
+        '单独 trace/guide/hidden 会被清理',
+        `${noteInfoLabel(note)} 是没有连接关系的单独节点，并且与同刻 connected ${noteInfoLabel(cover)} 重叠；游戏导出 Maker JSON 前会删除这个单独节点。`,
+      ),
+    )
+  }
+
+  const sortedNotes = [...finalNotes].sort((left, right) =>
+    left.tick === right.tick
+      ? left.importLane === right.importLane
+        ? left.source.sourceOrder - right.source.sourceOrder
+        : left.importLane - right.importLane
+      : left.tick - right.tick,
+  )
+
+  for (let leftIndex = 0; leftIndex < sortedNotes.length; leftIndex += 1) {
+    const left = sortedNotes[leftIndex]
+    if (!left || left.guideDict || !isHoldOrGuideEndpoint(left)) {
+      continue
+    }
+    for (let rightIndex = leftIndex + 1; rightIndex < sortedNotes.length; rightIndex += 1) {
+      const right = sortedNotes[rightIndex]
+      if (!right || right.tick !== left.tick) {
+        break
+      }
+      if (right.guideDict || left.longNo === right.longNo) {
+        continue
+      }
+      if (!laneOverlapsInclusive(left, right)) {
+        continue
+      }
+      const sameStartAndWidth = left.importLane === right.importLane && left.width === right.width
+      if (sameStartAndWidth) {
+        continue
+      }
+      pushDiagnostic(
+        makeImportDiagnostic(
+          'ambiguous_overlap',
+          'render_bug',
+          right,
+          left,
+          '长条/guide 端点同刻重叠',
+          `${noteInfoLabel(left)} 与 ${noteInfoLabel(right)} 在同一时刻范围重叠，但没有落在同一个导入槽位；这类写法不会按字典合并，却容易在长条头尾、去头尾 hold 或 guide 头尾解析/预览时产生歧义。`,
+        ),
+      )
+    }
+  }
+
+  return diagnostics
+}
+
+const buildAuditScore = (sus: ParsedSus): { diagnostics: ConflictDiagnostic[] } => {
+  const diagnostics: ConflictDiagnostic[] = buildGameImportDiagnostics(sus)
 
   const crashDiagnosticIds = new Set<string>()
 
@@ -705,449 +1072,16 @@ const buildAuditScore = (sus: ParsedSus): { score: AuditScore; diagnostics: Conf
 
       const first = left.sourceOrder <= right.sourceOrder ? left : right
       const second = left.sourceOrder <= right.sourceOrder ? right : left
-      const hasGuide = first.isGuide || second.isGuide
+      if (first.isGuide || second.isGuide) {
+        continue
+      }
       reportNodeDiagnostic(
         'hold_node_exact_overlap',
         first,
         second,
-        hasGuide ? '会导致渲染 bug：guide 节点完全重合' : '会导致本家预览崩溃：不同长条节点完全重合',
-        hasGuide
-          ? 'guide 节点与另一根长条或 guide 的节点在同一时间、同一轨道范围完全重合，可能导致本家预览渲染异常。'
-          : '两根不同长条的节点在同一时间、同一轨道范围完全重合，这类写法可能让本家预览直接崩溃。',
-        hasGuide ? 'render_bug' : 'crash',
+        '会导致本家预览崩溃：不同长条节点完全重合',
+        '两根不同长条的节点在同一时间、同一轨道范围完全重合，这类写法可能让本家预览直接崩溃。',
       )
-    }
-  }
-
-  for (const slide of sus.slides) {
-    for (const note of slide) {
-      if (note.type === 1 || note.type === 2 || note.type === 3 || note.type === 5) {
-        slideKeys.add(noteKey(note))
-      }
-    }
-  }
-
-  for (const directional of sus.directionals) {
-    const key = noteKey(directional)
-    switch (directional.type) {
-      case 1:
-        flicks.set(key, 'default')
-        break
-      case 3:
-        flicks.set(key, 'left')
-        break
-      case 4:
-        flicks.set(key, 'right')
-        break
-      case 2:
-        easeIns.add(key)
-        break
-      case 5:
-      case 6:
-        easeOuts.add(key)
-        break
-      default:
-        break
-    }
-  }
-
-  for (const tap of sus.taps) {
-    const key = noteKey(tap)
-    switch (tap.type) {
-      case 2:
-        criticals.add(key)
-        break
-      case 3:
-        stepIgnore.add(key)
-        break
-      case 5:
-        frictions.add(key)
-        break
-      case 6:
-        criticals.add(key)
-        frictions.add(key)
-        break
-      case 7:
-        hiddenHolds.add(key)
-        break
-      case 8:
-        hiddenHolds.add(key)
-        criticals.add(key)
-        break
-      default:
-        break
-    }
-  }
-
-  const shouldDropOverlappedTap = (candidate: AuditNote): AuditNote | null => {
-    if (!isTapCandidateForOverlapDedup(candidate)) {
-      return null
-    }
-
-    const candidateLeft = candidate.lane
-    const candidateRight = candidate.lane + candidate.width
-    for (const existing of score.notes.values()) {
-      if (!isTapCandidateForOverlapDedup(existing)) {
-        continue
-      }
-      if (existing.tick !== candidate.tick) {
-        continue
-      }
-      const existingLeft = existing.lane
-      const existingRight = existing.lane + existing.width
-      const overlaps = candidateLeft < existingRight && existingLeft < candidateRight
-      const sameSide = candidateLeft === existingLeft || candidateRight === existingRight
-      if (overlaps && sameSide) {
-        return existing
-      }
-    }
-    return null
-  }
-
-  for (const tap of sus.taps) {
-    if (tap.type === 7 || tap.type === 8) {
-      continue
-    }
-    if (tap.lane - 2 < MIN_LANE || tap.lane - 2 > MAX_LANE) {
-      continue
-    }
-
-    const key = noteKey(tap)
-    if (slideKeys.has(key)) {
-      continue
-    }
-
-    const note: AuditNote = {
-      id: nextId++,
-      type: 'tap',
-      parentId: -1,
-      tick: tap.tick,
-      lane: tap.lane - 2,
-      susLane: tap.lane,
-      width: tap.width,
-      critical: criticals.has(key),
-      friction: frictions.has(key),
-      flick: flicks.get(key) ?? 'none',
-      sourceOrder: tap.sourceOrder,
-      measure: tap.measure,
-      slotIndex: tap.slotIndex,
-      slotTotal: tap.slotTotal,
-      bar: tap.bar,
-    }
-
-    const keeper = shouldDropOverlappedTap(note)
-    if (keeper) {
-      diagnostics.push(
-        makeDiagnostic(
-          'tap_overlap',
-          'dedup',
-          note,
-          keeper,
-          '同刻重叠音符被忽略',
-          `${noteKindLabel(note)} 与更早出现的 ${noteKindLabel(keeper)} 在同一时刻共享边界重叠，按本家预览的规则会被忽略。`,
-        ),
-      )
-      continue
-    }
-
-    score.notes.set(note.id, note)
-  }
-
-  const fillSlides = (slides: ParsedSlideNote[][], isGuide: boolean): void => {
-    for (const slide of slides) {
-      if (slide.length < 2) {
-        continue
-      }
-
-      const start = slide.find((note) => note.type === 1 || note.type === 2)
-      if (!start) {
-        continue
-      }
-
-      const critical = criticals.has(noteKey(slide[0] ?? start))
-      const hold: HoldNote = {
-        start: { id: 0, type: 'normal' },
-        steps: [],
-        end: 0,
-        startType: 'normal',
-        endType: 'normal',
-      }
-      const startId = nextId++
-      hold.steps = []
-
-      for (const susNote of slide) {
-        const key = noteKey(susNote)
-        const ease = easeIns.has(key) ? 'easeIn' : easeOuts.has(key) ? 'easeOut' : 'linear'
-        void ease
-
-        switch (susNote.type) {
-          case 1: {
-            const note: AuditNote = {
-              id: startId,
-              type: 'hold',
-              parentId: -1,
-              tick: susNote.tick,
-              lane: susNote.lane - 2,
-              susLane: susNote.lane,
-              width: susNote.width,
-              critical,
-              friction: !isGuide && frictions.has(key),
-              flick: 'none',
-              sourceOrder: susNote.sourceOrder,
-              measure: susNote.measure,
-              slotIndex: susNote.slotIndex,
-              slotTotal: susNote.slotTotal,
-              bar: susNote.bar,
-            }
-
-            hold.startType = isGuide ? 'guide' : hiddenHolds.has(key) ? 'hidden' : 'normal'
-            score.notes.set(note.id, note)
-            hold.start = { id: note.id, type: 'normal' }
-            break
-          }
-
-          case 2: {
-            const note: AuditNote = {
-              id: nextId++,
-              type: 'holdEnd',
-              parentId: startId,
-              tick: susNote.tick,
-              lane: susNote.lane - 2,
-              susLane: susNote.lane,
-              width: susNote.width,
-              critical: critical || criticals.has(key),
-              friction: !isGuide && frictions.has(key),
-              flick: isGuide ? 'none' : flicks.get(key) ?? 'none',
-              sourceOrder: susNote.sourceOrder,
-              measure: susNote.measure,
-              slotIndex: susNote.slotIndex,
-              slotTotal: susNote.slotTotal,
-              bar: susNote.bar,
-            }
-
-            hold.endType = isGuide ? 'guide' : hiddenHolds.has(key) && note.flick === 'none' ? 'hidden' : 'normal'
-            score.notes.set(note.id, note)
-            hold.end = note.id
-            break
-          }
-
-          case 3:
-          case 5: {
-            const stepType: HoldStepType =
-              susNote.type === 3
-                ? stepIgnore.has(key) ? 'skip' : 'normal'
-                : 'hidden'
-
-            const note: AuditNote = {
-              id: nextId++,
-              type: 'holdMid',
-              parentId: startId,
-              tick: susNote.tick,
-              lane: susNote.lane - 2,
-              susLane: susNote.lane,
-              width: susNote.width,
-              critical,
-              friction: false,
-              flick: 'none',
-              sourceOrder: susNote.sourceOrder,
-              measure: susNote.measure,
-              slotIndex: susNote.slotIndex,
-              slotTotal: susNote.slotTotal,
-              bar: susNote.bar,
-            }
-
-            score.notes.set(note.id, note)
-            hold.steps.push({ id: note.id, type: stepType })
-            break
-          }
-
-          default:
-            break
-        }
-      }
-
-      if (hold.start.id && hold.end) {
-        sortHoldSteps(score, hold)
-        score.holdNotes.set(startId, hold)
-      }
-    }
-  }
-
-  fillSlides(sus.slides, false)
-  fillSlides(sus.guides, true)
-
-  const buildHoldStepTypes = (): Map<number, HoldStepType> => {
-    const holdStepTypesById = new Map<number, HoldStepType>()
-    for (const hold of score.holdNotes.values()) {
-      for (const step of hold.steps) {
-        holdStepTypesById.set(step.id, step.type)
-      }
-    }
-    return holdStepTypesById
-  }
-
-  {
-    const holdStepTypesById = buildHoldStepTypes()
-    const noteIds = [...score.notes.keys()]
-    const removedTapIds = new Set<number>()
-
-    for (const sourceId of noteIds) {
-      const source = score.notes.get(sourceId)
-      if (!source) {
-        continue
-      }
-      const visibleMid = isVisibleHoldMid(score, holdStepTypesById, source)
-      const visibleStart = isVisibleHoldStart(score, source)
-      if ((!visibleMid && !visibleStart) || source.friction) {
-        continue
-      }
-
-      for (const targetId of noteIds) {
-        if (sourceId === targetId) {
-          continue
-        }
-        const target = score.notes.get(targetId)
-        if (!target || !notesOverlapWithSharedSide(source, target)) {
-          continue
-        }
-
-        const shouldSuppress = visibleMid
-          ? target.type === 'holdEnd' || target.flick !== 'none' || target.friction
-          : target.flick !== 'none'
-        if (!shouldSuppress) {
-          continue
-        }
-
-        diagnostics.push(
-        makeDiagnostic(
-          'hold_coverage',
-          'dedup',
-          target,
-          source,
-          'Hold 覆盖了同刻音符',
-          `${noteKindLabel(source)} 在同一时刻覆盖了 ${noteKindLabel(target)}，后者会被隐藏。`,
-        ),
-      )
-
-        if (target.type === 'tap') {
-          removedTapIds.add(target.id)
-        } else if (target.type === 'holdEnd') {
-          const hold = score.holdNotes.get(target.parentId)
-          if (hold && hold.endType === 'normal') {
-            hold.endType = 'hidden'
-          }
-        }
-      }
-    }
-
-    for (const removedId of removedTapIds) {
-      score.notes.delete(removedId)
-    }
-  }
-
-  {
-    const holdStepTypesById = buildHoldStepTypes()
-    const noteIds = [...score.notes.keys()].sort((leftId, rightId) => {
-      const left = score.notes.get(leftId)
-      const right = score.notes.get(rightId)
-      if (!left || !right) {
-        return 0
-      }
-      if (left.tick !== right.tick) {
-        return left.tick - right.tick
-      }
-      if (left.sourceOrder !== right.sourceOrder) {
-        return left.sourceOrder - right.sourceOrder
-      }
-      return left.id - right.id
-    })
-
-    const keptIds: number[] = []
-    for (const noteId of noteIds) {
-      const note = score.notes.get(noteId)
-      if (!note || !isVisibleNote(score, holdStepTypesById, note)) {
-        continue
-      }
-
-      let keeper: AuditNote | null = null
-      for (const keptId of keptIds) {
-        const kept = score.notes.get(keptId)
-        if (!kept || !isVisibleNote(score, holdStepTypesById, kept)) {
-          continue
-        }
-
-        const keptIsSolidTrace = kept.type === 'tap' && kept.friction
-        const noteIsSolidTrace = note.type === 'tap' && note.friction
-        if (keptIsSolidTrace && noteIsSolidTrace) {
-          if (kept.tick !== note.tick) {
-            continue
-          }
-          const keptLeft = kept.lane
-          const keptRight = kept.lane + kept.width
-          const noteLeft = note.lane
-          const noteRight = note.lane + note.width
-          const overlaps = keptLeft < noteRight && noteLeft < keptRight
-          if (overlaps && keptLeft === noteLeft) {
-            keeper = kept
-            break
-          }
-          continue
-        }
-        if ((kept.friction || note.friction) && !(keptIsSolidTrace && noteIsSolidTrace)) {
-          continue
-        }
-        if (keptIsSolidTrace !== noteIsSolidTrace && (keptIsSolidTrace || noteIsSolidTrace)) {
-          continue
-        }
-        if (notesOverlapWithSharedSide(kept, note)) {
-          keeper = kept
-          break
-        }
-      }
-
-      if (!keeper) {
-        keptIds.push(noteId)
-        continue
-      }
-
-      diagnostics.push(
-        makeDiagnostic(
-          'visible_overlap',
-          'dedup',
-          note,
-          keeper,
-          '最终可见判重隐藏了音符',
-          `${noteKindLabel(note)} 与更早出现的 ${noteKindLabel(keeper)} 同刻共享边界重叠，最终显示时会被隐藏。`,
-        ),
-      )
-
-      if (note.type === 'tap') {
-        score.notes.delete(note.id)
-        continue
-      }
-      if (note.type === 'hold') {
-        const hold = score.holdNotes.get(note.id)
-        if (hold) {
-          hold.startType = 'hidden'
-        }
-        continue
-      }
-      if (note.type === 'holdEnd') {
-        const hold = score.holdNotes.get(note.parentId)
-        if (hold) {
-          hold.endType = 'hidden'
-        }
-        continue
-      }
-      if (note.type === 'holdMid') {
-        const hold = score.holdNotes.get(note.parentId)
-        if (hold) {
-          const step = hold.steps.find((item) => item.id === note.id)
-          if (step) {
-            step.type = 'hidden'
-          }
-        }
-      }
     }
   }
 
@@ -1163,7 +1097,7 @@ const buildAuditScore = (sus: ParsedSus): { score: AuditScore; diagnostics: Conf
     return left.sortTick === right.sortTick ? left.sortLane - right.sortLane : left.sortTick - right.sortTick
   })
 
-  return { score, diagnostics }
+  return { diagnostics }
 }
 
 const parseRebaseJson = (text: string): Record<string, unknown> => {
