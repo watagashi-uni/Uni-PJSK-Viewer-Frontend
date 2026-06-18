@@ -7,16 +7,13 @@ import {
   renderCustomScoreJsonToSvg,
   renderSusToPng,
   renderSusToSvg,
+  renderSusToSvgWithConflictOverlay,
   revokeSus2ImgResult,
   analyzeSusConflicts,
   type Sus2ImgFrontendResult,
   type Sus2ImgSkin,
   type ConflictDiagnostic,
 } from '@/vendor/sekai-sus2img'
-import {
-  annotateSvgWithConflict,
-  buildRenderOverlayContext,
-} from '@/utils/susConflictAudit'
 
 const FORM_STORAGE_KEY = 'sus2img-form-data'
 
@@ -112,34 +109,6 @@ const isHighlightReady = computed(
     && renderedRebaseText.value === analyzedRebaseText.value,
 )
 
-const renderOverlayState = computed(() => {
-  if (isJsonInput.value || !resultSvgText.value || !renderedChartText.value) {
-    return {
-      context: null,
-      error: null,
-    }
-  }
-
-  const pixelValue = Number(form.value.pixel)
-  const timeHeight = Number.isFinite(pixelValue) && pixelValue > 0 ? Math.floor(pixelValue) : 240
-
-  try {
-    return {
-      context: buildRenderOverlayContext(renderedChartText.value, renderedRebaseText.value, timeHeight),
-      error: null,
-    }
-  } catch (overlayError) {
-    return {
-      context: null,
-      error: overlayError instanceof Error ? overlayError.message : '无法生成定位预览',
-    }
-  }
-})
-
-const renderOverlayContext = computed(() => renderOverlayState.value.context)
-
-const previewErrorMessage = computed(() => resultSvgError.value ?? renderOverlayState.value.error)
-
 const resultBaseFileName = computed(() => {
   const rawName = form.value.title.trim() || 'sus2img-chart'
   const normalized = rawName
@@ -164,23 +133,6 @@ const resultDownloadDescription = computed(() => {
   const sourceText = resultSource.value === 'frontend' ? '前端' : '后端'
   const formatText = resultFormat.value.toUpperCase()
   return `最近一次由${sourceText}生成，输出格式为 ${formatText}。`
-})
-
-const annotatedSvgText = computed(() => {
-  if (!resultSvgText.value) {
-    return null
-  }
-
-  const context = renderOverlayContext.value
-  if (!context) {
-    return resultSvgText.value
-  }
-
-  return annotateSvgWithConflict(
-    resultSvgText.value,
-    context,
-    isHighlightReady.value ? selectedConflict.value : null,
-  )
 })
 
 const diagnosticSummaryText = computed(() => {
@@ -223,7 +175,14 @@ const scrollToSelectedConflict = async () => {
     return
   }
 
-  const focus = container.querySelector<SVGGraphicsElement>('#sus-conflict-focus')
+  // Try crash marker focus anchor first (new format)
+  let focus = container.querySelector<SVGGraphicsElement>(
+    `#sus-conflict-focus-${selectedConflictId.value}`,
+  )
+  // Fall back to legacy focus anchor
+  if (!focus) {
+    focus = container.querySelector<SVGGraphicsElement>('#sus-conflict-focus')
+  }
   if (!focus) {
     return
   }
@@ -293,9 +252,9 @@ watch(
 )
 
 watch(
-  [selectedConflictId, annotatedSvgText],
+  [selectedConflictId, () => resultSvgText.value],
   () => {
-    if (!selectedConflictId.value || !annotatedSvgText.value || !isHighlightReady.value) {
+    if (!selectedConflictId.value || !resultSvgText.value || !isHighlightReady.value) {
       return
     }
     void scrollToSelectedConflict()
@@ -420,7 +379,7 @@ async function handleAnalyze() {
     const chartText = await getChartText()
     await runAudit(chartText)
     if (diagnostics.value.length) {
-      await ensureSvgPreview(chartText)
+      await ensureSvgPreview(chartText, diagnostics.value)
       if (selectedConflictId.value) {
         await scrollToSelectedConflict()
       }
@@ -460,7 +419,7 @@ async function renderSvgPreviewViaBackend(chartText: string): Promise<string> {
   return await svgResponse.text()
 }
 
-async function ensureSvgPreview(chartText: string) {
+async function ensureSvgPreview(chartText: string, diagnosticsForGhost?: ConflictDiagnostic[]) {
   if (
     resultSvgText.value
     && renderedChartText.value === chartText
@@ -472,19 +431,26 @@ async function ensureSvgPreview(chartText: string) {
   resultSvgError.value = null
   isPreparingPreview.value = true
 
+  const baseInput = {
+    sus: chartText,
+    rebase: form.value.rebase,
+    title: form.value.title,
+    artist: form.value.artist,
+    author: form.value.author,
+    difficulty: form.value.difficulty,
+    playlevel: form.value.playlevel,
+    pixel: form.value.pixel,
+    skin: form.value.skin,
+    jacket: bottomLeftImageDataUrl.value || form.value.bottomLeftImageUrl.trim(),
+  }
+
   try {
-    const preview = await renderSusToSvg({
-      sus: chartText,
-      rebase: form.value.rebase,
-      title: form.value.title,
-      artist: form.value.artist,
-      author: form.value.author,
-      difficulty: form.value.difficulty,
-      playlevel: form.value.playlevel,
-      pixel: form.value.pixel,
-      skin: form.value.skin,
-      jacket: bottomLeftImageDataUrl.value || form.value.bottomLeftImageUrl.trim(),
-    })
+    const preview = diagnosticsForGhost?.length
+      ? await renderSusToSvgWithConflictOverlay({
+          ...baseInput,
+          diagnostics: diagnosticsForGhost,
+        })
+      : await renderSusToSvg(baseInput)
 
     resultSvgText.value = preview.svgText
     renderedChartText.value = chartText
@@ -1224,17 +1190,17 @@ function clearForm() {
             <span>检测到冲突，正在生成 SVG 预览并定位到对应位置，请稍候...</span>
           </div>
 
-          <div v-if="previewErrorMessage" class="alert alert-warning">
-            <span>{{ previewErrorMessage }}</span>
+          <div v-if="resultSvgError" class="alert alert-warning">
+            <span>{{ resultSvgError }}</span>
           </div>
 
-          <div v-else-if="!annotatedSvgText && !isPreparingPreview" class="alert">
+          <div v-else-if="!resultSvgText && !isPreparingPreview" class="alert">
             <span>检查到冲突后会自动生成 SVG，并在这里显示定位高亮结果。</span>
           </div>
 
-          <div v-else-if="annotatedSvgText" ref="svgPreviewContainer" class="h-[58vh] overflow-auto rounded-xl border border-base-300 bg-white p-4 scroll-smooth">
+          <div v-else-if="resultSvgText" ref="svgPreviewContainer" class="h-[58vh] overflow-auto rounded-xl border border-base-300 bg-white p-4 scroll-smooth">
             <!-- eslint-disable-next-line vue/no-v-html -->
-            <div class="inline-block min-w-full [&_svg]:max-w-none" v-html="annotatedSvgText"></div>
+            <div class="inline-block min-w-full [&_svg]:max-w-none" v-html="resultSvgText"></div>
           </div>
         </div>
       </section>

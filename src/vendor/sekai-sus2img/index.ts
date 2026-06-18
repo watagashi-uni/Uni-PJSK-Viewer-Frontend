@@ -1,11 +1,13 @@
 // @ts-nocheck
-import { Score } from './model'
+import { Score, Tap, Directional, Slide } from './model'
 import { applyRebase } from './rebase'
 import { renderScoreToSvg } from './renderer'
 import { scoreFromCustomScoreJson } from './customScoreJson'
 import { convertSusToCustomScoreJson } from './susToJsonWasm'
+import { buildGhostNotesFromDiagnostics, buildCrashMarkersFromDiagnostics, buildFocusAnchorsFromDiagnostics, type CrashMarkerRender } from './ghostNote'
 
 export { analyzeSusConflicts, type ConflictDiagnostic } from '@/utils/susConflictAudit'
+export { buildGhostNotesFromDiagnostics, buildCrashMarkersFromDiagnostics, buildFocusAnchorsFromDiagnostics, type CrashMarkerRender } from './ghostNote'
 
 export type Sus2ImgSkin = 'custom01' | 'custom02'
 
@@ -167,12 +169,18 @@ const createCustomScoreJsonScore = (
 const customScoreJsonToSvgPayload = (
     input: CustomScoreJsonRenderInput,
     runtimeOptions?: Sus2ImgRuntimeOptions,
+    ghostNotes?: (Tap | Directional | Slide)[],
+    crashMarkers?: CrashMarkerRender[],
+    focusAnchors?: CrashMarkerRender[],
 ): { svgText: string; width: number; height: number } => {
     const { score, noteHost, pixel } = createCustomScoreJsonScore(input, runtimeOptions)
     const rendered = renderScoreToSvg(score, {
         noteHost,
         noteSize: 18,
         timeHeight: pixel,
+        ghostNotes,
+        crashMarkers,
+        focusAnchors,
     })
     return {
         svgText: rendered.svg,
@@ -304,6 +312,46 @@ export const renderSusToSvg = async (
     runtimeOptions?: Sus2ImgRuntimeOptions,
 ): Promise<Sus2ImgFrontendResult> => {
     return renderCustomScoreJsonToSvg(await susToCustomScoreJsonInput(input), runtimeOptions)
+}
+
+/**
+ * Render SUS text to SVG with conflict audit overlay baked in.
+ *
+ * Ghost notes (suppressed/deduped notes) are rendered semi-transparently
+ * using sus2img's own note rendering. Crash markers are drawn as colored
+ * indicators directly in the SVG.
+ *
+ * Requires pre-computed diagnostics from analyzeSusConflicts.
+ */
+export const renderSusToSvgWithConflictOverlay = async (
+    input: Sus2ImgRenderInput & { diagnostics: import('@/utils/susConflictAudit').ConflictDiagnostic[] },
+    runtimeOptions?: Sus2ImgRuntimeOptions,
+): Promise<Sus2ImgFrontendResult> => {
+    const ghostNotes = buildGhostNotesFromDiagnostics(input.diagnostics)
+    const crashMarkers = buildCrashMarkersFromDiagnostics(input.diagnostics)
+    const focusAnchors = buildFocusAnchorsFromDiagnostics(input.diagnostics)
+
+    const susJsonInput = await susToCustomScoreJsonInput(input)
+    const { svgText: rawSvgText, width, height } = customScoreJsonToSvgPayload(
+        susJsonInput,
+        runtimeOptions,
+        ghostNotes,
+        crashMarkers,
+        focusAnchors,
+    )
+    const svgText = await inlineSvgImages(rawSvgText)
+    const blob = new Blob([svgText], { type: 'image/svg+xml;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+
+    return {
+        source: 'frontend',
+        format: 'svg',
+        url,
+        blob,
+        width,
+        height,
+        svgText,
+    }
 }
 
 export const renderCustomScoreJsonToSvg = async (

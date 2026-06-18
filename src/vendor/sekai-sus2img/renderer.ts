@@ -300,6 +300,8 @@ const WHITE_STYLE = `.bar-line {
 }
 `
 
+import type { CrashMarkerRender } from './ghostNote'
+
 export interface RenderOptions {
     noteHost: string
     styleSheet?: string
@@ -314,6 +316,9 @@ export interface RenderOptions {
     tickLength?: number
     tick2Length?: number
     nLanes?: number
+    ghostNotes?: (Tap | Directional | Slide)[]
+    crashMarkers?: CrashMarkerRender[]
+    focusAnchors?: CrashMarkerRender[]
 }
 
 export interface RenderedSvg {
@@ -386,11 +391,26 @@ class SentenceRenderer {
     private noteImages: string[] = []
     private flickImages: string[] = []
     private tickTexts: string[] = []
+    private crashMarkerElements: string[] = []
 
-    constructor(drawing: DrawingRenderer, barStart: number, barStop: number) {
+    private readonly sentenceGhostNotes: (Tap | Directional | Slide)[]
+    private readonly sentenceCrashMarkers: CrashMarkerRender[]
+    private readonly sentenceFocusAnchors: CrashMarkerRender[]
+
+    constructor(
+        drawing: DrawingRenderer,
+        barStart: number,
+        barStop: number,
+        sentenceGhostNotes?: (Tap | Directional | Slide)[],
+        sentenceCrashMarkers?: CrashMarkerRender[],
+        sentenceFocusAnchors?: CrashMarkerRender[],
+    ) {
         this.drawing = drawing
         this.barStart = barStart
         this.barStop = barStop
+        this.sentenceGhostNotes = sentenceGhostNotes ?? []
+        this.sentenceCrashMarkers = sentenceCrashMarkers ?? []
+        this.sentenceFocusAnchors = sentenceFocusAnchors ?? []
     }
 
     private get yBaseTop(): number {
@@ -601,7 +621,7 @@ class SentenceRenderer {
         this.slidePaths.push(`<path d="${commands.join(' ')}" class="${className}" />`)
     }
 
-    private addNoteImage(note: Tap | Directional | Slide) {
+    private addNoteImage(note: Tap | Directional | Slide, opacity = 1) {
         const y = this.getRelativeY(note.bar)
         const x = this.drawing.laneWidth * (note.lane - 2.5) + this.drawing.lanePadding
 
@@ -615,7 +635,9 @@ class SentenceRenderer {
         }
 
         if (note.isTrend()) {
-            this.addFrictionAmongImage(note)
+            if (opacity >= 1) {
+                this.addFrictionAmongImage(note)
+            }
             if (note.isCritical()) {
                 noteNumber = 5
             } else if (note instanceof Directional) {
@@ -635,11 +657,16 @@ class SentenceRenderer {
             }
         }
 
-        this.noteImages.push(
-            `<use href="#notes-${noteNumber}-${note.width}" x="${fmt(r(x))}" y="${fmt(
-                r(y - h / 2),
-            )}" width="${fmt(r(w))}" height="${fmt(r(h))}" />`,
-        )
+        const useTag = `<use href="#notes-${noteNumber}-${note.width}" x="${fmt(r(x))}" y="${fmt(
+            r(y - h / 2),
+        )}" width="${fmt(r(w))}" height="${fmt(r(h))}" />`
+
+        if (opacity < 1) {
+            this.noteImages.push(`<g opacity="${fmt(opacity)}">${useTag}</g>`)
+            return
+        }
+
+        this.noteImages.push(useTag)
 
         const speedRatio = getNoteSpeedRatio(note)
         if (speedRatio) {
@@ -760,6 +787,103 @@ class SentenceRenderer {
                 text,
             )}</text>`,
         )
+    }
+
+    private renderGhostNotes() {
+        for (const ghostNote of this.sentenceGhostNotes) {
+            if (ghostNote instanceof Tap) {
+                this.addNoteImage(ghostNote, 0.35)
+            } else if (ghostNote instanceof Directional) {
+                this.addGhostFlickImage(ghostNote)
+                this.addNoteImage(ghostNote, 0.35)
+            } else if (ghostNote instanceof Slide) {
+                // Ghost slide: note image only, no path, no flick
+                this.addNoteImage(ghostNote, 0.35)
+            }
+        }
+    }
+
+    private addGhostFlickImage(note: Directional) {
+        if (note.isNone()) {
+            return
+        }
+
+        let type: DirectionalType | null = DirectionalType.UP
+
+        if (note.type === DirectionalType.UPPER_LEFT) {
+            type = DirectionalType.UPPER_LEFT
+        } else if (note.type === DirectionalType.UPPER_RIGHT) {
+            type = DirectionalType.UPPER_RIGHT
+        }
+
+        if (type === null) {
+            return
+        }
+
+        const width = note.width < 6 ? note.width : 6
+        const y = this.getRelativeY(note.bar)
+
+        const h0 = this.drawing.flickHeight
+        const h = h0 * ((width + 3) / 3) ** 0.75
+        const w = h0 * 1.5 * ((width + 0.5) / 3) ** 0.75
+        const x = this.drawing.laneWidth * (note.lane - 2 + note.width / 2) + this.drawing.lanePadding
+        const bias =
+            type === DirectionalType.UPPER_LEFT
+                ? -this.drawing.noteSize / 4
+                : type === DirectionalType.UPPER_RIGHT
+                  ? this.drawing.noteSize / 4
+                  : 0
+
+        const src = `${this.drawing.noteHost}/notes_flick_arrow${note.isCritical() ? '_crtcl' : ''}_0${width}${
+            type === DirectionalType.UPPER_LEFT || type === DirectionalType.UPPER_RIGHT ? '_diagonal' : ''
+        }.png`
+
+        const transform =
+            type === DirectionalType.UPPER_RIGHT
+                ? ` transform="translate(${fmt(r((x + bias) * 2))} 0) scale(-1 1)"`
+                : ''
+
+        this.flickImages.push(
+            `<g opacity="0.35"><image href="${escapeXml(src)}" x="${fmt(r(x - w / 2 + bias))}" y="${fmt(
+                r(y + this.drawing.noteSize / 4 - h),
+            )}" width="${fmt(r(w))}" height="${fmt(r(h))}"${transform} /></g>`,
+        )
+    }
+
+    private renderCrashMarkers() {
+        for (const marker of this.sentenceCrashMarkers) {
+            const y = this.getRelativeY(marker.bar)
+            const cx = this.drawing.laneWidth * (marker.lane + marker.width / 2) + this.drawing.lanePadding
+            const r = Math.max(10, 8 + marker.width * 2)
+            const labelY = y - 18 - marker.markerIndex * 18
+
+            this.crashMarkerElements.push(
+                `<circle cx="${fmt(cx)}" cy="${fmt(y)}" r="${fmt(r)}" fill="${marker.color}" fill-opacity="0.16" stroke="${marker.color}" stroke-width="3" />`,
+            )
+            this.crashMarkerElements.push(
+                `<circle cx="${fmt(cx)}" cy="${fmt(y)}" r="4" fill="${marker.color}" />`,
+            )
+            this.crashMarkerElements.push(
+                `<line x1="${fmt(cx)}" y1="${fmt(y)}" x2="${fmt(cx)}" y2="${fmt(labelY)}" stroke="${marker.color}" stroke-width="2" stroke-dasharray="4 3" />`,
+            )
+            this.crashMarkerElements.push(
+                `<text x="${fmt(cx)}" y="${fmt(labelY)}" text-anchor="middle" font-size="16" font-weight="700" fill="${marker.color}" stroke="#ffffff" stroke-width="4" paint-order="stroke fill">${escapeXml(marker.label)}</text>`,
+            )
+        }
+    }
+
+    private renderFocusAnchors(): string {
+        const anchors: string[] = []
+
+        for (const anchor of this.sentenceFocusAnchors) {
+            const y = this.getRelativeY(anchor.bar)
+            const cx = this.drawing.laneWidth * (anchor.lane + anchor.width / 2) + this.drawing.lanePadding
+            anchors.push(
+                `<circle id="sus-conflict-focus-${anchor.diagnosticId}" cx="${fmt(cx)}" cy="${fmt(y)}" r="1" fill="transparent" />`,
+            )
+        }
+
+        return anchors.join('\n')
     }
 
     private renderEvents(): string[] {
@@ -980,6 +1104,12 @@ class SentenceRenderer {
             }
         }
 
+        // Render ghost notes (suppressed/deduped notes with reduced opacity)
+        this.renderGhostNotes()
+
+        // Render crash markers (for crash/render_bug diagnostics)
+        this.renderCrashMarkers()
+
         const height = this.drawing.timeHeight * this.drawing.score.getTimeDelta(this.barStart, this.barStop)
 
         const parts: string[] = []
@@ -1008,7 +1138,13 @@ class SentenceRenderer {
         parts.push(...this.noteImages)
         parts.push(...this.amongImages)
         parts.push(...this.flickImages.slice().reverse())
+        parts.push(...this.crashMarkerElements)
         parts.push(...this.tickTexts)
+
+        const focusAnchors = this.renderFocusAnchors()
+        if (focusAnchors) {
+            parts.push(focusAnchors)
+        }
 
         return {
             content: parts.join('\n'),
@@ -1033,6 +1169,9 @@ class DrawingRenderer {
     readonly tick2Length: number
     readonly noteHost: string
     readonly styleSheet: string
+    readonly ghostNotes: (Tap | Directional | Slide)[]
+    readonly crashMarkers: CrashMarkerRender[]
+    readonly focusAnchors: CrashMarkerRender[]
 
     constructor(score: Score, options: RenderOptions) {
         this.score = score
@@ -1051,6 +1190,10 @@ class DrawingRenderer {
 
         this.tickLength = options.tickLength ?? 24
         this.tick2Length = options.tick2Length ?? 8
+
+        this.ghostNotes = options.ghostNotes ?? []
+        this.crashMarkers = options.crashMarkers ?? []
+        this.focusAnchors = options.focusAnchors ?? []
 
         this.styleSheet = `${DEFAULT_STYLE}\n${WHITE_STYLE}${options.styleSheet ? `\n${options.styleSheet}` : ''}`
     }
@@ -1145,7 +1288,27 @@ class DrawingRenderer {
                     i === bar + previousSentenceLength ||
                     i === nBars)
             ) {
-                const sentence = new SentenceRenderer(this, bar, i).render()
+                // Filter ghost notes for this sentence's bar range
+                const sentenceGhosts = this.ghostNotes.filter((note) => {
+                    const noteBar = note.bar.toNumber()
+                    return noteBar >= bar - 1 && noteBar < i + 1
+                })
+                // Filter crash markers for this sentence's bar range
+                const sentenceCrash = this.crashMarkers.filter((marker) => {
+                    const markerBar = marker.bar.toNumber()
+                    return markerBar >= bar - 1 && markerBar < i + 1
+                })
+                // Filter focus anchors for this sentence's bar range
+                const sentenceFocus = this.focusAnchors.filter((anchor) => {
+                    const anchorBar = anchor.bar.toNumber()
+                    return anchorBar >= bar - 1 && anchorBar < i + 1
+                })
+                const sentence = new SentenceRenderer(
+                    this, bar, i,
+                    sentenceGhosts.length ? sentenceGhosts : undefined,
+                    sentenceCrash.length ? sentenceCrash : undefined,
+                    sentenceFocus.length ? sentenceFocus : undefined,
+                ).render()
                 drawings.push(sentence)
                 totalWidth += sentence.width
                 if (totalHeight < sentence.height) {
