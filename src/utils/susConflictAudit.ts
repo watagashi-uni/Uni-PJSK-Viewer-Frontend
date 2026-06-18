@@ -60,6 +60,10 @@ export type ConflictMarker = {
   bar: number
   susLane: number
   width: number
+  /** laneType from the SUS note: 1=tap, 3=slide, 5=directional, 9=guide */
+  noteLaneType?: number
+  /** type from the SUS note (TapType / DirectionalType / SlideType enum value) */
+  noteType?: number
 }
 
 export type ConflictDiagnostic = {
@@ -437,6 +441,8 @@ const makeSlideNodeDiagnostic = (
       bar: first.bar,
       susLane: first.lane,
       width: first.width,
+      noteLaneType: first.laneType,
+      noteType: first.type,
     },
     {
       id: `second-${second.sourceOrder}`,
@@ -445,6 +451,8 @@ const makeSlideNodeDiagnostic = (
       bar: second.bar,
       susLane: second.lane,
       width: second.width,
+      noteLaneType: second.laneType,
+      noteType: second.type,
     },
   ],
   sortTick: first.tick,
@@ -524,16 +532,6 @@ const parsedNoteLabel = (note: ParsedSusNote, category: ImportCategory): string 
 const isGuideCategory = (category: ImportCategory): boolean =>
   category === 'Guide' || category === 'GuideEnd' || category === 'GuideHidden'
 
-const isLongOrGuideStructural = (category: ImportCategory): boolean =>
-  category === 'Long'
-  || category === 'Connection'
-  || category === 'Hidden'
-  || category === 'Guide'
-  || category === 'GuideEnd'
-  || category === 'GuideHidden'
-  || category === 'FrictionLong'
-  || category === 'FrictionHideLong'
-
 const isSingleCleanupCategory = (category: ImportCategory): boolean =>
   category === 'Hidden'
 
@@ -574,6 +572,8 @@ const makeImportMarker = (
     bar: source.bar,
     susLane: importLane + 2,
     width: 'width' in note ? note.width : source.width,
+    noteLaneType: source.laneType,
+    noteType: source.type,
   }
 }
 
@@ -643,21 +643,21 @@ const updateNoteInfo = (current: ImportNoteInfo, incoming: ImportNoteInfo): void
 }
 
 const shouldReportImportMerge = (current: ImportNoteInfo, incoming: ImportNoteInfo): boolean => {
+  // Only report when two notes of the SAME kind collide at the same import slot.
+  // Different laneTypes (tap+directional, tap+slide, slide+guide) are INTENTIONAL —
+  // the game uses import slot collisions to combine properties (create flicks,
+  // attach taps to slides, let guides inherit from normal notes, etc).
+  // Same laneType collisions (two taps, two slides, two guides at the same spot)
+  // are almost certainly authoring mistakes.
+  if (current.source.laneType !== incoming.source.laneType) {
+    return false
+  }
+  // Width differs — game keeps the first note's width, incoming width is lost
   if (current.width !== incoming.width) {
     return true
   }
-  if (current.longNo !== -1 && incoming.longNo !== -1 && current.longNo !== incoming.longNo) {
-    return true
-  }
-  if (
-    isLongOrGuideStructural(current.category)
-    && isLongOrGuideStructural(incoming.category)
-    && current.category !== 'Skip'
-    && incoming.category !== 'Skip'
-  ) {
-    return true
-  }
-  return false
+  // Two notes of the same kind at the same position — one completely overwrites the other
+  return true
 }
 
 const importCategoryForSusNote = (note: ParsedSusNote): ImportCategory | null => {
@@ -1117,6 +1117,7 @@ export const analyzeSusConflicts = (susText: string): ConflictDiagnostic[] => {
   return diagnostics
 }
 
+/** @deprecated Use renderSusToSvgWithConflictOverlay from sekai-sus2img instead. This duplicates renderer layout calculation. */
 export const buildRenderOverlayContext = (
   susText: string,
   rebaseText: string,
@@ -1195,6 +1196,7 @@ const escapeXml = (value: string): string =>
     .split('>').join('&gt;')
     .split('"').join('&quot;')
 
+/** @deprecated Ghost notes and crash markers are now rendered natively by the integrated renderer via renderSusToSvgWithConflictOverlay. */
 export const annotateSvgWithConflict = (
   svgText: string,
   context: RenderOverlayContext,
