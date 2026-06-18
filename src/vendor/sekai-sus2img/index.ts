@@ -22,6 +22,8 @@ export interface Sus2ImgRenderInput {
     pixel?: string | number
     skin?: Sus2ImgSkin
     jacket?: string
+    /** 设为 true 则不显示"創作譜面"标签（用于官方谱面） */
+    isOfficial?: boolean
 }
 
 export interface CustomScoreJsonRenderInput {
@@ -37,6 +39,8 @@ export interface CustomScoreJsonRenderInput {
     jacket?: string
     songId?: string | number
     ticksPerBeat?: number
+    /** 设为 true 则不显示"創作譜面"标签（用于官方谱面） */
+    isOfficial?: boolean
 }
 
 export interface Sus2ImgRuntimeOptions {
@@ -153,11 +157,14 @@ const createCustomScoreJsonScore = (
 
     score.meta.jacket = resolveJacketPath(assetBase, input.jacket)
 
-    let playlevel = `${input.playlevel ?? ''} 創作譜面`
+    let playlevel = `${input.playlevel ?? ''}`
+    if (!input.isOfficial) {
+        playlevel += ` 創作譜面`
+    }
     if ((input.author ?? '').trim()) {
         playlevel += ` by ${input.author?.trim()}`
     }
-    score.meta.playlevel = playlevel
+    score.meta.playlevel = playlevel.trim()
 
     return {
         score,

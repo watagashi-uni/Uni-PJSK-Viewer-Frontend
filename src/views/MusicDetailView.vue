@@ -1,18 +1,19 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, onBeforeUnmount } from 'vue'
+import { ref, onMounted, computed, onBeforeUnmount, nextTick } from 'vue'
 import { useSeoMeta, useHead } from '@unhead/vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
 import { Mp3Encoder } from '@breezystack/lamejs'
-import { 
-  Play, Pause, BarChart2, Eye, Download, ChevronLeft, 
+import {
+  Play, Pause, BarChart2, Eye, Download, ChevronLeft,
   Disc3, Sparkles, Mic, Volume2, VolumeX, SkipBack, SkipForward,
-  PlayCircle, Zap
+  PlayCircle, Zap, X, FileImage, Loader2, ZoomIn, ZoomOut, Maximize, Expand, Minimize2
 } from 'lucide-vue-next'
 import AssetImage from '@/components/AssetImage.vue'
 import { alignFurigana } from '@/utils/furigana'
 import type { EventData } from '@/types/master'
+import { renderSusToSvg, type Sus2ImgFrontendResult } from '@/vendor/sekai-sus2img'
 
 interface Music {
   id: number
@@ -98,9 +99,7 @@ const limitedMusics = ref<LimitedTimeMusic[]>([])
 const isLoading = ref(true)
 
 const assetsHost = computed(() => settingsStore.assetsHost)
-const chartPreviewHost = import.meta.env.VITE_CHART_PREVIEW_URL || ''
 const chartPlaybackHost = 'https://chartview.unipjsk.com'
-const chartHost = `${chartPreviewHost}/moe/svg`
 
 // ===== 自定义播放器状态 =====
 const audioRef = ref<HTMLAudioElement | null>(null)
@@ -112,6 +111,59 @@ const volume = ref(1)
 const isMuted = ref(false)
 const isDragging = ref(false)
 const isAudioLoaded = ref(false)
+
+// ===== 谱面 SVG 预览 =====
+const chartSvgPreviewOpen = ref(false)
+const chartSvgPreviewLoading = ref(false)
+const chartSvgPreviewError = ref<string | null>(null)
+const chartSvgPreviewSvgText = ref<string | null>(null)
+const chartSvgPreviewWidth = ref(0)
+const chartSvgPreviewHeight = ref(0)
+const previewDifficultyData = ref<MusicDifficulty | null>(null)
+let chartSvgPreviewResult: Sus2ImgFrontendResult | null = null
+const isDownloadingPreviewPng = ref(false)
+
+// 缩放控制
+const previewZoom = ref(1)
+const previewSvgWrapperRef = ref<HTMLDivElement | null>(null)
+const isPreviewExpanded = ref(false)
+
+function previewZoomIn() {
+  previewZoom.value = Math.min(5, Math.round(previewZoom.value * 1.25 * 100) / 100)
+}
+
+function previewZoomOut() {
+  previewZoom.value = Math.max(0.1, Math.round(previewZoom.value * 0.8 * 100) / 100)
+}
+
+function previewZoomFit() {
+  if (!previewSvgWrapperRef.value || !chartSvgPreviewSvgText.value) {
+    previewZoom.value = 1
+    return
+  }
+  const wrapper = previewSvgWrapperRef.value
+  // wrapper 无固定高度会撑开到内容高度，需取其父级（scroll 容器）的可视高度
+  const viewport = wrapper.parentElement
+  if (!viewport) {
+    previewZoom.value = 1
+    return
+  }
+  const viewportHeight = viewport.clientHeight - 32 // padding
+  const currentScale = previewZoom.value || 1
+  const svgEl = wrapper.querySelector('svg')
+  if (!svgEl) {
+    previewZoom.value = 1
+    return
+  }
+  const svgHeight = svgEl.getBoundingClientRect().height / currentScale
+  if (svgHeight > 0 && viewportHeight > 0) {
+    previewZoom.value = Math.round((viewportHeight / svgHeight) * 100) / 100
+  }
+}
+
+function previewToggleExpand() {
+  isPreviewExpanded.value = !isPreviewExpanded.value
+}
 
 // 用于无缝切换 vocal 的状态
 const pendingSeekTime = ref<number | null>(null)  // 待恢复的播放位置
@@ -454,6 +506,10 @@ async function downloadTrimmedAudio() {
 onBeforeUnmount(() => {
   document.removeEventListener('mousemove', onProgressMouseMove)
   document.removeEventListener('mouseup', onProgressMouseUp)
+  if (chartSvgPreviewResult) {
+    URL.revokeObjectURL(chartSvgPreviewResult.url)
+    chartSvgPreviewResult = null
+  }
 })
 
 // 获取歌手名称列表
@@ -625,6 +681,139 @@ function openChartPreview(difficulty: string) {
   })
 
   window.open(previewUrl, '_blank')
+}
+
+// ===== 谱面 SVG 预览（前端 sus2img 生成） =====
+async function openChartSvgPreview(diff: MusicDifficulty) {
+  if (!music.value) return
+
+  // 清理上一次的结果
+  if (chartSvgPreviewResult) {
+    URL.revokeObjectURL(chartSvgPreviewResult.url)
+    chartSvgPreviewResult = null
+  }
+
+  chartSvgPreviewOpen.value = true
+  chartSvgPreviewLoading.value = true
+  chartSvgPreviewError.value = null
+  chartSvgPreviewSvgText.value = null
+  previewDifficultyData.value = diff
+  previewZoom.value = 1
+
+  try {
+    const susUrl = getDownloadUrl(diff.musicDifficulty)
+    const response = await fetch(susUrl)
+    if (!response.ok) {
+      throw new Error(`下载谱面文件失败：HTTP ${response.status}`)
+    }
+    const susText = await response.text()
+
+    const result = await renderSusToSvg({
+      sus: susText,
+      title: music.value.title,
+      artist: music.value.composer || undefined,
+      difficulty: difficultyLabels[diff.musicDifficulty] || diff.musicDifficulty.toUpperCase(),
+      playlevel: String(diff.playLevel),
+      pixel: '240',
+      skin: 'custom01',
+      jacket: coverUrl.value || undefined,
+      isOfficial: true,
+    })
+
+    chartSvgPreviewResult = result
+    chartSvgPreviewSvgText.value = result.svgText
+    chartSvgPreviewWidth.value = result.width
+    chartSvgPreviewHeight.value = result.height
+    // 等待 DOM 更新后自适应宽度
+    await nextTick()
+    previewZoomFit()
+  } catch (e) {
+    chartSvgPreviewError.value = e instanceof Error ? e.message : '生成谱面预览失败'
+  } finally {
+    chartSvgPreviewLoading.value = false
+  }
+}
+
+function closeChartSvgPreview() {
+  chartSvgPreviewOpen.value = false
+  if (chartSvgPreviewResult) {
+    URL.revokeObjectURL(chartSvgPreviewResult.url)
+    chartSvgPreviewResult = null
+  }
+  chartSvgPreviewSvgText.value = null
+}
+
+function downloadPreviewSvg() {
+  if (!chartSvgPreviewSvgText.value) return
+  const blob = new Blob([chartSvgPreviewSvgText.value], { type: 'image/svg+xml;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `${sanitizeFileName(music.value!.title)}_${previewDifficultyData.value?.musicDifficulty ?? 'chart'}.svg`
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+}
+
+async function downloadPreviewPng() {
+  if (!chartSvgPreviewSvgText.value) return
+  isDownloadingPreviewPng.value = true
+  try {
+    const svgText = chartSvgPreviewSvgText.value
+    const width = chartSvgPreviewWidth.value || chartSvgPreviewResult?.width || 0
+    const height = chartSvgPreviewHeight.value || chartSvgPreviewResult?.height || 0
+
+    // 如果可以从已有结果获取尺寸，直接使用；否则从 SVG 解析
+    let canvasWidth = width
+    let canvasHeight = height
+    if (!canvasWidth || !canvasHeight) {
+      const doc = new DOMParser().parseFromString(svgText, 'image/svg+xml')
+      const svgEl = doc.documentElement
+      canvasWidth = parseFloat(svgEl.getAttribute('width') || '0') || 0
+      canvasHeight = parseFloat(svgEl.getAttribute('height') || '0') || 0
+      if (!canvasWidth || !canvasHeight) {
+        const vb = svgEl.getAttribute('viewBox')?.trim().split(/\s+/).map(Number)
+        canvasWidth = vb?.[2] || 0
+        canvasHeight = vb?.[3] || 0
+      }
+    }
+
+    const svgBlob = new Blob([svgText], { type: 'image/svg+xml;charset=utf-8' })
+    const svgUrl = URL.createObjectURL(svgBlob)
+    const image = new Image()
+    await new Promise<void>((resolve, reject) => {
+      image.onload = () => resolve()
+      image.onerror = () => reject(new Error('SVG 图片载入失败'))
+      image.src = svgUrl
+    })
+    URL.revokeObjectURL(svgUrl)
+
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.ceil(canvasWidth || image.naturalWidth)
+    canvas.height = Math.ceil(canvasHeight || image.naturalHeight)
+    const ctx = canvas.getContext('2d')
+    if (!ctx) throw new Error('浏览器不支持 Canvas')
+    ctx.drawImage(image, 0, 0)
+
+    const pngBlob = await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('PNG 导出失败'))), 'image/png')
+    })
+
+    const url = URL.createObjectURL(pngBlob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `${sanitizeFileName(music.value!.title)}_${previewDifficultyData.value?.musicDifficulty ?? 'chart'}.png`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  } catch (e) {
+    console.error('PNG 下载失败:', e)
+    alert('PNG 下载失败，请稍后重试')
+  } finally {
+    isDownloadingPreviewPng.value = false
+  }
 }
 
 // 加载数据
@@ -1141,14 +1330,13 @@ const isExpired = computed(() => {
 
                   <!-- 按钮组 -->
                   <div class="w-full space-y-2 mt-auto">
-                    <!-- 预览 (External SVG) -->
-                    <a 
-                      :href="`${chartHost}/${music.id}/${diff.musicDifficulty}.svg`" 
-                      target="_blank"
+                    <!-- 谱面预览 (前端 sus2img 生成) -->
+                    <button
                       class="btn btn-sm btn-block btn-ghost btn-outline h-9 min-h-0 font-normal hover:bg-base-200 whitespace-nowrap"
+                      @click="openChartSvgPreview(diff)"
                     >
                       <Eye class="w-4 h-4 shrink-0" /> 谱面预览
-                    </a>
+                    </button>
                     
                     <!-- 谱面播放预览 -->
                     <button 
@@ -1188,6 +1376,123 @@ const isExpired = computed(() => {
     <div v-else class="text-center py-20">
       <p class="text-base-content/60 text-lg">未找到该歌曲</p>
     </div>
+
+    <!-- 谱面 SVG 预览弹窗 -->
+    <dialog
+      class="modal"
+      :class="{ 'modal-open': chartSvgPreviewOpen }"
+      @close="closeChartSvgPreview"
+    >
+      <div
+        class="modal-box flex flex-col p-0 overflow-hidden"
+        :class="isPreviewExpanded
+          ? 'fixed inset-0 w-screen h-screen max-w-none rounded-none'
+          : 'w-11/12 max-w-6xl h-[85vh] chart-preview-modal-box'"
+      >
+        <!-- 标题栏 -->
+        <div class="flex items-center justify-between gap-4 px-6 py-4 border-b border-base-200 shrink-0">
+          <div class="min-w-0">
+            <div class="flex items-center gap-3 flex-wrap">
+              <h3 class="text-lg font-bold truncate">{{ music?.title }}</h3>
+              <span
+                v-if="previewDifficultyData"
+                class="badge text-white font-bold border-none px-3 py-2"
+                :style="difficultyBadgeStyle(previewDifficultyData.musicDifficulty)"
+              >
+                {{ difficultyLabels[previewDifficultyData.musicDifficulty] || previewDifficultyData.musicDifficulty.toUpperCase() }}
+              </span>
+            </div>
+            <p v-if="previewDifficultyData" class="text-sm text-base-content/60 mt-1">
+              Lv.{{ previewDifficultyData.playLevel }}
+              <span class="mx-1.5">·</span>
+              {{ previewDifficultyData.totalNoteCount }} COMBO
+            </p>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <!-- 缩放控制 -->
+            <div class="flex items-center gap-0.5 mr-1">
+              <button class="btn btn-sm btn-ghost btn-square h-8 w-8" title="缩小" @click="previewZoomOut">
+                <ZoomOut class="w-4 h-4" />
+              </button>
+              <span class="text-xs font-mono w-12 text-center tabular-nums">{{ Math.round(previewZoom * 100) }}%</span>
+              <button class="btn btn-sm btn-ghost btn-square h-8 w-8" title="放大" @click="previewZoomIn">
+                <ZoomIn class="w-4 h-4" />
+              </button>
+              <button class="btn btn-sm btn-ghost btn-square h-8 w-8" title="适应宽度" @click="previewZoomFit">
+                <Maximize class="w-4 h-4" />
+              </button>
+              <button class="btn btn-sm btn-ghost btn-square h-8 w-8" :title="isPreviewExpanded ? '退出全屏' : '全屏'" @click="previewToggleExpand">
+                <Minimize2 v-if="isPreviewExpanded" class="w-4 h-4" />
+                <Expand v-else class="w-4 h-4" />
+              </button>
+            </div>
+            <div class="w-px h-6 bg-base-300"></div>
+            <button
+              class="btn btn-sm btn-ghost btn-outline"
+              :disabled="!chartSvgPreviewSvgText"
+              @click="downloadPreviewSvg"
+            >
+              <Download class="w-4 h-4" />
+              <span class="hidden sm:inline">下载 SVG</span>
+            </button>
+            <button
+              class="btn btn-sm btn-ghost btn-outline"
+              :disabled="!chartSvgPreviewSvgText || isDownloadingPreviewPng"
+              @click="downloadPreviewPng"
+            >
+              <span v-if="isDownloadingPreviewPng" class="loading loading-spinner loading-xs"></span>
+              <FileImage v-else class="w-4 h-4" />
+              <span class="hidden sm:inline">下载 PNG</span>
+            </button>
+            <button class="btn btn-sm btn-ghost btn-circle" @click="closeChartSvgPreview">
+              <X class="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        <!-- 内容区 -->
+        <div class="flex-1 overflow-auto bg-white p-4">
+          <!-- 加载中 -->
+          <div v-if="chartSvgPreviewLoading" class="flex flex-col items-center justify-center h-full gap-3 text-base-content/60">
+            <Loader2 class="w-8 h-8 animate-spin text-primary" />
+            <p class="text-sm">正在生成谱面预览…</p>
+          </div>
+
+          <!-- 错误 -->
+          <div v-else-if="chartSvgPreviewError" class="flex items-center justify-center h-full">
+            <div class="alert alert-error max-w-lg">
+              <span>{{ chartSvgPreviewError }}</span>
+            </div>
+          </div>
+
+          <!-- SVG 预览（带缩放） -->
+          <div
+            v-else-if="chartSvgPreviewSvgText"
+            ref="previewSvgWrapperRef"
+            class="min-w-full"
+          >
+            <!-- 外层容器：约束缩放后的实际尺寸，防止白边 -->
+            <div
+              :style="{
+                width: (chartSvgPreviewWidth * previewZoom) + 'px',
+                height: (chartSvgPreviewHeight * previewZoom) + 'px',
+                overflow: 'hidden',
+              }"
+            >
+              <div
+                class="inline-block origin-top-left [&_svg]:max-w-none [&_svg]:block"
+                :style="{ transform: `scale(${previewZoom})` }"
+                v-html="chartSvgPreviewSvgText"
+              ></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <form method="dialog" class="modal-backdrop">
+        <button @click="closeChartSvgPreview">close</button>
+      </form>
+    </dialog>
   </div>
 </template>
 
@@ -1236,5 +1541,10 @@ const isExpired = computed(() => {
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: oklch(var(--bc) / 0.3);
+}
+
+/* 谱面预览展开（占满屏幕） */
+.chart-preview-modal-box {
+  transition: all 0.2s ease;
 }
 </style>
