@@ -95,10 +95,6 @@ const setResult = (result: Sus2ImgFrontendResult | BackendResult) => {
   }
 }
 
-const selectedConflict = computed(() =>
-  diagnostics.value.find((item) => item.id === selectedConflictId.value) ?? null,
-)
-
 const isJsonInput = computed(() => form.value.inputType === 'json')
 
 const isHighlightReady = computed(
