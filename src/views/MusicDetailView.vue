@@ -1390,68 +1390,67 @@ const isExpired = computed(() => {
           : 'w-11/12 max-w-6xl h-[85vh] chart-preview-modal-box'"
       >
         <!-- 标题栏 -->
-        <div class="flex items-center justify-between gap-4 px-6 py-4 border-b border-base-200 shrink-0">
-          <div class="min-w-0">
-            <div class="flex items-center gap-3 flex-wrap">
-              <h3 class="text-lg font-bold truncate">{{ music?.title }}</h3>
-              <span
-                v-if="previewDifficultyData"
-                class="badge text-white font-bold border-none px-3 py-2"
-                :style="difficultyBadgeStyle(previewDifficultyData.musicDifficulty)"
-              >
-                {{ difficultyLabels[previewDifficultyData.musicDifficulty] || previewDifficultyData.musicDifficulty.toUpperCase() }}
-              </span>
-            </div>
-            <p v-if="previewDifficultyData" class="text-sm text-base-content/60 mt-1">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-3 py-2 sm:px-6 sm:py-4 border-b border-base-200 shrink-0">
+          <!-- 左侧：标题 + 难度 -->
+          <div class="min-w-0 flex items-center gap-2 sm:gap-3 flex-wrap">
+            <h3 class="text-sm sm:text-lg font-bold truncate">{{ music?.title }}</h3>
+            <span
+              v-if="previewDifficultyData"
+              class="badge text-white font-bold border-none px-2 py-1 sm:px-3 sm:py-2 text-xs"
+              :style="difficultyBadgeStyle(previewDifficultyData.musicDifficulty)"
+            >
+              {{ difficultyLabels[previewDifficultyData.musicDifficulty] || previewDifficultyData.musicDifficulty.toUpperCase() }}
+            </span>
+            <span v-if="previewDifficultyData" class="text-xs text-base-content/50 hidden sm:inline">
               Lv.{{ previewDifficultyData.playLevel }}
-              <span class="mx-1.5">·</span>
+              <span class="mx-1">·</span>
               {{ previewDifficultyData.totalNoteCount }} COMBO
-            </p>
+            </span>
           </div>
-          <div class="flex items-center gap-2 shrink-0">
+
+          <!-- 右侧：操作按钮 -->
+          <div class="flex items-center gap-1 sm:gap-2 shrink-0">
             <!-- 缩放控制 -->
-            <div class="flex items-center gap-0.5 mr-1">
-              <button class="btn btn-sm btn-ghost btn-square h-8 w-8" title="缩小" @click="previewZoomOut">
-                <ZoomOut class="w-4 h-4" />
+            <div class="flex items-center gap-0 sm:gap-0.5">
+              <button class="btn btn-xs sm:btn-sm btn-ghost btn-square h-7 w-7 sm:h-8 sm:w-8" title="缩小" @click="previewZoomOut">
+                <ZoomOut class="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </button>
-              <span class="text-xs font-mono w-12 text-center tabular-nums">{{ Math.round(previewZoom * 100) }}%</span>
-              <button class="btn btn-sm btn-ghost btn-square h-8 w-8" title="放大" @click="previewZoomIn">
-                <ZoomIn class="w-4 h-4" />
+              <span class="text-[10px] sm:text-xs font-mono w-8 sm:w-12 text-center tabular-nums">{{ Math.round(previewZoom * 100) }}%</span>
+              <button class="btn btn-xs sm:btn-sm btn-ghost btn-square h-7 w-7 sm:h-8 sm:w-8" title="放大" @click="previewZoomIn">
+                <ZoomIn class="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </button>
-              <button class="btn btn-sm btn-ghost btn-square h-8 w-8" title="适应宽度" @click="previewZoomFit">
-                <Maximize class="w-4 h-4" />
+              <button class="btn btn-xs sm:btn-sm btn-ghost btn-square h-7 w-7 sm:h-8 sm:w-8" title="适应高度" @click="previewZoomFit">
+                <Maximize class="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </button>
-              <button class="btn btn-sm btn-ghost btn-square h-8 w-8" :title="isPreviewExpanded ? '退出全屏' : '全屏'" @click="previewToggleExpand">
-                <Minimize2 v-if="isPreviewExpanded" class="w-4 h-4" />
-                <Expand v-else class="w-4 h-4" />
+              <button class="btn btn-xs sm:btn-sm btn-ghost btn-square h-7 w-7 sm:h-8 sm:w-8" :title="isPreviewExpanded ? '退出全屏' : '全屏'" @click="previewToggleExpand">
+                <Minimize2 v-if="isPreviewExpanded" class="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                <Expand v-else class="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </button>
             </div>
-            <div class="w-px h-6 bg-base-300"></div>
+            <div class="w-px h-5 sm:h-6 bg-base-300 hidden sm:block"></div>
             <button
-              class="btn btn-sm btn-ghost btn-outline"
+              class="btn btn-xs sm:btn-sm btn-ghost btn-outline h-7 sm:h-8"
               :disabled="!chartSvgPreviewSvgText"
               @click="downloadPreviewSvg"
             >
-              <Download class="w-4 h-4" />
-              <span class="hidden sm:inline">下载 SVG</span>
+              <Download class="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </button>
             <button
-              class="btn btn-sm btn-ghost btn-outline"
+              class="btn btn-xs sm:btn-sm btn-ghost btn-outline h-7 sm:h-8"
               :disabled="!chartSvgPreviewSvgText || isDownloadingPreviewPng"
               @click="downloadPreviewPng"
             >
               <span v-if="isDownloadingPreviewPng" class="loading loading-spinner loading-xs"></span>
-              <FileImage v-else class="w-4 h-4" />
-              <span class="hidden sm:inline">下载 PNG</span>
+              <FileImage v-else class="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </button>
-            <button class="btn btn-sm btn-ghost btn-circle" @click="closeChartSvgPreview">
-              <X class="w-4 h-4" />
+            <button class="btn btn-xs sm:btn-sm btn-ghost btn-circle h-7 w-7 sm:h-8 sm:w-8" @click="closeChartSvgPreview">
+              <X class="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </button>
           </div>
         </div>
 
         <!-- 内容区 -->
-        <div class="flex-1 overflow-auto bg-white p-4">
+        <div class="flex-1 overflow-auto bg-white p-2 sm:p-4">
           <!-- 加载中 -->
           <div v-if="chartSvgPreviewLoading" class="flex flex-col items-center justify-center h-full gap-3 text-base-content/60">
             <Loader2 class="w-8 h-8 animate-spin text-primary" />
