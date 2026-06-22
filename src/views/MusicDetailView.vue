@@ -1477,11 +1477,13 @@ const isExpired = computed(() => {
                 overflow: 'hidden',
               }"
             >
+              <!-- eslint-disable vue/no-v-html -->
               <div
                 class="inline-block origin-top-left [&_svg]:max-w-none [&_svg]:block"
                 :style="{ transform: `scale(${previewZoom})` }"
                 v-html="chartSvgPreviewSvgText"
               ></div>
+              <!-- eslint-enable vue/no-v-html -->
             </div>
           </div>
         </div>
