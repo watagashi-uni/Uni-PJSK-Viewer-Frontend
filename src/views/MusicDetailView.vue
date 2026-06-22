@@ -8,7 +8,7 @@ import { Mp3Encoder } from '@breezystack/lamejs'
 import {
   Play, Pause, BarChart2, Eye, Download, ChevronLeft,
   Disc3, Sparkles, Mic, Volume2, VolumeX, SkipBack, SkipForward,
-  PlayCircle, Zap, X, FileImage, Loader2, ZoomIn, ZoomOut, Maximize, Expand, Minimize2
+  PlayCircle, Zap, X, FileImage, Loader2, ZoomIn, ZoomOut, Maximize
 } from 'lucide-vue-next'
 import AssetImage from '@/components/AssetImage.vue'
 import { alignFurigana } from '@/utils/furigana'
@@ -126,7 +126,6 @@ const isDownloadingPreviewPng = ref(false)
 // 缩放控制
 const previewZoom = ref(1)
 const previewSvgWrapperRef = ref<HTMLDivElement | null>(null)
-const isPreviewExpanded = ref(false)
 
 function previewZoomIn() {
   previewZoom.value = Math.min(5, Math.round(previewZoom.value * 1.25 * 100) / 100)
@@ -159,10 +158,6 @@ function previewZoomFit() {
   if (svgHeight > 0 && viewportHeight > 0) {
     previewZoom.value = Math.round((viewportHeight / svgHeight) * 100) / 100
   }
-}
-
-function previewToggleExpand() {
-  isPreviewExpanded.value = !isPreviewExpanded.value
 }
 
 // 用于无缝切换 vocal 的状态
@@ -724,13 +719,16 @@ async function openChartSvgPreview(diff: MusicDifficulty) {
     chartSvgPreviewSvgText.value = result.svgText
     chartSvgPreviewWidth.value = result.width
     chartSvgPreviewHeight.value = result.height
-    // 等待 DOM 更新后自适应宽度
-    await nextTick()
-    previewZoomFit()
   } catch (e) {
     chartSvgPreviewError.value = e instanceof Error ? e.message : '生成谱面预览失败'
   } finally {
     chartSvgPreviewLoading.value = false
+    if (chartSvgPreviewSvgText.value) {
+      await nextTick()
+      requestAnimationFrame(() => {
+        previewZoomFit()
+      })
+    }
   }
 }
 
@@ -741,19 +739,6 @@ function closeChartSvgPreview() {
     chartSvgPreviewResult = null
   }
   chartSvgPreviewSvgText.value = null
-}
-
-function downloadPreviewSvg() {
-  if (!chartSvgPreviewSvgText.value) return
-  const blob = new Blob([chartSvgPreviewSvgText.value], { type: 'image/svg+xml;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = `${sanitizeFileName(music.value!.title)}_${previewDifficultyData.value?.musicDifficulty ?? 'chart'}.svg`
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-  URL.revokeObjectURL(url)
 }
 
 async function downloadPreviewPng() {
@@ -1384,10 +1369,7 @@ const isExpired = computed(() => {
       @close="closeChartSvgPreview"
     >
       <div
-        class="modal-box flex flex-col p-0 overflow-hidden"
-        :class="isPreviewExpanded
-          ? 'fixed inset-0 w-screen h-screen max-w-none rounded-none'
-          : 'w-11/12 max-w-6xl h-[85vh] chart-preview-modal-box'"
+        class="modal-box fixed inset-0 flex h-screen w-screen max-w-none flex-col overflow-hidden rounded-none p-0"
       >
         <!-- 标题栏 -->
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-3 py-2 sm:px-6 sm:py-4 border-b border-base-200 shrink-0">
@@ -1422,21 +1404,11 @@ const isExpired = computed(() => {
               <button class="btn btn-xs sm:btn-sm btn-ghost btn-square h-7 w-7 sm:h-8 sm:w-8" title="适应高度" @click="previewZoomFit">
                 <Maximize class="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </button>
-              <button class="btn btn-xs sm:btn-sm btn-ghost btn-square h-7 w-7 sm:h-8 sm:w-8" :title="isPreviewExpanded ? '退出全屏' : '全屏'" @click="previewToggleExpand">
-                <Minimize2 v-if="isPreviewExpanded" class="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                <Expand v-else class="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-              </button>
             </div>
             <div class="w-px h-5 sm:h-6 bg-base-300 hidden sm:block"></div>
             <button
               class="btn btn-xs sm:btn-sm btn-ghost btn-outline h-7 sm:h-8"
-              :disabled="!chartSvgPreviewSvgText"
-              @click="downloadPreviewSvg"
-            >
-              <Download class="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-            </button>
-            <button
-              class="btn btn-xs sm:btn-sm btn-ghost btn-outline h-7 sm:h-8"
+              title="下载 PNG"
               :disabled="!chartSvgPreviewSvgText || isDownloadingPreviewPng"
               @click="downloadPreviewPng"
             >
@@ -1540,10 +1512,5 @@ const isExpired = computed(() => {
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: oklch(var(--bc) / 0.3);
-}
-
-/* 谱面预览展开（占满屏幕） */
-.chart-preview-modal-box {
-  transition: all 0.2s ease;
 }
 </style>
