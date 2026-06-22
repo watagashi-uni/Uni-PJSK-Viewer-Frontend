@@ -133,6 +133,7 @@ const EMPTY_ARR: string[] = Object.freeze([]) as unknown as string[]
 
 // 状态
 const searchText = ref('')
+const selectedArtist = ref('')
 const sortKey = ref<'publishedAt' | 'id' | 'level'>('publishedAt')
 const sortOrder = ref<'asc' | 'desc'>('desc')
 const selectedDiffType = ref<string>('master')
@@ -764,6 +765,10 @@ const filteredMusics = computed(() => {
     })
   }
 
+  if (selectedArtist.value) {
+    result = result.filter(m => m.composer === selectedArtist.value)
+  }
+
   if (selectedMusicTags.value.size > 0) {
     const selected = selectedMusicTags.value
     result = result.filter(m => {
@@ -902,7 +907,12 @@ function resetToFirstPage() {
 }
 
 function filterByArtist(artist: string) {
-  searchText.value = artist
+  selectedArtist.value = artist
+  searchText.value = ''
+}
+
+function clearArtistFilter() {
+  selectedArtist.value = ''
 }
 
 function toggleSort(key: 'publishedAt' | 'id' | 'level') {
@@ -1038,7 +1048,7 @@ onUnmounted(() => {
 })
 
 // 监听过滤/排序变化 -> 重置显示数量
-watch([searchText, sortKey, sortOrder, resultFilter, filterDifficulty, extraFilterSignature], () => {
+watch([searchText, selectedArtist, sortKey, sortOrder, resultFilter, filterDifficulty, extraFilterSignature], () => {
   displayedCount.value = 30
   resetToFirstPage()
   window.scrollTo({ top: 0, behavior: 'auto' })
@@ -1091,9 +1101,22 @@ watch(totalPages, (pages) => {
           type="text"
           placeholder="搜索歌曲..."
           class="input input-bordered w-full pl-10 input-sm"
+          @input="clearArtistFilter"
         />
         <Search class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-base-content/40" />
       </div>
+
+      <button
+        v-if="selectedArtist"
+        type="button"
+        class="btn btn-primary btn-sm max-w-full gap-2 rounded-full"
+        :title="`清除 artist 筛选：${selectedArtist}`"
+        @click="clearArtistFilter"
+      >
+        <span class="text-xs opacity-75">Artist</span>
+        <span class="truncate max-w-[12rem]">{{ selectedArtist }}</span>
+        <span class="text-base leading-none">×</span>
+      </button>
 
       <div class="flex items-center gap-2 flex-nowrap overflow-x-auto no-scrollbar">
         <div class="join shrink-0">
