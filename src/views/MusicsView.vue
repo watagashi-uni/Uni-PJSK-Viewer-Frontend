@@ -5,7 +5,7 @@ import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
 import { useAccountStore } from '@/stores/account'
 import { useNotificationStore } from '@/stores/notification'
-import { Search, ArrowUpDown, Languages, Trophy, List, LayoutGrid, RefreshCw, Layers, Github, Camera, Loader2, Bell, BellRing } from 'lucide-vue-next'
+import { Search, ArrowUpDown, Languages, Trophy, List, LayoutGrid, RefreshCw, Layers, Github, Camera, Loader2, Bell, BellRing, FilterX, SlidersHorizontal, ChevronDown } from 'lucide-vue-next'
 import { toPng } from 'html-to-image'
 import MusicCard from '@/components/MusicCard.vue'
 import Pagination from '@/components/Pagination.vue'
@@ -22,6 +22,7 @@ interface Music {
   composer: string
   pronunciation: string
   categories: string[]
+  releaseConditionId: number
 }
 
 interface MusicDifficulty {
@@ -37,6 +38,40 @@ interface LimitedTimeMusic {
   musicId: number
   startAt: number
   endAt: number
+}
+
+interface MusicTag {
+  id: number
+  musicId: number
+  musicTag: string
+  seq: number
+}
+
+interface MusicVocal {
+  id: number
+  musicId: number
+  characters: { characterType: string; characterId: number }[]
+}
+
+interface Character {
+  id: number
+  firstName?: string | null
+  givenName: string
+}
+
+interface GameCharacterUnit {
+  id: number
+  gameCharacterId: number
+}
+
+interface OutsideCharacter {
+  id: number
+  name: string
+}
+
+interface ReleaseCondition {
+  id: number
+  sentence: string
 }
 
 interface UserMusicResult {
@@ -79,6 +114,12 @@ async function toggleMusicSub() {
 const musics = ref<Music[]>([])
 const musicDifficulties = ref<MusicDifficulty[]>([])
 const limitedMusics = ref<LimitedTimeMusic[]>([])
+const musicTags = ref<MusicTag[]>([])
+const musicVocals = ref<MusicVocal[]>([])
+const characters = ref<Character[]>([])
+const gameCharacterUnits = ref<GameCharacterUnit[]>([])
+const outsideCharacters = ref<OutsideCharacter[]>([])
+const releaseConditions = ref<ReleaseCondition[]>([])
 const pjskb30Map = ref<Map<string, number>>(new Map())
 const usePjskb30 = ref(true)
 const translations = toRef(masterStore, 'translations')
@@ -95,6 +136,11 @@ const searchText = ref('')
 const sortKey = ref<'publishedAt' | 'id' | 'level'>('publishedAt')
 const sortOrder = ref<'asc' | 'desc'>('desc')
 const selectedDiffType = ref<string>('master')
+const isFilterPanelOpen = ref(false)
+const selectedMusicTags = ref<Set<string>>(new Set())
+const selectedMvTypes = ref<Set<string>>(new Set())
+const selectedVocalCharacters = ref<Set<string>>(new Set())
+const selectedReleaseConditionIds = ref<Set<number>>(new Set())
 
 // 视图模式
 const viewMode = ref<'grid' | 'list' | 'b30' | 'level'>('grid')
@@ -362,14 +408,51 @@ const musicDifficultiesMap = computed(() => {
   return map
 })
 
-const now = Date.now()
+const musicTagMap = computed(() => {
+  const map: Record<number, Set<string>> = {}
+  for (const tag of musicTags.value) {
+    if (!map[tag.musicId]) map[tag.musicId] = new Set()
+    map[tag.musicId]!.add(tag.musicTag)
+  }
+  return map
+})
 
-// 过滤和排序
-const filteredMusics = computed(() => {
-  let result = [...musics.value]
-  const resultsMap = musicResultsMap.value
+const musicVocalCharacterMap = computed(() => {
+  const map: Record<number, Set<string>> = {}
+  for (const vocal of musicVocals.value) {
+    if (!map[vocal.musicId]) map[vocal.musicId] = new Set()
+    for (const character of vocal.characters || []) {
+      map[vocal.musicId]!.add(`${character.characterType}:${character.characterId}`)
+    }
+  }
+  return map
+})
 
+const releaseConditionMap = computed(() => {
+  return Object.fromEntries(releaseConditions.value.map(condition => [condition.id, condition]))
+})
+
+const musicTagOptions = [
+  { value: 'all', label: 'All', shortLabel: 'All' },
+  { value: 'vocaloid', label: 'Vocaloid', shortLabel: 'Vocaloid' },
+  { value: 'light_music_club', label: 'Leo/need', image: '/img/logo/logo_light_sound.png' },
+  { value: 'idol', label: 'MORE MORE JUMP!', image: '/img/logo/logo_idol.png' },
+  { value: 'street', label: 'Vivid BAD SQUAD', image: '/img/logo/logo_street.png' },
+  { value: 'theme_park', label: 'Wonderlands x Showtime', image: '/img/logo/logo_theme_park.png' },
+  { value: 'school_refusal', label: '25-ji, Nightcord de.', image: '/img/logo/logo_school_refusal.png' },
+  { value: 'other', label: 'Other', shortLabel: 'Other' },
+]
+
+const mvTypeOptions = [
+  { value: 'mv', label: '3DMV' },
+  { value: 'mv_2d', label: '2DMV' },
+  { value: 'original', label: '原曲MV' },
+  { value: 'image', label: '静态背景' },
+]
+
+const visibleBaseMusics = computed(() => {
   const currentNow = Date.now()
+  let result = [...musics.value]
   if (!settingsStore.showSpoilers) {
     result = result.filter(m => {
       if (m.publishedAt > currentNow) return false
@@ -378,16 +461,333 @@ const filteredMusics = computed(() => {
       return !isExpired(m.id)
     })
   }
+  return result
+})
 
-  if (searchText.value) {
-    const query = searchText.value.toLowerCase()
-    result = result.filter(m => {
-      const titleMatch = m.title.toLowerCase().includes(query)
-      const transMatch = translations.value[m.id]?.toLowerCase().includes(query)
-      const pronunciationMatch = m.pronunciation?.includes(query)
-      const romajiMatch = toRomaji(m.pronunciation)?.toLowerCase().includes(query)
-      return titleMatch || transMatch || pronunciationMatch || romajiMatch
+const visibleBaseMusicIds = computed(() => new Set(visibleBaseMusics.value.map(m => m.id)))
+
+const visibleMusicTagOptions = computed(() => {
+  const visibleIds = visibleBaseMusicIds.value
+  const counts = new Map<string, number>()
+  for (const tag of musicTags.value) {
+    if (!visibleIds.has(tag.musicId)) continue
+    counts.set(tag.musicTag, (counts.get(tag.musicTag) || 0) + 1)
+  }
+  return musicTagOptions
+    .map(option => ({ ...option, count: counts.get(option.value) || 0 }))
+    .filter(option => option.count > 0)
+})
+
+const visibleMvTypeOptions = computed(() => {
+  const counts = new Map<string, number>()
+  for (const music of visibleBaseMusics.value) {
+    for (const category of music.categories || []) {
+      counts.set(category, (counts.get(category) || 0) + 1)
+    }
+  }
+  return mvTypeOptions
+    .map(option => ({ ...option, count: counts.get(option.value) || 0 }))
+    .filter(option => option.count > 0)
+})
+
+const gameCharacterOptions = computed(() => {
+  const visibleIds = visibleBaseMusicIds.value
+  const counts = new Map<string, number>()
+  for (const vocal of musicVocals.value) {
+    if (!visibleIds.has(vocal.musicId)) continue
+    const seenInMusic = new Set<string>()
+    for (const character of vocal.characters || []) {
+      seenInMusic.add(`${character.characterType}:${character.characterId}`)
+    }
+    for (const key of seenInMusic) {
+      counts.set(key, (counts.get(key) || 0) + 1)
+    }
+  }
+
+  return [...characters.value]
+    .sort((a, b) => a.id - b.id)
+    .map(character => ({
+      value: `game_character:${character.id}`,
+      label: [character.firstName, character.givenName].filter(Boolean).join('') || `#${character.id}`,
+      icon: getCharaIcon(character.id),
+      count: counts.get(`game_character:${character.id}`) || 0,
+    }))
+    .filter(option => option.count > 0)
+})
+
+const outsideCharacterOptions = computed(() => {
+  const visibleIds = visibleBaseMusicIds.value
+  const counts = new Map<string, number>()
+  for (const vocal of musicVocals.value) {
+    if (!visibleIds.has(vocal.musicId)) continue
+    const seenInMusic = new Set<string>()
+    for (const character of vocal.characters || []) {
+      seenInMusic.add(`${character.characterType}:${character.characterId}`)
+    }
+    for (const key of seenInMusic) {
+      counts.set(key, (counts.get(key) || 0) + 1)
+    }
+  }
+
+  return [...outsideCharacters.value]
+    .sort((a, b) => a.id - b.id)
+    .map(character => ({
+      value: `outside_character:${character.id}`,
+      label: character.name || `#${character.id}`,
+      count: counts.get(`outside_character:${character.id}`) || 0,
+    }))
+    .filter(option => option.count > 0)
+})
+
+const releaseConditionOptions = computed(() => {
+  const counts = new Map<number, number>()
+  for (const music of visibleBaseMusics.value) {
+    if (!Number.isFinite(music.releaseConditionId)) continue
+    counts.set(music.releaseConditionId, (counts.get(music.releaseConditionId) || 0) + 1)
+  }
+  return [...counts.keys()]
+    .sort((a, b) => a - b)
+    .map(id => ({
+      value: id,
+      label: getReleaseConditionLabel(id),
+      count: counts.get(id) || 0,
+    }))
+    .filter(option => option.count > 0)
+})
+
+const hasExtraFilters = computed(() => {
+  return selectedMusicTags.value.size > 0
+    || selectedMvTypes.value.size > 0
+    || selectedVocalCharacters.value.size > 0
+    || selectedReleaseConditionIds.value.size > 0
+})
+
+const activeExtraFilterCount = computed(() => {
+  return selectedMusicTags.value.size
+    + selectedMvTypes.value.size
+    + selectedVocalCharacters.value.size
+    + selectedReleaseConditionIds.value.size
+})
+
+const extraFilterSignature = computed(() => [
+  [...selectedMusicTags.value].sort().join(','),
+  [...selectedMvTypes.value].sort().join(','),
+  [...selectedVocalCharacters.value].sort().join(','),
+  [...selectedReleaseConditionIds.value].sort((a, b) => a - b).join(','),
+].join('|'))
+
+const now = Date.now()
+
+const FUZZY_SEARCH_MIN_LENGTH = 3
+const SEARCH_SEPARATOR_PATTERN = /[\s・･·._\-—–‐'’"“”「」『』【】（）()［\][\]{}!！?？:：,，.。/／\\]+/g
+
+interface MusicSearchEntry {
+  directFields: string[][]
+  fuzzyFields: string[][]
+  pronunciation: string
+  romaji: string
+}
+
+function normalizeSearchValue(value?: string): string {
+  return (value || '').normalize('NFKC').toLowerCase().trim()
+}
+
+function getSearchVariants(value?: string): string[] {
+  const normalized = normalizeSearchValue(value)
+  if (!normalized) return []
+  const compact = normalized.replace(SEARCH_SEPARATOR_PATTERN, '')
+  return compact && compact !== normalized ? [normalized, compact] : [normalized]
+}
+
+function levenshteinDistance(a: string, b: string): number {
+  if (a === b) return 0
+  if (!a) return b.length
+  if (!b) return a.length
+
+  const previous = Array.from({ length: b.length + 1 }, (_, index) => index)
+  const current = new Array<number>(b.length + 1)
+
+  for (let i = 1; i <= a.length; i++) {
+    current[0] = i
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1
+      current[j] = Math.min(
+        current[j - 1]! + 1,
+        previous[j]! + 1,
+        previous[j - 1]! + cost,
+      )
+    }
+    previous.splice(0, previous.length, ...current)
+  }
+
+  return previous[b.length]!
+}
+
+function similarity(a: string, b: string): number {
+  const maxLength = Math.max(a.length, b.length)
+  if (maxLength === 0) return 1
+  return 1 - (levenshteinDistance(a, b) / maxLength)
+}
+
+function fuzzyThreshold(query: string): number {
+  if (query.length <= 4) return 0.72
+  if (query.length <= 8) return 0.62
+  return 0.56
+}
+
+function maxWindowSimilarity(value: string, query: string): number {
+  if (!value || !query) return 0
+  if (value.length <= query.length) return similarity(value, query)
+
+  let best = similarity(value, query)
+  for (const windowLength of new Set([query.length - 1, query.length, query.length + 1])) {
+    if (windowLength <= 0 || windowLength > value.length) continue
+    for (let start = 0; start <= value.length - windowLength; start++) {
+      best = Math.max(best, similarity(value.slice(start, start + windowLength), query))
+      if (best === 1) return best
+    }
+  }
+  return best
+}
+
+function characterCoverageScore(value: string, query: string): number {
+  if (!value || !query) return 0
+
+  const valueChars = Array.from(value)
+  const queryChars = Array.from(query)
+  let matched = 0
+  let inOrderMatched = 0
+  let searchStart = 0
+
+  for (const queryChar of queryChars) {
+    const existsIndex = valueChars.indexOf(queryChar)
+    if (existsIndex !== -1) matched++
+
+    const orderedIndex = valueChars.indexOf(queryChar, searchStart)
+    if (orderedIndex !== -1) {
+      inOrderMatched++
+      searchStart = orderedIndex + 1
+    }
+  }
+
+  const coverage = matched / queryChars.length
+  if (coverage < 1) return 0
+
+  const orderBonus = inOrderMatched / queryChars.length
+  const lengthPenalty = Math.min(queryChars.length / Math.max(valueChars.length, 1), 1)
+  return 1 + (orderBonus * 0.18) + (lengthPenalty * 0.12)
+}
+
+function directMatchScore(value: string, query: string): number {
+  const index = value.indexOf(query)
+  if (index === -1) return 0
+  const positionBonus = value.length > 0 ? (1 - (index / value.length)) * 0.2 : 0
+  const lengthBonus = Math.min(query.length / Math.max(value.length, 1), 1) * 0.3
+  return 2 + positionBonus + lengthBonus
+}
+
+const musicSearchIndex = computed(() => {
+  const index = new Map<number, MusicSearchEntry>()
+  for (const music of musics.value) {
+    index.set(music.id, {
+      directFields: [
+        getSearchVariants(music.title),
+        getSearchVariants(translations.value[music.id]),
+        getSearchVariants(music.composer),
+      ],
+      fuzzyFields: [
+        getSearchVariants(music.title),
+        getSearchVariants(translations.value[music.id]),
+      ],
+      pronunciation: normalizeSearchValue(music.pronunciation),
+      romaji: normalizeSearchValue(toRomaji(music.pronunciation)),
     })
+  }
+  return index
+})
+
+function getMusicSearchScore(music: Music, rawQuery: string, searchEntry?: MusicSearchEntry): number {
+  const queryVariants = getSearchVariants(rawQuery)
+  if (queryVariants.length === 0) return 0
+
+  const entry = searchEntry || musicSearchIndex.value.get(music.id)
+  if (!entry) return 0
+
+  let bestScore = 0
+  for (const fieldVariants of entry.directFields) {
+    for (const fieldVariant of fieldVariants) {
+      for (const query of queryVariants) {
+        bestScore = Math.max(bestScore, directMatchScore(fieldVariant, query))
+      }
+    }
+  }
+
+  for (const query of queryVariants) {
+    if (entry.pronunciation.includes(query)) bestScore = Math.max(bestScore, 2.1)
+    if (entry.romaji.includes(query)) bestScore = Math.max(bestScore, 2.1)
+  }
+
+  if (bestScore > 0) return bestScore
+
+  let bestFuzzyScore = 0
+  for (const fieldVariants of entry.fuzzyFields) {
+    for (const fieldVariant of fieldVariants) {
+      for (const query of queryVariants) {
+        if (query.length < FUZZY_SEARCH_MIN_LENGTH) continue
+        bestFuzzyScore = Math.max(
+          bestFuzzyScore,
+          maxWindowSimilarity(fieldVariant, query),
+          characterCoverageScore(fieldVariant, query),
+        )
+      }
+    }
+  }
+
+  const threshold = Math.min(...queryVariants.map(query => fuzzyThreshold(query)))
+  return bestFuzzyScore >= threshold ? bestFuzzyScore : 0
+}
+
+// 过滤和排序
+const filteredMusics = computed(() => {
+  let result = [...visibleBaseMusics.value]
+  const resultsMap = musicResultsMap.value
+  const searchScores = new Map<number, number>()
+
+  const query = searchText.value.trim()
+  if (query) {
+    const index = musicSearchIndex.value
+    result = result.filter(m => {
+      const score = getMusicSearchScore(m, query, index.get(m.id))
+      if (score <= 0) return false
+      searchScores.set(m.id, score)
+      return true
+    })
+  }
+
+  if (selectedMusicTags.value.size > 0) {
+    const selected = selectedMusicTags.value
+    result = result.filter(m => {
+      const tags = musicTagMap.value[m.id]
+      return tags ? [...selected].some(tag => tags.has(tag)) : false
+    })
+  }
+
+  if (selectedMvTypes.value.size > 0) {
+    const selected = selectedMvTypes.value
+    result = result.filter(m => (m.categories || []).some(category => selected.has(category)))
+  }
+
+  if (selectedVocalCharacters.value.size > 0) {
+    const selected = selectedVocalCharacters.value
+    result = result.filter(m => {
+      const vocalCharacters = musicVocalCharacterMap.value[m.id]
+      return vocalCharacters ? [...selected].some(character => vocalCharacters.has(character)) : false
+    })
+  }
+
+  if (selectedReleaseConditionIds.value.size > 0) {
+    const selected = selectedReleaseConditionIds.value
+    result = result.filter(m => selected.has(m.releaseConditionId))
   }
 
   if (hasSuiteData.value && resultFilter.value !== 'all') {
@@ -401,6 +801,11 @@ const filteredMusics = computed(() => {
   }
 
   result.sort((a, b) => {
+    if (searchScores.size > 0) {
+      const searchCmp = (searchScores.get(b.id) || 0) - (searchScores.get(a.id) || 0)
+      if (searchCmp !== 0) return searchCmp
+    }
+
     let cmp = 0
     if (sortKey.value === 'publishedAt') {
       cmp = a.publishedAt - b.publishedAt
@@ -446,14 +851,36 @@ async function loadPjskb30() {
 async function loadData() {
   isLoading.value = true
   try {
-    const [musicData, diffData, limitedData] = await Promise.all([
+    const [
+      musicData,
+      diffData,
+      limitedData,
+      musicTagData,
+      vocalData,
+      characterData,
+      gameCharacterUnitData,
+      outsideCharacterData,
+      releaseConditionData,
+    ] = await Promise.all([
       masterStore.getMaster<Music>('musics'),
       masterStore.getMaster<MusicDifficulty>('musicDifficulties'),
-      masterStore.getMaster<LimitedTimeMusic>('limitedTimeMusics')
+      masterStore.getMaster<LimitedTimeMusic>('limitedTimeMusics'),
+      masterStore.getMaster<MusicTag>('musicTags'),
+      masterStore.getMaster<MusicVocal>('musicVocals'),
+      masterStore.getMaster<Character>('gameCharacters'),
+      masterStore.getMaster<GameCharacterUnit>('gameCharacterUnits'),
+      masterStore.getMaster<OutsideCharacter>('outsideCharacters'),
+      masterStore.getMaster<ReleaseCondition>('releaseConditions'),
     ])
     musics.value = musicData
     musicDifficulties.value = diffData
     limitedMusics.value = limitedData
+    musicTags.value = musicTagData
+    musicVocals.value = vocalData
+    characters.value = characterData
+    gameCharacterUnits.value = gameCharacterUnitData
+    outsideCharacters.value = outsideCharacterData
+    releaseConditions.value = releaseConditionData
     
     // 背景加载翻译，不阻塞主列表渲染
     masterStore.getTranslations().catch(e => console.error('加载翻译失败:', e))
@@ -472,6 +899,10 @@ function handlePageChange(page: number) {
 function resetToFirstPage() {
   if (currentPage.value === 1) return
   router.replace({ query: { ...route.query, page: '1' } })
+}
+
+function filterByArtist(artist: string) {
+  searchText.value = artist
 }
 
 function toggleSort(key: 'publishedAt' | 'id' | 'level') {
@@ -513,6 +944,53 @@ function isExpired(musicId: number): boolean {
   const limited = limitedMusics.value.find(lm => lm.musicId === musicId)
   if (!limited) return false
   return now >= limited.endAt
+}
+
+function getCharaIcon(characterId: number): string {
+  const unit = gameCharacterUnits.value.find(u => u.gameCharacterId === characterId && u.id <= 26)
+  const unitId = unit?.id || characterId
+  if (unitId <= 20) return `/img/chr_ts/chr_ts_90_${unitId}.png`
+  if (characterId === 21) {
+    return unitId === 21 ? '/img/chr_ts/chr_ts_90_21.png' : `/img/chr_ts/chr_ts_90_21_${unitId - 25}.png`
+  }
+  return `/img/chr_ts/chr_ts_90_${characterId}_2.png`
+}
+
+function getReleaseConditionLabel(releaseConditionId: number): string {
+  if (releaseConditionId === 1) return '直接持有'
+  if (releaseConditionId === 5) return '音乐商店购买'
+  if (releaseConditionId === 10) return '礼物箱收取'
+  return releaseConditionMap.value[releaseConditionId]?.sentence || `#${releaseConditionId}`
+}
+
+function resetExtraFilters() {
+  selectedMusicTags.value = new Set()
+  selectedMvTypes.value = new Set()
+  selectedVocalCharacters.value = new Set()
+  selectedReleaseConditionIds.value = new Set()
+}
+
+function toggleSetValue<T>(source: Set<T>, value: T): Set<T> {
+  const next = new Set(source)
+  if (next.has(value)) next.delete(value)
+  else next.add(value)
+  return next
+}
+
+function toggleMusicTag(value: string) {
+  selectedMusicTags.value = toggleSetValue(selectedMusicTags.value, value)
+}
+
+function toggleMvType(value: string) {
+  selectedMvTypes.value = toggleSetValue(selectedMvTypes.value, value)
+}
+
+function toggleVocalCharacter(value: string) {
+  selectedVocalCharacters.value = toggleSetValue(selectedVocalCharacters.value, value)
+}
+
+function toggleReleaseCondition(value: number) {
+  selectedReleaseConditionIds.value = toggleSetValue(selectedReleaseConditionIds.value, value)
 }
 
 const diffColors: Record<string, string> = {
@@ -560,7 +1038,7 @@ onUnmounted(() => {
 })
 
 // 监听过滤/排序变化 -> 重置显示数量
-watch([searchText, sortKey, sortOrder, resultFilter, filterDifficulty], () => {
+watch([searchText, sortKey, sortOrder, resultFilter, filterDifficulty, extraFilterSignature], () => {
   displayedCount.value = 30
   resetToFirstPage()
   window.scrollTo({ top: 0, behavior: 'auto' })
@@ -756,6 +1234,108 @@ watch(totalPages, (pages) => {
         <button class="join-item btn btn-sm" :class="viewMode === 'level' ? 'btn-primary' : 'btn-ghost'" title="定数表" @click="viewMode = 'level'">
           <Layers class="w-4 h-4" />
         </button>
+      </div>
+    </div>
+
+    <!-- 第三行：歌曲资料筛选 -->
+    <div class="mb-4 bg-base-100 rounded-lg shadow-sm">
+      <div class="flex flex-wrap items-center gap-2 p-2">
+        <button class="btn btn-sm btn-ghost gap-2" @click="isFilterPanelOpen = !isFilterPanelOpen">
+          <SlidersHorizontal class="w-4 h-4" />
+          筛选
+          <span v-if="activeExtraFilterCount > 0" class="badge badge-primary badge-sm">{{ activeExtraFilterCount }}</span>
+          <ChevronDown class="w-4 h-4 transition-transform" :class="{ 'rotate-180': isFilterPanelOpen }" />
+        </button>
+
+        <button
+          v-if="hasExtraFilters"
+          class="btn btn-ghost btn-sm gap-1"
+          @click="resetExtraFilters"
+        >
+          <FilterX class="w-4 h-4" />
+          清空
+        </button>
+      </div>
+
+      <div v-if="isFilterPanelOpen" class="border-t border-base-200 p-3 space-y-4">
+        <div>
+          <div class="text-xs font-bold text-base-content/60 mb-2">歌曲标签</div>
+          <div class="flex flex-wrap gap-2">
+            <button
+              v-for="tag in visibleMusicTagOptions"
+              :key="tag.value"
+              class="btn btn-sm min-h-9 h-9 px-3"
+              :class="selectedMusicTags.has(tag.value) ? 'btn-primary' : 'btn-outline'"
+              :title="tag.label"
+              @click="toggleMusicTag(tag.value)"
+            >
+              <img v-if="tag.image" :src="tag.image" :alt="tag.label" class="h-4 max-w-[86px] object-contain" />
+              <span v-else>{{ tag.shortLabel || tag.label }}</span>
+              <span class="text-[10px] opacity-60">{{ tag.count }}</span>
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <div class="text-xs font-bold text-base-content/60 mb-2">MV类型</div>
+          <div class="flex flex-wrap gap-2">
+            <button
+              v-for="mvType in visibleMvTypeOptions"
+              :key="mvType.value"
+              class="btn btn-sm h-8 min-h-8"
+              :class="selectedMvTypes.has(mvType.value) ? 'btn-primary' : 'btn-outline'"
+              @click="toggleMvType(mvType.value)"
+            >
+              {{ mvType.label }}
+              <span class="text-[10px] opacity-60">{{ mvType.count }}</span>
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <div class="text-xs font-bold text-base-content/60 mb-2">Vocal角色</div>
+          <div class="flex flex-wrap gap-2 max-h-44 overflow-y-auto custom-scrollbar pr-1">
+            <button
+              v-for="character in gameCharacterOptions"
+              :key="character.value"
+              class="btn btn-sm h-9 min-h-9 gap-1.5 pl-1.5 pr-2"
+              :class="selectedVocalCharacters.has(character.value) ? 'btn-primary' : 'btn-outline'"
+              @click="toggleVocalCharacter(character.value)"
+            >
+              <span class="h-6 w-6 overflow-hidden rounded-full bg-base-200 ring-1 ring-base-300">
+                <img :src="character.icon" :alt="character.label" class="h-full w-full object-cover" />
+              </span>
+              {{ character.label }}
+              <span class="text-[10px] opacity-60">{{ character.count }}</span>
+            </button>
+            <button
+              v-for="character in outsideCharacterOptions"
+              :key="character.value"
+              class="btn btn-sm h-8 min-h-8"
+              :class="selectedVocalCharacters.has(character.value) ? 'btn-primary' : 'btn-outline'"
+              @click="toggleVocalCharacter(character.value)"
+            >
+              {{ character.label }}
+              <span class="text-[10px] opacity-60">{{ character.count }}</span>
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <div class="text-xs font-bold text-base-content/60 mb-2">乐曲获取方式</div>
+          <div class="flex flex-wrap gap-2 max-h-36 overflow-y-auto custom-scrollbar pr-1">
+            <button
+              v-for="condition in releaseConditionOptions"
+              :key="condition.value"
+              class="btn btn-sm h-auto min-h-8 py-1 text-left justify-start"
+              :class="selectedReleaseConditionIds.has(condition.value) ? 'btn-primary' : 'btn-outline'"
+              @click="toggleReleaseCondition(condition.value)"
+            >
+              <span>{{ condition.label }}</span>
+              <span class="text-[10px] opacity-60">{{ condition.count }}</span>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -1110,6 +1690,7 @@ watch(totalPages, (pages) => {
             :results="hasSuiteData && showUserResults ? (musicResultsMap[music.id] || EMPTY_OBJ) : undefined"
             :class="{ 'animate-fade-in-up': enableHeavyAnimation }"
             class="cv-auto-card"
+            @artist-click="filterByArtist"
           />
         </div>
 

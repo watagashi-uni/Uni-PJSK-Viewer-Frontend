@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { RouterLink } from 'vue-router'
-import { EyeOff } from 'lucide-vue-next'
+import { EyeOff, ListFilter } from 'lucide-vue-next'
 import { useSettingsStore } from '@/stores/settings'
 import AssetImage from '@/components/AssetImage.vue'
 
 const settingsStore = useSettingsStore()
+const spoilerRevealed = ref(false)
 
 const props = defineProps<{
   id: number
@@ -21,6 +22,10 @@ const props = defineProps<{
   categories: string[]
   // 成绩数据: difficulty -> 'AP' | 'FC' | 'C' | ''
   results?: Record<string, string>
+}>()
+
+const emit = defineEmits<{
+  artistClick: [artist: string]
 }>()
 
 // 类别 -> 图标文件名映射
@@ -73,6 +78,15 @@ const availableDifficulties = computed(() => {
 const coverUrl = computed(() => {
   return `${props.assetsHost}/startapp/music/jacket/${props.assetbundleName}/${props.assetbundleName}.png`
 })
+
+function revealSpoiler() {
+  spoilerRevealed.value = true
+}
+
+function selectArtist() {
+  if (!props.composer) return
+  emit('artistClick', props.composer)
+}
 </script>
 
 <template>
@@ -82,10 +96,17 @@ const coverUrl = computed(() => {
     :class="results ? 'hover:border-primary/30 border border-transparent transition-colors' : 'hover:shadow-md transition-all hover:-translate-y-1'"
   >
     <!-- 全卡片遮罩 (仅在开启遮罩模式下显示，Hover时消失) -->
-    <div v-if="isLeak && settingsStore.maskSpoilers" class="absolute inset-0 z-50 bg-base-100/95 backdrop-blur-sm flex flex-col items-center justify-center text-center p-4 transition-opacity duration-300 group-hover:opacity-0 pointer-events-none">
+    <div
+      v-if="isLeak && settingsStore.maskSpoilers && !spoilerRevealed"
+      class="absolute inset-0 z-50 bg-base-100/95 backdrop-blur-sm flex flex-col items-center justify-center text-center p-4 transition-opacity duration-300 group-hover:opacity-0 group-hover:pointer-events-none"
+      @click.prevent.stop="revealSpoiler"
+    >
       <EyeOff class="w-8 h-8 mb-2 text-warning" />
       <span class="font-bold text-lg mb-1">剧透内容</span>
-      <span class="text-xs text-base-content/60">鼠标悬停查看</span>
+      <span class="text-xs text-base-content/60 mb-3">鼠标悬停或点击查看</span>
+      <span class="btn btn-warning btn-xs pointer-events-auto" role="button">
+        取消遮罩
+      </span>
     </div>
     <!-- 封面 -->
     <figure class="relative aspect-square">
@@ -131,7 +152,15 @@ const coverUrl = computed(() => {
       <!-- ID 和 作者 -->
       <div class="flex justify-between items-center text-xs text-base-content/60 mb-1">
         <span>#{{ id }}</span>
-        <span class="truncate max-w-[60%]" :title="composer">{{ composer }}</span>
+        <button
+          type="button"
+          class="inline-flex max-w-[68%] items-center gap-1 rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-primary transition-colors hover:border-primary/50 hover:bg-primary/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          :title="`筛选 ${composer}`"
+          @click.prevent.stop="selectArtist"
+        >
+          <ListFilter class="h-3 w-3 shrink-0" />
+          <span class="truncate">{{ composer }}</span>
+        </button>
       </div>
 
       <!-- 难度条 -->
