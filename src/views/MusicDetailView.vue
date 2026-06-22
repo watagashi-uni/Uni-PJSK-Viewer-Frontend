@@ -27,6 +27,7 @@ interface Music {
   filterSec?: number
   categories: string[]
   assetbundleName: string
+  releaseConditionId: number
 }
 
 interface MusicDifficulty {
@@ -69,6 +70,11 @@ interface LimitedTimeMusic {
   endAt: number
 }
 
+interface ReleaseCondition {
+  id: number
+  sentence: string
+}
+
 type PreviewPayload = {
   sus: string
   bgm?: string
@@ -96,6 +102,7 @@ const relatedEvent = ref<EventData | null>(null)
 const characters = ref<Character[]>([])
 const outsideCharacters = ref<OutsideCharacter[]>([])
 const limitedMusics = ref<LimitedTimeMusic[]>([])
+const releaseConditions = ref<ReleaseCondition[]>([])
 const isLoading = ref(true)
 
 const assetsHost = computed(() => settingsStore.assetsHost)
@@ -816,7 +823,8 @@ async function loadData() {
       eventMusicsData,
       charactersData,
       outsideCharactersData,
-      limitedData
+      limitedData,
+      releaseConditionData,
     ] = await Promise.all([
       masterStore.getMaster<Music>('musics'),
       masterStore.getMaster<MusicDifficulty>('musicDifficulties'),
@@ -825,13 +833,15 @@ async function loadData() {
       masterStore.getMaster<EventMusic>('eventMusics'),
       masterStore.getMaster<Character>('gameCharacters'),
       masterStore.getMaster<OutsideCharacter>('outsideCharacters'),
-      masterStore.getMaster<LimitedTimeMusic>('limitedTimeMusics')
+      masterStore.getMaster<LimitedTimeMusic>('limitedTimeMusics'),
+      masterStore.getMaster<ReleaseCondition>('releaseConditions'),
     ])
     
     // 设置角色数据
     characters.value = charactersData
     outsideCharacters.value = outsideCharactersData
     limitedMusics.value = limitedData
+    releaseConditions.value = releaseConditionData
 
     // 获取歌曲数据
     music.value = musicsData.find(m => m.id === musicId.value) || null
@@ -900,6 +910,19 @@ const matchedIcons = computed(() => {
   return Object.entries(categoryIconMap)
     .filter(([cat]) => music.value!.categories.includes(cat))
     .map(([, icon]) => icon)
+})
+
+const releaseConditionMap = computed(() => {
+  return Object.fromEntries(releaseConditions.value.map(condition => [condition.id, condition]))
+})
+
+const musicReleaseConditionText = computed(() => {
+  const id = music.value?.releaseConditionId
+  if (!id) return ''
+  if (id === 1) return '直接持有'
+  if (id === 5) return '音乐商店购买'
+  if (id === 10) return '礼物箱收取'
+  return releaseConditionMap.value[id]?.sentence || `#${id}`
 })
 
 // 注音 (furigana) - 实验性
@@ -1072,6 +1095,10 @@ const isExpired = computed(() => {
             <div class="flex justify-between items-center text-sm border-b border-base-200 pb-2">
               <span class="text-base-content/60">发布日期</span>
               <span class="font-medium">{{ formatDate(music.publishedAt) }}</span>
+            </div>
+            <div class="flex justify-between items-center gap-3 text-sm border-b border-base-200 pb-2">
+              <span class="text-base-content/60 shrink-0">乐曲获取方式</span>
+              <span class="font-medium text-right select-all">{{ musicReleaseConditionText }}</span>
             </div>
             <div class="flex justify-between items-center text-sm border-b border-base-200 pb-2">
               <span class="text-base-content/60">ID</span>
