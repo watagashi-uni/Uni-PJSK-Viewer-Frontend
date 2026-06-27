@@ -20,6 +20,8 @@ export const useMasterStore = defineStore('master', () => {
     const loadingFile = ref('')
     const cache = ref<Record<string, any[]>>({})
     const translations = ref<Record<number, string>>({})
+    const assetVersion = ref<string | null>(null)
+    const cacheRevision = ref(0)
 
     // 计算属性
     const isReady = computed(() => version.value !== null)
@@ -29,6 +31,12 @@ export const useMasterStore = defineStore('master', () => {
      */
     let initPromise: Promise<void> | null = null
     let versionCheckPromise: Promise<void> | null = null
+    const pendingRequests = new Map<string, Promise<any>>()
+
+    function invalidateMasterCache(): void {
+        cache.value = {}
+        cacheRevision.value += 1
+    }
 
     /**
      * 从本地缓存恢复版本号，保证离线或弱网时仍可读取已缓存的 master 数据。
@@ -60,10 +68,11 @@ export const useMasterStore = defineStore('master', () => {
                     console.log(`版本更新: ${localVersion} -> ${serverVersion}`)
                     await clearAllCache()
                     await setStoredVersion(serverVersion)
-                    cache.value = {}
+                    invalidateMasterCache()
                 }
 
                 version.value = serverVersion
+                assetVersion.value = serverInfo.assetVersion || null
             } catch (error) {
                 console.error('同步 master 版本失败:', error)
 
@@ -124,8 +133,6 @@ export const useMasterStore = defineStore('master', () => {
         }
     }
 
-    const pendingRequests = new Map<string, Promise<any>>()
-
     /**
      * 获取 master 数据（优先使用缓存，防止重复请求）
      */
@@ -136,14 +143,9 @@ export const useMasterStore = defineStore('master', () => {
             return cache.value[name] as T[]
         }
 
-        // 2. 检查是否有正在进行的请求（防止并发重复请求）
-        if (pendingRequests.has(name)) {
-            return pendingRequests.get(name) as Promise<T[]>
-        }
-
-        // 3. 创建新请求逻辑
+        // 2. 创建新请求逻辑
         const promise = (async () => {
-            // 3.1 检查 IndexedDB 缓存
+            // 2.1 检查 IndexedDB 缓存
             const cachedData = await getCachedData<T>(name)
             if (cachedData) {
                 cache.value[name] = cachedData
@@ -151,7 +153,7 @@ export const useMasterStore = defineStore('master', () => {
                 return cachedData
             }
 
-            // 3.2 从服务器获取
+            // 2.2 从服务器获取
             if (!version.value) {
                 await initialize()
                 if (!version.value) {
@@ -159,29 +161,40 @@ export const useMasterStore = defineStore('master', () => {
                 }
             }
 
+            const requestVersion = version.value
+            const requestRevision = cacheRevision.value
+            const requestKey = `${name}:${requestVersion}:${requestRevision}`
+
+            if (pendingRequests.has(requestKey)) {
+                return pendingRequests.get(requestKey) as Promise<T[]>
+            }
+
             isLoading.value = true
             loadingFile.value = name
 
-            try {
-                const data = await getMasterData<T>(name, version.value)
-                await setCachedData(name, data)
-                cache.value[name] = data
-                return data
-            } finally {
-                isLoading.value = false
-                loadingFile.value = ''
-            }
+            const networkPromise = (async () => {
+                try {
+                    const data = await getMasterData<T>(name, requestVersion)
+
+                    if (requestVersion !== version.value || requestRevision !== cacheRevision.value) {
+                        return getMaster<T>(name)
+                    }
+
+                    await setCachedData(name, data)
+                    cache.value[name] = data
+                    return data
+                } finally {
+                    isLoading.value = false
+                    loadingFile.value = ''
+                    pendingRequests.delete(requestKey)
+                }
+            })()
+
+            pendingRequests.set(requestKey, networkPromise)
+            return networkPromise
         })()
 
-        // 记录请求
-        pendingRequests.set(name, promise)
-
-        try {
-            return await promise
-        } finally {
-            // 请求完成后移除记录
-            pendingRequests.delete(name)
-        }
+        return promise
     }
 
     /**
@@ -266,8 +279,9 @@ export const useMasterStore = defineStore('master', () => {
      */
     async function refresh(): Promise<void> {
         await clearAllCache()
-        cache.value = {}
+        invalidateMasterCache()
         translations.value = {}
+        assetVersion.value = null
         version.value = null
         await initialize()
     }
@@ -279,6 +293,8 @@ export const useMasterStore = defineStore('master', () => {
         loadingFile,
         cache,
         translations,
+        assetVersion,
+        cacheRevision,
         // 计算属性
         isReady,
         // 方法
