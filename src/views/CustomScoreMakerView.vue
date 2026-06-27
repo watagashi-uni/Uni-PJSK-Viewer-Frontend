@@ -184,7 +184,7 @@ const masterStore = useMasterStore()
 const settingsStore = useSettingsStore()
 
 const activeTab = ref<FeedTab>('ranking')
-const rankingMode = ref<RankingMode>('total')
+const rankingMode = ref<RankingMode>('daily')
 const searchMusicId = ref('')
 const searchMode = ref<'music' | 'id'>('music')
 const searchScoreId = ref('')
@@ -998,7 +998,7 @@ function selectTab(tab: FeedTab) {
   }
   activeTab.value = tab
   if (tab === 'ranking') {
-    rankingMode.value = rankingMode.value || 'total'
+    rankingMode.value = rankingMode.value || 'daily'
   }
   if (tab === 'search') {
     return
