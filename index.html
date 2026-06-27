@@ -15,7 +15,15 @@
 
 <body>
   <div id="app"></div>
-  <script type="module" src="/src/main.ts"></script>
+  <script type="module">
+    import { isQQInAppBrowser, renderUnsupportedBrowserNotice } from '/src/utils/browserSupport'
+
+    if (isQQInAppBrowser(navigator.userAgent)) {
+      renderUnsupportedBrowserNotice()
+    } else {
+      import('/src/main.ts')
+    }
+  </script>
 </body>
 
 </html>
