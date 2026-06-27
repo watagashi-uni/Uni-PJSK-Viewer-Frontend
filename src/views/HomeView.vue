@@ -3,7 +3,6 @@ import { ref, computed, onMounted } from 'vue'
 import { useMasterStore } from '@/stores/master'
 import { useAccountStore } from '@/stores/account'
 import { useSettingsStore } from '@/stores/settings'
-import { getVersion } from '@/api/version'
 import { 
   Music, Calendar, Clock, 
   ChevronRight, Sparkles, BarChart3,
@@ -18,8 +17,8 @@ const accountStore = useAccountStore()
 const settingsStore = useSettingsStore()
 const assetsHost = computed(() => settingsStore.assetsHost)
 
-const dataVersion = ref<string>('加载中...')
-const assetVersion = ref<string>('加载中...')
+const dataVersion = computed(() => masterStore.version || '加载中...')
+const assetVersion = computed(() => masterStore.assetVersion || '加载中...')
 const isLoading = ref(true)
 
 const themesList = [
@@ -191,22 +190,15 @@ const currentUserProfileData = computed(() => {
 
 onMounted(async () => {
   try {
-    // 1. 确保 masterStore 已初始化（如果 App.vue 还没完成初始化）
-    if (!masterStore.isReady) {
-      await masterStore.initialize()
-    }
-    
-    // 2. 并行获取版本信息和 master 数据
-    const [versionRes, eventsData, musicsData, gachasData] = await Promise.all([
-      getVersion(),
+    masterStore.checkVersionInBackground()
+
+    // 优先使用本地 master 缓存；version 在后台校验，变化时会触发当前页重新挂载。
+    const [eventsData, musicsData, gachasData] = await Promise.all([
       masterStore.getMaster<EventData>('events'),
       masterStore.getMaster<MusicData>('musics'),
       masterStore.getMaster<Gacha>('gachas'),
       masterStore.getMaster<any>('cards')
     ])
-
-    dataVersion.value = versionRes.dataVersion || '未知'
-    assetVersion.value = versionRes.assetVersion || '未知'
     
     // 设置数据 (events 需要倒序)
     events.value = eventsData.sort((a, b) => b.id - a.id)
@@ -214,8 +206,6 @@ onMounted(async () => {
     gachas.value = gachasData
   } catch (e) {
     console.error('加载首页数据失败:', e)
-    dataVersion.value = '获取失败'
-    assetVersion.value = '获取失败'
   } finally {
     isLoading.value = false
   }

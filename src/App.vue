@@ -21,6 +21,7 @@ const notificationStore = useNotificationStore()
 const refreshError = ref('')
 
 const isFullscreen = computed(() => route.meta.fullscreen === true)
+const routerViewKey = computed(() => `${route.fullPath}:${masterStore.cacheRevision}`)
 
 onMounted(async () => {
   if ('caches' in window) {
@@ -29,8 +30,9 @@ onMounted(async () => {
   settingsStore.initialize()
   oauthStore.initialize()
   await accountStore.initialize()
-  await masterStore.initialize()
-  masterStore.checkVersionInBackground()
+  void masterStore.initialize().catch((error) => {
+    console.error('初始化 master 版本失败:', error)
+  })
   await notificationStore.initialize()
 })
 
@@ -64,7 +66,7 @@ async function handleSuiteRefresh() {
 
 <template>
   <div v-if="isFullscreen" class="min-h-screen">
-    <RouterView />
+    <RouterView :key="routerViewKey" />
   </div>
   
   <div v-else class="drawer lg:drawer-open min-h-screen bg-base-200">
@@ -74,7 +76,7 @@ async function handleSuiteRefresh() {
       <AppNavbar />
       
       <main class="flex-1 w-full max-w-7xl mx-auto px-4 py-6">
-        <RouterView />
+        <RouterView :key="routerViewKey" />
       </main>
       
       <footer class="footer items-center p-4 bg-base-300 text-base-content mt-auto">
