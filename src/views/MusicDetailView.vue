@@ -1028,7 +1028,10 @@ const isExpired = computed(() => {
 
       <div class="flex flex-col md:flex-row gap-8">
         <!-- 左侧：封面与基本信息 -->
-        <div class="md:w-1/3 flex flex-col items-center">
+        <div
+          class="flex flex-col items-center"
+          :class="difficulties.length >= 6 ? 'md:w-1/4' : 'md:w-1/3'"
+        >
           <!-- 封面 -->
           <div class="relative group w-full max-w-sm">
             <a :href="coverUrl" target="_blank" class="block rounded-2xl overflow-hidden shadow-2xl transition-transform duration-300 hover:scale-[1.02]">
@@ -1133,7 +1136,10 @@ const isExpired = computed(() => {
         </div>
 
         <!-- 右侧：音频与谱面 -->
-        <div class="md:w-2/3 space-y-8">
+        <div
+          class="space-y-8"
+          :class="difficulties.length >= 6 ? 'md:w-3/4' : 'md:w-2/3'"
+        >
           <!-- 自定义音频播放器 -->
           <div class="custom-player-card relative overflow-hidden rounded-2xl shadow-xl border border-white/10">
             <!-- 背景渐变 -->
@@ -1320,22 +1326,22 @@ const isExpired = computed(() => {
               <BarChart2 class="w-6 h-6 text-secondary" />
               谱面详情
             </h2>
-            <div class="grid grid-cols-[repeat(auto-fit,minmax(100px,1fr))] gap-3">
-              <div 
-                v-for="diff in difficulties" 
+            <div class="grid grid-cols-[repeat(auto-fit,minmax(115px,1fr))] gap-2 sm:gap-3">
+              <div
+                v-for="diff in difficulties"
                 :key="diff.id"
                 class="rounded-xl shadow-sm transition-all hover:shadow-md hover:-translate-y-1"
                 :style="difficultyCardStyle(diff.musicDifficulty)"
               >
-                <div class="flex h-full flex-col items-center rounded-[calc(0.75rem-4px)] bg-base-100 p-2 sm:p-4 mt-1">
+                <div class="flex h-full flex-col items-center rounded-[calc(0.75rem-4px)] bg-base-100 mt-1 p-2 sm:p-4">
                   <!-- 难度标签 -->
-                  <div 
-                    class="badge text-white font-bold mb-3 border-none px-4 py-3"
+                  <div
+                    class="badge border-none text-white font-bold mb-3 px-4 py-3"
                     :style="difficultyBadgeStyle(diff.musicDifficulty)"
                   >
                     {{ difficultyLabels[diff.musicDifficulty] }}
                   </div>
-                  
+
                   <!-- 等级与各种数 -->
                   <div class="text-3xl font-black text-base-content mb-1 tracking-tight">{{ diff.playLevel }}</div>
                   <div class="text-xs text-base-content/50 font-medium uppercase tracking-wide mb-4 whitespace-nowrap">{{ diff.totalNoteCount }} COMBO</div>
@@ -1345,22 +1351,25 @@ const isExpired = computed(() => {
                     <!-- 谱面预览 (前端 sus2img 生成) -->
                     <button
                       class="btn btn-sm btn-block btn-ghost btn-outline h-9 min-h-0 font-normal hover:bg-base-200 whitespace-nowrap"
+                      :class="{ 'chart-difficulty-action': difficulties.length >= 6 }"
                       @click="openChartSvgPreview(diff)"
                     >
                       <Eye class="w-4 h-4 shrink-0" /> 谱面预览
                     </button>
-                    
+
                     <!-- 谱面播放预览 -->
-                    <button 
+                    <button
                       class="btn btn-sm btn-block btn-ghost btn-outline h-9 min-h-0 font-normal hover:bg-base-200 whitespace-nowrap"
+                      :class="{ 'chart-difficulty-action': difficulties.length >= 6 }"
                       @click="openChartPreview(diff.musicDifficulty)"
                     >
                       <PlayCircle class="w-4 h-4 shrink-0" /> 3D谱面播放
                     </button>
-                    
+
                     <!-- 下载文件 (.sus) -->
-                    <button 
+                    <button
                       class="btn btn-sm btn-block btn-ghost btn-outline h-9 min-h-0 font-normal hover:bg-base-200 whitespace-nowrap"
+                      :class="{ 'chart-difficulty-action': difficulties.length >= 6 }"
                       @click="forceDownload(diff.musicDifficulty)"
                     >
                       <Download class="w-4 h-4 shrink-0" /> 谱面下载
@@ -1373,7 +1382,7 @@ const isExpired = computed(() => {
 
           <!-- 自动组队入口 -->
           <div class="mt-6">
-            <RouterLink 
+            <RouterLink
               :to="`/deck-recommend?musicId=${music.id}`"
               class="btn btn-primary btn-block gap-2"
             >
@@ -1449,10 +1458,10 @@ const isExpired = computed(() => {
         </div>
 
         <!-- 内容区 -->
-        <div class="flex-1 overflow-auto bg-white p-2 sm:p-4">
+        <div class="chart-svg-preview-canvas flex-1 overflow-auto bg-white p-2 text-slate-700 sm:p-4">
           <!-- 加载中 -->
-          <div v-if="chartSvgPreviewLoading" class="flex flex-col items-center justify-center h-full gap-3 text-base-content/60">
-            <Loader2 class="w-8 h-8 animate-spin text-primary" />
+          <div v-if="chartSvgPreviewLoading" class="flex h-full flex-col items-center justify-center gap-3 text-slate-600">
+            <Loader2 class="w-8 h-8 animate-spin text-cyan-600" />
             <p class="text-sm">正在生成谱面预览…</p>
           </div>
 
@@ -1523,6 +1532,58 @@ const isExpired = computed(() => {
 
 .range:hover::-webkit-slider-thumb {
   transform: scale(1.2);
+}
+
+@media (min-width: 768px) {
+  .chart-difficulty-action {
+    gap: 0.125rem !important;
+    padding-inline: 0.125rem !important;
+    font-size: 0.6875rem !important;
+    line-height: 1 !important;
+  }
+
+  .chart-difficulty-action svg {
+    width: 0.8125rem !important;
+    height: 0.8125rem !important;
+    flex-shrink: 0 !important;
+  }
+}
+
+@media (min-width: 1280px) {
+  .chart-difficulty-action {
+    gap: 0.25rem !important;
+    padding-inline: 0.25rem !important;
+    font-size: 0.8125rem !important;
+  }
+
+  .chart-difficulty-action svg {
+    width: 0.9375rem !important;
+    height: 0.9375rem !important;
+  }
+}
+
+.chart-svg-preview-canvas {
+  scrollbar-color: #94a3b8 #f8fafc;
+  color-scheme: light;
+}
+
+.chart-svg-preview-canvas::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.chart-svg-preview-canvas::-webkit-scrollbar-track {
+  background: #f8fafc;
+}
+
+.chart-svg-preview-canvas::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border: 2px solid #f8fafc;
+  border-radius: 999px;
+}
+
+.chart-svg-preview-canvas::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
 }
 
 /* 自定义滚动条 */
