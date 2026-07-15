@@ -113,9 +113,6 @@ export const applyRebase = (source: Score, input: RebaseInput): Score => {
                 (event) =>
                     new Event({
                         bar: rebaseBar(source, score, event.bar, rebase.offset),
-                        bpm: event.bpm,
-                        barLength: event.barLength,
-                        sentenceLength: event.sentenceLength,
                         speed: event.speed,
                         seVolume: event.seVolume,
                         section: event.section,
