@@ -56,11 +56,28 @@ const DEFAULT_STYLE = `.bar-line {
     stroke-width: 1;
 }
 
+.speed-line-condensed {
+    stroke: #ff33ff;
+    stroke-width: 1;
+    stroke-dasharray: 5 4;
+}
+
 .speed-text {
     font-size: 12px;
     font-family: Avenir;
     fill: #ff33ff;
     text-anchor: end;
+}
+
+.speed-trend-line {
+    stroke: #ff33ff;
+    stroke-width: 1.5;
+    stroke-opacity: 0.7;
+}
+
+.speed-trend-head {
+    fill: #ff33ff;
+    fill-opacity: 0.7;
 }
 
 .note-speed-text {
@@ -198,11 +215,28 @@ const WHITE_STYLE = `.bar-line {
     stroke-width: 1;
 }
 
+.speed-line-condensed {
+    stroke: #ff33ff;
+    stroke-width: 1;
+    stroke-dasharray: 5 4;
+}
+
 .speed-text {
     font-size: 12px;
     font-family: Avenir;
     fill: #ff33ff;
     text-anchor: end;
+}
+
+.speed-trend-line {
+    stroke: #ff33ff;
+    stroke-width: 1.5;
+    stroke-opacity: 0.7;
+}
+
+.speed-trend-head {
+    fill: #ff33ff;
+    fill-opacity: 0.7;
 }
 
 .note-speed-text {
@@ -323,6 +357,13 @@ export interface RenderedSvg {
 
 type Point = [number, number]
 type Bezier = [Point, Point, Point, Point]
+type SpeedRenderPoint = {
+    event: Event
+    y: number
+}
+
+const SPEED_DENSE_MAX_GAP = 16
+const SPEED_DENSE_MIN_POINTS = 4
 
 const escapeXml = (value: string): string =>
     value
@@ -685,10 +726,10 @@ class SentenceRenderer {
     }
 
     private addNoteSpeedText(note: Tap | Directional | Slide) {
-        if (note.isNone() && (!(note instanceof Slide) || !note.decoration)) {
+        if (note.isNone() && !(note instanceof Slide)) {
             return
         }
-        if (note instanceof Slide && note.decoration && note.head !== note) {
+        if (note instanceof Slide && note.head !== note) {
             return
         }
 
@@ -917,6 +958,88 @@ class SentenceRenderer {
         return anchors.join('\n')
     }
 
+    private renderSpeedPoint(point: SpeedRenderPoint, condensed = false): string[] {
+        const laneStart = this.drawing.lanePadding
+        const laneEnd = this.drawing.laneWidth * this.drawing.nLanes + laneStart
+        return [
+            `<line x1="${fmt(r(laneStart))}" y1="${fmt(r(point.y))}" x2="${fmt(r(laneEnd))}" y2="${fmt(r(point.y))}" class="${condensed ? 'speed-line-condensed' : 'speed-line'}" />`,
+            `<text x="${fmt(r(laneEnd - 2))}" y="${fmt(r(point.y - 2))}" class="speed-text">${escapeXml(
+                formatSpeedRatio(point.event.speed),
+            )}</text>`,
+        ]
+    }
+
+    private renderDenseSpeedGroup(points: SpeedRenderPoint[], visibleTop: number, visibleBottom: number): string[] {
+        const head = points[0]
+        const tail = points[points.length - 1]
+        const parts: string[] = []
+        if (visibleTop <= head.y && head.y <= visibleBottom) {
+            parts.push(...this.renderSpeedPoint(head, true))
+        }
+        if (tail !== head && visibleTop <= tail.y && tail.y <= visibleBottom) {
+            parts.push(...this.renderSpeedPoint(tail, true))
+        }
+
+        const arrowStartY = Math.max(visibleTop, Math.min(visibleBottom, head.y))
+        const arrowEndY = Math.max(visibleTop, Math.min(visibleBottom, tail.y))
+        const arrowX =
+            this.drawing.laneWidth * this.drawing.nLanes +
+            this.drawing.lanePadding * 1.5
+        if (Math.abs(arrowStartY - arrowEndY) >= 12) {
+            const direction = Math.sign(arrowEndY - arrowStartY)
+            const lineEndY = arrowEndY - direction * 7
+            const arrowBaseY = arrowEndY - direction * 8
+            parts.push(
+                `<line x1="${fmt(r(arrowX))}" y1="${fmt(r(arrowStartY))}" x2="${fmt(r(arrowX))}" y2="${fmt(r(lineEndY))}" class="speed-trend-line" />`,
+                `<polygon points="${fmt(r(arrowX))},${fmt(r(arrowEndY))} ${fmt(r(arrowX - 4))},${fmt(r(arrowBaseY))} ${fmt(r(arrowX + 4))},${fmt(r(arrowBaseY))}" class="speed-trend-head" />`,
+            )
+        }
+
+        return parts
+    }
+
+    private renderSpeedEvents(): string[] {
+        const visibleTop = 0
+        const visibleBottom =
+            this.drawing.timeHeight * this.drawing.score.getTimeDelta(this.barStart, this.barStop) +
+            this.drawing.timePadding * 2
+        const margin = SPEED_DENSE_MAX_GAP * SPEED_DENSE_MIN_POINTS
+        const points = this.drawing.score.events
+            .filter((event) => event.speed !== null)
+            .map((event): SpeedRenderPoint => ({
+                event,
+                y:
+                    this.drawing.timeHeight * this.drawing.score.getTimeDelta(event.bar, this.barStop) +
+                    this.drawing.timePadding,
+            }))
+            .filter((point) => visibleTop - margin <= point.y && point.y <= visibleBottom + margin)
+
+        const parts: string[] = []
+        for (let start = 0; start < points.length;) {
+            let end = start + 1
+            while (
+                end < points.length &&
+                Math.abs(points[end].y - points[end - 1].y) <= SPEED_DENSE_MAX_GAP
+            ) {
+                end += 1
+            }
+
+            const group = points.slice(start, end)
+            if (group.length >= SPEED_DENSE_MIN_POINTS) {
+                parts.push(...this.renderDenseSpeedGroup(group, visibleTop, visibleBottom))
+            } else {
+                for (const point of group) {
+                    if (visibleTop <= point.y && point.y <= visibleBottom) {
+                        parts.push(...this.renderSpeedPoint(point))
+                    }
+                }
+            }
+            start = end
+        }
+
+        return parts
+    }
+
     private renderEvents(): string[] {
         const parts: string[] = []
 
@@ -953,23 +1076,12 @@ class SentenceRenderer {
             ...this.drawing.score.events,
         ].sort((a, b) => a.bar.compare(b.bar))
 
+        parts.push(...this.renderSpeedEvents())
+
         for (const event of mergedEvents) {
             const eventY =
                 this.drawing.timeHeight * this.drawing.score.getTimeDelta(event.bar, this.barStop) +
                 this.drawing.timePadding
-
-            if (event.speed) {
-                parts.push(
-                    `<line x1="${fmt(r(this.drawing.lanePadding))}" y1="${fmt(r(eventY))}" x2="${fmt(
-                        r(this.drawing.laneWidth * this.drawing.nLanes + this.drawing.lanePadding),
-                    )}" y2="${fmt(r(eventY))}" class="speed-line" />`,
-                )
-                parts.push(
-                    `<text x="${fmt(r(this.drawing.laneWidth * this.drawing.nLanes + this.drawing.lanePadding - 2))}" y="${fmt(
-                        r(eventY - 2),
-                    )}" class="speed-text">${escapeXml(formatSpeedRatio(event.speed))}</text>`,
-                )
-            }
 
             const hasEventText = Boolean(
                 event.bpm ||
@@ -978,7 +1090,7 @@ class SentenceRenderer {
                     event.text ||
                     event.seVolume !== null,
             )
-            if (event.speed && !hasEventText) {
+            if (event.speed !== null && !hasEventText) {
                 continue
             }
 
