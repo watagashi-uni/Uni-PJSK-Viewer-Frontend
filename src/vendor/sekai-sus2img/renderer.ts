@@ -65,12 +65,9 @@ const DEFAULT_STYLE = `.bar-line {
 
 .note-speed-text {
     font-size: 10px;
-    font-weight: 900;
     font-family: Avenir;
-    fill: #ffffff;
-    stroke: #303030;
-    stroke-width: 2;
-    paint-order: stroke;
+    opacity: 0.5;
+    fill: #e2e2e2;
     text-anchor: middle;
     dominant-baseline: middle;
     pointer-events: none;
@@ -210,12 +207,9 @@ const WHITE_STYLE = `.bar-line {
 
 .note-speed-text {
     font-size: 10px;
-    font-weight: 900;
     font-family: Avenir;
-    fill: #303030;
-    stroke: #ffffff;
-    stroke-width: 2;
-    paint-order: stroke;
+    opacity: 0.5;
+    fill: #000000;
     text-anchor: middle;
     dominant-baseline: middle;
     pointer-events: none;
@@ -369,6 +363,26 @@ const getNoteSpeedRatio = (note: Tap | Directional | Slide): number | null => {
     return null
 }
 
+const getRhythmTickState = (note: Tap | Directional | Slide): boolean | null => {
+    if (!(note instanceof Slide)) {
+        return note.isTick()
+    }
+    if (note.decoration) {
+        return null
+    }
+
+    const isChainHead = note.head === note
+    const isChainTail = note.next === null
+    if (!isChainHead && !isChainTail) {
+        return null
+    }
+    if (note.type !== SlideType.START && note.type !== SlideType.END) {
+        return null
+    }
+
+    return note.isTick()
+}
+
 const cloneEvent = (event: Event): Event =>
     new Event({
         bar: event.bar,
@@ -390,6 +404,7 @@ class SentenceRenderer {
     private amongImages: string[] = []
     private noteImages: string[] = []
     private flickImages: string[] = []
+    private noteSpeedTexts: string[] = []
     private tickTexts: string[] = []
     private crashMarkerElements: string[] = []
 
@@ -667,15 +682,31 @@ class SentenceRenderer {
         }
 
         this.noteImages.push(useTag)
+    }
+
+    private addNoteSpeedText(note: Tap | Directional | Slide) {
+        if (note.isNone() && (!(note instanceof Slide) || !note.decoration)) {
+            return
+        }
+        if (note instanceof Slide && note.decoration && note.head !== note) {
+            return
+        }
 
         const speedRatio = getNoteSpeedRatio(note)
-        if (speedRatio) {
-            this.noteImages.push(
-                `<text x="${fmt(r(x + w / 2))}" y="${fmt(r(y))}" class="note-speed-text">${escapeXml(
-                    formatSpeedRatio(speedRatio),
-                )}</text>`,
-            )
+        if (!speedRatio) {
+            return
         }
+
+        const y = this.getRelativeY(note.bar)
+        const x =
+            this.drawing.laneWidth * (note.lane - 2 + note.width / 2) +
+            this.drawing.lanePadding
+        const text = formatSpeedRatio(speedRatio)
+        this.noteSpeedTexts.push(
+            `<text x="${fmt(r(x))}" y="${fmt(r(y))}" class="note-speed-text">${escapeXml(
+                text,
+            )}</text>`,
+        )
     }
 
     private addFlickImage(note: Directional | Slide) {
@@ -1060,13 +1091,14 @@ class SentenceRenderer {
                 }
             }
 
-            if (note.isTick() !== null) {
+            const rhythmTickState = getRhythmTickState(note)
+            if (rhythmTickState !== null) {
                 let nextTick: Tap | Directional | Slide | null = null
-                if (note.isTick()) {
+                if (rhythmTickState) {
                     nextTick = note
                     for (let j = i; j < this.drawing.score.notes.length; j += 1) {
                         const candidate = this.drawing.score.notes[j]
-                        if (candidate.isTick() && candidate.bar.compare(note.bar) > 0) {
+                        if (getRhythmTickState(candidate) && candidate.bar.compare(note.bar) > 0) {
                             nextTick = candidate
                             break
                         }
@@ -1075,6 +1107,8 @@ class SentenceRenderer {
 
                 this.addTickText(note, nextTick)
             }
+
+            this.addNoteSpeedText(note)
 
             if (note instanceof Tap) {
                 this.addNoteImage(note)
@@ -1138,6 +1172,7 @@ class SentenceRenderer {
         parts.push(...this.noteImages)
         parts.push(...this.amongImages)
         parts.push(...this.flickImages.slice().reverse())
+        parts.push(...this.noteSpeedTexts)
         parts.push(...this.crashMarkerElements)
         parts.push(...this.tickTexts)
 

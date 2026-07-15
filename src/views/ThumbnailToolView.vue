@@ -33,7 +33,9 @@ const searchResults = ref<Music[]>([])
 
 const selectedMusic = ref<Music | null>(null)
 const selectedDifficulty = ref('master')
+const customLevel = ref('')
 const customText = ref('ALL PERFECT')
+const customCoverImage = ref<string | null>(null)
 
 // 图片变换控制
 const bgImage = ref<string | null>(null)
@@ -96,21 +98,37 @@ function selectMusic(music: Music) {
   searchResults.value = []
 }
 
-// 图片上传处理（转为 data URL 以兼容 html-to-image 导出）
-function handleFileUpload(event: Event) {
+function readImageFile(event: Event, onLoad: (dataUrl: string) => void) {
   const file = (event.target as HTMLInputElement).files?.[0]
   if (file) {
     const reader = new FileReader()
     reader.onload = (e) => {
-      bgImage.value = e.target?.result as string
-      // 重置变换
-      bgScale.value = 1.0
-      bgRotate.value = 0
-      bgX.value = 0
-      bgY.value = 0
+      onLoad(e.target?.result as string)
     }
     reader.readAsDataURL(file)
   }
+}
+
+// 图片上传处理（转为 data URL 以兼容 html-to-image 导出）
+function handleFileUpload(event: Event) {
+  readImageFile(event, (dataUrl) => {
+    bgImage.value = dataUrl
+    // 重置变换
+    bgScale.value = 1.0
+    bgRotate.value = 0
+    bgX.value = 0
+    bgY.value = 0
+  })
+}
+
+function handleCoverUpload(event: Event) {
+  readImageFile(event, (dataUrl) => {
+    customCoverImage.value = dataUrl
+  })
+}
+
+function clearCustomCover() {
+  customCoverImage.value = null
 }
 
 // 计算属性
@@ -119,12 +137,20 @@ const coverUrl = computed(() => {
   return `${settingsStore.assetsHost}/startapp/music/jacket/${selectedMusic.value.assetbundleName}/${selectedMusic.value.assetbundleName}.png`
 })
 
+const activeCoverUrl = computed(() => customCoverImage.value || coverUrl.value)
+
+const normalizedDifficulty = computed(() => selectedDifficulty.value.trim().toLowerCase() || 'master')
+
+const difficultyDisplayText = computed(() => selectedDifficulty.value.trim() || 'MASTER')
+
 const currentLevel = computed(() => {
-  if (!selectedMusic.value) return 0
+  const level = customLevel.value.trim()
+  if (level) return level
+  if (!selectedMusic.value) return '32'
   const diff = allDifficulties.value.find(
-    d => d.musicId === selectedMusic.value!.id && d.musicDifficulty === selectedDifficulty.value
+    d => d.musicId === selectedMusic.value!.id && d.musicDifficulty === normalizedDifficulty.value
   )
-  return diff ? diff.playLevel : 0
+  return diff ? String(diff.playLevel) : '32'
 })
 
 const difficultyColors: Record<string, { bg: string, text: string, shadow: string, gradient?: string }> = {
@@ -137,7 +163,7 @@ const difficultyColors: Record<string, { bg: string, text: string, shadow: strin
 }
 
 const currentColors = computed(() => {
-  return difficultyColors[selectedDifficulty.value] || difficultyColors['master'] || { bg: '#C656EA', text: 'text-[#C656EA]', shadow: 'rgba(198,86,234,0.8)' }
+  return difficultyColors[normalizedDifficulty.value] || difficultyColors['master'] || { bg: '#C656EA', text: 'text-[#C656EA]', shadow: 'rgba(198,86,234,0.8)' }
 })
 
 const currentDifficultyBackground = computed(() => currentColors.value.gradient || currentColors.value.bg)
@@ -225,7 +251,7 @@ function copyMusicTitle() {
           />
 
           <!-- 左侧上宽下窄的模糊封面（叠在截图上方，不透明，斜线边缘羽化） -->
-          <template v-if="selectedMusic && coverUrl && bgImage">
+          <template v-if="activeCoverUrl && bgImage">
             <div 
               class="absolute inset-0 pointer-events-none z-[5]"
               :style="{ 
@@ -234,7 +260,7 @@ function copyMusicTitle() {
               }"
             >
               <img
-                :src="coverUrl"
+                :src="activeCoverUrl"
                 class="absolute inset-0 w-full h-full object-cover blur-[7px]"
                 crossorigin="anonymous"
               />
@@ -243,7 +269,7 @@ function copyMusicTitle() {
 
           <!-- 前景 Overlay（左上角），宽度固定为容器的 30% -->
           <div 
-            v-if="selectedMusic && bgImage" 
+            v-if="activeCoverUrl && bgImage" 
             class="absolute top-[6%] left-[3%] flex flex-col items-start select-none pointer-events-none z-10"
             style="width: 35%"
           >
@@ -260,7 +286,7 @@ function copyMusicTitle() {
               />
               <!-- 实际封面 -->
               <AssetImage 
-                :src="coverUrl" 
+                :src="activeCoverUrl" 
                 class="relative w-full h-full object-cover z-10 border border-white/20 rounded-sm shadow-md"
               />
             </div>
@@ -282,7 +308,7 @@ function copyMusicTitle() {
                 }"
               >
                 <span class="font-bold text-white" style="-webkit-text-stroke: 1px white">
-                  {{ selectedDifficulty.toUpperCase() }}
+                  {{ difficultyDisplayText.toUpperCase() }}
                 </span>
                 <span class="font-bold text-white" style="-webkit-text-stroke: 1px white">
                   {{ currentLevel }}
@@ -356,11 +382,11 @@ function copyMusicTitle() {
 
       <div class="card bg-base-100 shadow-xl border border-base-200">
         <div class="card-body p-5">
-          <h2 class="card-title text-base border-b border-base-200 pb-2 mb-2">2. 选择歌曲与状态</h2>
+          <h2 class="card-title text-base border-b border-base-200 pb-2 mb-2">2. 封面与状态</h2>
           
           <!-- 搜寻歌曲 -->
           <div class="form-control w-full relative">
-            <label class="label py-1"><span class="label-text text-xs">搜索歌曲名称</span></label>
+            <label class="label py-1"><span class="label-text text-xs">官方曲库</span></label>
             <div class="relative">
               <input 
                 v-model="searchQuery" 
@@ -406,14 +432,63 @@ function copyMusicTitle() {
             </button>
           </div>
 
+          <!-- 自定义封面 -->
+          <div class="form-control mt-3">
+            <label class="label py-1"><span class="label-text text-xs">自定义封面</span></label>
+            <input 
+              type="file" 
+              accept="image/*" 
+              class="file-input file-input-sm file-input-bordered w-full" 
+              @change="handleCoverUpload" 
+            />
+          </div>
+
+          <div v-if="activeCoverUrl" class="mt-3 p-2 bg-base-200/50 rounded-lg flex items-center gap-3">
+            <AssetImage :src="activeCoverUrl" class="w-12 h-12 rounded shadow-sm object-cover" />
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-bold truncate">{{ customCoverImage ? '自定义封面' : '当前封面' }}</p>
+              <p class="text-xs text-base-content/60">{{ customCoverImage ? '已覆盖官方封面' : '来自官方曲库' }}</p>
+            </div>
+            <button 
+              v-if="customCoverImage"
+              class="btn btn-xs btn-ghost"
+              @click="clearCustomCover"
+            >
+              清除
+            </button>
+          </div>
+
           <!-- 难度选择 -->
           <div class="form-control mt-3">
-            <label class="label py-1"><span class="label-text text-xs">难度</span></label>
-            <select v-model="selectedDifficulty" class="select select-sm select-bordered w-full font-bold" :class="currentColors.text">
-              <option v-for="diff in difficultiesDict" :key="diff" :value="diff">
-                {{ diff.toUpperCase() }}
-              </option>
-            </select>
+            <label class="label py-1"><span class="label-text text-xs">难度显示</span></label>
+            <input 
+              v-model="selectedDifficulty" 
+              type="text" 
+              class="input input-sm input-bordered w-full font-bold uppercase" 
+              :class="currentColors.text"
+            />
+            <div class="flex flex-wrap gap-2 mt-2">
+              <button 
+                v-for="diff in difficultiesDict" 
+                :key="diff" 
+                class="btn btn-xs btn-outline uppercase"
+                @click="selectedDifficulty = diff"
+              >
+                {{ diff }}
+              </button>
+            </div>
+          </div>
+
+          <!-- 等级 -->
+          <div class="form-control mt-3">
+            <label class="label py-1"><span class="label-text text-xs">等级</span></label>
+            <input 
+              v-model="customLevel" 
+              type="text" 
+              inputmode="decimal"
+              placeholder="32"
+              class="input input-sm input-bordered w-full font-bold" 
+            />
           </div>
 
           <!-- 状态文字 -->
