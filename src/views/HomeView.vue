@@ -307,23 +307,20 @@ onMounted(async () => {
       <div class="card-body p-4 md:p-5">
         <div class="flex flex-col md:flex-row items-center gap-4 md:gap-5">
           <img
-            src="/img/chart.webp"
-            alt="本家 1:1 复刻谱面在线预览"
+            src="/img/costume3d.webp"
+            alt="衣装 3D 在线预览"
             class="w-full md:w-56 rounded-lg object-cover shrink-0 border border-base-200"
           />
           <div class="min-w-0 w-full">
             <h2 class="text-lg md:text-xl font-bold text-base-content">
-              本家 1:1 复刻在线谱面预览
+              衣装图鉴 & 3D 在线预览上线
             </h2>
             <p class="text-sm text-base-content/70 mt-1">
-              歌曲详情页现已支持可播放的 3D 谱面预览，并支持游戏内谱面Maker自制谱预览，欢迎体验。
+              按角色浏览全部衣装、头饰与发型，查看来源卡片和当期活动；详情页可直接加载还原游戏渲染的 3D 模型，支持旋转缩放、切换配色与全屏查看。
             </p>
             <div class="flex flex-wrap gap-2 mt-3">
-              <RouterLink to="/musics" class="btn btn-sm btn-primary">
-                去歌曲详情体验
-              </RouterLink>
-              <RouterLink to="/custom-score-maker" class="btn btn-sm btn-secondary btn-outline">
-                去谱面Maker页面体验
+              <RouterLink to="/costumes" class="btn btn-sm btn-primary">
+                去衣装页体验
               </RouterLink>
             </div>
           </div>
