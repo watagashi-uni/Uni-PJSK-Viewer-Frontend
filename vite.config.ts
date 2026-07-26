@@ -101,14 +101,15 @@ export default defineConfig({
             handler: 'NetworkOnly',
           },
           {
-            // 版本号优先走网络，离线时回退缓存，避免破坏 PWA 的离线可用性
+            // 版本号优先走网络，离线时回退缓存，避免破坏 PWA 的离线可用性；
+            // 在线时 NetworkFirst 总是走网络，长 maxAge 只影响离线兜底的可用窗口
             urlPattern: /^https:\/\/viewer-api\.unipjsk\.com\/api\/version(?:\?.*)?$/i,
             handler: 'NetworkFirst',
             options: {
               cacheName: 'version-cache',
               expiration: {
                 maxEntries: 1,
-                maxAgeSeconds: 60 * 60 * 24, // 1 天
+                maxAgeSeconds: 60 * 60 * 24 * 30, // 30 天
               },
               cacheableResponse: {
                 statuses: [0, 200],

@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
-import apiClient from '@/api/client'
 import { getVersion, isCnAssetsEnabled } from '@/api/version'
+import { detectIsChina } from '@/utils/location'
 
 export const useSettingsStore = defineStore('settings', () => {
     const ASSETS_HOST_CN = 'https://assets-direct.unipjsk.com'
@@ -83,9 +83,10 @@ export const useSettingsStore = defineStore('settings', () => {
             try {
                 const versionInfo = await getVersion()
                 cnAssetsAllowed.value = isCnAssetsEnabled(versionInfo)
+                localStorage.setItem('settings_cnAssetsAllowed', cnAssetsAllowed.value ? '1' : '0')
             } catch (error) {
                 console.error('Failed to load asset source policy:', error)
-                cnAssetsAllowed.value = false
+                // 失败（如离线）时保留本地快照，避免把国内源用户踢回海外源导致缓存全部失配
             } finally {
                 cnAssetsPolicyLoaded.value = true
                 cnAssetsPolicyPromise = null
@@ -120,6 +121,13 @@ export const useSettingsStore = defineStore('settings', () => {
             defaultVocal.value = savedDefaultVocal
         }
 
+        // 恢复上次确认的国内源政策快照，version 返回前先按上次结果放行，
+        // 让选国内源的用户启动即用国内域名，不必等 /api/version
+        const savedCnAssetsAllowed = localStorage.getItem('settings_cnAssetsAllowed')
+        if (savedCnAssetsAllowed !== null) {
+            cnAssetsAllowed.value = savedCnAssetsAllowed === '1'
+        }
+
         // 检测是否为爬虫
         const isCrawler = /bot|googlebot|crawler|spider|robot|crawling|bingbot|yandex|duckduckbot|slurp|baiduspider/i.test(navigator.userAgent || '');
 
@@ -132,20 +140,16 @@ export const useSettingsStore = defineStore('settings', () => {
                 preferredAssetsHost.value = savedAssetsHost
             } else {
                 preferredAssetsHost.value = ASSETS_HOST_GLOBAL
-                apiClient.get('/api/location')
-                    .then(res => {
-                        if (localStorage.getItem('settings_assetsHost')) {
-                            return
-                        }
+                // 失败时 detectIsChina 返回 false，等价于原先 catch 分支写入海外源
+                void detectIsChina().then((isChina) => {
+                    if (localStorage.getItem('settings_assetsHost')) {
+                        return
+                    }
 
-                        const hostToSet = res.data.isChina ? ASSETS_HOST_CN : ASSETS_HOST_GLOBAL;
-                        preferredAssetsHost.value = hostToSet;
-                        localStorage.setItem('settings_assetsHost', hostToSet);
-                    })
-                    .catch(err => {
-                        console.error('Failed to detect location:', err);
-                        localStorage.setItem('settings_assetsHost', ASSETS_HOST_GLOBAL);
-                    })
+                    const hostToSet = isChina ? ASSETS_HOST_CN : ASSETS_HOST_GLOBAL
+                    preferredAssetsHost.value = hostToSet
+                    localStorage.setItem('settings_assetsHost', hostToSet)
+                })
             }
         }
 
