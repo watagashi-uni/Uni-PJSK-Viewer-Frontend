@@ -6,12 +6,14 @@ import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
 import { Mp3Encoder } from '@breezystack/lamejs'
 import {
-  Play, Pause, BarChart2, Eye, Download, ChevronLeft,
+  Play, Pause, BarChart2, Eye, Download, ChevronLeft, ChevronDown,
   Disc3, Sparkles, Mic, Volume2, VolumeX, SkipBack, SkipForward,
-  PlayCircle, Zap, X, FileImage, Loader2, ZoomIn, ZoomOut, Maximize
+  PlayCircle, Zap, X, FileImage, Loader2, ZoomIn, ZoomOut, Maximize,
+  Activity
 } from 'lucide-vue-next'
 import AssetImage from '@/components/AssetImage.vue'
 import { alignFurigana } from '@/utils/furigana'
+import { parseSusBpm, type SusBpmEvent } from '@/utils/susBpm'
 import type { EventData } from '@/types/master'
 import { renderSusToSvg, type Sus2ImgFrontendResult } from '@/vendor/sekai-sus2img'
 
@@ -614,6 +616,54 @@ async function forceDownload(difficulty: string) {
   }
 }
 
+// ===== BPM 展示（点击后拉取谱面解析） =====
+const bpmLoading = ref(false)
+const bpmError = ref<string | null>(null)
+const bpmEvents = ref<SusBpmEvent[] | null>(null)
+const bpmDetailOpen = ref(false)
+
+// 默认取 master 谱面；个别缺 master 时回退到已有的最高难度
+const bpmSourceDifficulty = computed(() => {
+  if (difficulties.value.some(d => d.musicDifficulty === 'master')) return 'master'
+  return difficulties.value[difficulties.value.length - 1]?.musicDifficulty ?? 'master'
+})
+
+async function loadBpm() {
+  if (bpmLoading.value) return
+  bpmLoading.value = true
+  bpmError.value = null
+  try {
+    const response = await fetch(getDownloadUrl(bpmSourceDifficulty.value))
+    if (!response.ok) {
+      throw new Error(`下载谱面文件失败：HTTP ${response.status}`)
+    }
+    bpmEvents.value = parseSusBpm(await response.text())
+  } catch (e) {
+    console.error('解析 BPM 失败:', e)
+    bpmError.value = e instanceof Error ? e.message : '解析 BPM 失败'
+  } finally {
+    bpmLoading.value = false
+  }
+}
+
+function formatBpmValue(value: number): string {
+  return `${Number(value.toFixed(3))}`
+}
+
+// 与谱面预览 formatBar 口径一致：整数直接显示，小节内偏移保留小数
+function formatBpmBar(value: number): string {
+  if (Math.abs(value - Math.round(value)) < 1e-9) return `${Math.round(value)}`
+  return `${Number(value.toFixed(4))}`
+}
+
+const bpmSummaryText = computed(() => {
+  const events = bpmEvents.value
+  if (!events || !events.length) return '—'
+  const values = [...new Set(events.map(e => e.bpm))]
+  if (values.length === 1) return formatBpmValue(values[0] ?? 0)
+  return `${formatBpmValue(Math.min(...values))} ~ ${formatBpmValue(Math.max(...values))}`
+})
+
 // 打开谱面播放预览
 function toHttpsUrl(rawUrl: string) {
   try {
@@ -1094,6 +1144,50 @@ const isExpired = computed(() => {
             <div class="flex justify-between items-center text-sm border-b border-base-200 pb-2">
               <span class="text-base-content/60">编曲</span>
               <span class="font-medium truncate max-w-[70%] select-all">{{ music.arranger }}</span>
+            </div>
+            <div class="text-sm border-b border-base-200 pb-2">
+              <div class="flex justify-between items-center min-h-6">
+                <span class="text-base-content/60">BPM</span>
+                <span v-if="bpmLoading" class="loading loading-spinner loading-xs text-primary"></span>
+                <button
+                  v-else-if="bpmError"
+                  class="btn btn-ghost btn-xs h-6 min-h-0 px-2 font-normal text-error"
+                  :title="bpmError"
+                  @click="loadBpm"
+                >
+                  加载失败，重试
+                </button>
+                <span v-else-if="bpmEvents" class="font-medium font-mono select-all">{{ bpmSummaryText }}</span>
+                <button
+                  v-else
+                  class="btn btn-ghost btn-xs h-6 min-h-0 px-2 font-normal text-primary gap-1"
+                  @click="loadBpm"
+                >
+                  <Activity class="w-3.5 h-3.5" /> 点击查看
+                </button>
+              </div>
+              <template v-if="bpmEvents && bpmEvents.length > 1">
+                <button
+                  class="mt-1.5 flex items-center gap-1 text-xs text-primary/70 hover:text-primary transition-colors"
+                  @click="bpmDetailOpen = !bpmDetailOpen"
+                >
+                  <ChevronDown class="w-3 h-3 transition-transform" :class="{ 'rotate-180': bpmDetailOpen }" />
+                  变速详情（{{ bpmEvents.length }} 段）
+                </button>
+                <div
+                  v-if="bpmDetailOpen"
+                  class="mt-1.5 max-h-36 overflow-y-auto custom-scrollbar rounded-lg bg-base-200/40 px-3 py-2 space-y-1"
+                >
+                  <div
+                    v-for="(ev, i) in bpmEvents"
+                    :key="i"
+                    class="flex justify-between items-center text-xs font-mono"
+                  >
+                    <span class="text-base-content/50">#{{ formatBpmBar(ev.bar) }} 小节起</span>
+                    <span>{{ formatBpmValue(ev.bpm) }}</span>
+                  </div>
+                </div>
+              </template>
             </div>
             <div class="flex justify-between items-center text-sm border-b border-base-200 pb-2">
               <span class="text-base-content/60">发布日期</span>
