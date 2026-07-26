@@ -1025,16 +1025,16 @@ function clearForm() {
             </div>
 
             <div class="form-control">
-              <label class="label cursor-pointer justify-start gap-3">
-                <input v-model="overlapAcknowledged" type="checkbox" class="checkbox checkbox-warning" />
-                <span class="label-text font-medium">我已知晓：谱面存在重叠 note 时，转换出的 SUS 可能不符合预期</span>
+              <label class="label cursor-pointer justify-start items-start gap-3 whitespace-normal">
+                <input v-model="overlapAcknowledged" type="checkbox" class="checkbox checkbox-warning shrink-0" />
+                <span class="label-text font-medium min-w-0">我已知晓：谱面存在重叠 note 时，转换出的 SUS 可能不符合预期</span>
               </label>
             </div>
 
             <div class="form-control">
-              <label class="label cursor-pointer justify-start gap-3">
-                <input v-model="form.convertIncludeNoteSpeed" type="checkbox" class="checkbox checkbox-primary" />
-                <span class="label-text">
+              <label class="label cursor-pointer justify-start items-start gap-3 whitespace-normal">
+                <input v-model="form.convertIncludeNoteSpeed" type="checkbox" class="checkbox checkbox-primary shrink-0" />
+                <span class="label-text min-w-0">
                   导出 note speed 扩展
                   <span class="text-xs opacity-60 block">该格式只有本家可以读取，第三方工具可能不兼容</span>
                 </span>
@@ -1210,9 +1210,9 @@ function clearForm() {
               </div>
 
               <div class="form-control">
-                <label class="label cursor-pointer justify-start gap-3">
-                  <input v-model="form.condenseSpeedTrend" type="checkbox" class="checkbox checkbox-primary" />
-                  <span class="label-text">
+                <label class="label cursor-pointer justify-start items-start gap-3 whitespace-normal">
+                  <input v-model="form.condenseSpeedTrend" type="checkbox" class="checkbox checkbox-primary shrink-0" />
+                  <span class="label-text min-w-0">
                     highspeed 短时间密集变化折叠为趋势箭头
                     <span class="text-xs opacity-60 block">关闭后将逐条展示每个 highspeed 变化（密集处文字可能重叠）；仅前端引擎生效</span>
                   </span>
