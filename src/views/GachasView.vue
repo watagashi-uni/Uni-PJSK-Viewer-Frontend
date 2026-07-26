@@ -50,11 +50,25 @@ watch([searchQuery, sortOrder], () => {
   currentPage.value = 1
 })
 
-// 卡池小图直接用首页 banner（老卡池没有 logo）；banner 也没有的显示占位
-const gachaImgFailed = ref<Record<number, boolean>>({})
+// 卡池小图优先用首页 banner，加载失败回退 logo（logo 按 assetbundleName 必然存在），再失败显示占位。
+// 复用其他卡池 assetbundleName 的池（复刻/常驻等）一定没有自己的 banner，直接从 logo 开始
+const gachaImgStage = ref<Record<number, number>>({})
 
-function getGachaImageUrl(gacha: Gacha): string {
-  return `${assetsHost.value}/startapp/home/banner/banner_gacha${gacha.id}/banner_gacha${gacha.id}.png`
+function gachaImgCandidates(gacha: Gacha): string[] {
+  const urls: string[] = []
+  if (gacha.assetbundleName === `ab_gacha_${gacha.id}`) {
+    urls.push(`${assetsHost.value}/startapp/home/banner/banner_gacha${gacha.id}/banner_gacha${gacha.id}.png`)
+  }
+  urls.push(`${assetsHost.value}/ondemand/gacha/${gacha.assetbundleName}/logo/logo.png`)
+  return urls
+}
+
+function gachaImgSrc(gacha: Gacha): string | undefined {
+  return gachaImgCandidates(gacha)[gachaImgStage.value[gacha.id] ?? 0]
+}
+
+function onGachaImgError(gacha: Gacha) {
+  gachaImgStage.value[gacha.id] = (gachaImgStage.value[gacha.id] ?? 0) + 1
 }
 
 function formatDate(timestamp: number): string {
@@ -150,11 +164,11 @@ onMounted(async () => {
 
           <figure class="relative aspect-[7/2] bg-base-200 overflow-hidden flex items-center justify-center">
             <AssetImage
-              v-if="!gachaImgFailed[gacha.id]"
-              :src="getGachaImageUrl(gacha)"
+              v-if="gachaImgSrc(gacha)"
+              :src="gachaImgSrc(gacha)!"
               :alt="gacha.name"
               class="h-full object-contain group-hover:scale-105 transition-transform"
-              @error="gachaImgFailed[gacha.id] = true"
+              @error="onGachaImgError(gacha)"
             />
             <Gift v-else class="w-10 h-10 text-base-content/20" />
             

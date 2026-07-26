@@ -431,10 +431,16 @@ function formatDateShort(timestamp: number): string {
 }
 
 // 卡池小图直接用首页 banner（老卡池没有 logo）；banner 也没有的显示占位
-const gachaImgFailed = ref<Record<number, boolean>>({})
+// banner 缺失时回退 logo（logo 按 assetbundleName 必然存在）；复用他池 assetbundleName 的池必无 banner
+const gachaImgStage = ref<Record<number, number>>({})
 
-function gachaImgSrc(gacha: RelatedGacha): string {
-  return `${assetsHost.value}/startapp/home/banner/banner_gacha${gacha.id}/banner_gacha${gacha.id}.png`
+function gachaImgSrc(gacha: RelatedGacha): string | undefined {
+  const urls: string[] = []
+  if (gacha.assetbundleName === `ab_gacha_${gacha.id}`) {
+    urls.push(`${assetsHost.value}/startapp/home/banner/banner_gacha${gacha.id}/banner_gacha${gacha.id}.png`)
+  }
+  urls.push(`${assetsHost.value}/ondemand/gacha/${gacha.assetbundleName}/logo/logo.png`)
+  return urls[gachaImgStage.value[gacha.id] ?? 0]
 }
 
 function eventBannerUrl(event: RelatedEvent): string {
@@ -795,11 +801,11 @@ onMounted(loadData)
                   class="flex items-center gap-3 bg-base-100 rounded-lg p-2 hover:shadow-md transition-all"
                 >
                   <AssetImage
-                    v-if="!gachaImgFailed[gacha.id]"
-                    :src="gachaImgSrc(gacha)"
+                    v-if="gachaImgSrc(gacha)"
+                    :src="gachaImgSrc(gacha)!"
                     :alt="gacha.name"
                     class="h-10 w-24 object-contain shrink-0"
-                    @error="gachaImgFailed[gacha.id] = true"
+                    @error="gachaImgStage[gacha.id] = (gachaImgStage[gacha.id] ?? 0) + 1"
                   />
                   <div v-else class="h-10 w-24 shrink-0 flex items-center justify-center">
                     <Gift class="w-5 h-5 text-base-content/20" />
