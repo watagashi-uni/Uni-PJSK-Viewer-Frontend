@@ -215,14 +215,11 @@ async function applyRecipe() {
   }
 }
 
-// 全屏：优先原生 Fullscreen API，不支持（如 iOS Safari）时退化为 CSS 覆盖层
-const nativeFullscreen = ref(false)
+// 全屏：全平台统一用 CSS 覆盖层（Teleport 到 body）。
+// 不用原生 Fullscreen API——各浏览器对 WebGL canvas 上层元素的渲染行为不一致，
+// 退出按钮时隐时现；CSS 方案行为完全一致且已验证
 const cssFullscreen = ref(false)
-const isFullscreen = computed(() => nativeFullscreen.value || cssFullscreen.value)
-
-function handleFullscreenChange() {
-  nativeFullscreen.value = document.fullscreenElement === viewerHost.value
-}
+const isFullscreen = computed(() => cssFullscreen.value)
 
 function handleFullscreenKeydown(event: KeyboardEvent) {
   if (event.key === 'Escape' && cssFullscreen.value) {
@@ -231,22 +228,7 @@ function handleFullscreenKeydown(event: KeyboardEvent) {
 }
 
 function toggleFullscreen() {
-  if (isFullscreen.value) {
-    if (document.fullscreenElement) {
-      void document.exitFullscreen()
-    }
-    cssFullscreen.value = false
-    return
-  }
-  const host = viewerHost.value
-  if (!host) return
-  if (host.requestFullscreen) {
-    host.requestFullscreen().catch(() => {
-      cssFullscreen.value = true
-    })
-  } else {
-    cssFullscreen.value = true
-  }
+  cssFullscreen.value = !cssFullscreen.value
 }
 
 // CSS 全屏时锁定背景滚动（iOS Safari 上尤其必要）
@@ -405,7 +387,6 @@ async function start() {
     })
     intersectionObserver.observe(host)
     document.addEventListener('visibilitychange', handleVisibilityChange)
-    document.addEventListener('fullscreenchange', handleFullscreenChange)
     document.addEventListener('keydown', handleFullscreenKeydown)
 
     await applyRecipe()
@@ -435,11 +416,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   document.removeEventListener('visibilitychange', handleVisibilityChange)
-  document.removeEventListener('fullscreenchange', handleFullscreenChange)
   document.removeEventListener('keydown', handleFullscreenKeydown)
-  if (document.fullscreenElement === viewerHost.value) {
-    void document.exitFullscreen()
-  }
   document.body.style.overflow = ''
   endProgress()
   resizeObserver?.disconnect()
@@ -508,14 +485,16 @@ onBeforeUnmount(() => {
         >
           <canvas ref="canvasEl" class="block w-full h-full touch-none cursor-grab active:cursor-grabbing"></canvas>
 
-          <!-- 全屏切换（transform-gpu 强制独立合成层，避免 Safari 把它画到 WebGL canvas 下面） -->
+          <!-- 进入全屏（transform-gpu 强制独立合成层，避免 Safari 把它画到 WebGL canvas 下面；
+               全屏中的退出按钮在下方 body 层单独渲染，避开 canvas 兄弟元素的合成问题） -->
+          <!-- absolute!/fixed! 加 important：jirai 等主题的 [data-theme] .btn 会用更高优先级覆盖 position -->
           <button
-            class="btn btn-sm btn-circle bg-base-100/90 border border-base-300 shadow-md absolute top-2 right-2 z-30 transform-gpu"
-            :title="isFullscreen ? '退出全屏' : '全屏预览'"
+            v-if="!cssFullscreen"
+            class="btn btn-sm btn-circle bg-base-100/90 border border-base-300 shadow-md absolute! top-2 right-2 z-30 transform-gpu"
+            title="全屏预览"
             @click="toggleFullscreen"
           >
-            <Minimize2 v-if="isFullscreen" class="w-4 h-4" />
-            <Maximize2 v-else class="w-4 h-4" />
+            <Maximize2 class="w-4 h-4" />
           </button>
 
           <!-- 加载进度 -->
@@ -537,6 +516,20 @@ onBeforeUnmount(() => {
             </button>
           </div>
         </div>
+      </Teleport>
+
+      <!-- CSS 全屏的退出按钮：独立挂在 body 层（z 高于全屏容器），
+           不作为 canvas 的兄弟元素，避开 iOS Safari 的合成层 bug；留出刘海安全区 -->
+      <Teleport to="body">
+        <button
+          v-if="cssFullscreen"
+          class="btn btn-circle bg-base-100/90 border border-base-300 shadow-md fixed! right-3 z-[1001]"
+          style="top: calc(0.75rem + env(safe-area-inset-top))"
+          title="退出全屏"
+          @click="toggleFullscreen"
+        >
+          <Minimize2 class="w-5 h-5" />
+        </button>
       </Teleport>
 
       <p class="text-xs text-base-content/50 mt-2">
