@@ -456,7 +456,7 @@ onBeforeUnmount(() => {
 
     <!-- 未开始：按需加载入口 -->
     <div v-if="!started" class="bg-base-200 rounded-xl p-6 flex flex-col items-center gap-3">
-      <p class="text-sm text-base-content/60">在线预览该衣装的 3D 模型（首次约 5~10 MB，加载过的资源会缓存）</p>
+      <p class="text-sm text-base-content/60">在线预览该衣装的 3D 模型（首次加载约 5~10 MB）</p>
       <button class="btn btn-primary btn-sm" @click="start">
         <Box class="w-4 h-4" /> 加载 3D 预览
       </button>
@@ -485,6 +485,11 @@ onBeforeUnmount(() => {
         >
           <option v-for="unit in unitOptions" :key="unit" :value="unit">{{ unit }}</option>
         </select>
+        <button class="btn btn-xs btn-outline gap-1" @click="toggleFullscreen">
+          <Minimize2 v-if="isFullscreen" class="w-3.5 h-3.5" />
+          <Maximize2 v-else class="w-3.5 h-3.5" />
+          {{ isFullscreen ? '退出全屏' : '全屏' }}
+        </button>
       </div>
 
       <!-- 画布 -->
@@ -497,7 +502,7 @@ onBeforeUnmount(() => {
 
         <!-- 全屏切换 -->
         <button
-          class="btn btn-sm btn-circle bg-base-100/70 border-0 shadow absolute top-2 right-2 z-10"
+          class="btn btn-sm btn-circle bg-base-100/90 border border-base-300 shadow-md absolute top-2 right-2 z-30"
           :title="isFullscreen ? '退出全屏' : '全屏预览'"
           @click="toggleFullscreen"
         >
