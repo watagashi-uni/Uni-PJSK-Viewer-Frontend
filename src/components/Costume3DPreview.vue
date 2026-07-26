@@ -249,6 +249,11 @@ function toggleFullscreen() {
   }
 }
 
+// CSS 全屏时锁定背景滚动（iOS Safari 上尤其必要）
+watch(cssFullscreen, (active) => {
+  document.body.style.overflow = active ? 'hidden' : ''
+})
+
 // 页面隐藏或画布滚出视口时暂停渲染循环，省电省 GPU
 function syncPlayState() {
   if (!kernel || errorMsg.value) return
@@ -435,6 +440,7 @@ onBeforeUnmount(() => {
   if (document.fullscreenElement === viewerHost.value) {
     void document.exitFullscreen()
   }
+  document.body.style.overflow = ''
   endProgress()
   resizeObserver?.disconnect()
   resizeObserver = null
@@ -492,43 +498,46 @@ onBeforeUnmount(() => {
         </button>
       </div>
 
-      <!-- 画布 -->
-      <div
-        ref="viewerHost"
-        class="bg-base-200 overflow-hidden"
-        :class="cssFullscreen ? 'fixed inset-0 z-[100]' : 'relative w-full aspect-[7/5] rounded-xl'"
-      >
-        <canvas ref="canvasEl" class="block w-full h-full touch-none cursor-grab active:cursor-grabbing"></canvas>
-
-        <!-- 全屏切换 -->
-        <button
-          class="btn btn-sm btn-circle bg-base-100/90 border border-base-300 shadow-md absolute top-2 right-2 z-30"
-          :title="isFullscreen ? '退出全屏' : '全屏预览'"
-          @click="toggleFullscreen"
+      <!-- 画布。CSS 全屏时 Teleport 到 body：详情页卡片的入场动画会在祖先留下
+           transform，fixed 定位会被它劫持导致盖不住页面 header（Safari 尤其明显） -->
+      <Teleport to="body" :disabled="!cssFullscreen">
+        <div
+          ref="viewerHost"
+          class="bg-base-200 overflow-hidden"
+          :class="cssFullscreen ? 'fixed inset-0 z-[1000]' : 'relative w-full aspect-[7/5] rounded-xl'"
         >
-          <Minimize2 v-if="isFullscreen" class="w-4 h-4" />
-          <Maximize2 v-else class="w-4 h-4" />
-        </button>
+          <canvas ref="canvasEl" class="block w-full h-full touch-none cursor-grab active:cursor-grabbing"></canvas>
 
-        <!-- 加载进度 -->
-        <div v-if="isBusy" class="absolute inset-0 z-20 grid place-items-center bg-base-200/70">
-          <div class="flex flex-col items-center gap-3 text-center px-4">
-            <progress
-              class="progress progress-primary w-56 max-w-full"
-              :value="progressDone"
-              :max="Math.max(progressStarted, 1)"
-            ></progress>
-            <p class="text-xs text-base-content/70">{{ progressText }}</p>
+          <!-- 全屏切换（transform-gpu 强制独立合成层，避免 Safari 把它画到 WebGL canvas 下面） -->
+          <button
+            class="btn btn-sm btn-circle bg-base-100/90 border border-base-300 shadow-md absolute top-2 right-2 z-30 transform-gpu"
+            :title="isFullscreen ? '退出全屏' : '全屏预览'"
+            @click="toggleFullscreen"
+          >
+            <Minimize2 v-if="isFullscreen" class="w-4 h-4" />
+            <Maximize2 v-else class="w-4 h-4" />
+          </button>
+
+          <!-- 加载进度 -->
+          <div v-if="isBusy" class="absolute inset-0 z-20 grid place-items-center bg-base-200/70">
+            <div class="flex flex-col items-center gap-3 text-center px-4">
+              <progress
+                class="progress progress-primary w-56 max-w-full"
+                :value="progressDone"
+                :max="Math.max(progressStarted, 1)"
+              ></progress>
+              <p class="text-xs text-base-content/70">{{ progressText }}</p>
+            </div>
+          </div>
+
+          <div v-if="errorMsg" class="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-base-200/90 p-4 text-center">
+            <p class="text-sm text-error break-all max-w-full">{{ errorMsg }}</p>
+            <button class="btn btn-sm btn-outline" @click="applyRecipe">
+              <RotateCcw class="w-4 h-4" /> 重试
+            </button>
           </div>
         </div>
-
-        <div v-if="errorMsg" class="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-base-200/90 p-4 text-center">
-          <p class="text-sm text-error break-all max-w-full">{{ errorMsg }}</p>
-          <button class="btn btn-sm btn-outline" @click="applyRecipe">
-            <RotateCcw class="w-4 h-4" /> 重试
-          </button>
-        </div>
-      </div>
+      </Teleport>
 
       <p class="text-xs text-base-content/50 mt-2">
         拖动旋转 · 滚轮 / 捏合缩放 · 双指划动 / 右键平移
