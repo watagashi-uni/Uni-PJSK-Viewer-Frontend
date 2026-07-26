@@ -1,29 +1,57 @@
 <script lang="ts">
-// RouterView 以 fullPath 为 key，query 变化（如筛选后重置页码、翻页）会重建整个视图，
-// <script setup> 内的 ref 会全部重置。这里用模块作用域在重建之间保留筛选/视图状态：
-// 仅在同路径重建（页码变化、master 缓存刷新）时恢复，真正离开 /musics 时清空。
-interface MusicsViewMemory {
+// RouterView 以 fullPath 为 key，query 变化（翻页/筛选重置页码）会重建整个视图，
+// <script setup> 内的 ref 会全部重置。筛选/排序/视图状态持久化到 localStorage：
+// 重建、进出详情页、刷新后均恢复，只有用户主动修改时才会变化。
+const MUSICS_VIEW_STATE_KEY = 'musicsView_state'
+
+interface StoredMusicsViewState {
   searchText: string
   selectedArtist: string
   sortKey: 'publishedAt' | 'id' | 'level'
   sortOrder: 'asc' | 'desc'
   selectedDiffType: string
   isFilterPanelOpen: boolean
-  selectedMusicTags: Set<string>
-  selectedMvTypes: Set<string>
-  selectedVocalCharacters: Set<string>
-  selectedReleaseConditionIds: Set<number>
+  selectedMusicTags: string[]
+  selectedMvTypes: string[]
+  selectedVocalCharacters: string[]
+  selectedReleaseConditionIds: number[]
   viewMode: 'grid' | 'list' | 'b30' | 'level'
   showUserResults: boolean
   resultFilter: 'all' | 'no_fc' | 'no_ap'
   filterDifficulty: string
 }
-// null as … 断言避免 TS 顶层流分析把它收窄成 null（赋值发生在 onBeforeUnmount 回调里）
-let musicsViewMemory = null as MusicsViewMemory | null
+
+// 读取并逐字段校验存储的状态，异常数据回落到默认值
+function loadStoredMusicsViewState(): StoredMusicsViewState | null {
+  try {
+    const raw = localStorage.getItem(MUSICS_VIEW_STATE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object') return null
+    return {
+      searchText: typeof parsed.searchText === 'string' ? parsed.searchText : '',
+      selectedArtist: typeof parsed.selectedArtist === 'string' ? parsed.selectedArtist : '',
+      sortKey: ['publishedAt', 'id', 'level'].includes(parsed.sortKey) ? parsed.sortKey : 'publishedAt',
+      sortOrder: parsed.sortOrder === 'asc' ? 'asc' : 'desc',
+      selectedDiffType: typeof parsed.selectedDiffType === 'string' ? parsed.selectedDiffType : 'master',
+      isFilterPanelOpen: parsed.isFilterPanelOpen === true,
+      selectedMusicTags: Array.isArray(parsed.selectedMusicTags) ? parsed.selectedMusicTags : [],
+      selectedMvTypes: Array.isArray(parsed.selectedMvTypes) ? parsed.selectedMvTypes : [],
+      selectedVocalCharacters: Array.isArray(parsed.selectedVocalCharacters) ? parsed.selectedVocalCharacters : [],
+      selectedReleaseConditionIds: Array.isArray(parsed.selectedReleaseConditionIds) ? parsed.selectedReleaseConditionIds : [],
+      viewMode: ['grid', 'list', 'b30', 'level'].includes(parsed.viewMode) ? parsed.viewMode : 'grid',
+      showUserResults: parsed.showUserResults === true,
+      resultFilter: ['all', 'no_fc', 'no_ap'].includes(parsed.resultFilter) ? parsed.resultFilter : 'all',
+      filterDifficulty: typeof parsed.filterDifficulty === 'string' ? parsed.filterDifficulty : 'master',
+    }
+  } catch {
+    return null
+  }
+}
 </script>
 
 <script setup lang="ts">
-import { ref, shallowRef, computed, onMounted, watch, toRef, onUnmounted, onBeforeUnmount, nextTick } from 'vue'
+import { ref, shallowRef, computed, onMounted, watch, toRef, onUnmounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
@@ -155,8 +183,8 @@ const assetsHost = computed(() => settingsStore.assetsHost)
 const EMPTY_OBJ: Record<string, any> = Object.freeze({})
 const EMPTY_ARR: string[] = Object.freeze([]) as unknown as string[]
 
-// 状态（同路径重建时从模块作用域恢复，见文件顶部说明）
-const restored: MusicsViewMemory | null = musicsViewMemory
+// 状态（从 localStorage 恢复，见文件顶部说明）
+const restored: StoredMusicsViewState | null = loadStoredMusicsViewState()
 const searchText = ref(restored?.searchText ?? '')
 const selectedArtist = ref(restored?.selectedArtist ?? '')
 const sortKey = ref<'publishedAt' | 'id' | 'level'>(restored?.sortKey ?? 'publishedAt')
@@ -1085,30 +1113,6 @@ onMounted(() => {
   loadFromCache()
 })
 
-// onBeforeUnmount 在替换实例的 setup 之前同步执行，query 变化重建时把状态交接给新实例
-onBeforeUnmount(() => {
-  if (route.path === '/musics') {
-    musicsViewMemory = {
-      searchText: searchText.value,
-      selectedArtist: selectedArtist.value,
-      sortKey: sortKey.value,
-      sortOrder: sortOrder.value,
-      selectedDiffType: selectedDiffType.value,
-      isFilterPanelOpen: isFilterPanelOpen.value,
-      selectedMusicTags: new Set(selectedMusicTags.value),
-      selectedMvTypes: new Set(selectedMvTypes.value),
-      selectedVocalCharacters: new Set(selectedVocalCharacters.value),
-      selectedReleaseConditionIds: new Set(selectedReleaseConditionIds.value),
-      viewMode: viewMode.value,
-      showUserResults: showUserResults.value,
-      resultFilter: resultFilter.value,
-      filterDifficulty: filterDifficulty.value,
-    }
-  } else {
-    musicsViewMemory = null
-  }
-})
-
 onUnmounted(() => {
   if (observer) observer.disconnect()
 })
@@ -1119,6 +1123,36 @@ watch([searchText, selectedArtist, sortKey, sortOrder, resultFilter, filterDiffi
   resetToFirstPage()
   window.scrollTo({ top: 0, behavior: 'auto' })
 })
+
+// 用户修改筛选/排序/视图状态时写入 localStorage（Set 均为整体替换赋值，浅层监听即可）
+watch(
+  [searchText, selectedArtist, sortKey, sortOrder, selectedDiffType, isFilterPanelOpen,
+    selectedMusicTags, selectedMvTypes, selectedVocalCharacters, selectedReleaseConditionIds,
+    viewMode, showUserResults, resultFilter, filterDifficulty],
+  () => {
+    const state: StoredMusicsViewState = {
+      searchText: searchText.value,
+      selectedArtist: selectedArtist.value,
+      sortKey: sortKey.value,
+      sortOrder: sortOrder.value,
+      selectedDiffType: selectedDiffType.value,
+      isFilterPanelOpen: isFilterPanelOpen.value,
+      selectedMusicTags: [...selectedMusicTags.value],
+      selectedMvTypes: [...selectedMvTypes.value],
+      selectedVocalCharacters: [...selectedVocalCharacters.value],
+      selectedReleaseConditionIds: [...selectedReleaseConditionIds.value],
+      viewMode: viewMode.value,
+      showUserResults: showUserResults.value,
+      resultFilter: resultFilter.value,
+      filterDifficulty: filterDifficulty.value,
+    }
+    try {
+      localStorage.setItem(MUSICS_VIEW_STATE_KEY, JSON.stringify(state))
+    } catch {
+      // 存储不可用（如隐私模式）时静默忽略
+    }
+  }
+)
 
 // 监听视图切换 -> 重新设置 observer
 watch(viewMode, async (newMode) => {
