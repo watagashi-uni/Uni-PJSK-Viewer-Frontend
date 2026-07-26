@@ -45,6 +45,24 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '图鉴状态' },
     },
     {
+        path: '/costumes',
+        name: 'Costumes',
+        component: () => import('@/views/CostumesView.vue'),
+        meta: { title: '衣装' },
+    },
+    {
+        path: '/costumes/card/:cardId',
+        name: 'CostumeDetailByCard',
+        component: () => import('@/views/CostumeDetailView.vue'),
+        meta: { title: '衣装详情' },
+    },
+    {
+        path: '/costumes/:id',
+        name: 'CostumeDetail',
+        component: () => import('@/views/CostumeDetailView.vue'),
+        meta: { title: '衣装详情' },
+    },
+    {
         path: '/events',
         name: 'Events',
         component: () => import('@/views/EventsView.vue'),
