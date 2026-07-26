@@ -1,0 +1,39 @@
+import type { BodyDebugMode, FaceSdfDebugLightMode, FaceSdfDebugMode, HarukiEngineSnapshots, PjskCameraPreset, PjskCameraProfile, ProjectedShadowSettingsInput } from "../engine/Haruki3DEngine";
+import type { CustomPartSelection } from "../parts/runtimePartComposer";
+import type { RuntimeCombinedCharacterAsset } from "../runtime/runtimeTypes";
+export type HarukiPrepareCaptureFrameRequest = {
+    phase?: number;
+    clip?: "motion" | "motion_loop";
+    warmupMs?: number;
+    warmupFrames?: number;
+    warmupMode?: "animation" | "runtime";
+    cameraPreset?: PjskCameraPreset;
+    cameraProfile?: PjskCameraProfile;
+    characterYawMode?: "0" | "45" | "-45" | "90" | "-90" | "180" | "face-camera";
+    traceUtjBones?: string[];
+    traceUtjMaxEvents?: number;
+    springDebugBones?: string[];
+    springDebugAllOffsets?: boolean;
+    bodyDebugMode?: BodyDebugMode;
+    faceSdfEnabled?: boolean;
+    faceSdfDebugMode?: FaceSdfDebugMode;
+    faceSdfDebugLightMode?: FaceSdfDebugLightMode;
+    projectedShadow?: ProjectedShadowSettingsInput;
+};
+export type HarukiCaptureRolePartsRequest = HarukiPrepareCaptureFrameRequest & {
+    runtimeBaseUrl?: string;
+    region?: string | null;
+    roleId: string;
+    bodyCostume3dId: number;
+    headCostume3dId: number;
+    headPackagePath?: string | null;
+    hairCostume3dId: number;
+    headOptionalCostume3dId?: number | null;
+    imageId?: string;
+    includeDebugSnapshots?: boolean;
+};
+export type HarukiCaptureRolePartsResult = {
+    selection: CustomPartSelection;
+    combinedCharacter: RuntimeCombinedCharacterAsset;
+    snapshots: HarukiEngineSnapshots | null;
+};
