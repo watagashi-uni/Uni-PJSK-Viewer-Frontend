@@ -1,11 +1,35 @@
+<script lang="ts">
+// RouterView 以 fullPath 为 key，query 变化（如筛选后重置页码、翻页）会重建整个视图，
+// <script setup> 内的 ref 会全部重置。这里用模块作用域在重建之间保留筛选/视图状态：
+// 仅在同路径重建（页码变化、master 缓存刷新）时恢复，真正离开 /musics 时清空。
+interface MusicsViewMemory {
+  searchText: string
+  selectedArtist: string
+  sortKey: 'publishedAt' | 'id' | 'level'
+  sortOrder: 'asc' | 'desc'
+  selectedDiffType: string
+  isFilterPanelOpen: boolean
+  selectedMusicTags: Set<string>
+  selectedMvTypes: Set<string>
+  selectedVocalCharacters: Set<string>
+  selectedReleaseConditionIds: Set<number>
+  viewMode: 'grid' | 'list' | 'b30' | 'level'
+  showUserResults: boolean
+  resultFilter: 'all' | 'no_fc' | 'no_ap'
+  filterDifficulty: string
+}
+// null as … 断言避免 TS 顶层流分析把它收窄成 null（赋值发生在 onBeforeUnmount 回调里）
+let musicsViewMemory = null as MusicsViewMemory | null
+</script>
+
 <script setup lang="ts">
-import { ref, shallowRef, computed, onMounted, watch, toRef, onUnmounted, nextTick } from 'vue'
+import { ref, shallowRef, computed, onMounted, watch, toRef, onUnmounted, onBeforeUnmount, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
 import { useAccountStore } from '@/stores/account'
 import { useNotificationStore } from '@/stores/notification'
-import { Search, ArrowUpDown, Languages, Trophy, List, LayoutGrid, RefreshCw, Layers, Github, Camera, Loader2, Bell, BellRing, FilterX, SlidersHorizontal, ChevronDown } from 'lucide-vue-next'
+import { Search, ArrowUpDown, Languages, Trophy, List, LayoutGrid, RefreshCw, Layers, Github, Camera, Loader2, Bell, BellRing, FilterX, SlidersHorizontal, ChevronDown, EyeOff, ListFilter } from 'lucide-vue-next'
 import { toPng } from 'html-to-image'
 import MusicCard from '@/components/MusicCard.vue'
 import Pagination from '@/components/Pagination.vue'
@@ -131,31 +155,32 @@ const assetsHost = computed(() => settingsStore.assetsHost)
 const EMPTY_OBJ: Record<string, any> = Object.freeze({})
 const EMPTY_ARR: string[] = Object.freeze([]) as unknown as string[]
 
-// 状态
-const searchText = ref('')
-const selectedArtist = ref('')
-const sortKey = ref<'publishedAt' | 'id' | 'level'>('publishedAt')
-const sortOrder = ref<'asc' | 'desc'>('desc')
-const selectedDiffType = ref<string>('master')
-const isFilterPanelOpen = ref(false)
-const selectedMusicTags = ref<Set<string>>(new Set())
-const selectedMvTypes = ref<Set<string>>(new Set())
-const selectedVocalCharacters = ref<Set<string>>(new Set())
-const selectedReleaseConditionIds = ref<Set<number>>(new Set())
+// 状态（同路径重建时从模块作用域恢复，见文件顶部说明）
+const restored: MusicsViewMemory | null = musicsViewMemory
+const searchText = ref(restored?.searchText ?? '')
+const selectedArtist = ref(restored?.selectedArtist ?? '')
+const sortKey = ref<'publishedAt' | 'id' | 'level'>(restored?.sortKey ?? 'publishedAt')
+const sortOrder = ref<'asc' | 'desc'>(restored?.sortOrder ?? 'desc')
+const selectedDiffType = ref<string>(restored?.selectedDiffType ?? 'master')
+const isFilterPanelOpen = ref(restored?.isFilterPanelOpen ?? false)
+const selectedMusicTags = ref<Set<string>>(new Set(restored?.selectedMusicTags ?? []))
+const selectedMvTypes = ref<Set<string>>(new Set(restored?.selectedMvTypes ?? []))
+const selectedVocalCharacters = ref<Set<string>>(new Set(restored?.selectedVocalCharacters ?? []))
+const selectedReleaseConditionIds = ref<Set<number>>(new Set(restored?.selectedReleaseConditionIds ?? []))
 
 // 视图模式
-const viewMode = ref<'grid' | 'list' | 'b30' | 'level'>('grid')
+const viewMode = ref<'grid' | 'list' | 'b30' | 'level'>(restored?.viewMode ?? 'grid')
 
 // 成绩数据（从缓存加载，不自动刷新）
 // Suite 成绩数据量很大，使用 shallowRef 避免深层响应式代理导致卡顿
 const musicResultsMap = shallowRef<Record<number, Record<string, string>>>({})
-const showUserResults = ref(false)
+const showUserResults = ref(restored?.showUserResults ?? false)
 const isDataLoaded = ref(false)
 const hasSuiteData = computed(() => showUserResults.value && isDataLoaded.value)
 
 // 成绩筛选
-const resultFilter = ref<'all' | 'no_fc' | 'no_ap'>('all')
-const filterDifficulty = ref<string>('master')
+const resultFilter = ref<'all' | 'no_fc' | 'no_ap'>(restored?.resultFilter ?? 'all')
+const filterDifficulty = ref<string>(restored?.filterDifficulty ?? 'master')
 
 // 定数表展开状态
 const expandedLevels = ref<Set<number>>(new Set())
@@ -398,6 +423,11 @@ function setupObserver() {
     observer.observe(loadMoreTrigger.value)
   }
 }
+
+// 触发元素出现时建立 observer（覆盖重建后直接以列表模式挂载、以及数据加载完成后才渲染列表的情况）
+watch(loadMoreTrigger, (el) => {
+  if (el) setupObserver()
+})
 
 // 难度映射
 const musicDifficultiesMap = computed(() => {
@@ -930,6 +960,18 @@ function isLeak(music: Music): boolean {
   return limited ? limited.startAt > Date.now() : false
 }
 
+// 列表视图的剧透遮罩（点击后本次浏览内不再遮罩）
+const revealedSpoilerIds = ref(new Set<number>())
+
+function isSpoilerMasked(music: Music): boolean {
+  return isLeak(music) && settingsStore.maskSpoilers && !revealedSpoilerIds.value.has(music.id)
+}
+
+function revealSpoiler(musicId: number): void {
+  revealedSpoilerIds.value.add(musicId)
+  revealedSpoilerIds.value = new Set(revealedSpoilerIds.value)
+}
+
 function getTranslation(id: number): string {
   return translations.value[id] || ''
 }
@@ -1041,6 +1083,30 @@ onMounted(() => {
   loadData()
   // 从缓存加载成绩，不调用 API
   loadFromCache()
+})
+
+// onBeforeUnmount 在替换实例的 setup 之前同步执行，query 变化重建时把状态交接给新实例
+onBeforeUnmount(() => {
+  if (route.path === '/musics') {
+    musicsViewMemory = {
+      searchText: searchText.value,
+      selectedArtist: selectedArtist.value,
+      sortKey: sortKey.value,
+      sortOrder: sortOrder.value,
+      selectedDiffType: selectedDiffType.value,
+      isFilterPanelOpen: isFilterPanelOpen.value,
+      selectedMusicTags: new Set(selectedMusicTags.value),
+      selectedMvTypes: new Set(selectedMvTypes.value),
+      selectedVocalCharacters: new Set(selectedVocalCharacters.value),
+      selectedReleaseConditionIds: new Set(selectedReleaseConditionIds.value),
+      viewMode: viewMode.value,
+      showUserResults: showUserResults.value,
+      resultFilter: resultFilter.value,
+      filterDifficulty: filterDifficulty.value,
+    }
+  } else {
+    musicsViewMemory = null
+  }
 })
 
 onUnmounted(() => {
@@ -1568,10 +1634,20 @@ watch(totalPages, (pages) => {
             </thead>
 
             <tbody>
-              <tr v-for="music in displayedMusics" :key="music.id" class="hover text-sm">
+              <tr v-for="music in displayedMusics" :key="music.id" class="hover text-sm relative group">
                 <td class="p-2">
-                  <AssetImage 
-                    :src="getMusicThumbnailUrl(music.id)" 
+                  <!-- 整行剧透遮罩 (仅在开启遮罩模式下显示，Hover时消失) -->
+                  <div
+                    v-if="isSpoilerMasked(music)"
+                    class="absolute inset-0 z-30 bg-base-100/95 backdrop-blur-sm flex items-center justify-center gap-2 transition-opacity duration-300 group-hover:opacity-0 group-hover:pointer-events-none cursor-pointer"
+                    @click.prevent.stop="revealSpoiler(music.id)"
+                  >
+                    <EyeOff class="w-4 h-4 text-warning" />
+                    <span class="font-bold text-sm">剧透内容</span>
+                    <span class="text-xs text-base-content/60">鼠标悬停或点击查看</span>
+                  </div>
+                  <AssetImage
+                    :src="getMusicThumbnailUrl(music.id)"
                     :alt="music.title"
                     class="w-12 h-12 rounded object-cover"
                   />
@@ -1582,8 +1658,15 @@ watch(totalPages, (pages) => {
                     <div v-if="getTranslation(music.id)" class="text-xs text-base-content/50 truncate max-w-[200px] lg:max-w-[400px]">{{ getTranslation(music.id) }}</div>
                   </RouterLink>
                   <div class="flex items-center gap-1 mt-1">
-                    <div v-if="isLeak(music)" class="badge badge-sm badge-error text-error-content font-bold shadow-sm whitespace-nowrap">LEAK</div>
-                    <div v-else class="badge badge-sm badge-ghost text-base-content/60 font-bold shadow-sm whitespace-nowrap">#{{ music.id }}</div>
+                    <button
+                      type="button"
+                      class="inline-flex max-w-[200px] items-center gap-1 rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-xs text-primary transition-colors hover:border-primary/50 hover:bg-primary/20"
+                      :title="`筛选 ${music.composer}`"
+                      @click.prevent.stop="filterByArtist(music.composer)"
+                    >
+                      <ListFilter class="h-3 w-3 shrink-0" />
+                      <span class="truncate">{{ music.composer }}</span>
+                    </button>
                     <div v-if="isLimitedTime(music.id)" class="badge badge-sm badge-warning text-warning-content font-bold shadow-sm whitespace-nowrap">期间限定</div>
                     <div v-else-if="isExpired(music.id)" class="badge badge-sm bg-base-300 text-base-content/60 font-bold border-none whitespace-nowrap">已过期</div>
                   </div>
@@ -1626,9 +1709,19 @@ watch(totalPages, (pages) => {
 
         <!-- Mobile List View -->
         <div class="block sm:hidden space-y-2">
-          <div v-for="music in displayedMusics" :key="music.id" class="bg-base-100 p-2 rounded-lg flex gap-3 shadow-sm cv-auto-row">
-            <AssetImage 
-              :src="getMusicThumbnailUrl(music.id)" 
+          <div v-for="music in displayedMusics" :key="music.id" class="bg-base-100 p-2 rounded-lg flex gap-3 shadow-sm cv-auto-row relative overflow-hidden group">
+            <!-- 整行剧透遮罩 (仅在开启遮罩模式下显示，点击后消失) -->
+            <div
+              v-if="isSpoilerMasked(music)"
+              class="absolute inset-0 z-30 bg-base-100/95 backdrop-blur-sm flex items-center justify-center gap-2 transition-opacity duration-300 group-hover:opacity-0 group-hover:pointer-events-none cursor-pointer"
+              @click.prevent.stop="revealSpoiler(music.id)"
+            >
+              <EyeOff class="w-4 h-4 text-warning" />
+              <span class="font-bold text-sm">剧透内容</span>
+              <span class="text-xs text-base-content/60">点击查看</span>
+            </div>
+            <AssetImage
+              :src="getMusicThumbnailUrl(music.id)"
               :alt="music.title"
               class="w-16 h-16 rounded object-cover shrink-0"
             />
@@ -1639,8 +1732,15 @@ watch(totalPages, (pages) => {
               </RouterLink>
               
               <div class="flex items-center gap-1 mt-0.5 mb-1">
-                <div v-if="isLeak(music)" class="badge badge-xs badge-error text-error-content font-bold shadow-sm whitespace-nowrap hidden sm:inline-flex">LEAK</div>
-                <div v-else class="badge badge-xs badge-ghost text-base-content/60 font-bold shadow-sm whitespace-nowrap">#{{ music.id }}</div>
+                <button
+                  type="button"
+                  class="inline-flex max-w-[150px] items-center gap-1 rounded-full border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[10px] leading-none text-primary transition-colors hover:border-primary/50 hover:bg-primary/20"
+                  :title="`筛选 ${music.composer}`"
+                  @click.prevent.stop="filterByArtist(music.composer)"
+                >
+                  <ListFilter class="h-2.5 w-2.5 shrink-0" />
+                  <span class="truncate">{{ music.composer }}</span>
+                </button>
                 <div v-if="isLimitedTime(music.id)" class="badge badge-xs badge-warning text-warning-content font-bold shadow-sm whitespace-nowrap">限定</div>
               </div>
 
