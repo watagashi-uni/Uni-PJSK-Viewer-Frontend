@@ -98,6 +98,7 @@ export const useMasterStore = defineStore('master', () => {
 
     /**
      * 在后台检查版本，不阻塞当前页面使用现有缓存。
+     * 每次调用都真实检查服务器版本，保证版本更新后能立刻被发现。
      */
     function checkVersionInBackground(): void {
         void syncVersion().catch((error) => {
