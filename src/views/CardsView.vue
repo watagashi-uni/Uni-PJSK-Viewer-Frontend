@@ -1,9 +1,16 @@
+<script lang="ts">
+// RouterView 以 fullPath 为 key，query 变化会重建整个视图；
+// <script setup> 内的变量每次重建都会重置，这里用真正的模块作用域
+// 在重建之间保留筛选面板的展开状态（null 表示本次会话还没手动开关过）
+let filterPanelOpenMemory: boolean | null = null
+</script>
+
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
-import { EyeOff, RefreshCw } from 'lucide-vue-next'
+import { EyeOff, RefreshCw, SlidersHorizontal, ChevronDown, FilterX } from 'lucide-vue-next'
 import { useAccountStore } from '@/stores/account'
 import Pagination from '@/components/Pagination.vue'
 import SekaiCard from '@/components/SekaiCard.vue'
@@ -14,6 +21,8 @@ interface Card {
   characterId: number
   cardRarityType: string
   attr: string
+  supportUnit: string
+  skillId: number
   prefix: string
   assetbundleName: string
   releaseAt: number
@@ -23,6 +32,17 @@ interface Character {
   id: number
   firstName?: string
   givenName: string
+  unit: string
+}
+
+interface SkillEffect {
+  skillEffectType: string
+  activateNotesJudgmentType?: string
+}
+
+interface Skill {
+  id: number
+  skillEffects: SkillEffect[]
 }
 
 const route = useRoute()
@@ -66,33 +86,45 @@ async function refreshUserCards() {
 
 const cards = ref<Card[]>([])
 const characters = ref<Character[]>([])
+const skills = ref<Skill[]>([])
 const isLoading = ref(true)
 
+// 筛选面板展开状态
+const isFilterPanelOpen = ref(filterPanelOpenMemory ?? false)
+watch(isFilterPanelOpen, val => { filterPanelOpenMemory = val })
 
-
-// 从 URL 读取筛选条件
-const selectedCharaIds = computed<number[]>(() => {
-  const param = route.query.charaIds
-  if (!param) return []
-  if (typeof param === 'string') {
-    return param.split(',').map(Number).filter(n => !isNaN(n))
-  }
-  return []
-})
-
-const selectedRarities = computed<string[]>(() => {
-  const param = route.query.rarities
-  if (!param) return []
-  if (typeof param === 'string') {
+// 从 URL 读取列表型筛选参数
+function queryList(key: string): string[] {
+  const param = route.query[key]
+  if (typeof param === 'string' && param) {
     return param.split(',').filter(Boolean)
   }
   return []
-})
+}
+
+const selectedCharaIds = computed<number[]>(() => queryList('charaIds').map(Number).filter(n => !isNaN(n)))
+const selectedUnits = computed<string[]>(() => queryList('units'))
+const selectedAttrs = computed<string[]>(() => queryList('attrs'))
+const selectedRarities = computed<string[]>(() => queryList('rarities'))
+const selectedSkillTypes = computed<string[]>(() => queryList('skills'))
 
 // 只看已拥有卡片
 const filterOwnedOnly = computed<boolean>(() => {
   return route.query.owned === '1'
 })
+
+// 组合列表
+const unitList = [
+  { value: 'light_sound', label: 'Leo/need', image: '/img/logo/logo_light_sound.png' },
+  { value: 'idol', label: 'MORE MORE JUMP!', image: '/img/logo/logo_idol.png' },
+  { value: 'street', label: 'Vivid BAD SQUAD', image: '/img/logo/logo_street.png' },
+  { value: 'theme_park', label: 'Wonderlands x Showtime', image: '/img/logo/logo_theme_park.png' },
+  { value: 'school_refusal', label: '25-ji, Nightcord de.', image: '/img/logo/logo_school_refusal.png' },
+  { value: 'piapro', label: 'VIRTUAL SINGER', image: '/img/logo/logo_piapro.png' },
+]
+
+// 属性列表
+const attrList = ['cute', 'cool', 'pure', 'happy', 'mysterious']
 
 // 稀有度列表
 const rarityList = [
@@ -103,6 +135,15 @@ const rarityList = [
   { value: 'rarity_birthday', label: '生日卡' },
 ]
 
+// 技能大类列表
+const skillTypeList = [
+  { value: 'score_up', label: '分数加成' },
+  { value: 'judgment_up', label: '判定强化' },
+  { value: 'life_recovery', label: 'LIVE恢复' },
+  { value: 'perfect_score_up', label: 'PERFECT分数加成' },
+  { value: 'life_score_up', label: 'LIVE要求的分数加成' },
+]
+
 // 分页配置
 const pageSize = 30
 const currentPage = computed(() => Number(route.query.page) || 1)
@@ -110,33 +151,154 @@ const totalPages = computed(() => Math.ceil(filteredCards.value.length / pageSiz
 
 const now = Date.now()
 
+// 角色 -> 组合
+const charaUnitMap = computed(() => new Map(characters.value.map(c => [c.id, c.unit])))
+
+// 技能 -> 大类（生日卡技能同时有恢复和 PERFECT 加分效果，归入两类）
+function classifySkill(skill: Skill): string[] {
+  const cats = new Set<string>()
+  for (const effect of skill.skillEffects || []) {
+    if (effect.skillEffectType === 'judgment_up') cats.add('judgment_up')
+    else if (effect.skillEffectType === 'life_recovery') cats.add('life_recovery')
+    else if (effect.skillEffectType === 'score_up_condition_life') cats.add('life_score_up')
+    else if (effect.skillEffectType === 'score_up' && effect.activateNotesJudgmentType === 'perfect') cats.add('perfect_score_up')
+  }
+  if (cats.size === 0) cats.add('score_up')
+  return [...cats]
+}
+
+const skillCategoriesMap = computed(() => new Map(skills.value.map(s => [s.id, classifySkill(s)])))
+
+// 卡片所属组合（V家卡带应援组合时同时归入两个组合）
+function getCardUnits(card: Card): string[] {
+  const units: string[] = []
+  const charaUnit = charaUnitMap.value.get(card.characterId)
+  if (charaUnit) units.push(charaUnit)
+  if (card.supportUnit && card.supportUnit !== 'none') units.push(card.supportUnit)
+  return units
+}
+
+// 仅过滤剧透后的卡片，用于计算各筛选项的数量
+const visibleBaseCards = computed(() => {
+  if (settingsStore.showSpoilers) return cards.value
+  return cards.value.filter(c => c.releaseAt <= now)
+})
+
+const unitOptions = computed(() => {
+  const counts = new Map<string, number>()
+  for (const card of visibleBaseCards.value) {
+    for (const unit of getCardUnits(card)) {
+      counts.set(unit, (counts.get(unit) || 0) + 1)
+    }
+  }
+  return unitList
+    .map(option => ({ ...option, count: counts.get(option.value) || 0 }))
+    .filter(option => option.count > 0)
+})
+
+const characterOptions = computed(() => {
+  const counts = new Map<number, number>()
+  for (const card of visibleBaseCards.value) {
+    counts.set(card.characterId, (counts.get(card.characterId) || 0) + 1)
+  }
+  return [...characters.value]
+    .sort((a, b) => a.id - b.id)
+    .map(chara => ({
+      value: chara.id,
+      label: (chara.firstName || '') + chara.givenName,
+      icon: `/img/chr_ts/chr_ts_90_${chara.id}.png`,
+      count: counts.get(chara.id) || 0,
+    }))
+    .filter(option => option.count > 0)
+})
+
+const attrOptions = computed(() => {
+  const counts = new Map<string, number>()
+  for (const card of visibleBaseCards.value) {
+    counts.set(card.attr, (counts.get(card.attr) || 0) + 1)
+  }
+  return attrList
+    .map(value => ({ value, icon: `/newcard/attr_${value}.png`, count: counts.get(value) || 0 }))
+    .filter(option => option.count > 0)
+})
+
+const rarityOptions = computed(() => {
+  const counts = new Map<string, number>()
+  for (const card of visibleBaseCards.value) {
+    counts.set(card.cardRarityType, (counts.get(card.cardRarityType) || 0) + 1)
+  }
+  return rarityList
+    .map(option => ({ ...option, count: counts.get(option.value) || 0 }))
+    .filter(option => option.count > 0)
+})
+
+const skillTypeOptions = computed(() => {
+  const counts = new Map<string, number>()
+  for (const card of visibleBaseCards.value) {
+    for (const cat of skillCategoriesMap.value.get(card.skillId) || []) {
+      counts.set(cat, (counts.get(cat) || 0) + 1)
+    }
+  }
+  return skillTypeList
+    .map(option => ({ ...option, count: counts.get(option.value) || 0 }))
+    .filter(option => option.count > 0)
+})
+
+const activeFilterCount = computed(() => {
+  return selectedCharaIds.value.length
+    + selectedUnits.value.length
+    + selectedAttrs.value.length
+    + selectedRarities.value.length
+    + selectedSkillTypes.value.length
+})
+
+const hasFilters = computed(() => activeFilterCount.value > 0)
+
 // 过滤后的卡片列表
 const filteredCards = computed(() => {
   let result = [...cards.value]
-  
+
   // 按 ID 排序（最新优先）
   result.sort((a, b) => b.id - a.id)
-  
+
   // 过滤剧透内容
   if (!settingsStore.showSpoilers) {
     result = result.filter(c => c.releaseAt <= now)
   }
-  
+
   // 只看拥有的卡
   if (filterOwnedOnly.value && showUserCards.value && suiteData.value?.userCards) {
     result = result.filter(c => userCardsMap.value.has(c.id))
   }
-  
+
   // 按角色筛选 (多选)
   if (selectedCharaIds.value.length > 0) {
     result = result.filter(c => selectedCharaIds.value.includes(c.characterId))
   }
-  
+
+  // 按组合筛选 (多选)
+  if (selectedUnits.value.length > 0) {
+    const selected = selectedUnits.value
+    result = result.filter(c => getCardUnits(c).some(unit => selected.includes(unit)))
+  }
+
+  // 按属性筛选 (多选)
+  if (selectedAttrs.value.length > 0) {
+    result = result.filter(c => selectedAttrs.value.includes(c.attr))
+  }
+
   // 按稀有度筛选 (多选)
   if (selectedRarities.value.length > 0) {
     result = result.filter(c => selectedRarities.value.includes(c.cardRarityType))
   }
-  
+
+  // 按技能大类筛选 (多选)
+  if (selectedSkillTypes.value.length > 0) {
+    const selected = selectedSkillTypes.value
+    const map = skillCategoriesMap.value
+    result = result.filter(c => (map.get(c.skillId) || []).some(cat => selected.includes(cat)))
+  }
+
   return result
 })
 
@@ -158,62 +320,73 @@ function isLeak(releaseAt: number): boolean {
   return releaseAt > now
 }
 
+// 筛选相关的 URL 参数
+const FILTER_KEYS = ['charaIds', 'units', 'attrs', 'rarities', 'skills'] as const
 
-
-// 更新 URL 筛选参数
-function updateFilters(charaIds: number[], rarities: string[], owned: boolean, page: string = '1') {
-  const query: Record<string, string> = { page }
-  if (charaIds.length > 0) {
-    query.charaIds = charaIds.join(',')
+// 更新 URL 筛选参数（patch 中值为 undefined 表示删除该参数）
+function pushQuery(patch: Record<string, string | undefined>, page: string = '1') {
+  const query: Record<string, string> = {}
+  for (const key of [...FILTER_KEYS, 'owned']) {
+    const value = route.query[key]
+    if (typeof value === 'string' && value) query[key] = value
   }
-  if (rarities.length > 0) {
-    query.rarities = rarities.join(',')
+  for (const [key, value] of Object.entries(patch)) {
+    if (value === undefined) delete query[key]
+    else query[key] = value
   }
-  if (owned) {
-    query.owned = '1'
-  }
+  query.page = page
   router.push({ query })
 }
 
-// 切换角色选择
-function toggleCharacter(id: number) {
-  const current = [...selectedCharaIds.value]
-  const idx = current.indexOf(id)
-  if (idx > -1) {
-    current.splice(idx, 1)
-  } else {
-    current.push(id)
-  }
-  updateFilters(current, selectedRarities.value, filterOwnedOnly.value)
-}
-
-// 切换稀有度选择
-function toggleRarity(value: string) {
-  const current = [...selectedRarities.value]
+// 切换列表型筛选参数中的某个值
+function toggleListValue(key: string, value: string) {
+  const current = queryList(key)
   const idx = current.indexOf(value)
   if (idx > -1) {
     current.splice(idx, 1)
   } else {
     current.push(value)
   }
-  updateFilters(selectedCharaIds.value, current, filterOwnedOnly.value)
+  pushQuery({ [key]: current.length > 0 ? current.join(',') : undefined })
+}
+
+function toggleCharacter(id: number) {
+  toggleListValue('charaIds', String(id))
+}
+
+function toggleUnit(value: string) {
+  toggleListValue('units', value)
+}
+
+function toggleAttr(value: string) {
+  toggleListValue('attrs', value)
+}
+
+function toggleRarity(value: string) {
+  toggleListValue('rarities', value)
+}
+
+function toggleSkillType(value: string) {
+  toggleListValue('skills', value)
 }
 
 // 切换只看拥有
 function toggleOwnedOnly() {
-  updateFilters(selectedCharaIds.value, selectedRarities.value, !filterOwnedOnly.value)
+  pushQuery({ owned: filterOwnedOnly.value ? undefined : '1' })
 }
 
 // 加载数据
 async function loadData() {
   isLoading.value = true
   try {
-    const [cardsData, charactersData] = await Promise.all([
+    const [cardsData, charactersData, skillsData] = await Promise.all([
       masterStore.getMaster<Card>('cards'),
       masterStore.getMaster<Character>('gameCharacters'),
+      masterStore.getMaster<Skill>('skills'),
     ])
     cards.value = cardsData
     characters.value = charactersData
+    skills.value = skillsData
   } catch (error) {
     console.error('加载卡片数据失败:', error)
   } finally {
@@ -223,12 +396,12 @@ async function loadData() {
 
 // 页码变化
 function handlePageChange(page: number) {
-  updateFilters(selectedCharaIds.value, selectedRarities.value, filterOwnedOnly.value, page.toString())
+  pushQuery({}, page.toString())
 }
 
 // 清除筛选
 function clearFilters() {
-  router.push({ query: { page: '1' } })
+  pushQuery(Object.fromEntries(FILTER_KEYS.map(key => [key, undefined])))
 }
 
 // 检查卡片是否有觉醒立绘
@@ -238,6 +411,10 @@ function hasTrainedCard(rarity: string): boolean {
 
 onMounted(() => {
   loadData()
+  // 本次会话还没开关过面板时，带筛选参数打开页面默认展开
+  if (filterPanelOpenMemory === null && hasFilters.value) {
+    isFilterPanelOpen.value = true
+  }
 })
 </script>
 
@@ -250,7 +427,7 @@ onMounted(() => {
           <input v-model="showUserCards" type="checkbox" class="toggle toggle-primary toggle-sm" />
           <span class="label-text font-medium mt-0.5">显示拥有状态</span>
         </label>
-        
+
         <template v-if="showUserCards">
           <div class="divider divider-horizontal mx-0"></div>
           <label class="label cursor-pointer gap-2 p-0">
@@ -258,12 +435,12 @@ onMounted(() => {
             <span class="label-text font-medium mt-0.5">只看已拥有</span>
           </label>
           <div class="divider divider-horizontal mx-0"></div>
-          
+
           <div v-if="accountStore.accounts.length > 0" class="min-w-[150px] max-w-[220px]">
             <AccountSelector v-model="selectedUserId" />
           </div>
           <span v-else class="text-sm text-base-content/60">无绑定账号</span>
-          
+
           <button
             v-if="selectedUserId"
             class="btn btn-sm btn-ghost gap-1"
@@ -274,7 +451,7 @@ onMounted(() => {
             刷新数据
           </button>
         </template>
-        
+
         <div class="divider divider-horizontal mx-0"></div>
         <RouterLink class="btn btn-sm btn-primary" to="/card-collection">
           图鉴状态
@@ -283,47 +460,107 @@ onMounted(() => {
     </div>
 
     <!-- 筛选面板 -->
-    <div class="collapse collapse-arrow bg-base-100 shadow-sm mb-6 border border-base-200">
-      <input type="checkbox" />
-      <div class="collapse-title text-lg font-medium">
-        筛选菜单
+    <div class="mb-6 bg-base-100 rounded-lg shadow-sm">
+      <div class="flex flex-wrap items-center gap-2 p-2">
+        <button class="btn btn-sm btn-ghost gap-2" @click="isFilterPanelOpen = !isFilterPanelOpen">
+          <SlidersHorizontal class="w-4 h-4" />
+          筛选
+          <span v-if="activeFilterCount > 0" class="badge badge-primary badge-sm">{{ activeFilterCount }}</span>
+          <ChevronDown class="w-4 h-4 transition-transform" :class="{ 'rotate-180': isFilterPanelOpen }" />
+        </button>
+
+        <button
+          v-if="hasFilters"
+          class="btn btn-ghost btn-sm gap-1"
+          @click="clearFilters"
+        >
+          <FilterX class="w-4 h-4" />
+          清空
+        </button>
       </div>
-      <div class="collapse-content">
-        <!-- 清除筛选 -->
-        <div class="mb-4">
-          <button class="btn btn-sm btn-outline" @click="clearFilters">
-            取消所有筛选
-          </button>
-        </div>
-        
-        <!-- 角色筛选 -->
-        <div class="mb-4">
-          <p class="text-sm text-base-content/60 mb-2">角色（可多选）</p>
+
+      <div v-if="isFilterPanelOpen" class="border-t border-base-200 p-3 space-y-4">
+        <div>
+          <div class="text-xs font-bold text-base-content/60 mb-2">组合</div>
           <div class="flex flex-wrap gap-2">
             <button
-              v-for="chara in characters"
-              :key="chara.id"
-              class="btn btn-sm"
-              :class="selectedCharaIds.includes(chara.id) ? 'btn-primary' : 'btn-ghost'"
-              @click="toggleCharacter(chara.id)"
+              v-for="unit in unitOptions"
+              :key="unit.value"
+              class="btn btn-sm min-h-9 h-9 px-3"
+              :class="selectedUnits.includes(unit.value) ? 'btn-primary' : 'btn-outline'"
+              :title="unit.label"
+              @click="toggleUnit(unit.value)"
             >
-              {{ (chara.firstName || '') + chara.givenName }}
+              <img :src="unit.image" :alt="unit.label" class="h-4 max-w-[86px] object-contain" />
+              <span class="text-[10px] opacity-60">{{ unit.count }}</span>
             </button>
           </div>
         </div>
-        
-        <!-- 稀有度筛选 -->
+
         <div>
-          <p class="text-sm text-base-content/60 mb-2">稀有度（可多选）</p>
+          <div class="text-xs font-bold text-base-content/60 mb-2">角色</div>
           <div class="flex flex-wrap gap-2">
             <button
-              v-for="rarity in rarityList"
+              v-for="chara in characterOptions"
+              :key="chara.value"
+              class="btn btn-sm h-9 min-h-9 gap-1.5 pl-1.5 pr-2"
+              :class="selectedCharaIds.includes(chara.value) ? 'btn-primary' : 'btn-outline'"
+              @click="toggleCharacter(chara.value)"
+            >
+              <span class="h-6 w-6 overflow-hidden rounded-full bg-base-200 ring-1 ring-base-300">
+                <img :src="chara.icon" :alt="chara.label" class="h-full w-full object-cover" />
+              </span>
+              {{ chara.label }}
+              <span class="text-[10px] opacity-60">{{ chara.count }}</span>
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <div class="text-xs font-bold text-base-content/60 mb-2">属性</div>
+          <div class="flex flex-wrap gap-2">
+            <button
+              v-for="attr in attrOptions"
+              :key="attr.value"
+              class="btn btn-sm h-9 min-h-9 gap-1 px-2.5"
+              :class="selectedAttrs.includes(attr.value) ? 'btn-primary' : 'btn-outline'"
+              :title="attr.value"
+              @click="toggleAttr(attr.value)"
+            >
+              <img :src="attr.icon" :alt="attr.value" class="h-5 w-5 object-contain" />
+              <span class="text-[10px] opacity-60">{{ attr.count }}</span>
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <div class="text-xs font-bold text-base-content/60 mb-2">稀有度</div>
+          <div class="flex flex-wrap gap-2">
+            <button
+              v-for="rarity in rarityOptions"
               :key="rarity.value"
-              class="btn btn-sm"
-              :class="selectedRarities.includes(rarity.value) ? 'btn-primary' : 'btn-ghost'"
+              class="btn btn-sm h-8 min-h-8"
+              :class="selectedRarities.includes(rarity.value) ? 'btn-primary' : 'btn-outline'"
               @click="toggleRarity(rarity.value)"
             >
               {{ rarity.label }}
+              <span class="text-[10px] opacity-60">{{ rarity.count }}</span>
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <div class="text-xs font-bold text-base-content/60 mb-2">技能类型</div>
+          <div class="flex flex-wrap gap-2">
+            <button
+              v-for="skillType in skillTypeOptions"
+              :key="skillType.value"
+              class="btn btn-sm h-8 min-h-8"
+              :class="selectedSkillTypes.includes(skillType.value) ? 'btn-primary' : 'btn-outline'"
+              @click="toggleSkillType(skillType.value)"
+            >
+              {{ skillType.label }}
+              <span class="text-[10px] opacity-60">{{ skillType.count }}</span>
             </button>
           </div>
         </div>
@@ -346,8 +583,8 @@ onMounted(() => {
         <!-- 卡片背景框 -->
         <div class="bg-base-100 rounded-xl p-3 shadow-md border border-base-200 hover:shadow-lg hover:border-primary/30 transition-all relative overflow-hidden">
           <!-- 全卡片遮罩 (仅在开启遮罩模式下显示，Hover时消失) -->
-          <div 
-            v-if="isLeak(card.releaseAt) && settingsStore.maskSpoilers" 
+          <div
+            v-if="isLeak(card.releaseAt) && settingsStore.maskSpoilers"
             class="absolute inset-0 z-50 bg-base-100/95 backdrop-blur-sm flex flex-col items-center justify-center text-center p-4 transition-opacity duration-300 group-hover:opacity-0 pointer-events-none"
           >
             <EyeOff class="w-6 h-6 mb-2 text-warning" />
@@ -365,8 +602,8 @@ onMounted(() => {
             <!-- 普通卡面 -->
             <div class="w-20 sm:w-24 flex-shrink-0" :class="{ 'mx-auto': !hasTrainedCard(card.cardRarityType) }">
               <div class="relative aspect-square">
-                <SekaiCard 
-                  :card="card" 
+                <SekaiCard
+                  :card="card"
                   :master-rank="getMasterRank(card.id)"
                   class="transition-transform group-hover:scale-105"
                 />
@@ -378,12 +615,12 @@ onMounted(() => {
                 <span class="text-secondary/80">SLv.{{ userCardsMap.get(card.id).skillLevel || 1 }}</span>
               </div>
             </div>
-            
+
             <!-- 觉醒卡面 (3星/4星) -->
             <div v-if="hasTrainedCard(card.cardRarityType)" class="w-20 sm:w-24 flex-shrink-0">
               <div class="relative aspect-square">
-                <SekaiCard 
-                  :card="card" 
+                <SekaiCard
+                  :card="card"
                   :trained="true"
                   :master-rank="getMasterRank(card.id)"
                   class="transition-transform group-hover:scale-105"
@@ -397,7 +634,7 @@ onMounted(() => {
               </div>
             </div>
           </div>
-          
+
           <!-- 卡片名称 -->
           <h3 class="font-semibold text-sm mt-2 line-clamp-2">{{ card.prefix }}</h3>
           <p class="text-xs text-base-content/60">{{ getCharaName(card.characterId) }}</p>
