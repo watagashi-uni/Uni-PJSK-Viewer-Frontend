@@ -297,7 +297,7 @@ onMounted(() => {
                 v-for="tab in sourceTabs"
                 :key="tab.value"
                 class="join-item btn btn-sm"
-                :class="selectedSource === tab.value ? 'btn-secondary' : 'btn-outline'"
+                :class="selectedSource === tab.value ? 'btn-primary' : 'btn-outline'"
                 @click="selectSource(tab.value)"
               >
                 {{ tab.label }}
