@@ -21,7 +21,9 @@ const notificationStore = useNotificationStore()
 const refreshError = ref('')
 
 const isFullscreen = computed(() => route.meta.fullscreen === true)
-const routerViewKey = computed(() => `${route.fullPath}:${masterStore.cacheRevision}`)
+// key 只含 path：翻页/筛选等 query 变化由各页面自身响应（均为 computed/watch 驱动），
+// 不整树重建；cacheRevision 变化（master 版本更新清缓存）时仍强制重建
+const routerViewKey = computed(() => `${route.path}:${masterStore.cacheRevision}`)
 
 onMounted(async () => {
   if ('caches' in window) {
