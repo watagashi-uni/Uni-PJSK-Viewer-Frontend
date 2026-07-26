@@ -50,8 +50,11 @@ watch([searchQuery, sortOrder], () => {
   currentPage.value = 1
 })
 
-function getLogoUrl(gacha: Gacha): string {
-  return `${assetsHost.value}/ondemand/gacha/${gacha.assetbundleName}/logo/logo.png`
+// 卡池小图直接用首页 banner（老卡池没有 logo）；banner 也没有的显示占位
+const gachaImgFailed = ref<Record<number, boolean>>({})
+
+function getGachaImageUrl(gacha: Gacha): string {
+  return `${assetsHost.value}/startapp/home/banner/banner_gacha${gacha.id}/banner_gacha${gacha.id}.png`
 }
 
 function formatDate(timestamp: number): string {
@@ -146,11 +149,14 @@ onMounted(async () => {
           </div>
 
           <figure class="relative aspect-[7/2] bg-base-200 overflow-hidden flex items-center justify-center">
-            <AssetImage 
-              :src="getLogoUrl(gacha)" 
+            <AssetImage
+              v-if="!gachaImgFailed[gacha.id]"
+              :src="getGachaImageUrl(gacha)"
               :alt="gacha.name"
               class="h-full object-contain group-hover:scale-105 transition-transform"
+              @error="gachaImgFailed[gacha.id] = true"
             />
+            <Gift v-else class="w-10 h-10 text-base-content/20" />
             
             <!-- 简单角标 -->
             <div class="absolute top-2 right-2 flex gap-1">
