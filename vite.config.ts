@@ -28,14 +28,47 @@ export default defineConfig({
         // 运行时缓存策略
         runtimeCaching: [
           {
-            // JS / CSS 按需缓存：用户访问到哪个页面加载的 chunk 就缓存那个，只缓存当前需要的
-            urlPattern: /\.(?:js|css)$/i,
+            // JS / CSS / WASM 按需缓存：用户访问到哪个页面加载的 chunk 就缓存那个，只缓存当前需要的
+            // （wasm 含 3D 预览用的 brotli 解压器与 basis 转码器）
+            urlPattern: /\.(?:js|css|wasm)$/i,
             handler: 'StaleWhileRevalidate',
             options: {
               cacheName: 'assets-runtime-cache',
               expiration: {
                 maxEntries: 200,
                 maxAgeSeconds: 60 * 60 * 24 * 30, // 30 天
+              },
+              cacheableResponse: {
+                statuses: [0, 200],
+              },
+            },
+          },
+          {
+            // 3D role catalog：引擎契约要求保持新鲜（携带 masterVersion），网络优先、离线回退缓存
+            urlPattern: /^https:\/\/3d-export\.unipjsk\.com\/.*runtime-role-catalog\.msgpack\.br/i,
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'pjsk-3d-catalog',
+              expiration: {
+                maxEntries: 60,
+                maxAgeSeconds: 60 * 60 * 24 * 30,
+              },
+              cacheableResponse: {
+                statuses: [0, 200],
+              },
+            },
+          },
+          {
+            // 3D 运行时资源：网格/贴图按内容寻址、registry 等带 masterVersion 查询参数，
+            // 均可安全地缓存优先；LRU 上限控制占用
+            urlPattern: /^https:\/\/3d-export\.unipjsk\.com\/.*/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'pjsk-3d-assets',
+              expiration: {
+                maxEntries: 400,
+                maxAgeSeconds: 60 * 60 * 24 * 30, // 30 天
+                purgeOnQuotaError: true,
               },
               cacheableResponse: {
                 statuses: [0, 200],
@@ -148,7 +181,14 @@ export default defineConfig({
     alias: {
       '@': resolve(__dirname, 'src'),
       'moesekai-calculator': resolve(__dirname, 'src/vendor/moesekai-calculator/index.mjs'),
+      // internal 在前：别名按前缀匹配，防止被 haruki-3d-engine 吞掉
+      'haruki-3d-engine/internal': resolve(__dirname, 'src/vendor/haruki-3d-engine/haruki-3d-engine-internal.js'),
+      'haruki-3d-engine': resolve(__dirname, 'src/vendor/haruki-3d-engine/haruki-3d-engine.js'),
     },
+  },
+  optimizeDeps: {
+    // brotli-wasm 通过 import.meta.url 引用 wasm，预打包会破坏其路径解析
+    exclude: ['brotli-wasm'],
   },
   build: {
     rollupOptions: {

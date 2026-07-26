@@ -12,6 +12,12 @@
       ],
       "moesekai-calculator": [
         "src/vendor/moesekai-calculator/index.d.ts"
+      ],
+      "haruki-3d-engine": [
+        "src/vendor/haruki-3d-engine/types/index.d.ts"
+      ],
+      "haruki-3d-engine/internal": [
+        "src/vendor/haruki-3d-engine/types/internal.d.ts"
       ]
     },
     /* Linting */
