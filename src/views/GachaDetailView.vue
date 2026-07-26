@@ -25,6 +25,7 @@ const isLoading = ref(true)
 type BgType = 'chr' | 'normal_n' | 'normal_single' | 'none'
 
 const hasBanner = ref(false)
+const hasLogo = ref(false)
 const bgType = ref<BgType>('none')
 const currentBgIndex = ref(1)
 const maxValidBgIndex = ref(1)
@@ -134,7 +135,13 @@ function goPrevBg() {
 async function checkImageAvailability() {
   if (!gacha.value) return
   
-  hasBanner.value = await checkUrlHead(bannerUrl.value)
+  // 老卡池可能没有 logo，只有 banner；探测到才显示
+  const [bannerOk, logoOk] = await Promise.all([
+    checkUrlHead(bannerUrl.value),
+    checkUrlHead(logoUrl.value),
+  ])
+  hasBanner.value = bannerOk
+  hasLogo.value = logoOk
 
   bgType.value = 'none'
   currentBgIndex.value = 1
@@ -344,6 +351,7 @@ async function loadData() {
   currentBgIndex.value = 1
   maxValidBgIndex.value = 1
   hasBanner.value = false
+  hasLogo.value = false
   try {
     const [gachasData, cardsData] = await Promise.all([
       masterStore.getMaster<Gacha>('gachas'),
@@ -455,13 +463,13 @@ watch(() => route.params.id, loadData)
       </div>
 
       <!-- Logo和Banner展示 -->
-      <div v-if="logoUrl || hasBanner" class="card bg-base-100 shadow-lg">
+      <div v-if="hasLogo || hasBanner" class="card bg-base-100 shadow-lg">
         <div class="card-body p-3 sm:p-5">
           <h2 class="text-base font-medium mb-1 opacity-80">
             展示图
           </h2>
           <div class="flex flex-row flex-wrap justify-center items-end gap-6">
-            <div v-if="logoUrl" class="flex flex-col items-center gap-1">
+            <div v-if="hasLogo" class="flex flex-col items-center gap-1">
               <span class="text-[10px] font-bold opacity-40 uppercase tracking-wider">Logo</span>
               <AssetImage 
                 :src="logoUrl" 

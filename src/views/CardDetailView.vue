@@ -6,7 +6,7 @@ import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
 import AssetImage from '@/components/AssetImage.vue'
 import SekaiCard from '@/components/SekaiCard.vue'
-import { ChevronLeft, ScrollText, Zap } from 'lucide-vue-next'
+import { ChevronLeft, ScrollText, Zap, Link2, Shirt, Calendar, Gift } from 'lucide-vue-next'
 
 interface Card {
   id: number
@@ -52,6 +52,33 @@ interface Character {
   givenName: string
 }
 
+interface CardCostumeLink {
+  cardId: number
+  costume3dId: number
+}
+
+interface EventCardLink {
+  cardId: number
+  eventId: number
+}
+
+interface RelatedEvent {
+  id: number
+  name: string
+  assetbundleName: string
+  startAt: number
+  aggregateAt: number
+}
+
+interface RelatedGacha {
+  id: number
+  name: string
+  assetbundleName: string
+  startAt: number
+  endAt: number
+  gachaPickups?: { cardId: number }[]
+}
+
 interface SkillEffectDetail {
   level: number
   activateEffectDuration?: number
@@ -95,6 +122,16 @@ const showNormalCutout = ref(true)
 const showTrainedCutout = ref(true)
 
 const limitType = ref<false | 'limited' | 'fes'>(false)
+
+// 关联内容：衣装 / 当期活动 / 出现卡池
+const hasCostume = ref(false)
+const relatedEvents = ref<RelatedEvent[]>([])
+const relatedGachas = ref<RelatedGacha[]>([])
+const showAllGachas = ref(false)
+
+const displayedGachas = computed(() => {
+  return showAllGachas.value ? relatedGachas.value : relatedGachas.value.slice(0, 6)
+})
 
 const assetsHost = computed(() => settingsStore.assetsHost)
 
@@ -385,6 +422,50 @@ function formatDate(timestamp: number): string {
   })
 }
 
+function formatDateShort(timestamp: number): string {
+  return new Date(timestamp).toLocaleDateString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  })
+}
+
+// 卡池小图直接用首页 banner（老卡池没有 logo）；banner 也没有的显示占位
+const gachaImgFailed = ref<Record<number, boolean>>({})
+
+function gachaImgSrc(gacha: RelatedGacha): string {
+  return `${assetsHost.value}/startapp/home/banner/banner_gacha${gacha.id}/banner_gacha${gacha.id}.png`
+}
+
+function eventBannerUrl(event: RelatedEvent): string {
+  return `${assetsHost.value}/startapp/home/banner/${event.assetbundleName}/${event.assetbundleName}.png`
+}
+
+async function loadRelatedData() {
+  if (!card.value) return
+  const id = card.value.id
+  try {
+    const [cardCostumesData, eventCardsData, eventsData, gachasData] = await Promise.all([
+      masterStore.getMaster<CardCostumeLink>('cardCostume3ds'),
+      masterStore.getMaster<EventCardLink>('eventCards'),
+      masterStore.getMaster<RelatedEvent>('events'),
+      masterStore.getMaster<RelatedGacha>('gachas'),
+    ])
+    hasCostume.value = cardCostumesData.some(l => l.cardId === id)
+
+    const eventIds = new Set(eventCardsData.filter(l => l.cardId === id).map(l => l.eventId))
+    relatedEvents.value = eventsData
+      .filter(e => eventIds.has(e.id))
+      .sort((a, b) => a.startAt - b.startAt)
+
+    relatedGachas.value = gachasData
+      .filter(g => g.gachaPickups?.some(p => p.cardId === id))
+      .sort((a, b) => a.startAt - b.startAt)
+  } catch (error) {
+    console.error('加载卡片关联内容失败:', error)
+  }
+}
+
 async function loadCardTypeData() {
   isCardTypeLoading.value = true
   try {
@@ -450,8 +531,9 @@ async function loadData() {
     isLoading.value = false
   }
   // Initialize parsing correctly with Watcher effect to avoid computed side effects
-  
+
   loadCardTypeData()
+  loadRelatedData()
 }
 
 const defaultTitle = 'Uni PJSK Viewer'
@@ -656,6 +738,88 @@ onMounted(loadData)
                 <div class="text-xl font-bold">{{ totalPower.total }}</div>
               </div>
               <p class="text-xs text-base-content/60 mt-3 flex items-center gap-1 justify-center">注：前篇和后篇看完的值</p>
+            </div>
+          </div>
+
+          <!-- 关联内容 -->
+          <div v-if="hasCostume || relatedEvents.length > 0 || relatedGachas.length > 0" class="bg-base-200 rounded-xl p-5 mt-6">
+            <h3 class="font-semibold text-primary mb-4 flex items-center gap-2">
+              <Link2 class="w-5 h-5" /> 关联内容
+            </h3>
+
+            <!-- 关联衣装 -->
+            <div v-if="hasCostume" class="mb-4">
+              <RouterLink :to="`/costumes/card/${card.id}`" class="btn btn-sm btn-primary btn-outline gap-2">
+                <Shirt class="w-4 h-4" /> 查看关联衣装
+              </RouterLink>
+            </div>
+
+            <!-- 当期活动 -->
+            <div v-if="relatedEvents.length > 0" class="space-y-2 mb-4">
+              <p class="text-sm font-medium flex items-center gap-1.5">
+                <Calendar class="w-4 h-4" /> 当期活动
+              </p>
+              <div class="grid sm:grid-cols-2 gap-2">
+                <RouterLink
+                  v-for="event in relatedEvents"
+                  :key="event.id"
+                  :to="`/events/${event.id}`"
+                  class="flex items-center gap-3 bg-base-100 rounded-lg p-2 hover:shadow-md transition-all group"
+                >
+                  <AssetImage
+                    :src="eventBannerUrl(event)"
+                    :alt="event.name"
+                    class="h-12 rounded object-contain shrink-0 group-hover:scale-[1.02] transition-transform"
+                  />
+                  <div class="min-w-0">
+                    <p class="text-sm font-medium truncate">{{ event.name }}</p>
+                    <p class="text-xs text-base-content/60">
+                      {{ formatDateShort(event.startAt) }} ~ {{ formatDateShort(event.aggregateAt) }}
+                    </p>
+                  </div>
+                </RouterLink>
+              </div>
+            </div>
+
+            <!-- 出现卡池 -->
+            <div v-if="relatedGachas.length > 0" class="space-y-2">
+              <p class="text-sm font-medium flex items-center gap-1.5">
+                <Gift class="w-4 h-4" /> 出现卡池
+                <span class="text-xs text-base-content/50">共 {{ relatedGachas.length }} 个</span>
+              </p>
+              <div class="grid sm:grid-cols-2 gap-2">
+                <RouterLink
+                  v-for="(gacha, index) in displayedGachas"
+                  :key="gacha.id"
+                  :to="`/gacha/${gacha.id}`"
+                  class="flex items-center gap-3 bg-base-100 rounded-lg p-2 hover:shadow-md transition-all"
+                >
+                  <AssetImage
+                    v-if="!gachaImgFailed[gacha.id]"
+                    :src="gachaImgSrc(gacha)"
+                    :alt="gacha.name"
+                    class="h-10 w-24 object-contain shrink-0"
+                    @error="gachaImgFailed[gacha.id] = true"
+                  />
+                  <div v-else class="h-10 w-24 shrink-0 flex items-center justify-center">
+                    <Gift class="w-5 h-5 text-base-content/20" />
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <p class="text-sm font-medium truncate">{{ gacha.name }}</p>
+                    <p class="text-xs text-base-content/60">
+                      {{ formatDateShort(gacha.startAt) }} ~ {{ formatDateShort(gacha.endAt) }}
+                    </p>
+                  </div>
+                  <span v-if="index === 0" class="badge badge-primary badge-sm shrink-0">初出</span>
+                </RouterLink>
+              </div>
+              <button
+                v-if="relatedGachas.length > 6"
+                class="btn btn-ghost btn-xs"
+                @click="showAllGachas = !showAllGachas"
+              >
+                {{ showAllGachas ? '收起' : `展开全部 ${relatedGachas.length} 个卡池` }}
+              </button>
             </div>
           </div>
 
