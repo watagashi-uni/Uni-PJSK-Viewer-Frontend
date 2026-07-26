@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, onMounted, watch, onBeforeUnmount } from 'vue'
-import { Download, FileImage, Play, Search, Trash2 } from 'lucide-vue-next'
+import { ArrowLeftRight, ClipboardCopy, Download, FileImage, Play, Search, Settings2, Trash2, TriangleAlert } from 'lucide-vue-next'
 import apiClient from '@/api/client'
 import {
   renderCustomScoreJsonToPng,
@@ -10,6 +10,8 @@ import {
   renderSusToSvgWithConflictOverlay,
   revokeSus2ImgResult,
   analyzeSusConflicts,
+  convertSusToCustomScoreJson,
+  convertCustomScoreJsonToSus,
   type Sus2ImgFrontendResult,
   type Sus2ImgSkin,
   type ConflictDiagnostic,
@@ -19,7 +21,7 @@ const FORM_STORAGE_KEY = 'sus2img-form-data'
 
 type RenderEngine = 'frontend' | 'backend'
 type RenderFormat = 'svg' | 'png'
-type ChartInputType = 'sus' | 'json'
+type ChartInputType = 'sus' | 'json' | 'sus2json' | 'json2sus'
 
 type BackendResult = {
   source: 'backend'
@@ -41,6 +43,8 @@ const form = ref({
   skin: 'custom01' as Sus2ImgSkin,
   engine: 'frontend' as RenderEngine,
   bottomLeftImageUrl: '',
+  condenseSpeedTrend: true,
+  convertIncludeNoteSpeed: true,
 })
 
 const chartFile = ref<File | null>(null)
@@ -54,6 +58,21 @@ const isAnalyzing = ref(false)
 const hasAuditRun = ref(false)
 const isPreparingPreview = ref(false)
 const isDownloadingPng = ref(false)
+
+// 可选设置折叠状态（默认折叠，不持久化）
+const showOptionalSettings = ref(false)
+
+// SUS ⇄ JSON 互转状态
+type ConversionOutput = {
+  kind: 'sus' | 'json'
+  text: string
+}
+const conversionOutput = ref<ConversionOutput | null>(null)
+const isConverting = ref(false)
+const conversionError = ref<string | null>(null)
+const conversionMessage = ref<string | null>(null)
+// 每次进入页面都需要重新勾选，不随表单持久化
+const overlapAcknowledged = ref(false)
 
 const resultData = ref<string | null>(null)
 const resultFormat = ref<RenderFormat>('svg')
@@ -95,7 +114,9 @@ const setResult = (result: Sus2ImgFrontendResult | BackendResult) => {
   }
 }
 
-const isJsonInput = computed(() => form.value.inputType === 'json')
+const isJsonInput = computed(() => form.value.inputType === 'json' || form.value.inputType === 'json2sus')
+
+const isConvertMode = computed(() => form.value.inputType === 'sus2json' || form.value.inputType === 'json2sus')
 
 const isHighlightReady = computed(
   () =>
@@ -263,7 +284,8 @@ watch(
     chartFile.value = null
     resetAuditState()
     resetRenderState()
-    if (inputType === 'json' && form.value.engine === 'backend') {
+    resetConversionState()
+    if ((inputType === 'json' || inputType === 'json2sus') && form.value.engine === 'backend') {
       form.value.engine = 'frontend'
     }
   },
@@ -329,6 +351,88 @@ async function getChartText(): Promise<string> {
   }
 
   throw new Error(isJsonInput.value ? '请提供 JSON 谱面内容或上传文件' : '请提供 SUS 文件内容或上传文件')
+}
+
+const resetConversionState = () => {
+  conversionOutput.value = null
+  conversionError.value = null
+  conversionMessage.value = null
+  isConverting.value = false
+}
+
+const conversionOutputSizeText = computed(() => {
+  const text = conversionOutput.value?.text
+  if (!text) {
+    return ''
+  }
+  const bytes = new Blob([text]).size
+  if (bytes >= 1024 * 1024) {
+    return `${(bytes / 1024 / 1024).toFixed(2)} MB`
+  }
+  if (bytes >= 1024) {
+    return `${(bytes / 1024).toFixed(1)} KB`
+  }
+  return `${bytes} B`
+})
+
+async function handleConvertFormat() {
+  conversionError.value = null
+  conversionMessage.value = null
+  conversionOutput.value = null
+  isConverting.value = true
+
+  try {
+    const chartText = await getChartText()
+
+    if (form.value.inputType === 'json2sus') {
+      if (!overlapAcknowledged.value) {
+        throw new Error('请先阅读重叠说明并勾选"我已知晓"')
+      }
+      // 先做一次本地 JSON 校验，错误提示更友好
+      parseCustomScoreJson(chartText)
+      const susText = await convertCustomScoreJsonToSus(chartText, {
+        title: form.value.title,
+        artist: form.value.artist,
+        designer: form.value.author,
+        includeNoteSpeed: form.value.convertIncludeNoteSpeed,
+      })
+      conversionOutput.value = { kind: 'sus', text: susText }
+      conversionMessage.value = 'JSON 转 SUS 完成。建议切换到「SUS 转图片」模式，对转换结果跑一次 note 重叠检查。'
+    } else {
+      const jsonText = await convertSusToCustomScoreJson(chartText)
+      conversionOutput.value = { kind: 'json', text: jsonText }
+      conversionMessage.value = 'SUS 转 JSON 完成。'
+    }
+  } catch (convertReason) {
+    conversionError.value = convertReason instanceof Error ? convertReason.message : '格式转换失败'
+  } finally {
+    isConverting.value = false
+  }
+}
+
+function downloadConversionOutput() {
+  const output = conversionOutput.value
+  if (!output) {
+    return
+  }
+
+  const mime = output.kind === 'json' ? 'application/json;charset=utf-8' : 'text/plain;charset=utf-8'
+  const blob = new Blob([output.text], { type: mime })
+  triggerBlobDownload(blob, `${resultBaseFileName.value}.${output.kind}`)
+}
+
+async function copyConversionOutput() {
+  const output = conversionOutput.value
+  if (!output) {
+    return
+  }
+
+  try {
+    await navigator.clipboard.writeText(output.text)
+    conversionMessage.value = '已复制到剪贴板。'
+  } catch {
+    conversionError.value = '复制到剪贴板失败，请使用下载按钮'
+  }
 }
 
 async function runAudit(chartText: string) {
@@ -438,6 +542,7 @@ async function ensureSvgPreview(chartText: string, diagnosticsForGhost?: Conflic
     pixel: form.value.pixel,
     skin: form.value.skin,
     jacket: bottomLeftImageDataUrl.value || form.value.bottomLeftImageUrl.trim(),
+    condenseSpeedTrend: form.value.condenseSpeedTrend,
   }
 
   try {
@@ -699,6 +804,7 @@ async function renderViaFrontend(chartText: string): Promise<Sus2ImgFrontendResu
     pixel: form.value.pixel,
     skin: form.value.skin,
     jacket: bottomLeftImage,
+    condenseSpeedTrend: form.value.condenseSpeedTrend,
   }
 
   if (isJsonInput.value) {
@@ -726,6 +832,14 @@ async function renderViaFrontend(chartText: string): Promise<Sus2ImgFrontendResu
   }
 
   return await renderSusToSvg(input)
+}
+
+async function handleFormSubmit() {
+  if (isConvertMode.value) {
+    await handleConvertFormat()
+    return
+  }
+  await handleSubmit()
 }
 
 async function handleSubmit() {
@@ -806,6 +920,8 @@ function clearForm() {
     skin: 'custom01',
     engine: 'frontend',
     bottomLeftImageUrl: '',
+    condenseSpeedTrend: true,
+    convertIncludeNoteSpeed: true,
   }
 
   chartFile.value = null
@@ -815,6 +931,8 @@ function clearForm() {
   infoMessage.value = null
   resetAuditState()
   resetRenderState()
+  resetConversionState()
+  overlapAcknowledged.value = false
   sessionStorage.removeItem(FORM_STORAGE_KEY)
 }
 
@@ -823,151 +941,108 @@ function clearForm() {
 <template>
   <div class="max-w-4xl mx-auto">
     <h1 class="text-2xl font-bold text-center text-primary mb-2">SUS / JSON 谱面转图片</h1>
-    <p class="text-center text-base-content/60 text-sm mb-6">粘贴谱面内容和上传文件二选一即可，支持 SUS / JSON</p>
+    <p class="text-center text-base-content/60 text-sm mb-6">粘贴谱面内容和上传文件二选一即可，支持 SUS / JSON 转图片与 SUS ⇄ JSON 互转</p>
 
     <div class="card bg-base-100 shadow-lg animate-fade-in-up">
       <div class="card-body">
-        <form class="space-y-6" @submit.prevent="handleSubmit">
+        <form class="space-y-6" @submit.prevent="handleFormSubmit">
           <div class="form-control">
             <label class="label">
-              <span class="label-text font-medium">输入类型</span>
+              <span class="label-text font-medium">功能选择</span>
             </label>
             <div class="flex gap-4 flex-wrap">
               <label class="label cursor-pointer gap-2">
                 <input v-model="form.inputType" type="radio" value="sus" class="radio radio-primary" />
-                <span class="label-text">SUS</span>
+                <span class="label-text">SUS 转图片</span>
               </label>
               <label class="label cursor-pointer gap-2">
                 <input v-model="form.inputType" type="radio" value="json" class="radio radio-primary" />
-                <span class="label-text">JSON</span>
+                <span class="label-text">JSON 转图片</span>
+              </label>
+              <label class="label cursor-pointer gap-2">
+                <input v-model="form.inputType" type="radio" value="sus2json" class="radio radio-primary" />
+                <span class="label-text">SUS 转 JSON</span>
+              </label>
+              <label class="label cursor-pointer gap-2">
+                <input v-model="form.inputType" type="radio" value="json2sus" class="radio radio-primary" />
+                <span class="label-text">JSON 转 SUS</span>
               </label>
             </div>
           </div>
 
-          <div class="grid md:grid-cols-2 gap-4">
-            <div class="form-control w-full">
-              <label class="label">
-                <span class="label-text font-medium">{{ isJsonInput ? 'JSON 谱面内容' : 'SUS 内容' }}</span>
-              </label>
-              <textarea
-                v-model="form.chart"
-                class="textarea textarea-bordered h-40 font-mono text-sm w-full"
-                :placeholder="isJsonInput ? '在此粘贴 JSON 谱面内容' : '在此粘贴 SUS 文件内容'"
-              ></textarea>
-            </div>
-            <div class="form-control w-full">
-              <label class="label">
-                <span class="label-text font-medium">rebase.json 内容（可选）</span>
-              </label>
-              <textarea
-                v-model="form.rebase"
-                class="textarea textarea-bordered h-40 font-mono text-sm w-full"
-                placeholder="在此粘贴 rebase.json 内容"
-              ></textarea>
+          <div class="form-control w-full">
+            <label class="label">
+              <span class="label-text font-medium">{{ isJsonInput ? 'JSON 谱面内容' : 'SUS 内容' }}</span>
+            </label>
+            <textarea
+              v-model="form.chart"
+              class="textarea textarea-bordered h-40 font-mono text-sm w-full"
+              :placeholder="isJsonInput ? '在此粘贴 JSON 谱面内容' : '在此粘贴 SUS 文件内容'"
+            ></textarea>
+          </div>
+
+          <div class="form-control w-full">
+            <label class="label">
+              <span class="label-text font-medium">
+                上传{{ isJsonInput ? ' JSON' : ' SUS' }}文件（可选，和上方内容二选一即可）
+              </span>
+            </label>
+            <input
+              :key="form.inputType"
+              type="file"
+              class="file-input file-input-bordered w-full"
+              :accept="isJsonInput ? '.json,.txt' : '.sus,.txt'"
+              @change="handleFileChange"
+            />
+            <div v-if="!isJsonInput" class="alert alert-info mt-3 py-3 text-sm">
+              <span>SUS 读取已完全还原游戏逻辑，会自动去重和一些其他重叠处理操作</span>
             </div>
           </div>
 
-          <div class="grid md:grid-cols-2 gap-4">
-            <div class="form-control w-full">
-              <label class="label">
-                <span class="label-text font-medium">歌曲标题（可省略）</span>
-              </label>
-              <input
-                v-model="form.title"
-                type="text"
-                class="input input-bordered w-full"
-                placeholder="歌曲标题"
-              />
+          <template v-if="form.inputType === 'json2sus'">
+            <div class="alert alert-warning items-start">
+              <TriangleAlert class="w-6 h-6 shrink-0 mt-0.5" />
+              <div class="space-y-2 text-sm leading-6 min-w-0">
+                <p class="font-bold text-base">JSON 转 SUS 前，请先确认谱面没有重叠的 note</p>
+                <p>
+                  SUS 格式没有独立的"note 种类"字段——它靠把多个记号<b>叠放在同一时刻、同一位置</b>来表达种类：
+                  比如 trace 长条尾其实是"长条尾 + trace 记号"叠在一起，隐藏长条头是"长条头 + 隐藏记号"叠在一起，
+                  黄条（critical）也是在原 note 上叠一个 critical 记号。
+                </p>
+                <p>因此，如果你的谱面<b>本身</b>就存在下面这类重叠，导出的 SUS 会把它们误读成"种类修饰"，互相污染：</p>
+                <ul class="list-disc list-inside space-y-1">
+                  <li>长条（slide）节点之间的重叠（包括中继点与中继点、中继点与头尾）</li>
+                  <li>长条头 / 尾与其他长条头尾、tap、trace、flick 的重叠</li>
+                  <li>guide 的头尾、节点与其他 note 或 guide 之间的重叠</li>
+                  <li>同一位置只要有一个 critical note，同处的其他 note 也会被"传染"成 critical</li>
+                </ul>
+                <p>
+                  转换过程<b>不会报错</b>——问题只会在游戏或编辑器读取转换结果时显现：note 变种、丢失、被合并。
+                  建议转换完成后，切到「SUS 转图片」模式对结果跑一次「note 重叠检查」确认。
+                </p>
+                <p><b>遇到重叠的时候，请使用 1920 分把重叠的 note 错开即可。</b></p>
+              </div>
             </div>
-            <div class="form-control w-full">
-              <label class="label">
-                <span class="label-text font-medium">作曲作词编曲（可省略）</span>
-              </label>
-              <input
-                v-model="form.artist"
-                type="text"
-                class="input input-bordered w-full"
-                placeholder="作曲作词编曲"
-              />
-            </div>
-          </div>
 
-          <div class="grid md:grid-cols-2 gap-4">
-            <div class="form-control w-full">
-              <label class="label">
-                <span class="label-text font-medium">谱面作者（可省略）</span>
+            <div class="form-control">
+              <label class="label cursor-pointer justify-start gap-3">
+                <input v-model="overlapAcknowledged" type="checkbox" class="checkbox checkbox-warning" />
+                <span class="label-text font-medium">我已知晓：谱面存在重叠 note 时，转换出的 SUS 可能不符合预期</span>
               </label>
-              <input
-                v-model="form.author"
-                type="text"
-                class="input input-bordered w-full"
-                placeholder="谱面作者"
-              />
             </div>
-            <div class="form-control w-full">
-              <label class="label">
-                <span class="label-text font-medium">难度（可省略）</span>
-              </label>
-              <input
-                v-model="form.difficulty"
-                type="text"
-                class="input input-bordered w-full"
-                placeholder="难度"
-              />
-            </div>
-          </div>
 
-          <div class="grid md:grid-cols-2 gap-4">
-            <div class="form-control w-full">
-              <label class="label">
-                <span class="label-text font-medium">定数（可省略）</span>
+            <div class="form-control">
+              <label class="label cursor-pointer justify-start gap-3">
+                <input v-model="form.convertIncludeNoteSpeed" type="checkbox" class="checkbox checkbox-primary" />
+                <span class="label-text">
+                  导出 note speed 扩展
+                  <span class="text-xs opacity-60 block">该格式只有本家可以读取，第三方工具可能不兼容</span>
+                </span>
               </label>
-              <input
-                v-model="form.playlevel"
-                type="text"
-                class="input input-bordered w-full"
-                placeholder="定数"
-              />
             </div>
-            <div class="form-control w-full">
-              <label class="label">
-                <span class="label-text font-medium">每秒长度（默认240）</span>
-              </label>
-              <input
-                v-model="form.pixel"
-                type="text"
-                class="input input-bordered w-full"
-                placeholder="每秒长度"
-              />
-            </div>
-          </div>
+          </template>
 
-          <div class="grid md:grid-cols-2 gap-4">
-            <div class="form-control w-full">
-              <label class="label">
-                <span class="label-text font-medium">左下角图片 URL（前端专用，可选）</span>
-              </label>
-              <input
-                v-model="form.bottomLeftImageUrl"
-                type="text"
-                class="input input-bordered w-full"
-                placeholder="可填 data/http/绝对路径"
-              />
-            </div>
-            <div class="form-control w-full">
-              <label class="label">
-                <span class="label-text font-medium">上传左下角图片（前端专用，可选）</span>
-              </label>
-              <input
-                type="file"
-                class="file-input file-input-bordered w-full"
-                accept="image/*"
-                @change="handleBottomLeftImageChange"
-              />
-            </div>
-          </div>
-
-          <div class="grid md:grid-cols-3 gap-4">
+          <div v-if="!isConvertMode" class="grid md:grid-cols-3 gap-4">
             <div class="form-control">
               <label class="label">
                 <span class="label-text font-medium">输出格式</span>
@@ -1015,21 +1090,134 @@ function clearForm() {
             </div>
           </div>
 
-          <div class="form-control w-full">
-            <label class="label">
-              <span class="label-text font-medium">
-                上传{{ isJsonInput ? ' JSON' : ' SUS' }}文件（可选，和上方内容二选一即可）
-              </span>
-            </label>
-            <input
-              :key="form.inputType"
-              type="file"
-              class="file-input file-input-bordered w-full"
-              :accept="isJsonInput ? '.json,.txt' : '.sus,.txt'"
-              @change="handleFileChange"
-            />
-            <div v-if="!isJsonInput" class="alert alert-info mt-3 py-3 text-sm">
-              <span>sus转图片工具已完全还原游戏读取逻辑，会自动去重和一些其他重叠处理操作</span>
+          <div v-if="!isConvertMode" class="collapse collapse-arrow bg-base-200/60 border border-base-300 rounded-lg">
+            <input v-model="showOptionalSettings" type="checkbox" />
+            <div class="collapse-title font-medium flex items-center gap-2">
+              <Settings2 class="w-4 h-4" />
+              可选设置
+              <span class="text-xs opacity-60">（rebase / 标题信息 / 左下角图片 / highspeed 展示）</span>
+            </div>
+            <div class="collapse-content space-y-6">
+              <div class="form-control w-full">
+                <label class="label">
+                  <span class="label-text font-medium">rebase.json 内容（可选）</span>
+                </label>
+                <textarea
+                  v-model="form.rebase"
+                  class="textarea textarea-bordered h-32 font-mono text-sm w-full"
+                  placeholder="在此粘贴 rebase.json 内容"
+                ></textarea>
+              </div>
+
+              <div class="grid md:grid-cols-2 gap-4">
+                <div class="form-control w-full">
+                  <label class="label">
+                    <span class="label-text font-medium">歌曲标题（可省略）</span>
+                  </label>
+                  <input
+                    v-model="form.title"
+                    type="text"
+                    class="input input-bordered w-full"
+                    placeholder="歌曲标题"
+                  />
+                </div>
+                <div class="form-control w-full">
+                  <label class="label">
+                    <span class="label-text font-medium">作曲作词编曲（可省略）</span>
+                  </label>
+                  <input
+                    v-model="form.artist"
+                    type="text"
+                    class="input input-bordered w-full"
+                    placeholder="作曲作词编曲"
+                  />
+                </div>
+              </div>
+
+              <div class="grid md:grid-cols-2 gap-4">
+                <div class="form-control w-full">
+                  <label class="label">
+                    <span class="label-text font-medium">谱面作者（可省略）</span>
+                  </label>
+                  <input
+                    v-model="form.author"
+                    type="text"
+                    class="input input-bordered w-full"
+                    placeholder="谱面作者"
+                  />
+                </div>
+                <div class="form-control w-full">
+                  <label class="label">
+                    <span class="label-text font-medium">难度（可省略）</span>
+                  </label>
+                  <input
+                    v-model="form.difficulty"
+                    type="text"
+                    class="input input-bordered w-full"
+                    placeholder="难度"
+                  />
+                </div>
+              </div>
+
+              <div class="grid md:grid-cols-2 gap-4">
+                <div class="form-control w-full">
+                  <label class="label">
+                    <span class="label-text font-medium">定数（可省略）</span>
+                  </label>
+                  <input
+                    v-model="form.playlevel"
+                    type="text"
+                    class="input input-bordered w-full"
+                    placeholder="定数"
+                  />
+                </div>
+                <div class="form-control w-full">
+                  <label class="label">
+                    <span class="label-text font-medium">每秒长度（默认240）</span>
+                  </label>
+                  <input
+                    v-model="form.pixel"
+                    type="text"
+                    class="input input-bordered w-full"
+                    placeholder="每秒长度"
+                  />
+                </div>
+              </div>
+
+              <div class="grid md:grid-cols-2 gap-4">
+                <div class="form-control w-full">
+                  <label class="label">
+                    <span class="label-text font-medium">左下角图片 URL（前端专用，可选）</span>
+                  </label>
+                  <input
+                    v-model="form.bottomLeftImageUrl"
+                    type="text"
+                    class="input input-bordered w-full"
+                    placeholder="可填 data/http/绝对路径"
+                  />
+                </div>
+                <div class="form-control w-full">
+                  <label class="label">
+                    <span class="label-text font-medium">上传左下角图片（前端专用，可选）</span>
+                  </label>
+                  <input
+                    type="file"
+                    class="file-input file-input-bordered w-full"
+                    accept="image/*"
+                    @change="handleBottomLeftImageChange"
+                  />
+                </div>
+              </div>
+
+              <div class="form-control">
+                <label class="label cursor-pointer justify-start gap-3">
+                  <input v-model="form.condenseSpeedTrend" type="checkbox" class="checkbox checkbox-primary" />
+                  <span class="label-text">
+                    highspeed 短时间密集变化折叠为趋势箭头
+                    <span class="text-xs opacity-60 block">关闭后将逐条展示每个 highspeed 变化（密集处文字可能重叠）；仅前端引擎生效</span>
+                  </span>
+                </label>
+              </div>
             </div>
           </div>
 
@@ -1041,7 +1229,7 @@ function clearForm() {
             <span>{{ infoMessage }}</span>
           </div>
 
-          <div class="flex justify-center gap-4">
+          <div class="flex justify-center gap-4 flex-wrap">
             <button type="button" class="btn btn-outline btn-error" @click="clearForm">
               <Trash2 class="w-4 h-4" />
               清空
@@ -1051,10 +1239,43 @@ function clearForm() {
               <Search v-else class="w-4 h-4" />
               {{ isAnalyzing ? 'note重叠检查中...' : 'note重叠检查' }}
             </button>
-            <button type="submit" class="btn btn-primary btn-wide" :disabled="isSubmitting">
+            <button
+              v-if="isConvertMode"
+              type="submit"
+              class="btn btn-primary btn-wide"
+              :disabled="isConverting || (form.inputType === 'json2sus' && !overlapAcknowledged)"
+            >
+              <span v-if="isConverting" class="loading loading-spinner"></span>
+              <ArrowLeftRight v-else class="w-4 h-4" />
+              {{ isConverting ? '转换中...' : form.inputType === 'json2sus' ? 'JSON 转 SUS' : 'SUS 转 JSON' }}
+            </button>
+            <button v-else type="submit" class="btn btn-primary btn-wide" :disabled="isSubmitting">
               <span v-if="isSubmitting" class="loading loading-spinner"></span>
               <Play v-else class="w-4 h-4" />
               {{ isSubmitting ? '转换中...' : '开始转换' }}
+            </button>
+          </div>
+
+          <p v-if="form.inputType === 'json2sus' && !overlapAcknowledged" class="text-center text-sm text-base-content/60">
+            勾选"我已知晓"后才能转换
+          </p>
+
+          <div v-if="conversionError" class="alert alert-error">
+            <span>{{ conversionError }}</span>
+          </div>
+
+          <div v-if="conversionMessage" class="alert alert-success">
+            <span>{{ conversionMessage }}</span>
+          </div>
+
+          <div v-if="conversionOutput" class="flex flex-wrap justify-center items-center gap-3">
+            <button type="button" class="btn btn-outline btn-primary" @click="downloadConversionOutput">
+              <Download class="w-4 h-4" />
+              下载 {{ conversionOutput.kind === 'sus' ? 'SUS' : 'JSON' }}（{{ conversionOutputSizeText }}）
+            </button>
+            <button type="button" class="btn btn-outline" @click="copyConversionOutput">
+              <ClipboardCopy class="w-4 h-4" />
+              复制到剪贴板
             </button>
           </div>
         </form>

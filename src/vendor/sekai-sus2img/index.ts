@@ -8,6 +8,8 @@ import { buildGhostNotesFromDiagnostics, buildCrashMarkersFromDiagnostics, build
 
 export { analyzeSusConflicts, type ConflictDiagnostic } from '@/utils/susConflictAudit'
 export { buildGhostNotesFromDiagnostics, buildCrashMarkersFromDiagnostics, buildFocusAnchorsFromDiagnostics, type CrashMarkerRender } from './ghostNote'
+export { convertSusToCustomScoreJson, calculateSusComboCount } from './susToJsonWasm'
+export { convertCustomScoreJsonToSus, type JsonToSusOptions } from './jsonToSusWasm'
 
 export type Sus2ImgSkin = 'custom01' | 'custom02'
 
@@ -24,6 +26,8 @@ export interface Sus2ImgRenderInput {
     jacket?: string
     /** 设为 true 则不显示"創作譜面"标签（用于官方谱面） */
     isOfficial?: boolean
+    /** 密集 highspeed 变化折叠为趋势箭头，默认开启 */
+    condenseSpeedTrend?: boolean
 }
 
 export interface CustomScoreJsonRenderInput {
@@ -41,6 +45,8 @@ export interface CustomScoreJsonRenderInput {
     ticksPerBeat?: number
     /** 设为 true 则不显示"創作譜面"标签（用于官方谱面） */
     isOfficial?: boolean
+    /** 密集 highspeed 变化折叠为趋势箭头，默认开启 */
+    condenseSpeedTrend?: boolean
 }
 
 export interface Sus2ImgRuntimeOptions {
@@ -188,6 +194,7 @@ const customScoreJsonToSvgPayload = (
         ghostNotes,
         crashMarkers,
         focusAnchors,
+        condenseSpeedTrend: input.condenseSpeedTrend,
     })
     return {
         svgText: rendered.svg,

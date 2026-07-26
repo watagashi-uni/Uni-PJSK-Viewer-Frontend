@@ -347,6 +347,8 @@ export interface RenderOptions {
     ghostNotes?: (Tap | Directional | Slide)[]
     crashMarkers?: CrashMarkerRender[]
     focusAnchors?: CrashMarkerRender[]
+    /** 密集 highspeed 变化折叠为趋势箭头展示，默认开启；关闭后逐条展示每个变化 */
+    condenseSpeedTrend?: boolean
 }
 
 export interface RenderedSvg {
@@ -1025,7 +1027,7 @@ class SentenceRenderer {
             }
 
             const group = points.slice(start, end)
-            if (group.length >= SPEED_DENSE_MIN_POINTS) {
+            if (this.drawing.condenseSpeedTrend && group.length >= SPEED_DENSE_MIN_POINTS) {
                 parts.push(...this.renderDenseSpeedGroup(group, visibleTop, visibleBottom))
             } else {
                 for (const point of group) {
@@ -1319,6 +1321,7 @@ class DrawingRenderer {
     readonly ghostNotes: (Tap | Directional | Slide)[]
     readonly crashMarkers: CrashMarkerRender[]
     readonly focusAnchors: CrashMarkerRender[]
+    readonly condenseSpeedTrend: boolean
 
     constructor(score: Score, options: RenderOptions) {
         this.score = score
@@ -1341,6 +1344,7 @@ class DrawingRenderer {
         this.ghostNotes = options.ghostNotes ?? []
         this.crashMarkers = options.crashMarkers ?? []
         this.focusAnchors = options.focusAnchors ?? []
+        this.condenseSpeedTrend = options.condenseSpeedTrend ?? true
 
         this.styleSheet = `${DEFAULT_STYLE}\n${WHITE_STYLE}${options.styleSheet ? `\n${options.styleSheet}` : ''}`
     }
