@@ -296,20 +296,20 @@ onMounted(loadData)
             <p v-if="part.howToObtain && part.howToObtain !== group.howToObtain" class="text-xs text-base-content/60 -mt-1 mb-3">
               {{ part.howToObtain }}
             </p>
-            <div class="flex flex-wrap gap-3">
+            <div class="flex flex-wrap gap-2 sm:gap-3">
               <div
                 v-for="variant in part.variants"
                 :key="variant.costume3dId"
                 class="flex flex-col items-center gap-1"
               >
-                <div class="w-20 h-20 bg-base-200 rounded-xl overflow-hidden shadow-sm">
+                <div class="w-16 h-16 sm:w-20 sm:h-20 bg-base-200 rounded-xl overflow-hidden shadow-sm">
                   <CostumeThumb
                     :assetbundle-name="variant.assetbundleName"
                     :alt="`${group.name} ${variant.colorName}`"
                     class="w-full h-full p-1"
                   />
                 </div>
-                <span class="text-xs text-base-content/70 max-w-20 truncate">{{ variant.colorName }}</span>
+                <span class="text-xs text-base-content/70 max-w-16 sm:max-w-20 truncate">{{ variant.colorName }}</span>
               </div>
             </div>
           </div>
@@ -403,21 +403,21 @@ onMounted(loadData)
             <h3 class="font-semibold text-primary mb-3 flex items-center gap-2">
               <Shirt class="w-5 h-5" /> 相关衣装
             </h3>
-            <div class="flex flex-wrap gap-3">
+            <div class="flex flex-wrap gap-2 sm:gap-3">
               <RouterLink
                 v-for="related in relatedGroups"
                 :key="related.key"
                 :to="`/costumes/${related.representativeId}`"
                 class="flex flex-col items-center gap-1 group"
               >
-                <div class="w-20 h-20 bg-base-200 rounded-xl overflow-hidden shadow-sm group-hover:shadow-md group-hover:-translate-y-0.5 transition-all">
+                <div class="w-16 h-16 sm:w-20 sm:h-20 bg-base-200 rounded-xl overflow-hidden shadow-sm group-hover:shadow-md group-hover:-translate-y-0.5 transition-all">
                   <CostumeThumb
                     :assetbundle-name="related.thumbAssetbundleName"
                     :alt="related.name"
                     class="w-full h-full p-1"
                   />
                 </div>
-                <span class="text-xs text-base-content/70 max-w-20 truncate">
+                <span class="text-xs text-base-content/70 max-w-16 sm:max-w-20 truncate">
                   {{ related.parts.map(p => partLabel(p.partType)).join('+') }}
                 </span>
               </RouterLink>
