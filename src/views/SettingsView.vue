@@ -80,7 +80,7 @@ const assetsHostOptions = [
 
 const assetSourceNotice = computed(() => {
   if (!settingsStore.cnAssetsPolicyLoaded) {
-    return '正在确认当前版本是否允许使用国内源，确认前资源会使用海外源。'
+    return '正在确认当前版本是否允许使用国内源，确认前暂按上次结果选择源站（首次访问为海外源）。'
   }
 
   if (!settingsStore.cnAssetsAllowed) {
