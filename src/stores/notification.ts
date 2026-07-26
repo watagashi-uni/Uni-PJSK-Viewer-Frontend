@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { request } from '@/utils/request'
+import { detectIsChina } from '@/utils/location'
 
 export const useNotificationStore = defineStore('notification', () => {
     const isSupported = ref(false)
@@ -12,16 +13,6 @@ export const useNotificationStore = defineStore('notification', () => {
 
     const subscribedTopics = ref<string[]>([])
     const isLoading = ref(true)
-
-    async function checkLocation() {
-        try {
-            const res = await request.fetchApi('/api/location')
-            const text = await res.text()
-            isChina.value = (text.trim() === '1')
-        } catch {
-            // 默认非大陆
-        }
-    }
 
     function urlBase64ToUint8Array(base64String: string) {
         const padding = '='.repeat((4 - base64String.length % 4) % 4)
@@ -45,7 +36,7 @@ export const useNotificationStore = defineStore('notification', () => {
             return
         }
 
-        await checkLocation()
+        isChina.value = await detectIsChina()
 
         try {
             const registration = await navigator.serviceWorker.ready
