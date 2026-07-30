@@ -1,8 +1,8 @@
-import { $ as e, A as t, B as n, C as r, D as i, E as a, F as o, G as s, H as c, I as l, J as ee, K as te, L as ne, M as re, N as ie, O as ae, P as oe, Q as se, R as ce, S as le, T as ue, U as de, V as fe, W as pe, X as me, Y as he, Z as ge, _ as _e, a as ve, at as ye, b as be, c as u, ct as d, d as f, dt as p, et as m, f as h, ft as g, g as _, h as v, i as y, it as b, j as x, k as S, l as C, lt as w, m as T, mt as E, n as D, nt as O, o as k, ot as A, p as j, pt as M, q as N, r as P, rt as xe, s as Se, st as Ce, t as we, tt as Te, u as Ee, ut as De, v as Oe, w as ke, x as Ae, y as je, z as Me } from "./Haruki3DKernel-BRsy2Wwq.js";
+import { $ as e, A as t, B as n, C as r, D as i, E as a, F as o, G as s, H as c, I as l, J as ee, K as te, L as ne, M as re, N as ie, O as ae, P as oe, Q as se, R as ce, S as le, T as ue, U as de, V as fe, W as pe, X as me, Y as he, Z as ge, _ as _e, _t as ve, a as ye, at as be, b as u, c as d, ct as f, d as p, dt as m, et as h, f as g, ft as _, g as v, gt as y, h as b, ht as x, i as S, it as C, j as w, k as T, l as E, lt as D, m as O, mt as k, n as A, nt as j, o as M, ot as N, p as xe, pt as Se, q as Ce, r as P, rt as we, s as Te, st as Ee, t as De, tt as Oe, u as ke, ut as Ae, v as je, vt as Me, w as Ne, x as Pe, y as Fe, yt as Ie, z as Le } from "./Haruki3DKernel-BYEf1lSY.js";
 import * as F from "three";
-import { Controls as Ne, MOUSE as I, MathUtils as Pe, Plane as Fe, Quaternion as L, Ray as Ie, Spherical as R, TOUCH as z, Vector2 as B, Vector3 as V } from "three";
+import { Controls as Re, MOUSE as I, MathUtils as ze, Plane as Be, Quaternion as L, Ray as Ve, Spherical as R, TOUCH as z, Vector2 as B, Vector3 as V } from "three";
 //#region node_modules/three/examples/jsm/controls/OrbitControls.js
-var H = { type: "change" }, U = { type: "start" }, W = { type: "end" }, G = new Ie(), K = new Fe(), Le = Math.cos(70 * Pe.DEG2RAD), q = new V(), J = 2 * Math.PI, Y = {
+var H = { type: "change" }, U = { type: "start" }, W = { type: "end" }, G = new Ve(), K = new Be(), He = Math.cos(70 * ze.DEG2RAD), q = new V(), J = 2 * Math.PI, Y = {
 	NONE: -1,
 	ROTATE: 0,
 	DOLLY: 1,
@@ -11,7 +11,7 @@ var H = { type: "change" }, U = { type: "start" }, W = { type: "end" }, G = new 
 	TOUCH_PAN: 4,
 	TOUCH_DOLLY_PAN: 5,
 	TOUCH_DOLLY_ROTATE: 6
-}, X = 1e-6, Re = class extends Ne {
+}, X = 1e-6, Ue = class extends Re {
 	constructor(e, t = null) {
 		super(e, t), this.state = Y.NONE, this.target = new V(), this.cursor = new V(), this.minDistance = 0, this.maxDistance = Infinity, this.minZoom = 0, this.maxZoom = Infinity, this.minTargetRadius = 0, this.maxTargetRadius = Infinity, this.minPolarAngle = 0, this.maxPolarAngle = Math.PI, this.minAzimuthAngle = -Infinity, this.maxAzimuthAngle = Infinity, this.enableDamping = !1, this.dampingFactor = .05, this.enableZoom = !0, this.zoomSpeed = 1, this.enableRotate = !0, this.rotateSpeed = 1, this.keyRotateSpeed = 1, this.enablePan = !0, this.panSpeed = 1, this.screenSpacePanning = !0, this.keyPanSpeed = 7, this.zoomToCursor = !1, this.autoRotate = !1, this.autoRotateSpeed = 2, this.keys = {
 			LEFT: "ArrowLeft",
@@ -25,7 +25,7 @@ var H = { type: "change" }, U = { type: "start" }, W = { type: "end" }, G = new 
 		}, this.touches = {
 			ONE: z.ROTATE,
 			TWO: z.DOLLY_PAN
-		}, this.target0 = this.target.clone(), this.position0 = this.object.position.clone(), this.zoom0 = this.object.zoom, this._domElementKeyEvents = null, this._lastPosition = new V(), this._lastQuaternion = new L(), this._lastTargetPosition = new V(), this._quat = new L().setFromUnitVectors(e.up, new V(0, 1, 0)), this._quatInverse = this._quat.clone().invert(), this._spherical = new R(), this._sphericalDelta = new R(), this._scale = 1, this._panOffset = new V(), this._rotateStart = new B(), this._rotateEnd = new B(), this._rotateDelta = new B(), this._panStart = new B(), this._panEnd = new B(), this._panDelta = new B(), this._dollyStart = new B(), this._dollyEnd = new B(), this._dollyDelta = new B(), this._dollyDirection = new V(), this._mouse = new B(), this._performCursorZoom = !1, this._pointers = [], this._pointerPositions = {}, this._controlActive = !1, this._onPointerMove = Be.bind(this), this._onPointerDown = ze.bind(this), this._onPointerUp = Ve.bind(this), this._onContextMenu = qe.bind(this), this._onMouseWheel = Z.bind(this), this._onKeyDown = We.bind(this), this._onTouchStart = Ge.bind(this), this._onTouchMove = Ke.bind(this), this._onMouseDown = He.bind(this), this._onMouseMove = Ue.bind(this), this._interceptControlDown = Je.bind(this), this._interceptControlUp = Ye.bind(this), this.domElement !== null && this.connect(this.domElement), this.update();
+		}, this.target0 = this.target.clone(), this.position0 = this.object.position.clone(), this.zoom0 = this.object.zoom, this._domElementKeyEvents = null, this._lastPosition = new V(), this._lastQuaternion = new L(), this._lastTargetPosition = new V(), this._quat = new L().setFromUnitVectors(e.up, new V(0, 1, 0)), this._quatInverse = this._quat.clone().invert(), this._spherical = new R(), this._sphericalDelta = new R(), this._scale = 1, this._panOffset = new V(), this._rotateStart = new B(), this._rotateEnd = new B(), this._rotateDelta = new B(), this._panStart = new B(), this._panEnd = new B(), this._panDelta = new B(), this._dollyStart = new B(), this._dollyEnd = new B(), this._dollyDelta = new B(), this._dollyDirection = new V(), this._mouse = new B(), this._performCursorZoom = !1, this._pointers = [], this._pointerPositions = {}, this._controlActive = !1, this._onPointerMove = Ge.bind(this), this._onPointerDown = We.bind(this), this._onPointerUp = Ke.bind(this), this._onContextMenu = Qe.bind(this), this._onMouseWheel = Je.bind(this), this._onKeyDown = Ye.bind(this), this._onTouchStart = Xe.bind(this), this._onTouchMove = Ze.bind(this), this._onMouseDown = Z.bind(this), this._onMouseMove = qe.bind(this), this._interceptControlDown = $e.bind(this), this._interceptControlUp = et.bind(this), this.domElement !== null && this.connect(this.domElement), this.update();
 	}
 	connect(e) {
 		super.connect(e), this.domElement.addEventListener("pointerdown", this._onPointerDown), this.domElement.addEventListener("pointercancel", this._onPointerUp), this.domElement.addEventListener("contextmenu", this._onContextMenu), this.domElement.addEventListener("wheel", this._onMouseWheel, { passive: !1 }), this.domElement.getRootNode().addEventListener("keydown", this._interceptControlDown, {
@@ -86,7 +86,7 @@ var H = { type: "change" }, U = { type: "start" }, W = { type: "end" }, G = new 
 				let r = new V(this._mouse.x, this._mouse.y, 0);
 				r.unproject(this.object), this.object.position.sub(r).add(t), this.object.updateMatrixWorld(), e = q.length();
 			} else console.warn("WARNING: OrbitControls.js encountered an unknown camera type - zoom to cursor disabled."), this.zoomToCursor = !1;
-			e !== null && (this.screenSpacePanning ? this.target.set(0, 0, -1).transformDirection(this.object.matrix).multiplyScalar(e).add(this.object.position) : (G.origin.copy(this.object.position), G.direction.set(0, 0, -1).transformDirection(this.object.matrix), Math.abs(this.object.up.dot(G.direction)) < Le ? this.object.lookAt(this.target) : (K.setFromNormalAndCoplanarPoint(this.object.up, this.target), G.intersectPlane(K, this.target))));
+			e !== null && (this.screenSpacePanning ? this.target.set(0, 0, -1).transformDirection(this.object.matrix).multiplyScalar(e).add(this.object.position) : (G.origin.copy(this.object.position), G.direction.set(0, 0, -1).transformDirection(this.object.matrix), Math.abs(this.object.up.dot(G.direction)) < He ? this.object.lookAt(this.target) : (K.setFromNormalAndCoplanarPoint(this.object.up, this.target), G.intersectPlane(K, this.target))));
 		} else if (this.object.isOrthographicCamera) {
 			let e = this.object.zoom;
 			this.object.zoom = Math.max(this.minZoom, Math.min(this.maxZoom, this.object.zoom / this._scale)), e !== this.object.zoom && (this.object.updateProjectionMatrix(), i = !0);
@@ -270,13 +270,13 @@ var H = { type: "change" }, U = { type: "start" }, W = { type: "end" }, G = new 
 		return e.ctrlKey && !this._controlActive && (n.deltaY *= 10), n;
 	}
 };
-function ze(e) {
+function We(e) {
 	this.enabled !== !1 && (this._pointers.length === 0 && (this.domElement.setPointerCapture(e.pointerId), this.domElement.addEventListener("pointermove", this._onPointerMove), this.domElement.addEventListener("pointerup", this._onPointerUp)), !this._isTrackingPointer(e) && (this._addPointer(e), e.pointerType === "touch" ? this._onTouchStart(e) : this._onMouseDown(e)));
 }
-function Be(e) {
+function Ge(e) {
 	this.enabled !== !1 && (e.pointerType === "touch" ? this._onTouchMove(e) : this._onMouseMove(e));
 }
-function Ve(e) {
+function Ke(e) {
 	switch (this._removePointer(e), this._pointers.length) {
 		case 0:
 			this.domElement.releasePointerCapture(e.pointerId), this.domElement.removeEventListener("pointermove", this._onPointerMove), this.domElement.removeEventListener("pointerup", this._onPointerUp), this.dispatchEvent(W), this.state = Y.NONE;
@@ -291,7 +291,7 @@ function Ve(e) {
 			break;
 	}
 }
-function He(e) {
+function Z(e) {
 	let t;
 	switch (e.button) {
 		case 0:
@@ -332,7 +332,7 @@ function He(e) {
 	}
 	this.state !== Y.NONE && this.dispatchEvent(U);
 }
-function Ue(e) {
+function qe(e) {
 	switch (this.state) {
 		case Y.ROTATE:
 			if (this.enableRotate === !1) return;
@@ -348,13 +348,13 @@ function Ue(e) {
 			break;
 	}
 }
-function Z(e) {
+function Je(e) {
 	this.enabled === !1 || this.enableZoom === !1 || this.state !== Y.NONE || (e.preventDefault(), this.dispatchEvent(U), this._handleMouseWheel(this._customWheelEvent(e)), this.dispatchEvent(W));
 }
-function We(e) {
+function Ye(e) {
 	this.enabled !== !1 && this._handleKeyDown(e);
 }
-function Ge(e) {
+function Xe(e) {
 	switch (this._trackPointer(e), this._pointers.length) {
 		case 1:
 			switch (this.touches.ONE) {
@@ -386,7 +386,7 @@ function Ge(e) {
 	}
 	this.state !== Y.NONE && this.dispatchEvent(U);
 }
-function Ke(e) {
+function Ze(e) {
 	switch (this._trackPointer(e), this.state) {
 		case Y.TOUCH_ROTATE:
 			if (this.enableRotate === !1) return;
@@ -407,16 +407,16 @@ function Ke(e) {
 		default: this.state = Y.NONE;
 	}
 }
-function qe(e) {
+function Qe(e) {
 	this.enabled !== !1 && e.preventDefault();
 }
-function Je(e) {
+function $e(e) {
 	e.key === "Control" && (this._controlActive = !0, this.domElement.getRootNode().addEventListener("keyup", this._interceptControlUp, {
 		passive: !0,
 		capture: !0
 	}));
 }
-function Ye(e) {
+function et(e) {
 	e.key === "Control" && (this._controlActive = !1, this.domElement.getRootNode().removeEventListener("keyup", this._interceptControlUp, {
 		passive: !0,
 		capture: !0
@@ -425,7 +425,7 @@ function Ye(e) {
 //#endregion
 //#region src/host/orbitControlsFactory.ts
 var Q = ({ camera: e, canvas: t, target: n, onChange: r }) => {
-	let i = new Re(e, t);
+	let i = new Ue(e, t);
 	return i.enableDamping = !0, i.minPolarAngle = F.MathUtils.degToRad(82), i.maxPolarAngle = F.MathUtils.degToRad(100), i.target.copy(n), i.addEventListener("change", () => r(i.target)), i.update(), i;
 }, $ = class {
 	engine;
@@ -476,14 +476,9 @@ var Q = ({ camera: e, canvas: t, target: n, onChange: r }) => {
 		};
 	}
 	async prepareCaptureFrame(e = {}) {
-		this.engine.setPresentationMode("capture"), this.engine.setSpringRuntimeMode("unity-prefab"), e.bodyDebugMode !== void 0 && this.engine.setBodyDebugMode(e.bodyDebugMode), e.faceSdfEnabled !== void 0 && this.engine.setFaceSdfEnabled(e.faceSdfEnabled), e.faceSdfDebugMode !== void 0 && this.engine.setFaceSdfDebugMode(e.faceSdfDebugMode), e.faceSdfDebugLightMode !== void 0 && this.engine.setFaceSdfDebugLightMode(e.faceSdfDebugLightMode), e.projectedShadow !== void 0 && this.engine.setProjectedShadowSettings(e.projectedShadow), this.engine.setUtjSpringBoneTraceFilters(e.traceUtjBones ?? [], e.traceUtjMaxEvents), this.engine.setAnimationPaused(!0);
+		this.engine.setPresentationMode("capture"), this.engine.setSpringRuntimeMode(e.springRuntimeMode ?? "unity-prefab"), e.bodyDebugMode !== void 0 && this.engine.setBodyDebugMode(e.bodyDebugMode), e.faceSdfEnabled !== void 0 && this.engine.setFaceSdfEnabled(e.faceSdfEnabled), e.faceSdfDebugMode !== void 0 && this.engine.setFaceSdfDebugMode(e.faceSdfDebugMode), e.faceSdfDebugLightMode !== void 0 && this.engine.setFaceSdfDebugLightMode(e.faceSdfDebugLightMode), e.projectedShadow !== void 0 && this.engine.setProjectedShadowSettings(e.projectedShadow), this.engine.setUtjSpringBoneTraceFilters(e.traceUtjBones ?? [], e.traceUtjMaxEvents), this.engine.setAnimationPaused(!0);
 		let t = F.MathUtils.clamp(Number.isFinite(e.phase) ? e.phase : .5, 0, 1), n = e.clip ?? "motion_loop", r = Math.max(Math.trunc(e.warmupFrames ?? 0), 0), i = Math.max(Math.trunc(e.warmupMs ?? 0), 0), a = e.warmupMode ?? "animation", o = a === "animation", s = (e) => n === "motion" ? this.engine.seekAnimationPhase(e) : this.engine.seekAnimationLoopPhase(e), c = Math.max(s(t).duration, 0), l = o && r > 0 && c > 0 ? F.MathUtils.euclideanModulo(t - r / (60 * c), 1) : t;
-		if (l !== t && s(l), r > 0) {
-			this.engine.setAnimationPaused(!o);
-			for (let e = 0; e < r; e += 1) this.engine.stepRuntimeFrame(1 / 60, { advanceAnimation: o });
-			this.engine.setAnimationPaused(!0);
-		} else i > 0 && (this.engine.setAnimationPaused(a === "runtime"), await new Promise((e) => window.setTimeout(e, i)), this.engine.setAnimationPaused(!0));
-		switch (this.engine.applyCameraPreset(e.cameraPreset ?? "capture", e.cameraProfile), e.characterYawMode) {
+		switch (l !== t && s(l), this.engine.applyCameraPreset(e.cameraPreset ?? "capture", e.cameraProfile), e.characterYawMode) {
 			case "45":
 			case "-45":
 			case "90":
@@ -497,16 +492,21 @@ var Q = ({ camera: e, canvas: t, target: n, onChange: r }) => {
 				break;
 			default: break;
 		}
-		this.engine.stepRuntimeFrame(0, { advanceAnimation: !1 }), this.engine.renderFrame(), this.engine.finishCaptureFrame();
+		if (r > 0) {
+			this.engine.setAnimationPaused(!o);
+			for (let e = 0; e < r; e += 1) this.engine.stepRuntimeFrame(1 / 60, { advanceAnimation: o });
+			this.engine.setAnimationPaused(!0);
+		} else i > 0 ? (this.engine.setAnimationPaused(a === "runtime"), await new Promise((e) => window.setTimeout(e, i)), this.engine.setAnimationPaused(!0)) : this.engine.stepRuntimeFrame(0, { advanceAnimation: !1 });
+		this.engine.renderFrame(), this.engine.finishCaptureFrame();
 	}
-}, Xe = class extends P {
+}, tt = class extends P {
 	captureAdapter = new $(this);
 	constructor(e, t) {
 		let n = e instanceof HTMLElement ? {
 			container: e,
 			initialLight: t,
 			controlsFactory: Q
-		} : Ze(e);
+		} : nt(e);
 		super(n);
 	}
 	captureRoleParts(e) {
@@ -516,7 +516,7 @@ var Q = ({ camera: e, canvas: t, target: n, onChange: r }) => {
 		return this.captureAdapter.prepareCaptureFrame(e);
 	}
 };
-function Ze(e) {
+function nt(e) {
 	let { enableControls: t, ...n } = e;
 	return {
 		...n,
@@ -524,4 +524,4 @@ function Ze(e) {
 	};
 }
 //#endregion
-export { ie as AnimationPlaybackRuntime, Se as CharacterLightingRuntime, te as CharacterProjectedShadowController, w as CustomWardrobeController, x as FaceMotionRuntime, Xe as Haruki3DEngine, P as Haruki3DEngineCore, $ as HarukiCaptureAdapter, e as UnityPrefabSpringRuntime, _e as applyRawMaterialShaderUniforms, a as applyRawMaterialTextureTransform, n as applyUnityCharacterHeight, Oe as bindBodyRuntimeMaterials, _ as bindHeadRuntimeMaterials, u as bodyDebugModeToUniform, fe as buildUnityPrefabSourceGraph, je as configureSekaiBaseStencilClear, be as configureSekaiEyelashPass, Ae as configureSekaiFaceLayerStencilPrepass, le as configureSekaiHairStencil, ee as createCaptureBackgroundTexture, we as createHaruki3DKernel, D as createHaruki3DKernelRuntime, m as createSekaiBodyMaterial, Te as createSekaiFaceMaterial, O as createSekaiLayerMaterial, Ee as createSekaiOutlineMaterial, r as createSekaiThroughHairOverlayMesh, oe as createSmoothedLoopClip, c as createUnityPrefabConstraintRuntime, d as decodeRuntimeMessagePackBrotli, o as decodeUnityMotionClips, N as defaultProjectedShadowSettings, xe as evaluateSekaiBaseShadow, b as evaluateSekaiFaceShadow, f as evaluateSekaiOutlineColor, h as evaluateSekaiOutlineFovFactor, ye as evaluateSekaiSkinColor, C as faceSdfDebugModeToUniform, he as getCostumeShopCameraPose, me as getDefaultCameraPose, l as inferBodyAnimationKind, de as installUnityRuntimeNativeMeshes, j as isSekaiOutlinePassEnabled, A as loadRuntimePackageFromBaseUrl, ne as makeAnimationTrackDebug, pe as makeUnityPrefabHeadFollowDebugSnapshot, se as normalizeHarukiRenderRecipe, ce as prepareRuntimeAnimationClip, De as previewLightDefaults, y as readCharacterHairMaterialController, re as readEmbeddedRuntimeFaceMotion, i as readRawMaterialBoolean, ae as readRawMaterialColor, S as readRawMaterialFloat, t as readRawMaterialTexture, Ce as resolveRuntimePackageUrl, ve as resolveSekaiPreviewPixelRatio, Me as retargetUnityPrefabAnimationClip, p as sekaiCostumeShopControllerDefaults, g as sekaiCostumeShopDirectionalLightDirection, M as sekaiCostumeShopDirectionalLightRotationDegrees, T as sekaiCostumeShopOutlineControllerDefaults, v as sekaiCostumeShopOutlineSettings, E as sekaiCostumeShopRimLightDirection, k as sekaiPreviewPostProcessDefaults, ge as shiftCameraPoseRight, s as syncUnityPrefabSourceGraph, ke as tuneLightingForPreview, ue as updateSekaiEyelashPassView };
+export { oe as AnimationPlaybackRuntime, Te as CharacterLightingRuntime, Ce as CharacterProjectedShadowController, Se as CustomWardrobeController, re as FaceMotionRuntime, tt as Haruki3DEngine, P as Haruki3DEngineCore, $ as HarukiCaptureAdapter, h as UnityPrefabSpringRuntime, Oe as UtjColliderStatus, je as applyRawMaterialShaderUniforms, i as applyRawMaterialTextureTransform, fe as applyUnityCharacterHeight, Fe as bindBodyRuntimeMaterials, _e as bindHeadRuntimeMaterials, d as bodyDebugModeToUniform, c as buildUnityPrefabSourceGraph, j as checkLocalCapsuleCollisionAndReact, we as checkLocalSphereCollisionAndReact, u as configureSekaiBaseStencilClear, Pe as configureSekaiEyelashPass, le as configureSekaiFaceLayerStencilPrepass, r as configureSekaiHairStencil, he as createCaptureBackgroundTexture, De as createHaruki3DKernel, A as createHaruki3DKernelRuntime, C as createSekaiBodyMaterial, be as createSekaiFaceMaterial, N as createSekaiLayerMaterial, ke as createSekaiOutlineMaterial, Ne as createSekaiThroughHairOverlayMesh, o as createSmoothedLoopClip, de as createUnityPrefabConstraintRuntime, _ as decodeRuntimeMessagePackBrotli, l as decodeUnityMotionClips, ee as defaultProjectedShadowSettings, Ee as evaluateSekaiBaseShadow, f as evaluateSekaiFaceShadow, p as evaluateSekaiOutlineColor, g as evaluateSekaiOutlineFovFactor, D as evaluateSekaiSkinColor, E as faceSdfDebugModeToUniform, me as getCostumeShopCameraPose, ge as getDefaultCameraPose, ne as inferBodyAnimationKind, pe as installUnityRuntimeNativeMeshes, xe as isSekaiOutlinePassEnabled, Ae as loadRuntimePackageFromBaseUrl, ce as makeAnimationTrackDebug, s as makeUnityPrefabHeadFollowDebugSnapshot, e as normalizeHarukiRenderRecipe, k as officialColliderFlagPrefixes, Le as prepareRuntimeAnimationClip, x as previewLightDefaults, S as readCharacterHairMaterialController, ie as readEmbeddedRuntimeFaceMotion, ae as readRawMaterialBoolean, T as readRawMaterialColor, t as readRawMaterialFloat, w as readRawMaterialTexture, m as resolveRuntimePackageUrl, ye as resolveSekaiPreviewPixelRatio, n as retargetUnityPrefabAnimationClip, y as sekaiCostumeShopControllerDefaults, ve as sekaiCostumeShopDirectionalLightDirection, Me as sekaiCostumeShopDirectionalLightRotationDegrees, O as sekaiCostumeShopOutlineControllerDefaults, b as sekaiCostumeShopOutlineSettings, Ie as sekaiCostumeShopRimLightDirection, v as sekaiPreviewOutlineCalibration, M as sekaiPreviewPostProcessDefaults, se as shiftCameraPoseRight, te as syncUnityPrefabSourceGraph, ue as tuneLightingForPreview, a as updateSekaiEyelashPassView };

@@ -25,6 +25,19 @@ export declare const sekaiCostumeShopOutlineControllerDefaults: {
     };
     readonly blending: 0.5;
 };
+/**
+ * Presentation calibration for direct high-resolution browser output.
+ *
+ * CostumeShop renders its preview into a smaller intermediate texture before
+ * the UI scales it up. The browser kernel renders directly at the final device
+ * resolution, so applying the captured world-space shell unchanged makes it
+ * visibly thicker and lets too much shaded material color into the outline.
+ * Keep the captured globals above intact and correct only the presentation.
+ */
+export declare const sekaiPreviewOutlineCalibration: {
+    readonly widthScale: 0.5;
+    readonly shadedColorBlend: 0.3;
+};
 export declare function isSekaiOutlinePassEnabled(rawMaterial: RawMaterialProperties | null | undefined): boolean;
 export declare function evaluateSekaiOutlineColor(mainTexture: SekaiRgb, materialOutline: SekaiRgb, globalOutline: SekaiRgb, blending: number): SekaiRgb;
 export declare function applySekaiOutlineController(material: THREE.Material, color: THREE.ColorRepresentation | SekaiRgb | null | undefined, blending: number | null | undefined): void;

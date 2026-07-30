@@ -33,5 +33,6 @@ export declare class CustomWardrobeController {
     private assertSameActiveCharacter;
     private ensureSelectionPackages;
     private findRegistryEntry;
+    private findRegistryEntryForRole;
     private compose;
 }

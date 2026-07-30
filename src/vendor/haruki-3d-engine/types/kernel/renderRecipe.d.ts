@@ -1,5 +1,6 @@
 export type HarukiRenderRecipe = {
     roleId: string;
+    bodyRoleId?: string | null;
     bodyCostume3dId: number;
     headCostume3dId: number;
     headPackagePath?: string | null;
@@ -11,6 +12,7 @@ export type HarukiRuntimeRenderRecipe = HarukiRenderRecipe & {
 };
 export type NormalizedHarukiRenderRecipe = {
     roleId: string;
+    bodyRoleId: string;
     bodyCostume3dId: number;
     headCostume3dId: number;
     headPackagePath: string | null;

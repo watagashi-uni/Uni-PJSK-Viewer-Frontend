@@ -15,6 +15,12 @@ export type RuntimePackageLoadOptions = {
     roleId: string;
 };
 export declare function loadRuntimePackageFromBaseUrl(baseUrl: string, options: RuntimePackageLoadOptions): Promise<RuntimePackageLoadResult>;
+/**
+ * Merge another scoped role's catalog and registry into an existing package set.
+ * Runtime packages remain lazy-loaded by the wardrobe controller. This is used by
+ * experimental cross-role body composition while keeping the active face/head role.
+ */
+export declare function ensureRolePartRegistry(partSet: PartPackageSet, characterId: number, unit: string | null): Promise<void>;
 export declare function resolveRuntimePackageUrl(baseUrl: string, relativePath: string): string;
 export declare function ensureRoleRuntimePackage(partSet: PartPackageSet, characterId: number, unit: string | null): Promise<RoleRuntimePackage | null>;
 export declare function fetchRuntimeMessagePack(url: string): Promise<unknown>;

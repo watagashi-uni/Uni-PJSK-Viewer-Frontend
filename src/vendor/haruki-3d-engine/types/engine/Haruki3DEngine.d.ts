@@ -96,6 +96,11 @@ export type RuntimeOutlineShellDebug = {
     vertexColorRedMax: number | null;
     renderOrder: number;
     sourceRenderOrder: number;
+    hasTangent: boolean;
+    hasUv1: boolean;
+    hasUv2: boolean;
+    useSecondNormal: boolean[];
+    wantsSecondNormal: boolean[];
 };
 export type RuntimeFaceLightDebug = {
     lightDirection: {
