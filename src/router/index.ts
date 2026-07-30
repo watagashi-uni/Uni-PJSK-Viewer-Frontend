@@ -51,6 +51,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '衣装' },
     },
     {
+        path: '/costumes/custom',
+        name: 'CostumeCustom',
+        component: () => import('@/views/CostumeCustomView.vue'),
+        meta: { title: '衣装自由选择器' },
+    },
+    {
         path: '/costumes/card/:cardId',
         name: 'CostumeDetailByCard',
         component: () => import('@/views/CostumeDetailView.vue'),

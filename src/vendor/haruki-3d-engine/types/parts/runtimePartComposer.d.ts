@@ -131,6 +131,9 @@ export type PartPackageSet = {
 export type CustomPartSelection = {
     characterId: number;
     unit: string | null;
+    /** Optional source role for the body. Head, face and hair remain on characterId/unit. */
+    bodyCharacterId?: number;
+    bodyUnit?: string | null;
     bodyCostume3dId: number;
     headCostume3dId: number;
     headPackagePath?: string | null;
@@ -165,3 +168,4 @@ export declare function resolveHeadRegistryEntry(partSet: PartPackageSet, select
 export declare function resolveOptionalHeadRegistryEntry(partSet: PartPackageSet, selection: CustomPartSelection): PartRegistryEntry | null;
 export declare function getDeniedHeadHairCompatibilityKeys(compatibility: HeadHairCompatibility | null): ReadonlySet<string>;
 export declare function headHairCompatibilityKey(unit: string | null | undefined, headCostume3dId: number, hairCostume3dId: number): string;
+export declare function officialColliderFlagPrefixes(flag: number): string[];

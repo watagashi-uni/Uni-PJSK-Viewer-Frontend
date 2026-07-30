@@ -1,4 +1,5 @@
 import type { BodyDebugMode, FaceSdfDebugLightMode, FaceSdfDebugMode, HarukiEngineSnapshots, PjskCameraPreset, PjskCameraProfile, ProjectedShadowSettingsInput } from "../engine/Haruki3DEngine";
+import type { SpringRuntimeMode } from "../config/viewerConfig";
 import type { CustomPartSelection } from "../parts/runtimePartComposer";
 import type { RuntimeCombinedCharacterAsset } from "../runtime/runtimeTypes";
 export type HarukiPrepareCaptureFrameRequest = {
@@ -7,6 +8,7 @@ export type HarukiPrepareCaptureFrameRequest = {
     warmupMs?: number;
     warmupFrames?: number;
     warmupMode?: "animation" | "runtime";
+    springRuntimeMode?: SpringRuntimeMode;
     cameraPreset?: PjskCameraPreset;
     cameraProfile?: PjskCameraProfile;
     characterYawMode?: "0" | "45" | "-45" | "90" | "-90" | "180" | "face-camera";

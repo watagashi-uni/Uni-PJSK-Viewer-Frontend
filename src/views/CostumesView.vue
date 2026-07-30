@@ -11,7 +11,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
-import { Shirt, Search, EyeOff, CreditCard } from 'lucide-vue-next'
+import { Shirt, Search, EyeOff, CreditCard, Dices } from 'lucide-vue-next'
 import Pagination from '@/components/Pagination.vue'
 import CostumeThumb from '@/components/CostumeThumb.vue'
 import { buildCostumeGroups, COSTUME_PART_LABELS } from '@/utils/costume'
@@ -235,11 +235,15 @@ onMounted(() => {
 <template>
   <div class="space-y-6 pb-10">
     <!-- 标题 -->
-    <div class="flex items-center justify-between">
+    <div class="flex flex-wrap items-center justify-between gap-3">
       <h1 class="text-2xl font-bold flex items-center gap-2">
         <Shirt class="w-6 h-6 text-primary" />
         衣装一览
       </h1>
+      <RouterLink to="/costumes/custom" class="btn btn-primary btn-sm gap-2">
+        <Dices class="w-4 h-4" />
+        自由搭配
+      </RouterLink>
     </div>
 
     <!-- 角色选择 -->

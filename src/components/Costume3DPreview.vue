@@ -1,11 +1,4 @@
 <script lang="ts">
-// role catalog（角色默认部件）跨组件实例缓存，避免切换衣装时重复下载
-interface RoleDefaults {
-  bodyCostume3dId: number
-  headCostume3dId: number
-  hairCostume3dId: number
-}
-const roleDefaultsCache = new Map<string, RoleDefaults>()
 // 只插入一次 3d-export 的 preconnect
 let preconnectAdded = false
 </script>
@@ -22,16 +15,20 @@ let preconnectAdded = false
  *
  * recipe 组装规则（与游戏内 CostumeShop 一致）：
  * - body/hair 缺失时用 role catalog 声明的角色默认部件补全；
- * - 专属头（assetbundleName 带 unique_）占 head 槽；
- * - 普通头饰是可拆卸配件，走 headOptional 槽，head 槽用角色默认头。
+ * - 具体槽位以 role registry 的 headCostume3dAssetbundleType 为准；
+ * - registry 标记 missing 的早期部件跳过并回退角色默认值。
  */
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { Box, RotateCcw, Maximize2, Minimize2 } from 'lucide-vue-next'
-import { decode } from '@msgpack/msgpack'
 import type { Haruki3DKernel } from 'haruki-3d-engine'
 import type { Haruki3DEngine as Haruki3DEngineType } from 'haruki-3d-engine/internal'
 import { useMasterStore } from '@/stores/master'
 import { PJSK_3D_ASSETS_BASE_URL, PJSK_3D_BASIS_PATH, isWebGL2Supported } from '@/utils/haruki3d'
+import {
+  findRuntimePart,
+  loadRuntimeRoleData,
+  runtimePartSlot,
+} from '@/utils/haruki3dRegistry'
 import type { CostumePart, CostumeColorVariant } from '@/types/costume'
 
 interface Character {
@@ -39,15 +36,24 @@ interface Character {
   unit: string
 }
 
-interface GameCharacterUnit {
+interface Character3dRole {
   id: number
-  gameCharacterId: number
+  characterId: number
   unit: string
 }
 
 const props = defineProps<{
   characterId: number
-  parts: CostumePart[]
+  parts?: CostumePart[]
+  selection?: {
+    body?: CostumeColorVariant | null
+    head?: CostumeColorVariant | null
+    hair?: CostumeColorVariant | null
+  }
+  bodyRole?: {
+    characterId: number
+    unit: string
+  } | null
 }>()
 
 const masterStore = useMasterStore()
@@ -115,83 +121,75 @@ function endProgress() {
 }
 
 const colorOptions = computed(() => {
-  const primary = props.parts[0]
+  const primary = props.parts?.[0]
   if (!primary) return []
   return primary.variants.map(v => ({ colorId: v.colorId, colorName: v.colorName }))
 })
 
 function pickVariant(partType: string): CostumeColorVariant | null {
-  const part = props.parts.find(p => p.partType === partType)
+  if (props.selection && partType in props.selection) {
+    return props.selection[partType as keyof typeof props.selection] ?? null
+  }
+  const part = props.parts?.find(p => p.partType === partType)
   if (!part) return null
   return part.variants.find(v => v.colorId === selectedColorId.value) || part.variants[0] || null
 }
 
-async function fetchRoleDefaults(characterId: number, unit: string): Promise<RoleDefaults> {
-  const key = `${characterId}:${unit}`
-  const cached = roleDefaultsCache.get(key)
-  if (cached) return cached
-
-  const url = `${PJSK_3D_ASSETS_BASE_URL}parts/by-role/${characterId}/${unit}/runtime-role-catalog.msgpack.br`
-  const res = await fetch(url)
-  if (!res.ok) {
-    throw new Error(`该角色（${key}）暂无 3D 运行时数据 (HTTP ${res.status})`)
-  }
-  const brotli = await (await import('brotli-wasm')).default
-  const raw = brotli.decompress(new Uint8Array(await res.arrayBuffer()))
-  const catalog = decode(raw) as { roles?: RoleDefaults[] }
-  const role = catalog.roles?.[0]
-  if (!role) {
-    throw new Error('role catalog 中没有角色数据')
-  }
-  const defaults: RoleDefaults = {
-    bodyCostume3dId: role.bodyCostume3dId,
-    headCostume3dId: role.headCostume3dId,
-    hairCostume3dId: role.hairCostume3dId,
-  }
-  roleDefaultsCache.set(key, defaults)
-  return defaults
-}
-
 async function buildRecipe() {
-  const defaults = await fetchRoleDefaults(props.characterId, selectedUnit.value)
+  const roleData = await loadRuntimeRoleData(props.characterId, selectedUnit.value)
+  const defaults = roleData.defaults
+  const bodyCharacterId = props.bodyRole?.characterId ?? props.characterId
+  const bodyUnit = props.bodyRole?.unit ?? selectedUnit.value
+  const bodyRoleData = bodyCharacterId === props.characterId && bodyUnit === selectedUnit.value
+    ? roleData
+    : await loadRuntimeRoleData(bodyCharacterId, bodyUnit)
   const body = pickVariant('body')
   const head = pickVariant('head')
   const hair = pickVariant('hair')
 
+  const bodyEntry = body
+    ? findRuntimePart(bodyRoleData, body.costume3dId, ['body'])
+    : undefined
+  const hairEntry = hair
+    ? findRuntimePart(roleData, hair.costume3dId, ['hair'])
+    : undefined
   let headCostume3dId = defaults.headCostume3dId
   let headOptionalCostume3dId: number | null = null
   if (head) {
-    if (head.assetbundleName.includes('unique_')) {
+    const headEntry = findRuntimePart(roleData, head.costume3dId, ['head', 'head_optional'])
+    const slot = headEntry ? runtimePartSlot(headEntry) : null
+    if (slot === 'head') {
       headCostume3dId = head.costume3dId
-    } else {
+    } else if (slot === 'head_optional') {
       headOptionalCostume3dId = head.costume3dId
     }
   }
 
   return {
     roleId: `${props.characterId}:${selectedUnit.value}`,
-    bodyCostume3dId: body ? body.costume3dId : defaults.bodyCostume3dId,
+    bodyRoleId: `${bodyCharacterId}:${bodyUnit}`,
+    bodyCostume3dId: bodyEntry ? body!.costume3dId : bodyRoleData.defaults.bodyCostume3dId,
     headCostume3dId,
-    hairCostume3dId: hair ? hair.costume3dId : defaults.hairCostume3dId,
+    hairCostume3dId: hairEntry ? hair!.costume3dId : defaults.hairCostume3dId,
     headOptionalCostume3dId,
   }
 }
 
 async function loadContextData() {
-  const [charactersData, characterUnitsData] = await Promise.all([
+  const [charactersData, characterRolesData] = await Promise.all([
     masterStore.getMaster<Character>('gameCharacters'),
-    masterStore.getMaster<GameCharacterUnit>('gameCharacterUnits'),
+    masterStore.getMaster<Character3dRole>('character3ds'),
   ])
 
   const units = [...new Set(
-    characterUnitsData
-      .filter(u => u.gameCharacterId === props.characterId)
+    characterRolesData
+      .filter(role => role.characterId === props.characterId)
       .sort((a, b) => a.id - b.id)
-      .map(u => u.unit)
+      .map(role => role.unit)
   )]
   const chara = charactersData.find(c => c.id === props.characterId)
   unitOptions.value = units.length > 0 ? units : (chara ? [chara.unit] : [])
-  if (!selectedUnit.value) {
+  if (!unitOptions.value.includes(selectedUnit.value)) {
     selectedUnit.value = unitOptions.value[0] || ''
   }
 }
@@ -401,6 +399,24 @@ async function start() {
 watch([selectedColorId, selectedUnit], () => {
   if (kernel) applyRecipe()
 })
+
+watch(
+  () => [
+    props.characterId,
+    props.bodyRole?.characterId,
+    props.bodyRole?.unit,
+    props.selection?.body?.costume3dId,
+    props.selection?.head?.costume3dId,
+    props.selection?.hair?.costume3dId,
+  ],
+  async ([characterId], previous) => {
+    if (!kernel) return
+    if (characterId !== previous?.[0]) {
+      await loadContextData()
+    }
+    await applyRecipe()
+  }
+)
 
 onMounted(() => {
   // 提前和 3d-export 建立连接，点开预览时省一次握手
