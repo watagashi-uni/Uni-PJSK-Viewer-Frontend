@@ -86,6 +86,7 @@ let resizeObserver: ResizeObserver | null = null
 let intersectionObserver: IntersectionObserver | null = null
 let viewerInView = true
 let originalFetch: typeof window.fetch | null = null
+let recipeLoadGeneration = 0
 
 const assetsOrigin = new URL(PJSK_3D_ASSETS_BASE_URL).origin
 
@@ -119,6 +120,12 @@ function endProgress() {
     window.fetch = originalFetch
     originalFetch = null
   }
+}
+
+function isSupersededSelectionError(error: unknown): boolean {
+  return error instanceof Error
+    && error.name === 'AbortError'
+    && error.message === 'Custom part selection was superseded by a newer request.'
 }
 
 const colorOptions = computed(() => {
@@ -206,21 +213,34 @@ async function loadContextData() {
 }
 
 async function applyRecipe() {
-  if (!kernel) return
+  const activeKernel = kernel
+  if (!activeKernel) return
+  const generation = ++recipeLoadGeneration
   isBusy.value = true
   errorMsg.value = ''
   beginProgress()
   try {
     const recipe = await buildRecipe()
-    await kernel.load(recipe)
+    if (generation !== recipeLoadGeneration || kernel !== activeKernel) return
+    await activeKernel.load(recipe)
+    if (generation !== recipeLoadGeneration || kernel !== activeKernel) return
     syncPlayState()
   } catch (error) {
+    if (
+      generation !== recipeLoadGeneration
+      || kernel !== activeKernel
+      || isSupersededSelectionError(error)
+    ) {
+      return
+    }
     console.error('3D 预览加载失败:', error)
     errorMsg.value = error instanceof Error ? error.message : String(error)
-    kernel.pause()
+    activeKernel.pause()
   } finally {
-    endProgress()
-    isBusy.value = false
+    if (generation === recipeLoadGeneration && kernel === activeKernel) {
+      endProgress()
+      isBusy.value = false
+    }
   }
 }
 
@@ -442,6 +462,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  recipeLoadGeneration += 1
   document.removeEventListener('visibilitychange', handleVisibilityChange)
   document.removeEventListener('keydown', handleFullscreenKeydown)
   document.body.style.overflow = ''
