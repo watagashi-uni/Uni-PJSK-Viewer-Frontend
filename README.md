@@ -53,10 +53,72 @@ If you want to deploy your own backend, you can refer to [API_README.md](API_REA
 
 ### Dependencies / References
 
-| Project | License |
-|---|---|
-| [Sekai-World/sekai-viewer](https://github.com/Sekai-World/sekai-viewer) | GPL-3.0 |
-| [xfl03/sekai-calculator](https://github.com/xfl03/sekai-calculator) | LGPL-2.1 |
-| [xfl03/33KitFrontend](https://github.com/xfl03/33KitFrontend) | — |
-| [pjsekai/scores](https://gitlab.com/pjsekai/scores) | [MIT](https://gitlab.com/pjsekai/scores/-/blob/main/LICENSE?ref_type=heads) |
-| [NeuraXmy/lunabot](https://github.com/NeuraXmy/lunabot) | [MIT](https://github.com/NeuraXmy/lunabot/blob/master/LICENSE) |
+| Project | Usage | License |
+|---|---|---|
+| [Sekai-World/sekai-viewer](https://github.com/Sekai-World/sekai-viewer) | Project reference | GPL-3.0 |
+| [xfl03/sekai-calculator](https://github.com/xfl03/sekai-calculator) | Event score calculation | LGPL-2.1 |
+| [xfl03/33KitFrontend](https://github.com/xfl03/33KitFrontend) | Project reference | — |
+| [pjsekai/scores](https://gitlab.com/pjsekai/scores) | SUS chart image rendering | [MIT](https://gitlab.com/pjsekai/scores/-/blob/main/LICENSE?ref_type=heads) |
+| [watagashi-uni/Sekai-SUS-Parser](https://github.com/watagashi-uni/Sekai-SUS-Parser) | SUS-to-JSON WebAssembly parser used before chart rendering | [MIT](https://github.com/watagashi-uni/Sekai-SUS-Parser/blob/main/LICENSE) |
+| [Sekai-World/MikuMikuWorld](https://github.com/Sekai-World/MikuMikuWorld) | Basis of the modified JSON-to-SUS exporter | [MIT](https://github.com/Sekai-World/MikuMikuWorld/blob/master/LICENSE) |
+| [Team-Haruki/Haruki-3D-Exporter](https://github.com/Team-Haruki/Haruki-3D-Exporter) | Costume 3D preview runtime asset export; author: storyxy3 | [MIT](https://github.com/Team-Haruki/Haruki-3D-Exporter/blob/main/LICENSE) |
+| [NeuraXmy/lunabot](https://github.com/NeuraXmy/lunabot) | Project reference | [MIT](https://github.com/NeuraXmy/lunabot/blob/master/LICENSE) |
+
+### WebAssembly and generated JavaScript
+
+The repository checks in browser-ready artifacts. `npm run build` does **not**
+compile the C++ converters or the 3D exporter; Vite packages or copies their
+prebuilt output.
+
+#### SUS to JSON and chart images
+
+The SUS parser is the C++17 implementation from
+[Sekai-SUS-Parser](https://github.com/watagashi-uni/Sekai-SUS-Parser). With an
+activated Emscripten SDK, the upstream WebAssembly target is built with:
+
+```bash
+emcmake cmake -S SusToJsonCpp -B build-wasm
+cmake --build build-wasm --target sus_to_json_wasm
+```
+
+The two generated files are committed together:
+
+- `public/wasm/sus-to-json/sus_to_json_wasm.wasm` contains the compiled parser.
+- `public/wasm/sus-to-json/sus_to_json_wasm.js` is Emscripten's ES module
+  loader and JavaScript/WASM glue, not a separate handwritten parser.
+
+`src/vendor/sekai-sus2img/susToJsonWasm.ts` dynamically imports the generated
+loader, uses `locateFile` to resolve its adjacent `.wasm` file under Vite's base
+URL, and wraps the exported `sus_to_json`, `sus_combo_count`, and `sus_free`
+functions. The resulting JSON is then rendered into an image by the vendored
+`sekai-sus2img` renderer, whose core rendering work is derived from
+`pjsekai/scores`.
+
+#### JSON to SUS
+
+JSON-to-SUS conversion is based on a modified exporter extracted from
+[MikuMikuWorld](https://github.com/Sekai-World/MikuMikuWorld) and compiled to
+WebAssembly with Emscripten. The modified exporter source is not publicly
+released; the original MikuMikuWorld project is licensed under MIT.
+
+The checked-in build consists of
+`public/wasm/json-to-sus/json_to_sus_wasm.wasm` and its generated Emscripten
+loader `public/wasm/json-to-sus/json_to_sus_wasm.js`.
+`src/vendor/sekai-sus2img/jsonToSusWasm.ts` loads this pair and provides the
+TypeScript-facing conversion API. `public/sus_json_converter.js` is a separate
+standalone pure-JavaScript converter and is not the Emscripten glue used by the
+current conversion page.
+
+#### Costume 3D preview
+
+Costume preview runtime assets are produced by
+[Haruki-3D-Exporter](https://github.com/Team-Haruki/Haruki-3D-Exporter), authored
+by storyxy3 and released under MIT. The exporter converts Unity AssetBundles
+offline into browser-oriented, Brotli-compressed MessagePack runtime packages.
+The browser loads those packages through the prebuilt Haruki 3D Engine files in
+`src/vendor/haruki-3d-engine/`; its generated worker chunks and Brotli WASM live
+in the adjacent `assets/` directory.
+
+Files under `public/wasm/` and generated bundles under
+`src/vendor/haruki-3d-engine/` should be updated from their respective build
+outputs rather than edited by hand.

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { 
-  Music, Code, Wrench, ExternalLink, Github, Heart, Languages, ShieldCheck
+  Music, Code, Wrench, ExternalLink, Github, Heart, Languages
 } from 'lucide-vue-next'
 </script>
 
@@ -17,37 +17,6 @@ import {
     <!-- <AlertBanner type="warning">
       <strong class="flex items-center gap-1"><AlertTriangle class="w-4 h-4" /> 内测中！</strong> 该网站还在内部测试中，出现问题请及时反馈
     </AlertBanner> -->
-
-    <!-- 数据与隐私 -->
-    <div class="card bg-base-100 shadow-lg mb-6 animate-fade-in-up animation-delay-50">
-      <div class="card-body">
-        <h3 class="card-title text-lg flex items-center gap-2">
-          <ShieldCheck class="w-5 h-5 text-primary" /> 账号数据与隐私说明
-        </h3>
-        <div class="mt-3 space-y-3 text-base-content/75 leading-relaxed">
-          <p>
-            <strong style="font-weight: bold; font-size: 1.2rem;">账号数据只在浏览器里，不会存到本站服务器。所有的账号数据展示都是浏览器本地计算</strong>
-          </p>
-          <p>
-            <strong>你看到的你的账号数据，主要来自两处：</strong><br />
-            1) 游戏公开查询（当前等级，名字，卡组，角色等级等）。<br />
-            2) Haruki 工具箱数据（你抓包上传的个人数据，比如持卡、编队、挑战信息、MySekai家具、打歌成绩等）。<br />
-            网站只是把这些数据拉到你的浏览器里显示。
-          </p>
-          <p>
-            <strong>会保存在浏览器本地的内容：</strong><br />
-            账号 ID、你查过的数据缓存、页面设置（主题/剧透开关等），还有一些加速用缓存。
-          </p>
-          <p>
-            <strong>不会上传到本站服务器的内容：</strong><br />
-            账号相关的所有数据、你在页面里的筛选、查看过程、以及本地计算结果，均不会上传到本站服务器。
-          </p>
-          <p class="text-sm text-base-content/60">
-            换设备、换浏览器，或者清除缓存后，本地数据不会自动跟着走。你可以在用户页面导出数据自行备份。
-          </p>
-        </div>
-      </div>
-    </div>
 
     <!-- 开发者信息 -->
     <div class="card bg-base-100 shadow-lg mb-6 animate-fade-in-up animation-delay-100">
@@ -243,6 +212,118 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.</pre>
+            </div>
+          </div>
+          <!-- Sekai SUS Parser -->
+          <div class="collapse collapse-arrow bg-base-200">
+            <input type="checkbox" />
+            <div class="collapse-title font-medium">
+              Sekai SUS Parser（SUS 转 JSON WebAssembly）
+            </div>
+            <div class="collapse-content space-y-2">
+              <p class="text-sm text-base-content/70">
+                谱面转图片前使用其 C++17 解析器将 SUS 转为 JSON，再交给前端渲染器绘制。
+                上游通过 Emscripten 构建，产出成对的
+                <code class="text-xs">sus_to_json_wasm.js</code> 加载胶水与
+                <code class="text-xs">sus_to_json_wasm.wasm</code> 二进制；本站的
+                TypeScript 包装层负责动态加载并调用导出函数。
+              </p>
+              <p class="text-sm text-base-content/70">
+                <a
+                  href="https://github.com/watagashi-uni/Sekai-SUS-Parser"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="link link-primary inline-flex items-center gap-1"
+                >
+                  GitHub 项目地址
+                  <ExternalLink class="w-3 h-3" />
+                </a>
+                ·
+                <a
+                  href="https://github.com/watagashi-uni/Sekai-SUS-Parser/blob/main/LICENSE"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="link link-primary inline-flex items-center gap-1"
+                >
+                  MIT License
+                  <ExternalLink class="w-3 h-3" />
+                </a>
+              </p>
+            </div>
+          </div>
+          <!-- MikuMikuWorld -->
+          <div class="collapse collapse-arrow bg-base-200">
+            <input type="checkbox" />
+            <div class="collapse-title font-medium">
+              MikuMikuWorld（JSON 转 SUS）
+            </div>
+            <div class="collapse-content space-y-2">
+              <p class="text-sm text-base-content/70">
+                JSON 转 SUS 功能基于修改后的 MikuMikuWorld 导出器：从导出器中提取转换部分，
+                再通过 Emscripten 构建为
+                <code class="text-xs">json_to_sus_wasm.js</code> 加载胶水与
+                <code class="text-xs">json_to_sus_wasm.wasm</code> 二进制。
+                修改后的导出器源码未公开；原项目采用 MIT 协议。
+              </p>
+              <p class="text-sm text-base-content/70">
+                <a
+                  href="https://github.com/Sekai-World/MikuMikuWorld"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="link link-primary inline-flex items-center gap-1"
+                >
+                  GitHub 原项目
+                  <ExternalLink class="w-3 h-3" />
+                </a>
+                ·
+                <a
+                  href="https://github.com/Sekai-World/MikuMikuWorld/blob/master/LICENSE"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="link link-primary inline-flex items-center gap-1"
+                >
+                  MIT License
+                  <ExternalLink class="w-3 h-3" />
+                </a>
+              </p>
+            </div>
+          </div>
+          <!-- Haruki 3D Exporter -->
+          <div class="collapse collapse-arrow bg-base-200">
+            <input type="checkbox" />
+            <div class="collapse-title font-medium">
+              Haruki 3D Exporter（衣装 3D 预览）
+            </div>
+            <div class="collapse-content space-y-2">
+              <p class="text-sm text-base-content/70">
+                衣装 3D 预览所用运行时资源由该项目离线导出。它将 Unity AssetBundle
+                转换为适合浏览器加载的 Brotli 压缩 MessagePack 运行时包，再由本站内置的
+                Haruki 3D Engine 构建文件加载与渲染。
+              </p>
+              <p class="text-sm text-base-content/70">
+                作者：<strong>storyxy3</strong> · MIT License
+              </p>
+              <p class="text-sm text-base-content/70">
+                <a
+                  href="https://github.com/Team-Haruki/Haruki-3D-Exporter"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="link link-primary inline-flex items-center gap-1"
+                >
+                  GitHub 项目地址
+                  <ExternalLink class="w-3 h-3" />
+                </a>
+                ·
+                <a
+                  href="https://github.com/Team-Haruki/Haruki-3D-Exporter/blob/main/LICENSE"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="link link-primary inline-flex items-center gap-1"
+                >
+                  MIT License
+                  <ExternalLink class="w-3 h-3" />
+                </a>
+              </p>
             </div>
           </div>
           <!-- sekai-calculator -->
