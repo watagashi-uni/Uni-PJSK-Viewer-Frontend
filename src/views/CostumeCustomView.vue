@@ -753,7 +753,7 @@ onBeforeUnmount(() => {
           <div class="card-body p-4 sm:p-6">
             <h2 class="font-bold mb-1">3. 预览自由搭配</h2>
             <p class="text-xs text-base-content/50 mb-3">
-              不可用或源文件缺失的部件会自动回退到角色默认部件。
+              不可用或源文件缺失的已选部件会显示“暂无”，不会替换为默认部件。
             </p>
             <Costume3DPreview
               :character-id="selectedCharacterId"
