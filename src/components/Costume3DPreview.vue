@@ -14,9 +14,10 @@ let preconnectAdded = false
  * controlsFactory 注入 three 的 OrbitControls 实现（公开 kernel 不暴露相机）。
  *
  * recipe 组装规则（与游戏内 CostumeShop 一致）：
- * - body/hair 缺失时用 role catalog 声明的角色默认部件补全；
+ * - 未选择的槽位用 role catalog 声明的角色默认部件补全；
+ * - 已选择但 registry 中不可用的部件直接提示暂无，不静默回退；
  * - 具体槽位以 role registry 的 headCostume3dAssetbundleType 为准；
- * - registry 标记 missing 的早期部件跳过并回退角色默认值。
+ * - registry 标记 missing 的早期部件同样视为不可用。
  */
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { Box, RotateCcw, Maximize2, Minimize2 } from 'lucide-vue-next'
@@ -153,11 +154,21 @@ async function buildRecipe() {
   const hairEntry = hair
     ? findRuntimePart(roleData, hair.costume3dId, ['hair'])
     : undefined
+  if (body && !bodyEntry) {
+    throw new Error('所选衣服暂无 3D 模型')
+  }
+  if (hair && !hairEntry) {
+    throw new Error('所选发型暂无 3D 模型')
+  }
+
   let headCostume3dId = defaults.headCostume3dId
   let headOptionalCostume3dId: number | null = null
   if (head) {
     const headEntry = findRuntimePart(roleData, head.costume3dId, ['head', 'head_optional'])
-    const slot = headEntry ? runtimePartSlot(headEntry) : null
+    if (!headEntry) {
+      throw new Error('所选发饰暂无 3D 模型')
+    }
+    const slot = runtimePartSlot(headEntry)
     if (slot === 'head') {
       headCostume3dId = head.costume3dId
     } else if (slot === 'head_optional') {
@@ -168,9 +179,9 @@ async function buildRecipe() {
   return {
     roleId: `${props.characterId}:${selectedUnit.value}`,
     bodyRoleId: `${bodyCharacterId}:${bodyUnit}`,
-    bodyCostume3dId: bodyEntry ? body!.costume3dId : bodyRoleData.defaults.bodyCostume3dId,
+    bodyCostume3dId: body?.costume3dId ?? bodyRoleData.defaults.bodyCostume3dId,
     headCostume3dId,
-    hairCostume3dId: hairEntry ? hair!.costume3dId : defaults.hairCostume3dId,
+    hairCostume3dId: hair?.costume3dId ?? defaults.hairCostume3dId,
     headOptionalCostume3dId,
   }
 }
