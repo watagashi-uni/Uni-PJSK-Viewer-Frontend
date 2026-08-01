@@ -1,28 +1,8 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import tailwindcss from '@tailwindcss/vite'
-import { createHash } from 'node:crypto'
-import { readFile } from 'node:fs/promises'
 import { resolve } from 'path'
 import { VitePWA } from 'vite-plugin-pwa'
-
-const buildOutputDirectory = resolve(__dirname, 'dist')
-
-async function addPrecacheIntegrity(
-  manifestEntries: Array<{ integrity?: string; revision: string | null; size: number; url: string }>,
-) {
-  const manifest = await Promise.all(manifestEntries.map(async (entry) => {
-    const urlPath = decodeURIComponent(entry.url.split(/[?#]/, 1)[0] || '')
-    const filePath = resolve(buildOutputDirectory, urlPath)
-    const content = await readFile(filePath)
-    const integrity = `sha384-${createHash('sha384').update(content).digest('base64')}`
-
-    return { ...entry, integrity }
-  }))
-
-  return { manifest, warnings: [] }
-}
-
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -34,8 +14,8 @@ export default defineConfig({
       injectRegister: 'auto',
       workbox: {
         importScripts: ['push-sw.js'],
-        // HTML 与全部本地可执行资源按构建版本共同预缓存，确保离线可用且不会跨版本混用。
-        globPatterns: ['**/*.{js,css,wasm,html,ico,svg,webmanifest}'],
+        // 只预缓存入口与 PWA 元数据；页面 chunk 继续按实际访问情况写入运行时缓存。
+        globPatterns: ['**/*.{html,ico,svg,webmanifest}'],
         // 2. 排除隐藏页面和特定文件的预缓存
         globIgnores: [
           '**/node_modules/**/*',
@@ -44,11 +24,42 @@ export default defineConfig({
         ],
         // 允许缓存较大的资源文件 (如 masterdata 和 mp3)
         maximumFileSizeToCacheInBytes: 10 * 1024 * 1024,
-        // EdgeOne 的 SPA fallback 会为缺失静态资源返回 200 HTML。为预缓存加入 SRI，
-        // 一旦部署节点返回了错误内容，新 SW 将安装失败并继续保留完整的旧版本。
-        manifestTransforms: [addPrecacheIntegrity],
         // 运行时缓存策略
         runtimeCaching: [
+          {
+            // 本地应用代码按需缓存。EdgeOne 可能为缺失资源返回 200 HTML，必须同时校验
+            // 状态码和 MIME；错误响应仍会触发页面恢复逻辑，但绝不会写入 SW 缓存。
+            urlPattern: /\.(?:js|css|wasm)$/i,
+            handler: 'StaleWhileRevalidate',
+            options: {
+              cacheName: 'assets-runtime-cache',
+              expiration: {
+                maxEntries: 200,
+                maxAgeSeconds: 60 * 60 * 24 * 30,
+              },
+              plugins: [
+                {
+                  cacheWillUpdate: async ({ request, response }) => {
+                    if (response.status !== 200) return null
+
+                    const pathname = new URL(request.url).pathname.toLowerCase()
+                    const contentType = response.headers.get('content-type')?.toLowerCase() ?? ''
+
+                    if (pathname.endsWith('.css')) {
+                      return contentType.includes('text/css') ? response : null
+                    }
+                    if (pathname.endsWith('.wasm')) {
+                      return contentType.includes('application/wasm') ? response : null
+                    }
+                    if (pathname.endsWith('.js')) {
+                      return /(?:java|ecma)script/.test(contentType) ? response : null
+                    }
+                    return null
+                  },
+                },
+              ],
+            },
+          },
           {
             // 3D role catalog：引擎契约要求保持新鲜（携带 masterVersion），网络优先、离线回退缓存
             urlPattern: /^https:\/\/3d-export\.unipjsk\.com\/.*runtime-role-catalog\.msgpack\.br/i,
