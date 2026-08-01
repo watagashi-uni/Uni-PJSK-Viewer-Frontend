@@ -32,13 +32,31 @@ export default defineConfig({
             urlPattern: /\.(?:js|css|wasm)$/i,
             handler: 'StaleWhileRevalidate',
             options: {
-              cacheName: 'assets-runtime-cache',
+              // 使用新缓存名，避免继续读取旧版本可能已经污染的条目。
+              cacheName: 'assets-runtime-cache-v2',
               expiration: {
                 maxEntries: 200,
                 maxAgeSeconds: 60 * 60 * 24 * 30,
               },
               plugins: [
                 {
+                  cachedResponseWillBeUsed: async ({ request, cachedResponse }) => {
+                    if (!cachedResponse || cachedResponse.status !== 200) return null
+
+                    const pathname = new URL(request.url).pathname.toLowerCase()
+                    const contentType = cachedResponse.headers.get('content-type')?.toLowerCase() ?? ''
+
+                    if (pathname.endsWith('.css')) {
+                      return contentType.includes('text/css') ? cachedResponse : null
+                    }
+                    if (pathname.endsWith('.wasm')) {
+                      return contentType.includes('application/wasm') ? cachedResponse : null
+                    }
+                    if (pathname.endsWith('.js')) {
+                      return /(?:java|ecma)script/.test(contentType) ? cachedResponse : null
+                    }
+                    return null
+                  },
                   cacheWillUpdate: async ({ request, response }) => {
                     if (response.status !== 200) return null
 

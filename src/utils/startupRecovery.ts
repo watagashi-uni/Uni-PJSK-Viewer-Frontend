@@ -58,7 +58,10 @@ function renderStartupFailure(message: string) {
   retry.type = 'button'
   retry.textContent = '重新加载'
   retry.style.cssText = 'border:0;border-radius:.75rem;padding:.75rem 1.25rem;background:#ff85a1;color:white;font-weight:700;cursor:pointer'
-  retry.addEventListener('click', () => window.location.reload())
+  retry.addEventListener('click', () => {
+    clearRecoveryAttempt()
+    window.location.reload()
+  })
 
   panel.append(title, description, retry)
   app.replaceChildren(panel)
