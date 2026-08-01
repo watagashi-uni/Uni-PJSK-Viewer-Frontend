@@ -17,10 +17,74 @@
 
 <body>
   <div id="app"></div>
+  <script>
+    (() => {
+      const app = document.getElementById('app')
+      const recoveryAttemptKey = 'pwa_asset_recovery_attempted'
+      let rendered = false
+
+      const renderFallback = (message = '应用资源没有成功加载，请检查网络后重新加载。') => {
+        if (rendered || !app || app.childElementCount > 0) return
+        rendered = true
+
+        const panel = document.createElement('main')
+        panel.style.cssText = 'max-width:36rem;margin:12vh auto;padding:2rem;font-family:system-ui,sans-serif;text-align:center;color:#593d48'
+        const title = document.createElement('h1')
+        title.textContent = '页面暂时无法启动'
+        title.style.cssText = 'font-size:1.5rem;margin:0 0 1rem'
+        const description = document.createElement('p')
+        description.textContent = message
+        description.style.cssText = 'line-height:1.7;margin:0 0 1.5rem'
+        const retry = document.createElement('button')
+        retry.type = 'button'
+        retry.textContent = '重新加载'
+        retry.style.cssText = 'border:0;border-radius:.75rem;padding:.75rem 1.25rem;background:#ff85a1;color:white;font-weight:700;cursor:pointer'
+        retry.addEventListener('click', () => window.location.reload())
+        panel.append(title, description, retry)
+        app.replaceChildren(panel)
+      }
+
+      const recoverFromEntryFailure = () => {
+        if (!navigator.onLine) {
+          renderFallback('当前处于离线状态，并且应用入口尚未缓存。请联网后重新加载。')
+          return
+        }
+
+        try {
+          if (sessionStorage.getItem(recoveryAttemptKey) !== '1') {
+            sessionStorage.setItem(recoveryAttemptKey, '1')
+            renderFallback('应用资源没有成功加载，正在重新获取最新版本……')
+            window.setTimeout(() => window.location.reload(), 1_500)
+            return
+          }
+        } catch {
+          // Storage may be unavailable; show a manual recovery action instead.
+        }
+
+        renderFallback()
+      }
+
+      const timeout = window.setTimeout(renderFallback, 15_000)
+      window.__markPwaAppStarted = () => window.clearTimeout(timeout)
+      window.addEventListener('error', (event) => {
+        const target = event.target
+        if (target instanceof HTMLScriptElement && target.type === 'module') {
+          recoverFromEntryFailure()
+        } else if (target instanceof HTMLLinkElement && ['stylesheet', 'modulepreload'].includes(target.rel)) {
+          renderFallback()
+        }
+      }, true)
+    })()
+  </script>
   <script type="module">
     import { isQQInAppBrowser, renderUnsupportedBrowserNotice } from '/src/utils/browserSupport'
+    import '/src/pwa'
+    import { installStartupRecovery } from '/src/utils/startupRecovery'
+
+    installStartupRecovery()
 
     if (isQQInAppBrowser(navigator.userAgent)) {
+      window.__markPwaAppStarted?.()
       renderUnsupportedBrowserNotice()
     } else {
       import('/src/main.ts')

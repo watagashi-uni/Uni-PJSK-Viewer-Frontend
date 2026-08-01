@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { useMasterStore } from '@/stores/master'
 import { useAccountStore } from '@/stores/account'
-import { ref, onMounted } from 'vue'
+import { applyPwaUpdate, subscribeToPwaState } from '@/pwa'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { Download, RefreshCw, X, CheckCircle2 } from 'lucide-vue-next'
 
 const masterStore = useMasterStore()
@@ -9,31 +10,18 @@ const accountStore = useAccountStore()
 
 // PWA 更新状态
 const needRefresh = ref(false)
-const updateServiceWorker = ref<(() => void) | null>(null)
+let unsubscribePwaState: (() => void) | undefined
 
 // 监听 PWA 更新事件
-onMounted(async () => {
-  // 动态导入 PWA 注册模块
-  const { useRegisterSW } = await import('virtual:pwa-register/vue')
-  
-  const { needRefresh: nr, updateServiceWorker: usw } = useRegisterSW({
-    onNeedRefresh() {
-      needRefresh.value = true
-    },
-    onOfflineReady() {
-      console.log('PWA: App ready for offline use')
-    },
+onMounted(() => {
+  unsubscribePwaState = subscribeToPwaState((state) => {
+    needRefresh.value = state.needRefresh
   })
-  
-  // 同步响应式状态
-  needRefresh.value = nr.value
-  updateServiceWorker.value = usw
 })
+onUnmounted(() => unsubscribePwaState?.())
 
 function handleUpdate() {
-  if (updateServiceWorker.value) {
-    updateServiceWorker.value()
-  }
+  void applyPwaUpdate()
 }
 
 function dismissUpdate() {

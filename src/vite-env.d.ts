@@ -17,6 +17,24 @@ interface ImportMeta {
     readonly env: ImportMetaEnv
 }
 
+interface Window {
+    __markPwaAppStarted?: () => void
+}
+
+interface VitePreloadErrorEvent extends Event {
+    payload: unknown
+}
+
+interface WindowEventMap {
+    'vite:preloadError': VitePreloadErrorEvent
+}
+
+declare module 'virtual:pwa-register' {
+    import type { RegisterSWOptions } from 'vite-plugin-pwa/types'
+
+    export function registerSW(options?: RegisterSWOptions): (reloadPage?: boolean) => Promise<void>
+}
+
 declare module 'virtual:pwa-register/vue' {
     import type { Ref } from 'vue'
 
