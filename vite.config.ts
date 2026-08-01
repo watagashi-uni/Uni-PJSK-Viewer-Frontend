@@ -1,8 +1,27 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import tailwindcss from '@tailwindcss/vite'
+import { createHash } from 'node:crypto'
+import { readFile } from 'node:fs/promises'
 import { resolve } from 'path'
 import { VitePWA } from 'vite-plugin-pwa'
+
+const buildOutputDirectory = resolve(__dirname, 'dist')
+
+async function addPrecacheIntegrity(
+  manifestEntries: Array<{ integrity?: string; revision: string | null; size: number; url: string }>,
+) {
+  const manifest = await Promise.all(manifestEntries.map(async (entry) => {
+    const urlPath = decodeURIComponent(entry.url.split(/[?#]/, 1)[0] || '')
+    const filePath = resolve(buildOutputDirectory, urlPath)
+    const content = await readFile(filePath)
+    const integrity = `sha384-${createHash('sha384').update(content).digest('base64')}`
+
+    return { ...entry, integrity }
+  }))
+
+  return { manifest, warnings: [] }
+}
 
 
 // https://vite.dev/config/
@@ -15,8 +34,8 @@ export default defineConfig({
       injectRegister: 'auto',
       workbox: {
         importScripts: ['push-sw.js'],
-        // 1. 取消 js/css 预缓存，只预留入口 HTML 和必要图标。其余资源按需下载
-        globPatterns: ['**/*.{html,ico,svg,webmanifest}'],
+        // HTML 与全部本地可执行资源按构建版本共同预缓存，确保离线可用且不会跨版本混用。
+        globPatterns: ['**/*.{js,css,wasm,html,ico,svg,webmanifest}'],
         // 2. 排除隐藏页面和特定文件的预缓存
         globIgnores: [
           '**/node_modules/**/*',
@@ -25,24 +44,11 @@ export default defineConfig({
         ],
         // 允许缓存较大的资源文件 (如 masterdata 和 mp3)
         maximumFileSizeToCacheInBytes: 10 * 1024 * 1024,
+        // EdgeOne 的 SPA fallback 会为缺失静态资源返回 200 HTML。为预缓存加入 SRI，
+        // 一旦部署节点返回了错误内容，新 SW 将安装失败并继续保留完整的旧版本。
+        manifestTransforms: [addPrecacheIntegrity],
         // 运行时缓存策略
         runtimeCaching: [
-          {
-            // JS / CSS / WASM 按需缓存：用户访问到哪个页面加载的 chunk 就缓存那个，只缓存当前需要的
-            // （wasm 含 3D 预览用的 brotli 解压器与 basis 转码器）
-            urlPattern: /\.(?:js|css|wasm)$/i,
-            handler: 'StaleWhileRevalidate',
-            options: {
-              cacheName: 'assets-runtime-cache',
-              expiration: {
-                maxEntries: 200,
-                maxAgeSeconds: 60 * 60 * 24 * 30, // 30 天
-              },
-              cacheableResponse: {
-                statuses: [0, 200],
-              },
-            },
-          },
           {
             // 3D role catalog：引擎契约要求保持新鲜（携带 masterVersion），网络优先、离线回退缓存
             urlPattern: /^https:\/\/3d-export\.unipjsk\.com\/.*runtime-role-catalog\.msgpack\.br/i,
@@ -150,7 +156,14 @@ export default defineConfig({
         // 清理旧版本缓存
         cleanupOutdatedCaches: true,
         // 排除对 /img/ 和 /api/ 等路径的 fallback 拦截
-        navigateFallbackDenylist: [/^\/img\//, /^\/api\//, /^\/cursors\//],
+        navigateFallbackDenylist: [
+          /^\/assets\//,
+          /^\/img\//,
+          /^\/api\//,
+          /^\/cursors\//,
+          /^\/(?:sw|push-sw)\.js$/,
+          /^\/workbox-[^/]+\.js$/,
+        ],
       },
       manifest: {
         name: 'Uni PJSK Viewer',
