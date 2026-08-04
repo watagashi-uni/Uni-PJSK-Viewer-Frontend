@@ -154,7 +154,7 @@ const diagnosticSummaryText = computed(() => {
     return ''
   }
   if (!diagnostics.value.length) {
-    return '未发现会导致游戏 SUS 导入合并、导出清理、预览崩溃或渲染 bug 的冲突。'
+    return '未发现会让音符在游戏读取后消失、发生覆盖，或导致预览异常的问题。'
   }
 
   const crashCount = diagnostics.value.filter((item) => item.severity === 'crash').length
@@ -162,11 +162,11 @@ const diagnosticSummaryText = computed(() => {
   const dedupCount = diagnostics.value.filter((item) => item.severity === 'dedup').length
   const parts = [
     crashCount ? `${crashCount} 处会导致本家预览崩溃` : '',
-    renderBugCount ? `${renderBugCount} 处会导致渲染 bug` : '',
-    dedupCount ? `${dedupCount} 处会被游戏 SUS 导入合并或导出清理` : '',
+    renderBugCount ? `${renderBugCount} 处可能导致显示异常` : '',
+    dedupCount ? `${dedupCount} 处会在游戏读取或生成谱面时发生变化` : '',
   ].filter(Boolean)
 
-  return `共发现 ${diagnostics.value.length} 处冲突，其中 ${parts.join('，另有 ')}。`
+  return `共发现 ${diagnostics.value.length} 处问题，其中 ${parts.join('，另有 ')}。`
 })
 
 const crashDiagnosticCount = computed(
@@ -394,7 +394,7 @@ async function handleConvertFormat() {
         includeNoteSpeed: form.value.convertIncludeNoteSpeed,
       })
       conversionOutput.value = { kind: 'sus', text: susText }
-      conversionMessage.value = 'JSON 转 SUS 完成。建议切换到「SUS 转图片」模式，对转换结果跑一次 note 重叠检查。'
+      conversionMessage.value = 'JSON 转 SUS 完成。建议切换到「SUS 转图片」模式，对转换结果做一次 SUS 兼容性检查。'
     } else {
       const jsonText = await convertSusToCustomScoreJson(chartText)
       conversionOutput.value = { kind: 'json', text: jsonText }
@@ -456,7 +456,7 @@ async function runAudit(chartText: string) {
     diagnostics.value = []
     hasAuditRun.value = true
     selectedConflictId.value = null
-    auditError.value = auditReason instanceof Error ? auditReason.message : 'note重叠检查失败'
+    auditError.value = auditReason instanceof Error ? auditReason.message : 'SUS 兼容性检查失败'
   } finally {
     isAnalyzing.value = false
   }
@@ -484,7 +484,7 @@ async function handleAnalyze() {
     diagnostics.value = []
     hasAuditRun.value = false
     selectedConflictId.value = null
-    auditError.value = auditReason instanceof Error ? auditReason.message : 'note重叠检查失败'
+    auditError.value = auditReason instanceof Error ? auditReason.message : 'SUS 兼容性检查失败'
   }
 }
 
@@ -864,7 +864,7 @@ function clearForm() {
               @change="handleFileChange"
             />
             <div v-if="!isJsonInput" class="alert alert-info mt-3 py-3 text-sm">
-              <span>SUS 读取已完全还原游戏逻辑，会自动去重和一些其他重叠处理操作</span>
+              <span>审核会模拟游戏读取和生成谱面的过程，并检查音符覆盖、长条连接、差速及已知预览异常</span>
             </div>
           </div>
 
@@ -887,7 +887,7 @@ function clearForm() {
                 </ul>
                 <p>
                   转换过程<b>不会报错</b>——问题只会在游戏或编辑器读取转换结果时显现：note 变种、丢失、被合并。
-                  建议转换完成后，切到「SUS 转图片」模式对结果跑一次「note 重叠检查」确认。
+                  建议转换完成后，切到「SUS 转图片」模式对结果运行一次「SUS 兼容性检查」。
                 </p>
                 <p><b>遇到重叠的时候，请使用 1920 分把重叠的 note 错开即可。</b></p>
               </div>
@@ -1102,7 +1102,7 @@ function clearForm() {
             <button v-if="!isJsonInput" type="button" class="btn btn-outline" :disabled="isAnalyzing || isSubmitting" @click="handleAnalyze">
               <span v-if="isAnalyzing" class="loading loading-spinner"></span>
               <Search v-else class="w-4 h-4" />
-              {{ isAnalyzing ? 'note重叠检查中...' : 'note重叠检查' }}
+              {{ isAnalyzing ? 'SUS 兼容性检查中...' : '检查 SUS 兼容性' }}
             </button>
             <button
               v-if="isConvertMode"
@@ -1186,7 +1186,7 @@ function clearForm() {
         <div class="card-body gap-4">
           <div class="flex items-start justify-between gap-3">
             <div>
-              <h2 class="card-title text-lg">note重叠检查结果</h2>
+              <h2 class="card-title text-lg">SUS 兼容性检查结果</h2>
               <p class="text-sm text-base-content/60 mt-1">{{ diagnosticSummaryText }}</p>
             </div>
             <span v-if="diagnostics.length" class="badge badge-primary badge-outline">{{ diagnostics.length }}</span>
@@ -1197,11 +1197,11 @@ function clearForm() {
           </div>
 
           <div v-if="renderBugDiagnosticCount" class="alert alert-warning">
-            <span>发现 {{ renderBugDiagnosticCount }} 处会导致本家预览渲染 bug 的 guide 重合。</span>
+            <span>发现 {{ renderBugDiagnosticCount }} 处可能导致本家预览显示异常的写法。</span>
           </div>
 
           <div v-else-if="dedupDiagnosticCount && !crashDiagnosticCount" class="alert alert-warning">
-            <span>发现 {{ dedupDiagnosticCount }} 处会被游戏 SUS 导入合并或导出清理的冲突。</span>
+            <span>发现 {{ dedupDiagnosticCount }} 处音符会在游戏读取或生成谱面时消失、被覆盖或改变。</span>
           </div>
 
           <div v-if="auditError" class="alert alert-error">
@@ -1209,7 +1209,7 @@ function clearForm() {
           </div>
 
           <div v-else-if="hasAuditRun && !diagnostics.length" class="alert alert-success">
-            <span>当前谱面没有发现会导致游戏 SUS 导入合并、导出清理、预览崩溃或渲染 bug 的冲突。</span>
+            <span>当前谱面没有发现会让音符消失、发生覆盖，或导致预览异常的问题。</span>
           </div>
 
           <div v-else class="space-y-3 max-h-[70vh] overflow-auto pr-1">
@@ -1241,7 +1241,10 @@ function clearForm() {
                       class="badge badge-sm shrink-0"
                       :class="item.severity === 'crash' ? 'badge-error' : 'badge-warning badge-outline'"
                     >
-                      {{ item.severity === 'crash' ? '会崩溃' : item.severity === 'render_bug' ? '渲染 bug' : '会被处理' }}
+                      {{ item.severity === 'crash' ? '可能崩溃' : item.severity === 'render_bug' ? '显示异常' : '内容会改变' }}
+                    </span>
+                    <span class="badge badge-sm badge-ghost shrink-0">
+                      {{ item.stage === 'import' ? '读取时' : item.stage === 'maker' ? '生成谱面时' : '预览时' }}
                     </span>
                   </div>
                   <div class="text-xs text-base-content/60 mt-1">{{ item.positionText }} · {{ item.trackText }}</div>
