@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, onMounted, watch, onBeforeUnmount } from 'vue'
 import { ArrowLeftRight, ClipboardCopy, Download, FileImage, Play, Search, Settings2, Trash2, TriangleAlert } from 'lucide-vue-next'
-import apiClient from '@/api/client'
 import {
   renderCustomScoreJsonToPng,
+  renderCustomScoreJsonToPngWithRust,
   renderCustomScoreJsonToSvg,
+  renderCustomScoreJsonToSvgWithRust,
   renderSusToPng,
+  renderSusToPngWithRust,
   renderSusToSvg,
+  renderSusToSvgWithRust,
   renderSusToSvgWithConflictOverlay,
   revokeSus2ImgResult,
   analyzeSusConflicts,
@@ -19,15 +22,9 @@ import {
 
 const FORM_STORAGE_KEY = 'sus2img-form-data'
 
-type RenderEngine = 'frontend' | 'backend'
+type RenderEngine = 'frontend' | 'rust'
 type RenderFormat = 'svg' | 'png'
 type ChartInputType = 'sus' | 'json' | 'sus2json' | 'json2sus'
-
-type BackendResult = {
-  source: 'backend'
-  format: RenderFormat
-  url: string
-}
 
 const form = ref({
   inputType: 'sus' as ChartInputType,
@@ -52,7 +49,6 @@ const bottomLeftImageFile = ref<File | null>(null)
 const bottomLeftImageDataUrl = ref('')
 const isSubmitting = ref(false)
 const error = ref<string | null>(null)
-const infoMessage = ref<string | null>(null)
 const auditError = ref<string | null>(null)
 const isAnalyzing = ref(false)
 const hasAuditRun = ref(false)
@@ -76,7 +72,7 @@ const overlapAcknowledged = ref(false)
 
 const resultData = ref<string | null>(null)
 const resultFormat = ref<RenderFormat>('svg')
-const resultSource = ref<'frontend' | 'backend' | null>(null)
+const resultSource = ref<RenderEngine | null>(null)
 const resultSvgText = ref<string | null>(null)
 const resultSvgError = ref<string | null>(null)
 const downloadError = ref<string | null>(null)
@@ -98,25 +94,26 @@ const resetFrontendResult = () => {
   }
 }
 
-const setResult = (result: Sus2ImgFrontendResult | BackendResult) => {
+const setResult = (result: Sus2ImgFrontendResult, engine: RenderEngine) => {
   resetFrontendResult()
 
   resultData.value = result.url
   resultFormat.value = result.format
-  resultSource.value = result.source
-  resultSvgText.value = result.source === 'frontend' ? result.svgText : null
+  resultSource.value = engine
+  resultSvgText.value = result.svgText
   resultSvgError.value = null
   downloadError.value = null
   downloadMessage.value = null
 
-  if (result.source === 'frontend') {
-    frontendResult = result
-  }
+  frontendResult = result
 }
 
 const isJsonInput = computed(() => form.value.inputType === 'json' || form.value.inputType === 'json2sus')
 
 const isConvertMode = computed(() => form.value.inputType === 'sus2json' || form.value.inputType === 'json2sus')
+
+const renderEngineName = (engine: RenderEngine): string =>
+  engine === 'rust' ? 'Rust WASM' : '现有前端'
 
 const isHighlightReady = computed(
   () =>
@@ -147,7 +144,7 @@ const resultDownloadDescription = computed(() => {
     return ''
   }
 
-  const sourceText = resultSource.value === 'frontend' ? '前端' : '后端'
+  const sourceText = renderEngineName(resultSource.value)
   const formatText = resultFormat.value.toUpperCase()
   return `最近一次由${sourceText}生成，输出格式为 ${formatText}。`
 })
@@ -250,6 +247,9 @@ onMounted(() => {
     try {
       const parsed = JSON.parse(saved)
       Object.assign(form.value, parsed)
+      if (form.value.engine !== 'rust') {
+        form.value.engine = 'frontend'
+      }
     } catch {
       // ignore parse error
     }
@@ -280,14 +280,11 @@ watch(
 
 watch(
   () => form.value.inputType,
-  (inputType) => {
+  () => {
     chartFile.value = null
     resetAuditState()
     resetRenderState()
     resetConversionState()
-    if ((inputType === 'json' || inputType === 'json2sus') && form.value.engine === 'backend') {
-      form.value.engine = 'frontend'
-    }
   },
 )
 
@@ -467,7 +464,6 @@ async function runAudit(chartText: string) {
 
 async function handleAnalyze() {
   error.value = null
-  infoMessage.value = null
   auditError.value = null
 
   if (isJsonInput.value) {
@@ -490,33 +486,6 @@ async function handleAnalyze() {
     selectedConflictId.value = null
     auditError.value = auditReason instanceof Error ? auditReason.message : 'note重叠检查失败'
   }
-}
-
-function buildSvgBackendFormData(chartText: string): FormData {
-  const formData = buildBackendFormData(chartText)
-  formData.set('form', 'svg')
-  return formData
-}
-
-async function renderSvgPreviewViaBackend(chartText: string): Promise<string> {
-  const response = await apiClient.post('/api/sus2img', buildSvgBackendFormData(chartText), {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
-    timeout: 100000,
-  })
-
-  const result = response.data
-  if (!result.success || !result.url) {
-    throw new Error(result.error || '生成 SVG 预览失败')
-  }
-
-  const svgResponse = await fetch(result.url)
-  if (!svgResponse.ok) {
-    throw new Error(`载入 SVG 预览失败：HTTP ${svgResponse.status}`)
-  }
-
-  return await svgResponse.text()
 }
 
 async function ensureSvgPreview(chartText: string, diagnosticsForGhost?: ConflictDiagnostic[]) {
@@ -551,52 +520,19 @@ async function ensureSvgPreview(chartText: string, diagnosticsForGhost?: Conflic
           ...baseInput,
           diagnostics: diagnosticsForGhost,
         })
-      : await renderSusToSvg(baseInput)
+      : form.value.engine === 'rust'
+        ? await renderSusToSvgWithRust(baseInput)
+        : await renderSusToSvg(baseInput)
 
     resultSvgText.value = preview.svgText
     renderedChartText.value = chartText
     renderedRebaseText.value = form.value.rebase
     revokeSus2ImgResult(preview)
   } catch (previewError) {
-    const frontendMessage = previewError instanceof Error ? previewError.message : '前端生成 SVG 预览失败'
-
-    try {
-      resultSvgText.value = await renderSvgPreviewViaBackend(chartText)
-      renderedChartText.value = chartText
-      renderedRebaseText.value = form.value.rebase
-      resultSvgError.value = `前端预览失败，已自动回退后端：${frontendMessage}`
-    } catch (backendError) {
-      resultSvgText.value = null
-      resultSvgError.value = backendError instanceof Error ? backendError.message : '生成 SVG 预览失败'
-    }
+    resultSvgText.value = null
+    resultSvgError.value = previewError instanceof Error ? previewError.message : '前端生成 SVG 预览失败'
   } finally {
     isPreparingPreview.value = false
-  }
-}
-
-async function loadResultSvgText(result: BackendResult | Sus2ImgFrontendResult) {
-  if (result.source === 'frontend') {
-    resultSvgText.value = result.svgText
-    resultSvgError.value = null
-    return
-  }
-
-  if (result.format !== 'svg') {
-    resultSvgText.value = null
-    resultSvgError.value = 'PNG 结果不支持在页面内高亮冲突。'
-    return
-  }
-
-  try {
-    const response = await fetch(result.url)
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`)
-    }
-    resultSvgText.value = await response.text()
-    resultSvgError.value = null
-  } catch (svgReason) {
-    resultSvgText.value = null
-    resultSvgError.value = svgReason instanceof Error ? `载入 SVG 预览失败：${svgReason.message}` : '载入 SVG 预览失败'
   }
 }
 
@@ -746,45 +682,6 @@ async function downloadPngResult() {
   }
 }
 
-function buildBackendFormData(chartText: string): FormData {
-  const formData = new FormData()
-  formData.append('chart', chartText)
-  formData.append('rebase', form.value.rebase)
-  formData.append('title', form.value.title)
-  formData.append('artist', form.value.artist)
-  formData.append('author', form.value.author)
-  formData.append('difficulty', form.value.difficulty)
-  formData.append('playlevel', form.value.playlevel)
-  formData.append('pixel', form.value.pixel)
-  formData.append('form', form.value.format)
-  formData.append('skin', form.value.skin)
-  return formData
-}
-
-async function renderViaBackend(chartText: string): Promise<BackendResult> {
-  if (isJsonInput.value) {
-    throw new Error('JSON 谱面仅支持前端生成')
-  }
-
-  const response = await apiClient.post('/api/sus2img', buildBackendFormData(chartText), {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
-    timeout: 100000,
-  })
-
-  const result = response.data
-  if (!result.success) {
-    throw new Error(result.error || '转换失败')
-  }
-
-  return {
-    source: 'backend',
-    format: result.format,
-    url: result.url,
-  }
-}
-
 function parseCustomScoreJson(chartText: string): unknown {
   try {
     return JSON.parse(chartText)
@@ -815,10 +712,14 @@ async function renderViaFrontend(chartText: string): Promise<Sus2ImgFrontendResu
     }
 
     if (form.value.format === 'png') {
-      return await renderCustomScoreJsonToPng(input)
+      return form.value.engine === 'rust'
+        ? await renderCustomScoreJsonToPngWithRust(input)
+        : await renderCustomScoreJsonToPng(input)
     }
 
-    return await renderCustomScoreJsonToSvg(input)
+    return form.value.engine === 'rust'
+      ? await renderCustomScoreJsonToSvgWithRust(input)
+      : await renderCustomScoreJsonToSvg(input)
   }
 
   const input = {
@@ -828,10 +729,14 @@ async function renderViaFrontend(chartText: string): Promise<Sus2ImgFrontendResu
   }
 
   if (form.value.format === 'png') {
-    return await renderSusToPng(input)
+    return form.value.engine === 'rust'
+      ? await renderSusToPngWithRust(input)
+      : await renderSusToPng(input)
   }
 
-  return await renderSusToSvg(input)
+  return form.value.engine === 'rust'
+    ? await renderSusToSvgWithRust(input)
+    : await renderSusToSvg(input)
 }
 
 async function handleFormSubmit() {
@@ -845,55 +750,20 @@ async function handleFormSubmit() {
 async function handleSubmit() {
   isSubmitting.value = true
   error.value = null
-  infoMessage.value = null
   const previewTab = window.open('', '_blank')
   showGeneratingHint(previewTab)
 
   try {
     const chartText = await getChartText()
 
-    if (!isJsonInput.value && form.value.engine === 'backend') {
-      const backendResult = await renderViaBackend(chartText)
-      setResult(backendResult)
-      renderedChartText.value = chartText
-      renderedRebaseText.value = form.value.rebase
-      await loadResultSvgText(backendResult)
-      if (previewTab && !previewTab.closed) {
-        previewTab.location.href = backendResult.url
-      } else {
-        window.open(backendResult.url, '_blank')
-      }
-      return
-    }
-
-    try {
-      const frontend = await renderViaFrontend(chartText)
-      setResult(frontend)
-      renderedChartText.value = chartText
-      renderedRebaseText.value = form.value.rebase
-      await loadResultSvgText(frontend)
-      if (previewTab && !previewTab.closed) {
-        previewTab.location.href = frontend.url
-      } else {
-        window.open(frontend.url, '_blank')
-      }
-    } catch (frontendError) {
-      if (isJsonInput.value) {
-        throw frontendError
-      }
-
-      const frontendMessage = frontendError instanceof Error ? frontendError.message : '前端转换失败'
-      const backendResult = await renderViaBackend(chartText)
-      setResult(backendResult)
-      renderedChartText.value = chartText
-      renderedRebaseText.value = form.value.rebase
-      await loadResultSvgText(backendResult)
-      infoMessage.value = `前端转换失败，已自动回退后端：${frontendMessage}`
-      if (previewTab && !previewTab.closed) {
-        previewTab.location.href = backendResult.url
-      } else {
-        window.open(backendResult.url, '_blank')
-      }
+    const frontend = await renderViaFrontend(chartText)
+    setResult(frontend, form.value.engine)
+    renderedChartText.value = chartText
+    renderedRebaseText.value = form.value.rebase
+    if (previewTab && !previewTab.closed) {
+      previewTab.location.href = frontend.url
+    } else {
+      window.open(frontend.url, '_blank')
     }
   } catch (e) {
     if (previewTab && !previewTab.closed) {
@@ -928,7 +798,6 @@ function clearForm() {
   bottomLeftImageFile.value = null
   bottomLeftImageDataUrl.value = ''
   error.value = null
-  infoMessage.value = null
   resetAuditState()
   resetRenderState()
   resetConversionState()
@@ -1080,11 +949,11 @@ function clearForm() {
               <div class="flex gap-4 flex-wrap">
                 <label class="label cursor-pointer gap-2">
                   <input v-model="form.engine" type="radio" value="frontend" class="radio radio-primary" />
-                  <span class="label-text">前端（极速）</span>
+                  <span class="label-text">现有前端（兼容）</span>
                 </label>
                 <label class="label cursor-pointer gap-2">
-                  <input v-model="form.engine" type="radio" value="backend" class="radio radio-primary" :disabled="isJsonInput" />
-                  <span class="label-text">后端（兼容）</span>
+                  <input v-model="form.engine" type="radio" value="rust" class="radio radio-primary" />
+                  <span class="label-text">Rust WASM（快速）</span>
                 </label>
               </div>
             </div>
@@ -1214,7 +1083,7 @@ function clearForm() {
                   <input v-model="form.condenseSpeedTrend" type="checkbox" class="checkbox checkbox-primary shrink-0" />
                   <span class="label-text min-w-0">
                     highspeed 短时间密集变化折叠为趋势箭头
-                    <span class="text-xs opacity-60 block">关闭后将逐条展示每个 highspeed 变化（密集处文字可能重叠）；仅前端引擎生效</span>
+                    <span class="text-xs opacity-60 block">关闭后将逐条展示每个 highspeed 变化（密集处文字可能重叠）；仅现有前端引擎生效</span>
                   </span>
                 </label>
               </div>
@@ -1223,10 +1092,6 @@ function clearForm() {
 
           <div v-if="error" class="alert alert-error">
             <span>{{ error }}</span>
-          </div>
-
-          <div v-if="infoMessage" class="alert alert-info">
-            <span>{{ infoMessage }}</span>
           </div>
 
           <div class="flex justify-center gap-4 flex-wrap">
@@ -1290,7 +1155,7 @@ function clearForm() {
             <p class="text-sm text-base-content/60 mt-1">{{ resultDownloadDescription }}</p>
           </div>
           <span v-if="resultSource" class="badge badge-outline shrink-0">
-            {{ resultSource === 'frontend' ? '前端生成' : '后端生成' }}
+            {{ renderEngineName(resultSource) }}生成
           </span>
         </div>
 

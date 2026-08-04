@@ -60,6 +60,7 @@ If you want to deploy your own backend, you can refer to [API_README.md](API_REA
 | [xfl03/33KitFrontend](https://github.com/xfl03/33KitFrontend) | Project reference | — |
 | [pjsekai/scores](https://gitlab.com/pjsekai/scores) | SUS chart image rendering | [MIT](https://gitlab.com/pjsekai/scores/-/blob/main/LICENSE?ref_type=heads) |
 | [watagashi-uni/Sekai-SUS-Parser](https://github.com/watagashi-uni/Sekai-SUS-Parser) | SUS-to-JSON WebAssembly parser used before chart rendering | [MIT](https://github.com/watagashi-uni/Sekai-SUS-Parser/blob/main/LICENSE) |
+| [Team-Haruki/pjsekai-scores-rs](https://github.com/Team-Haruki/pjsekai-scores-rs) | Optional browser-side JSON-to-SVG renderer | [MIT](https://github.com/Team-Haruki/pjsekai-scores-rs/blob/main/LICENSE) |
 | [Sekai-World/MikuMikuWorld](https://github.com/Sekai-World/MikuMikuWorld) | Basis of the modified JSON-to-SUS exporter | [MIT](https://github.com/Sekai-World/MikuMikuWorld/blob/master/LICENSE) |
 | [Team-Haruki/Haruki-3D-Exporter](https://github.com/Team-Haruki/Haruki-3D-Exporter) | Costume 3D preview runtime asset export; author: storyxy3 | [MIT](https://github.com/Team-Haruki/Haruki-3D-Exporter/blob/main/LICENSE) |
 | [NeuraXmy/lunabot](https://github.com/NeuraXmy/lunabot) | Project reference | [MIT](https://github.com/NeuraXmy/lunabot/blob/master/LICENSE) |
@@ -92,7 +93,20 @@ loader, uses `locateFile` to resolve its adjacent `.wasm` file under Vite's base
 URL, and wraps the exported `sus_to_json`, `sus_combo_count`, and `sus_free`
 functions. The resulting JSON is then rendered into an image by the vendored
 `sekai-sus2img` renderer, whose core rendering work is derived from
-`pjsekai/scores`.
+`pjsekai/scores`, or by the optional `pjsekai-scores-rs` WebAssembly renderer.
+Both rendering engines always consume the C++ converter's JSON; the Rust
+engine does not parse SUS in this frontend.
+
+The Rust browser build is generated from `pjsekai-scores-rs` with its `wasm`
+feature and `wasm-bindgen --target web`. Its checked-in browser artifacts are:
+
+- `public/wasm/pjsekai-scores-rs/pjsekai_scores_rs_bg.wasm`
+- `public/wasm/pjsekai-scores-rs/pjsekai_scores_rs.js`
+- `public/wasm/pjsekai-scores-rs/LICENSE`
+
+`src/vendor/sekai-sus2img/rustRendererWasm.ts` loads that pair only when the
+user selects the Rust engine, passes the C++ JSON to `Score.fromJson`, and uses
+`Drawing.svg` for rendering.
 
 #### JSON to SUS
 

@@ -4,6 +4,7 @@ import { applyRebase } from './rebase'
 import { renderScoreToSvg } from './renderer'
 import { scoreFromCustomScoreJson } from './customScoreJson'
 import { convertSusToCustomScoreJson } from './susToJsonWasm'
+import { renderCustomScoreJsonWithRust } from './rustRendererWasm'
 import { buildGhostNotesFromDiagnostics, buildCrashMarkersFromDiagnostics, buildFocusAnchorsFromDiagnostics, type CrashMarkerRender } from './ghostNote'
 
 export { analyzeSusConflicts, type ConflictDiagnostic } from '@/utils/susConflictAudit'
@@ -203,6 +204,52 @@ const customScoreJsonToSvgPayload = (
     }
 }
 
+const scoreJsonText = (scoreJson: unknown): string =>
+    typeof scoreJson === 'string' ? scoreJson : JSON.stringify(scoreJson)
+
+const svgCanvasSize = (svgText: string): { width: number; height: number } => {
+    const openingTag = svgText.match(/^<svg\b[^>]*>/u)?.[0] ?? ''
+    const width = Number(openingTag.match(/\bwidth="([^"]+)"/u)?.[1])
+    const height = Number(openingTag.match(/\bheight="([^"]+)"/u)?.[1])
+    if (!Number.isFinite(width) || width <= 0 || !Number.isFinite(height) || height <= 0) {
+        throw new Error('Rust WASM 返回的 SVG 缺少有效尺寸')
+    }
+    return { width, height }
+}
+
+const customScoreJsonToRustSvgPayload = async (
+    input: CustomScoreJsonRenderInput,
+    runtimeOptions?: Sus2ImgRuntimeOptions,
+): Promise<{ svgText: string; width: number; height: number }> => {
+    const assetBase = resolveAssetBase(runtimeOptions?.assetOrigin)
+    let playlevel = `${input.playlevel ?? ''}`
+    if (!input.isOfficial) {
+        playlevel += ` 創作譜面`
+    }
+    if ((input.author ?? '').trim()) {
+        playlevel += ` by ${input.author?.trim()}`
+    }
+
+    const svgText = await renderCustomScoreJsonWithRust({
+        scoreJson: scoreJsonText(input.scoreJson),
+        rebase: input.rebase,
+        meta: {
+            title: input.title ?? '',
+            artist: input.artist ?? '',
+            designer: input.author ?? '',
+            difficulty: input.difficulty ?? '',
+            playlevel: playlevel.trim(),
+            songid: `${input.songId ?? ''}`,
+            jacket: resolveJacketPath(assetBase, input.jacket),
+        },
+        noteHost: joinAssetPath(assetBase, `static/notes_new/${input.skin ?? 'custom01'}`),
+        noteSize: 18,
+        timeHeight: normalizePixel(input.pixel),
+    })
+
+    return { svgText, ...svgCanvasSize(svgText) }
+}
+
 const blobToDataUrl = async (blob: Blob): Promise<string> =>
     await new Promise((resolve, reject) => {
         const reader = new FileReader()
@@ -388,11 +435,51 @@ export const renderCustomScoreJsonToSvg = async (
     }
 }
 
+export const renderCustomScoreJsonToSvgWithRust = async (
+    input: CustomScoreJsonRenderInput,
+    runtimeOptions?: Sus2ImgRuntimeOptions,
+): Promise<Sus2ImgFrontendResult> => {
+    const { svgText: rawSvgText, width, height } = await customScoreJsonToRustSvgPayload(input, runtimeOptions)
+    const svgText = await inlineSvgImages(rawSvgText)
+    const blob = new Blob([svgText], { type: 'image/svg+xml;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+
+    return {
+        source: 'frontend',
+        format: 'svg',
+        url,
+        blob,
+        width,
+        height,
+        svgText,
+    }
+}
+
 export const renderCustomScoreJsonToPng = async (
     input: CustomScoreJsonRenderInput,
     runtimeOptions?: Sus2ImgRuntimeOptions,
 ): Promise<Sus2ImgFrontendResult> => {
     const { svgText: rawSvgText, width, height } = customScoreJsonToSvgPayload(input, runtimeOptions)
+    const svgText = await inlineSvgImages(rawSvgText)
+    const pngBlob = await (runtimeOptions?.pngRenderer ?? defaultPngRenderer)(svgText, width, height)
+    const url = URL.createObjectURL(pngBlob)
+
+    return {
+        source: 'frontend',
+        format: 'png',
+        url,
+        blob: pngBlob,
+        width,
+        height,
+        svgText,
+    }
+}
+
+export const renderCustomScoreJsonToPngWithRust = async (
+    input: CustomScoreJsonRenderInput,
+    runtimeOptions?: Sus2ImgRuntimeOptions,
+): Promise<Sus2ImgFrontendResult> => {
+    const { svgText: rawSvgText, width, height } = await customScoreJsonToRustSvgPayload(input, runtimeOptions)
     const svgText = await inlineSvgImages(rawSvgText)
     const pngBlob = await (runtimeOptions?.pngRenderer ?? defaultPngRenderer)(svgText, width, height)
     const url = URL.createObjectURL(pngBlob)
@@ -414,6 +501,18 @@ export const renderSusToPng = async (
 ): Promise<Sus2ImgFrontendResult> => {
     return renderCustomScoreJsonToPng(await susToCustomScoreJsonInput(input), runtimeOptions)
 }
+
+export const renderSusToSvgWithRust = async (
+    input: Sus2ImgRenderInput,
+    runtimeOptions?: Sus2ImgRuntimeOptions,
+): Promise<Sus2ImgFrontendResult> =>
+    renderCustomScoreJsonToSvgWithRust(await susToCustomScoreJsonInput(input), runtimeOptions)
+
+export const renderSusToPngWithRust = async (
+    input: Sus2ImgRenderInput,
+    runtimeOptions?: Sus2ImgRuntimeOptions,
+): Promise<Sus2ImgFrontendResult> =>
+    renderCustomScoreJsonToPngWithRust(await susToCustomScoreJsonInput(input), runtimeOptions)
 
 export const revokeSus2ImgResult = (result: { url?: string | null } | null | undefined) => {
     if (!result?.url) {

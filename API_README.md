@@ -112,45 +112,7 @@ Response:
 - `text/plain` (TSV)
 - Row format: `id\tdifficulty\tconstant`
 
-### 7) SUS to Image
-
-- `POST /api/sus2img`
-- Content-Type: `multipart/form-data`
-- Used by: `Sus2ImgView` backend rendering/fallback
-
-Form fields (used by frontend):
-
-- `chart`: SUS text content
-- `rebase`: JSON string or empty
-- `title`
-- `artist`
-- `author`
-- `difficulty`
-- `playlevel`
-- `pixel`: integer string, max `600`
-- `form`: `svg` | `png`
-- `skin`: e.g. `custom01`
-
-Success response:
-
-```json
-{
-  "success": true,
-  "format": "svg",
-  "url": "https://.../api/chart/<filename>.svg"
-}
-```
-
-Error response:
-
-```json
-{
-  "success": false,
-  "error": "error message"
-}
-```
-
-### 8) Chart Share Upload (May be deleted in the future)
+### 7) Chart Share Upload (May be deleted in the future)
 
 - `POST /api/chart-share`
 - Content-Type: `multipart/form-data`
@@ -183,8 +145,6 @@ Error response:
 
 These are not posted directly by frontend forms, but are part of the returned URLs:
 
-- `GET /api/chart/<filename>`
-  - serves generated `.svg` / `.png` from `sus2img`
 - `GET /s/<share_id>`
   - short URL redirect to chart preview page
 - `GET /api/chart-share/<share_id>/<filename>`
