@@ -88,6 +88,12 @@ The two generated files are committed together:
 - `public/wasm/sus-to-json/sus_to_json_wasm.js` is Emscripten's ES module
   loader and JavaScript/WASM glue, not a separate handwritten parser.
 
+The frontend loads content-fingerprinted copies of both files. When rebuilding
+the parser, update both fingerprinted copies and their paths in
+`susToJsonWasm.ts` in the same commit. This prevents a service worker or CDN
+from combining JavaScript glue from one Emscripten build with a binary from
+another build.
+
 `src/vendor/sekai-sus2img/susToJsonWasm.ts` dynamically imports the generated
 loader, uses `locateFile` to resolve its adjacent `.wasm` file under Vite's base
 URL, and wraps the exported `sus_to_json`, `sus_combo_count`, and `sus_free`
