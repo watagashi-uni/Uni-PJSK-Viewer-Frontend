@@ -48,6 +48,7 @@ type ParsedFormatIssue = {
   longNo: number
   tick: number
   summary: string
+  trackText?: string
 }
 
 type ParsedHighSpeed = {
@@ -155,6 +156,12 @@ type ImportNoteInfo = {
   longNo: number
   isSkip: boolean
   source: ParsedSusNote
+  categorySource: ParsedSusNote
+  criticalSource: ParsedSusNote | null
+  flickSource: ParsedSusNote | null
+  lineTypeSource: ParsedSusNote | null
+  speedSource: ParsedSusNote
+  longNoSource: ParsedSusNote
   updateSources: ParsedSusNote[]
   guideDict: boolean
 }
@@ -170,6 +177,7 @@ type ImportMergeClass =
 type ImportMergeDecision = {
   classification: ImportMergeClass
   reasons: string[]
+  existingSource: ParsedSusNote
 }
 
 type RuntimeNode = {
@@ -251,6 +259,58 @@ const parseFloat32 = (text: string, fallback: number): { value: number; valid: b
     return { value: f32(fallback), valid: false }
   }
   return { value: rounded, valid: true }
+}
+
+const parseInt32 = (text: string): number | null => {
+  if (!/^[+-]?\d+$/u.test(text)) {
+    return null
+  }
+  const parsed = Number(text)
+  return Number.isInteger(parsed) && parsed >= -2147483648 && parsed <= 2147483647
+    ? parsed
+    : null
+}
+
+const approximatelyFloat32 = (left: number, right: number): boolean => {
+  const difference = Math.abs(left - right)
+  return difference < Math.max(0.000001 * Math.max(Math.abs(left), Math.abs(right)), 1.401298e-45 * 8)
+}
+
+const getEffectiveHighSpeedChanges = (events: ParsedHighSpeed[]): ParsedHighSpeed[] => {
+  const sorted = [...events].sort((left, right) => {
+    if (left.measure !== right.measure) {
+      return left.measure - right.measure
+    }
+    if (left.barProgress !== right.barProgress) {
+      return left.barProgress - right.barProgress
+    }
+    return left.sourceOrder - right.sourceOrder
+  })
+  const result: ParsedHighSpeed[] = []
+  let currentSpeed = f32(1)
+  let index = 0
+  while (index < sorted.length) {
+    const first = sorted[index]
+    if (!first) {
+      index += 1
+      continue
+    }
+    let finalAtPosition = first
+    index += 1
+    while (
+      index < sorted.length
+      && sorted[index]?.measure === first.measure
+      && approximatelyFloat32(sorted[index]?.barProgress ?? 0, first.barProgress)
+    ) {
+      finalAtPosition = sorted[index] ?? finalAtPosition
+      index += 1
+    }
+    if (finalAtPosition.speedRatio !== currentSpeed) {
+      result.push(finalAtPosition)
+      currentSpeed = finalAtPosition.speedRatio
+    }
+  }
+  return result
 }
 
 const parseNoteCells = (rawData: string): ParsedNoteCells => {
@@ -398,6 +458,34 @@ const parseSusTextForAudit = (content: string): ParsedSus => {
   const highSpeeds: ParsedHighSpeed[] = []
   let nextHighSpeedOrder = 0
 
+  const appendTimelineFormatIssue = (
+    id: string,
+    title: string,
+    summary: string,
+    measure: number,
+    trackText = '时间轴',
+  ): void => {
+    formatIssues.push({
+      id,
+      title,
+      severity: 'dedup',
+      markerLabel: '格式不受支持',
+      measure,
+      bar: measure,
+      barProgress: 0,
+      slotIndex: 0,
+      slotTotal: 1,
+      importLane: -1,
+      lane: -1,
+      width: 1,
+      laneType: -1,
+      longNo: -1,
+      tick: 0,
+      summary,
+      trackText,
+    })
+  }
+
   const appendNotes = (line: SusDataLine, laneType: number, longNo: number): void => {
     const parsed = parseNoteCells(line.data)
     const laneChar = line.header.slice(4, 5)
@@ -490,13 +578,81 @@ const parseSusTextForAudit = (content: string): ParsedSus => {
     })
   }
 
+  const appendUnsupportedNoteChannelIssue = (
+    line: SusDataLine,
+    laneType: number,
+    isLong: boolean,
+  ): void => {
+    const parsed = parseNoteCells(line.data)
+    const first = parsed.cells[0]
+    if (!first || parsed.slotTotal <= 0) {
+      return
+    }
+    const laneChar = line.header.slice(4, 5)
+    const importLane = getImportLane(laneChar)
+    const barProgress = f32(f32(first.slotIndex) / f32(parsed.slotTotal))
+    formatIssues.push({
+      id: `unsupported-note-channel-${line.lineIndex}`,
+      title: isLong ? '游戏不支持这一类长条通道' : '游戏不支持这一类音符通道',
+      severity: 'dedup',
+      markerLabel: `行类型 ${laneType} 不受支持`,
+      measure: line.measure,
+      bar: line.measure + barProgress,
+      barProgress,
+      slotIndex: first.slotIndex,
+      slotTotal: parsed.slotTotal,
+      importLane,
+      lane: parseSusDigit(laneChar),
+      width: Math.max(1, getNoteWidth(first.value.slice(1, 2))),
+      laneType,
+      longNo: -1,
+      tick: 0,
+      summary: isLong
+        ? `检测到行类型 ${laneType} 的长条写法，但游戏只会把行类型 3 作为 Hold、行类型 9 作为 Guide；这一行不会生成音符。请改用对应的 3/9 通道。`
+        : `检测到行类型 ${laneType} 的普通音符写法，但游戏只会读取行类型 1 和 5；这一行不会生成音符。请检查 SUS 通道编号。`,
+    })
+  }
+
   const lines = content.split('\n')
   for (let lineIndex = 0; lineIndex < lines.length; lineIndex += 1) {
     const rawLine = lines[lineIndex] ?? ''
     if (rawLine.includes('#REQUEST "ticks_per_beat')) {
       const match = /^#REQUEST ticks_per_beat (\d+)/u.exec(rawLine.split('"').join(''))
       if (match) {
-        ticksPerBeat = Number.parseInt(match[1] ?? '480', 10) || ticksPerBeat
+        const parsedTicksPerBeat = parseInt32(match[1] ?? '')
+        if (parsedTicksPerBeat === null) {
+          appendTimelineFormatIssue(
+            `ticks-per-beat-range-${lineIndex}`,
+            'ticks_per_beat 超出了游戏可读取的范围',
+            `这一数值无法转换成游戏使用的 32 位整数，因此游戏会继续使用之前的 ${ticksPerBeat}。请改成 1–2147483647 之间的整数。`,
+            0,
+            '全谱面',
+          )
+        } else {
+          ticksPerBeat = parsedTicksPerBeat
+          if (parsedTicksPerBeat === 0) {
+            appendTimelineFormatIssue(
+              `ticks-per-beat-zero-${lineIndex}`,
+              'ticks_per_beat 不能为 0',
+              '游戏会接受这个数值，但所有按 tickOffset 写入的全局变速和音效音量事件都会落到小节开头。请改成正常的正整数，通常为 480。',
+              0,
+              '全谱面',
+            )
+          }
+        }
+      }
+    }
+    const measureBaseMatch = /^#MEASUREBS\s+([+-]?\d+)/u.exec(rawLine)
+    if (measureBaseMatch) {
+      const measureBase = Number.parseInt(measureBaseMatch[1] ?? '0', 10)
+      if (measureBase !== 0) {
+        appendTimelineFormatIssue(
+          'unsupported-measure-base',
+          '游戏不支持 MEASUREBS 小节偏移',
+          `检测到 MEASUREBS ${measureBase}。游戏会忽略这条命令，后续形如 #000… 的内容仍会被当成第 0 小节，可能造成大范围错位和覆盖。请在导出时避免超过 999 小节，或先把谱面整体移回 0–999 小节。`,
+          measureBase,
+          '全谱面',
+        )
       }
     }
     const bpmDefinition = /^#BPM([0-9A-Z]{2}):(.+)/u.exec(rawLine)
@@ -555,7 +711,14 @@ const parseSusTextForAudit = (content: string): ParsedSus => {
     ) {
       const eventType = header.slice(3, 5)
       if (eventType === '02') {
-        if (!data.includes(',')) {
+        if (data.includes(',')) {
+          appendTimelineFormatIssue(
+            `time-signature-speed-format-${lineIndex}`,
+            '带差速格式的拍号行不会被游戏读取',
+            '02 拍号通道中出现了逗号，游戏会跳过整行，导致后续音符的时间和 Maker tick 发生偏移。请把拍号写成普通数值，例如“#00002:4”。',
+            measure,
+          )
+        } else {
           barlengths.push({
             bar: measure,
             length: parseFloat32(data, 4).value,
@@ -565,16 +728,27 @@ const parseSusTextForAudit = (content: string): ParsedSus => {
         }
         continue
       }
-      if (eventType === '08' && !data.includes(',')) {
-        const bpmCells = parseNoteCells(data)
-        if (bpmCells.cells.some((cell) => bpmIds.has(cell.value.toUpperCase()) || bpmIds.has(cell.value))) {
-          makerEventBars.add(measure)
+      if (eventType === '08') {
+        if (data.includes(',')) {
+          appendTimelineFormatIssue(
+            `bpm-speed-format-${lineIndex}`,
+            '带差速格式的 BPM 行不会被游戏读取',
+            '08 BPM 通道中出现了逗号，游戏会跳过整行，对应的 BPM 变化不会生效。请使用普通的两字符 BPM 编号。',
+            measure,
+          )
+        } else {
+          const bpmCells = parseNoteCells(data)
+          if (bpmCells.cells.some((cell) => bpmIds.has(cell.value.toUpperCase()) || bpmIds.has(cell.value))) {
+            makerEventBars.add(measure)
+          }
         }
         continue
       }
       const laneType = parseSusDigit(header[3] ?? '')
       if (laneType === 1 || laneType === 5) {
         appendNotes(line, laneType, -1)
+      } else {
+        appendUnsupportedNoteChannelIssue(line, laneType, false)
       }
       continue
     }
@@ -587,6 +761,18 @@ const parseSusTextForAudit = (content: string): ParsedSus => {
     ) {
       const laneType = parseSusDigit(header[3] ?? '')
       if (laneType !== 3 && laneType !== 9) {
+        const parsed = parseNoteCells(line.data)
+        const importLane = getImportLane(header[4] ?? '')
+        const isFeverEventLine = laneType === 1
+          && importLane === 13
+          && parsed.cells.length > 0
+          && parsed.cells.every((cell) => {
+            const noteType = parseSusDigit(cell.value.slice(0, 1))
+            return noteType === 1 || noteType === 2
+          })
+        if (!isFeverEventLine) {
+          appendUnsupportedNoteChannelIssue(line, laneType, true)
+        }
         continue
       }
       const longNo = parseSusHexDigit(header[5] ?? '')
@@ -628,7 +814,13 @@ const parseSusTextForAudit = (content: string): ParsedSus => {
       highSpeed.barProgress,
     )
   }
-  return { rawNotes, barlengths, makerEventBars: [...makerEventBars], formatIssues, highSpeeds }
+  return {
+    rawNotes,
+    barlengths,
+    makerEventBars: [...makerEventBars],
+    formatIssues,
+    highSpeeds: getEffectiveHighSpeedChanges(highSpeeds),
+  }
 }
 
 const importCategoryLabel = (category: ImportCategory): string => {
@@ -672,7 +864,7 @@ const makeImportMarker = (
     label,
     bar: source.bar,
     susLane: importLane + 2,
-    width: 'width' in note ? note.width : source.width,
+    width: Math.max(1, 'width' in note ? note.width : source.width),
     noteLaneType: source.laneType,
     noteType: source.type,
   }
@@ -686,6 +878,10 @@ const makeImportDiagnostic = (
   source: ParsedSusNote | ImportNoteInfo,
   title: string,
   summary: string,
+  markerLabels: { source: string; target: string } = {
+    source: '已有槽位',
+    target: '后写入',
+  },
 ): ConflictDiagnostic => {
   const targetSource = 'source' in target ? target.source : target
   const sourceSource = 'source' in source ? source.source : source
@@ -702,8 +898,8 @@ const makeImportDiagnostic = (
     positionText: getPositionText(targetSource.measure, targetSource.slotIndex, targetSource.slotTotal),
     trackText: getTrackText(targetLane, targetWidth),
     markers: [
-      makeImportMarker('source', 'source', '已存在', source),
-      makeImportMarker('suppressed', 'target', '合并/覆盖', target),
+      makeImportMarker('source', 'source', markerLabels.source, source),
+      makeImportMarker('suppressed', 'target', markerLabels.target, target),
     ],
     sortTick: targetSource.tick,
     sortLane: targetLane,
@@ -725,8 +921,12 @@ const makeSingleNoteDiagnostic = (
   summary,
   measure: note.measure,
   positionText: getPositionText(note.measure, note.slotIndex, note.slotTotal),
-  trackText: getTrackText(note.importLane, Math.max(1, note.width)),
-  markers: [makeImportMarker('suppressed', 'dropped', '不会进入结果', note)],
+  trackText: note.importLane >= 0 && note.importLane <= 11
+    ? getTrackText(note.importLane, Math.max(1, note.width))
+    : '无效轨道',
+  markers: note.importLane >= 0 && note.importLane <= 11
+    ? [makeImportMarker('suppressed', 'dropped', '不会进入结果', note)]
+    : [],
   sortTick: note.tick,
   sortLane: note.importLane,
 })
@@ -740,8 +940,9 @@ const makeFormatIssueDiagnostic = (issue: ParsedFormatIssue): ConflictDiagnostic
   summary: issue.summary,
   measure: issue.measure,
   positionText: getPositionText(issue.measure, issue.slotIndex, issue.slotTotal),
-  trackText: issue.importLane >= 0 ? getTrackText(issue.importLane, issue.width) : '无效轨道',
-  markers: issue.importLane >= 0 ? [{
+  trackText: issue.trackText
+    ?? (issue.importLane >= 0 && issue.importLane <= 11 ? getTrackText(issue.importLane, issue.width) : '无效轨道'),
+  markers: issue.importLane >= 0 && issue.importLane <= 11 ? [{
     id: `${issue.id}-marker`,
     role: 'suppressed',
     label: issue.markerLabel,
@@ -770,62 +971,103 @@ const updateNoteInfo = (current: ImportNoteInfo, incoming: ImportNoteInfo): void
     } else {
       current.category = incoming.category
     }
+    current.categorySource = incoming.categorySource
   }
   if (incoming.critical) {
     current.critical = true
+    current.criticalSource = incoming.criticalSource ?? incoming.source
   }
   if (incoming.flick !== 'none') {
     current.flick = incoming.flick
+    current.flickSource = incoming.flickSource ?? incoming.source
   }
   if (incoming.lineType !== 'linear') {
     current.lineType = incoming.lineType
+    current.lineTypeSource = incoming.lineTypeSource ?? incoming.source
   }
   if (incoming.speedRatio !== 1) {
     current.speedRatio = incoming.speedRatio
+    current.speedSource = incoming.speedSource
   }
   if (incoming.longNo !== -1) {
     current.longNo = incoming.longNo
+    current.longNoSource = incoming.longNoSource
   }
   current.updateSources.push(incoming.source)
 }
 
 const classifyImportMerge = (current: ImportNoteInfo, incoming: ImportNoteInfo): ImportMergeDecision => {
   const reasons: string[] = []
+  let destructiveSource = current.categorySource
+  const addDestructiveReason = (reason: string, source: ParsedSusNote): void => {
+    if (reasons.length === 0) {
+      destructiveSource = source
+    }
+    reasons.push(reason)
+  }
   const merged = cloneNoteInfo(current)
   updateNoteInfo(merged, incoming)
   if (current.width !== incoming.width) {
-    reasons.push(`游戏会保留先写入的宽度 ${current.width}，后写入的宽度 ${incoming.width} 不会生效`)
+    addDestructiveReason(
+      `游戏会保留先写入的宽度 ${current.width}，后写入的宽度 ${incoming.width} 不会生效`,
+      current.source,
+    )
   }
   if (current.longNo !== -1 && incoming.longNo !== -1 && current.longNo !== incoming.longNo) {
-    reasons.push(`长条/Guide 编号会从 ${current.longNo.toString(16)} 改成 ${incoming.longNo.toString(16)}`)
+    addDestructiveReason(
+      `长条/Guide 编号会从 ${current.longNo.toString(16)} 改成 ${incoming.longNo.toString(16)}`,
+      current.longNoSource,
+    )
   }
   if (isLongRootCategory(current.category) && !isLongRootCategory(merged.category)) {
-    reasons.push(`${importCategoryLabel(current.category)} 的起点会被改成 ${importCategoryLabel(merged.category)}`)
+    addDestructiveReason(
+      `${importCategoryLabel(current.category)} 的起点会被改成 ${importCategoryLabel(merged.category)}`,
+      current.categorySource,
+    )
   }
   if (isGuideCategory(current.category) && !isGuideCategory(merged.category)) {
-    reasons.push(`${importCategoryLabel(current.category)} 会被改成普通的 ${importCategoryLabel(merged.category)}`)
+    addDestructiveReason(
+      `${importCategoryLabel(current.category)} 会被改成普通的 ${importCategoryLabel(merged.category)}`,
+      current.categorySource,
+    )
   }
+  const sameLaneTypeSource = [...current.updateSources]
+    .reverse()
+    .find((source) => source.laneType === incoming.source.laneType)
   if (
-    current.source.laneType === incoming.source.laneType
+    sameLaneTypeSource
     && incoming.category !== 'Normal'
     && current.category !== incoming.category
     && reasons.length === 0
   ) {
-    reasons.push(`${importCategoryLabel(current.category)} 会被改成 ${importCategoryLabel(incoming.category)}`)
+    addDestructiveReason(
+      `${importCategoryLabel(current.category)} 会被改成 ${importCategoryLabel(incoming.category)}`,
+      current.categorySource,
+    )
   }
+  const hasSpeedConflict = current.speedRatio !== 1
+    && incoming.speedRatio !== 1
+    && current.speedRatio !== incoming.speedRatio
   if (reasons.length > 0) {
-    return { classification: 'destructive_merge', reasons }
+    if (hasSpeedConflict) {
+      reasons.push(`差速也会从 ${current.speedRatio}x 改成 ${incoming.speedRatio}x`)
+    }
+    return { classification: 'destructive_merge', reasons, existingSource: destructiveSource }
   }
-  if (current.speedRatio !== incoming.speedRatio) {
+  // NoteInfo.Update treats 1x as "no speed modifier". A composed note commonly
+  // has one SUS row carrying the real Notespeed and another row left at 1x;
+  // that default row does not overwrite the existing speed in the C# importer.
+  if (hasSpeedConflict) {
     return {
       classification: 'speed_overwrite',
       reasons: [`同一位置只能保留一个差速，${current.speedRatio}x 与 ${incoming.speedRatio}x 不会同时生效`],
+      existingSource: current.speedSource,
     }
   }
-  if (current.source.laneType === incoming.source.laneType) {
-    return { classification: 'same_kind_duplicate', reasons: [] }
+  if (sameLaneTypeSource) {
+    return { classification: 'same_kind_duplicate', reasons: [], existingSource: sameLaneTypeSource }
   }
-  return { classification: 'expected_composition', reasons: [] }
+  return { classification: 'expected_composition', reasons: [], existingSource: current.source }
 }
 
 const importCategoryForSusNote = (note: ParsedSusNote): ImportCategory | null => {
@@ -905,6 +1147,14 @@ const importNoteInfoFromSusNote = (
     longNo: note.longNo,
     isSkip: category === 'Skip',
     source: note,
+    categorySource: note,
+    criticalSource: note.laneType === 1 && (note.type === 2 || note.type === 6 || note.type === 8)
+      ? note
+      : null,
+    flickSource: flick !== 'none' ? note : null,
+    lineTypeSource: lineType !== 'linear' ? note : null,
+    speedSource: note,
+    longNoSource: note,
     updateSources: [note],
     guideDict,
   }
@@ -956,7 +1206,7 @@ const addToImportDictionary = (
       'import',
       'dedup',
       incoming,
-      current,
+      decision.existingSource,
       titles[decision.classification],
       `${parsedNoteLabel(incoming.source, incoming.category)} 与 ${noteInfoLabel(current)} 位于游戏认定的同一时间和同一轨道起点，因此只会留下一个音符${detail}。请删除重复项，或错开它们的时间/轨道。`,
     ))
@@ -974,12 +1224,15 @@ const applyGuideInheritance = (target: ImportNoteInfo, inherited: ImportNoteInfo
   }
   if (inherited.critical) {
     target.critical = true
+    target.criticalSource = inherited.criticalSource ?? inherited.source
   }
   if (inherited.flick !== 'none') {
     target.flick = inherited.flick
+    target.flickSource = inherited.flickSource ?? inherited.source
   }
   if (inherited.lineType !== 'linear') {
     target.lineType = inherited.lineType
+    target.lineTypeSource = inherited.lineTypeSource ?? inherited.source
   }
 }
 
@@ -1081,15 +1334,19 @@ const attachRuntimeNode = (
   node: RuntimeNode,
   diagnostics: ConflictDiagnostic[],
 ): void => {
-  if (node.effectiveSpeed !== parent.effectiveSpeed) {
+  if (node.effectiveSpeed !== 1 && node.effectiveSpeed !== parent.effectiveSpeed) {
     diagnostics.push(makeImportDiagnostic(
       'child_speed_inherited',
       'maker',
       'dedup',
-      node.info,
-      parent.info,
+      node.info.speedSource,
+      parent.info.speedSource,
       '长条中间节点的单独差速不会生效',
       `${noteInfoLabel(node.info)} 写了 ${node.effectiveSpeed}x，但连接成长条后会统一使用起点的 ${parent.effectiveSpeed}x。若要改变整条长条的速度，请修改起点的差速。`,
+      {
+        source: `起点 ${parent.effectiveSpeed}x`,
+        target: `子节点 ${node.effectiveSpeed}x`,
+      },
     ))
   }
   node.effectiveSpeed = parent.effectiveSpeed
@@ -1216,6 +1473,20 @@ const laneOverlapsInclusive = (
     && Math.min(rightStart, rightEnd) <= Math.max(leftStart, leftEnd)
 }
 
+const isExpectedGuideModifierCleanup = (node: RuntimeNode, cover: RuntimeNode): boolean =>
+  serializedCategory(node) === 'FrictionHide'
+  && !node.info.guideDict
+  && cover.info.guideDict
+  && cover.root.kind === 'Guide'
+  && cover.root.children.length > 0
+  && node.info.positionKey === cover.info.positionKey
+  && node.info.importLane === cover.info.importLane
+  && node.info.width === cover.info.width
+  && (node.info.critical || node.info.flick !== 'none' || node.info.lineType !== 'linear')
+  && (!node.info.critical || cover.info.critical)
+  && (node.info.flick === 'none' || node.info.flick === cover.info.flick)
+  && (node.info.lineType === 'linear' || node.info.lineType === cover.info.lineType)
+
 const addMakerCleanupDiagnostics = (roots: RuntimeNode[], diagnostics: ConflictDiagnostic[]): void => {
   const nodes = runtimeNodes(roots)
   const byTick = new Map<number, RuntimeNode[]>()
@@ -1229,10 +1500,15 @@ const addMakerCleanupDiagnostics = (roots: RuntimeNode[], diagnostics: ConflictD
     if (!isCleanupCategory(serializedCategory(node)) || isConnectedRuntimeNode(node)) {
       continue
     }
-    const cover = byTick.get(node.info.tick)?.find((other) =>
+    const covers = byTick.get(node.info.tick)?.filter((other) =>
       other !== node
       && isConnectedRuntimeNode(other)
       && laneOverlapsInclusive(node.info, other.info))
+      ?? []
+    if (covers.some((cover) => isExpectedGuideModifierCleanup(node, cover))) {
+      continue
+    }
+    const cover = covers[0]
     if (!cover) {
       continue
     }
@@ -1243,7 +1519,11 @@ const addMakerCleanupDiagnostics = (roots: RuntimeNode[], diagnostics: ConflictD
       node.info,
       cover.info,
       '重叠的独立节点会在生成谱面时消失',
-      `${importCategoryLabel(serializedCategory(node))} 没有连接到其他节点，又与同一时刻的一条完整 ${importCategoryLabel(serializedCategory(cover))} 重叠，游戏生成最终谱面时会删除它。请把它连接成完整长条，或错开时间/轨道。`,
+      `${importCategoryLabel(serializedCategory(node))} 没有连接到其他节点，又与同一时刻的一条完整 ${importCategoryLabel(serializedCategory(cover))} 重叠，游戏生成最终谱面时会删除它。这里没有匹配到可安全合入 Guide 的辅助写法，请检查节点顺序、宽度和用途，或将它错开。`,
+      {
+        source: '重叠的已连接节点',
+        target: '会被清理',
+      },
     ))
   }
 }
@@ -1290,12 +1570,10 @@ const isLongChainRoot = (root: RuntimeNode): boolean =>
 const isGuideChainRoot = (root: RuntimeNode): boolean =>
   root.children.length > 0 && root.kind === 'Guide'
 
-const runtimePositionKey = (node: RuntimeNode): string => `${node.info.bar}:${node.info.barProgress}`
-
-const groupByPosition = (nodes: RuntimeNode[]): Map<string, RuntimeNode[]> => {
-  const result = new Map<string, RuntimeNode[]>()
+const groupByMakerTick = (nodes: RuntimeNode[]): Map<number, RuntimeNode[]> => {
+  const result = new Map<number, RuntimeNode[]>()
   for (const node of nodes) {
-    const key = runtimePositionKey(node)
+    const key = node.info.tick
     const list = result.get(key) ?? []
     list.push(node)
     result.set(key, list)
@@ -1312,7 +1590,7 @@ const addRelayPreviewDiagnostics = (roots: RuntimeNode[], diagnostics: ConflictD
     const relays = root.children.filter((node) => isGuide
       ? node.info.category === 'GuideHidden'
       : node.info.category === 'Connection' || node.info.category === 'Hidden' || node.info.isSkip)
-    for (const samePosition of groupByPosition(relays).values()) {
+    for (const samePosition of groupByMakerTick(relays).values()) {
       for (let index = 1; index < samePosition.length; index += 1) {
         const first = samePosition[index - 1]
         const second = samePosition[index]
@@ -1343,7 +1621,7 @@ const addCrossChainPreviewDiagnostics = (roots: RuntimeNode[], diagnostics: Conf
     .filter(isLongChainRoot)
     .flatMap((root) => [root, ...root.children])
 
-  for (const samePosition of groupByPosition(longNodes).values()) {
+  for (const samePosition of groupByMakerTick(longNodes).values()) {
     for (let leftIndex = 0; leftIndex < samePosition.length; leftIndex += 1) {
       const left = samePosition[leftIndex]
       if (!left) {

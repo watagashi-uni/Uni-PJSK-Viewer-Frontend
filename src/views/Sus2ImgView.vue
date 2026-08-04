@@ -154,7 +154,7 @@ const diagnosticSummaryText = computed(() => {
     return ''
   }
   if (!diagnostics.value.length) {
-    return '未发现会让音符在游戏读取后消失、发生覆盖，或导致预览异常的问题。'
+    return '未发现会让谱面内容在游戏读取后被忽略、覆盖，或导致预览异常的问题。'
   }
 
   const crashCount = diagnostics.value.filter((item) => item.severity === 'crash').length
@@ -163,7 +163,7 @@ const diagnosticSummaryText = computed(() => {
   const parts = [
     crashCount ? `${crashCount} 处会导致本家预览崩溃` : '',
     renderBugCount ? `${renderBugCount} 处可能导致显示异常` : '',
-    dedupCount ? `${dedupCount} 处会在游戏读取或生成谱面时发生变化` : '',
+    dedupCount ? `${dedupCount} 处谱面内容会在游戏读取或生成时发生变化` : '',
   ].filter(Boolean)
 
   return `共发现 ${diagnostics.value.length} 处问题，其中 ${parts.join('，另有 ')}。`
@@ -864,7 +864,7 @@ function clearForm() {
               @change="handleFileChange"
             />
             <div v-if="!isJsonInput" class="alert alert-info mt-3 py-3 text-sm">
-              <span>审核会模拟游戏读取和生成谱面的过程，并检查音符覆盖、长条连接、差速及已知预览异常</span>
+              <span>审核会模拟游戏读取和生成谱面的过程，并检查格式兼容性、音符覆盖、长条连接、差速及已知预览异常</span>
             </div>
           </div>
 
@@ -1181,13 +1181,13 @@ function clearForm() {
       </div>
     </section>
 
-    <div v-if="!isJsonInput && (hasAuditRun || auditError || (hasAuditRun && (resultSvgText || resultSvgError)))" class="mt-8 grid gap-6 xl:grid-cols-[380px_minmax(0,1fr)]">
-      <section class="card bg-base-100 shadow-lg">
-        <div class="card-body gap-4">
-          <div class="flex items-start justify-between gap-3">
-            <div>
-              <h2 class="card-title text-lg">SUS 兼容性检查结果</h2>
-              <p class="text-sm text-base-content/60 mt-1">{{ diagnosticSummaryText }}</p>
+    <div v-if="!isJsonInput && (hasAuditRun || auditError || (hasAuditRun && (resultSvgText || resultSvgError)))" class="mt-8 grid min-w-0 gap-6 xl:grid-cols-[380px_minmax(0,1fr)]">
+      <section class="card min-w-0 bg-base-100 shadow-lg">
+        <div class="card-body min-w-0 gap-4 p-4 sm:p-6">
+          <div class="flex min-w-0 flex-wrap items-start justify-between gap-3">
+            <div class="min-w-0 flex-1">
+              <h2 class="card-title break-words text-lg">SUS 兼容性检查结果</h2>
+              <p class="mt-1 break-words text-sm text-base-content/60">{{ diagnosticSummaryText }}</p>
             </div>
             <span v-if="diagnostics.length" class="badge badge-primary badge-outline">{{ diagnostics.length }}</span>
           </div>
@@ -1201,7 +1201,7 @@ function clearForm() {
           </div>
 
           <div v-else-if="dedupDiagnosticCount && !crashDiagnosticCount" class="alert alert-warning">
-            <span>发现 {{ dedupDiagnosticCount }} 处音符会在游戏读取或生成谱面时消失、被覆盖或改变。</span>
+            <span>发现 {{ dedupDiagnosticCount }} 处谱面内容会在游戏读取或生成时被忽略、覆盖或改变。</span>
           </div>
 
           <div v-if="auditError" class="alert alert-error">
@@ -1209,15 +1209,15 @@ function clearForm() {
           </div>
 
           <div v-else-if="hasAuditRun && !diagnostics.length" class="alert alert-success">
-            <span>当前谱面没有发现会让音符消失、发生覆盖，或导致预览异常的问题。</span>
+            <span>当前谱面没有发现会让内容被忽略、覆盖，或导致预览异常的问题。</span>
           </div>
 
-          <div v-else class="space-y-3 max-h-[70vh] overflow-auto pr-1">
+          <div v-else class="max-h-[70vh] min-w-0 space-y-3 overflow-y-auto overflow-x-hidden pr-1">
             <button
               v-for="item in diagnostics"
               :key="item.id"
               type="button"
-              class="w-full text-left rounded-xl border px-4 py-3 transition-colors"
+              class="w-full min-w-0 max-w-full overflow-hidden rounded-xl border px-3 py-3 text-left transition-colors sm:px-4"
               :class="[
                 item.severity === 'crash'
                   ? (item.id === selectedConflictId
@@ -1233,10 +1233,10 @@ function clearForm() {
               ]"
               @click="selectConflict(item.id)"
             >
-              <div class="flex items-start justify-between gap-3">
-                <div class="min-w-0">
-                  <div class="flex flex-wrap items-center gap-2">
-                    <div class="font-semibold text-sm">{{ item.title }}</div>
+              <div class="flex min-w-0 flex-wrap items-start justify-between gap-3">
+                <div class="min-w-0 flex-1">
+                  <div class="flex min-w-0 flex-wrap items-center gap-2">
+                    <div class="min-w-0 break-words text-sm font-semibold">{{ item.title }}</div>
                     <span
                       class="badge badge-sm shrink-0"
                       :class="item.severity === 'crash' ? 'badge-error' : 'badge-warning badge-outline'"
@@ -1247,12 +1247,12 @@ function clearForm() {
                       {{ item.stage === 'import' ? '读取时' : item.stage === 'maker' ? '生成谱面时' : '预览时' }}
                     </span>
                   </div>
-                  <div class="text-xs text-base-content/60 mt-1">{{ item.positionText }} · {{ item.trackText }}</div>
+                  <div class="mt-1 break-words text-xs text-base-content/60">{{ item.positionText }} · {{ item.trackText }}</div>
                 </div>
                 <span class="badge badge-outline shrink-0">{{ item.measure }}</span>
               </div>
               <p
-                class="text-sm mt-2 leading-6"
+                class="mt-2 break-words text-sm leading-6 [overflow-wrap:anywhere]"
                 :class="item.severity === 'crash' ? 'text-error' : item.severity === 'render_bug' ? 'text-warning' : 'text-base-content/70'"
               >
                 {{ item.summary }}
@@ -1262,8 +1262,8 @@ function clearForm() {
         </div>
       </section>
 
-      <section class="card bg-base-100 shadow-lg">
-        <div class="card-body gap-4">
+      <section class="card min-w-0 bg-base-100 shadow-lg">
+        <div class="card-body min-w-0 gap-4 p-4 sm:p-6">
           <div>
             <h2 class="card-title text-lg">SVG 高亮预览</h2>
             <p class="text-sm text-base-content/60 mt-1">
@@ -1283,7 +1283,7 @@ function clearForm() {
             <span>检查到冲突后会自动生成 SVG，并在这里显示定位高亮结果。</span>
           </div>
 
-          <div v-else-if="resultSvgText" ref="svgPreviewContainer" class="h-[58vh] overflow-auto rounded-xl border border-base-300 bg-white p-4 scroll-smooth">
+          <div v-else-if="resultSvgText" ref="svgPreviewContainer" class="h-[58vh] min-w-0 max-w-full overflow-auto rounded-xl border border-base-300 bg-white p-4 scroll-smooth">
             <!-- eslint-disable-next-line vue/no-v-html -->
             <div class="inline-block min-w-full [&_svg]:max-w-none" v-html="resultSvgText"></div>
           </div>
