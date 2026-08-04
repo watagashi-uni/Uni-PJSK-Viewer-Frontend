@@ -51,21 +51,11 @@ type ParsedFormatIssue = {
   trackText?: string
 }
 
-type ParsedHighSpeed = {
-  measure: number
-  tickOffset: number
-  barProgress: number
-  speedRatio: number
-  sourceOrder: number
-  tick: number
-}
-
 type ParsedSus = {
   rawNotes: ParsedSusNote[]
   barlengths: ParsedBarLength[]
   makerEventBars: number[]
   formatIssues: ParsedFormatIssue[]
-  highSpeeds: ParsedHighSpeed[]
 }
 
 type MarkerRole = 'kept' | 'suppressed' | 'source'
@@ -98,7 +88,6 @@ export type ConflictDiagnostic = {
     | 'export_cleanup'
     | 'child_speed_inherited'
     | 'ambiguous_overlap'
-    | 'dense_speed_guide_after_hispeed'
   stage: 'import' | 'maker' | 'preview'
   severity: 'dedup' | 'crash' | 'render_bug'
   title: string
@@ -271,48 +260,6 @@ const parseInt32 = (text: string): number | null => {
     : null
 }
 
-const approximatelyFloat32 = (left: number, right: number): boolean => {
-  const difference = Math.abs(left - right)
-  return difference < Math.max(0.000001 * Math.max(Math.abs(left), Math.abs(right)), 1.401298e-45 * 8)
-}
-
-const getEffectiveHighSpeedChanges = (events: ParsedHighSpeed[]): ParsedHighSpeed[] => {
-  const sorted = [...events].sort((left, right) => {
-    if (left.measure !== right.measure) {
-      return left.measure - right.measure
-    }
-    if (left.barProgress !== right.barProgress) {
-      return left.barProgress - right.barProgress
-    }
-    return left.sourceOrder - right.sourceOrder
-  })
-  const result: ParsedHighSpeed[] = []
-  let currentSpeed = f32(1)
-  let index = 0
-  while (index < sorted.length) {
-    const first = sorted[index]
-    if (!first) {
-      index += 1
-      continue
-    }
-    let finalAtPosition = first
-    index += 1
-    while (
-      index < sorted.length
-      && sorted[index]?.measure === first.measure
-      && approximatelyFloat32(sorted[index]?.barProgress ?? 0, first.barProgress)
-    ) {
-      finalAtPosition = sorted[index] ?? finalAtPosition
-      index += 1
-    }
-    if (finalAtPosition.speedRatio !== currentSpeed) {
-      result.push(finalAtPosition)
-      currentSpeed = finalAtPosition.speedRatio
-    }
-  }
-  return result
-}
-
 const parseNoteCells = (rawData: string): ParsedNoteCells => {
   const data = rawData.split('\t').join('')
   const cells: ParsedNoteCell[] = []
@@ -455,9 +402,6 @@ const parseSusTextForAudit = (content: string): ParsedSus => {
   const makerEventBars = new Set<number>([0])
   const bpmIds = new Set<string>()
   const formatIssues: ParsedFormatIssue[] = []
-  const highSpeeds: ParsedHighSpeed[] = []
-  let nextHighSpeedOrder = 0
-
   const appendTimelineFormatIssue = (
     id: string,
     title: string,
@@ -548,7 +492,6 @@ const parseSusTextForAudit = (content: string): ParsedSus => {
   const appendUnsupportedLongChannelIssue = (
     line: SusDataLine,
     laneType: number,
-    channel: string,
   ): void => {
     const parsed = parseNoteCells(line.data)
     const first = parsed.cells[0]
@@ -560,9 +503,9 @@ const parseSusTextForAudit = (content: string): ParsedSus => {
     const barProgress = f32(f32(first.slotIndex) / f32(parsed.slotTotal))
     formatIssues.push({
       id: 'unsupported-long-channel',
-      title: '部分长条或 Guide 使用了游戏不支持的编号',
+      title: '同一时段重合的长条或 Guide 太多',
       severity: 'dedup',
-      markerLabel: `编号 ${channel} 不受支持`,
+      markerLabel: '这一组读不出来',
       measure: line.measure,
       bar: line.measure + barProgress,
       barProgress,
@@ -574,7 +517,7 @@ const parseSusTextForAudit = (content: string): ParsedSus => {
       laneType,
       longNo: -1,
       tick: 0,
-      summary: `检测到编号 ${channel}。游戏只识别 0–f，这一编号对应的整组长条或 Guide 都会消失。请减少同一时段并存的长条/Guide，确保只使用 0–f；这里只标出第一个位置。`,
+      summary: '同一时段重合的长条或 Guide 超过了 16 组，后面的内容游戏读不出来。请错开其中一些长条或 Guide 的起止时间，减少同时存在的数量；这里只标出第一组读不出来的位置。',
     })
   }
 
@@ -668,27 +611,6 @@ const parseSusTextForAudit = (content: string): ParsedSus => {
         embeddedMatch = embeddedEventRegex.exec(normalized)
       }
     }
-    if (rawLine.includes('#TIL00')) {
-      const normalized = rawLine
-        .split('"').join('')
-        .split('#TIL00:').join('')
-        .split(',').join('\r')
-        .trim()
-      const highSpeedRegex = /(\d+)'(\d+):([-+]?(?:\d+(?:\.\d*)?|\.\d+))(?:\r|$)/gu
-      let highSpeedMatch = highSpeedRegex.exec(normalized)
-      while (highSpeedMatch) {
-        const parsedSpeed = parseFloat32(highSpeedMatch[3] ?? '', 1)
-        highSpeeds.push({
-          measure: Number.parseInt(highSpeedMatch[1] ?? '0', 10),
-          tickOffset: Number.parseInt(highSpeedMatch[2] ?? '0', 10),
-          barProgress: 0,
-          speedRatio: parsedSpeed.value,
-          sourceOrder: nextHighSpeedOrder++,
-          tick: 0,
-        })
-        highSpeedMatch = highSpeedRegex.exec(normalized)
-      }
-    }
     if (!rawLine.startsWith('#')) {
       continue
     }
@@ -779,7 +701,7 @@ const parseSusTextForAudit = (content: string): ParsedSus => {
       if (longNo !== -1) {
         appendNotes(line, laneType, longNo)
       } else if (/^[g-z]$/u.test(header[5] ?? '')) {
-        appendUnsupportedLongChannelIssue(line, laneType, header[5] ?? '')
+        appendUnsupportedLongChannelIssue(line, laneType)
       }
     }
   }
@@ -793,33 +715,11 @@ const parseSusTextForAudit = (content: string): ParsedSus => {
   for (const issue of formatIssues) {
     issue.tick = getMakerTicks(barlengths, [...makerEventBars], issue.measure, issue.barProgress)
   }
-  for (const highSpeed of highSpeeds) {
-    let timeSignature = f32(4)
-    for (const change of [...barlengths].sort((left, right) => left.bar === right.bar
-      ? left.sourceOrder - right.sourceOrder
-      : left.bar - right.bar)) {
-      if (change.bar > highSpeed.measure) {
-        break
-      }
-      timeSignature = change.length
-    }
-    const sourceBarTicks = f32(f32(timeSignature) * f32(ticksPerBeat))
-    highSpeed.barProgress = sourceBarTicks > 0
-      ? Math.max(0, f32(f32(highSpeed.tickOffset) / sourceBarTicks))
-      : 0
-    highSpeed.tick = getMakerTicks(
-      barlengths,
-      [...makerEventBars],
-      highSpeed.measure,
-      highSpeed.barProgress,
-    )
-  }
   return {
     rawNotes,
     barlengths,
     makerEventBars: [...makerEventBars],
     formatIssues,
-    highSpeeds: getEffectiveHighSpeedChanges(highSpeeds),
   }
 }
 
@@ -1663,93 +1563,12 @@ const addCrossChainPreviewDiagnostics = (roots: RuntimeNode[], diagnostics: Conf
   }
 }
 
-const getRuntimeChainEndTick = (root: RuntimeNode): number =>
-  Math.max(root.info.tick, ...root.children.map((child) => child.info.tick))
-
-const addDenseSpeedGuideDiagnostics = (
-  sus: ParsedSus,
-  roots: RuntimeNode[],
-  diagnostics: ConflictDiagnostic[],
-): void => {
-  // master.sus reproduces the game-side failure with 16 overlapping Notespeed Guides
-  // starting within roughly a quarter beat of the last global hi-speed event.
-  const maxDelayTicks = 120
-  const minimumConcurrentGuides = 12
-  const speedEvents = [...sus.highSpeeds].sort((left, right) => left.tick === right.tick
-    ? left.sourceOrder - right.sourceOrder
-    : left.tick - right.tick)
-  const speedGuides = roots.filter((root) =>
-    isGuideChainRoot(root)
-    && root.effectiveSpeed !== 1
-    && Number.isFinite(root.effectiveSpeed))
-  const rootsByEvent = new Map<number, { event: ParsedHighSpeed; roots: RuntimeNode[] }>()
-
-  for (const root of speedGuides) {
-    let precedingEvent: ParsedHighSpeed | undefined
-    for (const event of speedEvents) {
-      if (event.tick > root.info.tick) {
-        break
-      }
-      precedingEvent = event
-    }
-    if (!precedingEvent || root.info.tick - precedingEvent.tick > maxDelayTicks) {
-      continue
-    }
-    const group = rootsByEvent.get(precedingEvent.sourceOrder) ?? { event: precedingEvent, roots: [] }
-    group.roots.push(root)
-    rootsByEvent.set(precedingEvent.sourceOrder, group)
-  }
-
-  for (const { event, roots: nearbyRoots } of rootsByEvent.values()) {
-    let peakRoots: RuntimeNode[] = []
-    for (const candidate of nearbyRoots) {
-      const active = nearbyRoots.filter((root) =>
-        root.info.tick <= candidate.info.tick
-        && getRuntimeChainEndTick(root) >= candidate.info.tick)
-      if (active.length > peakRoots.length) {
-        peakRoots = active
-      }
-    }
-    if (peakRoots.length < minimumConcurrentGuides) {
-      continue
-    }
-
-    const first = [...peakRoots].sort((left, right) => left.info.tick - right.info.tick)[0]
-    if (!first) {
-      continue
-    }
-    const distinctSpeeds = [...new Set(peakRoots.map((root) => root.effectiveSpeed))]
-      .sort((left, right) => left - right)
-    diagnostics.push({
-      id: `dense-speed-guide-after-hispeed-${event.sourceOrder}`,
-      category: 'dense_speed_guide_after_hispeed',
-      stage: 'preview',
-      severity: 'render_bug',
-      title: '全局变速后紧接着出现了过多差速 Guide',
-      summary: `全局速度切到 ${event.speedRatio}x 后几乎立刻出现了 ${peakRoots.length} 条同时显示的差速 Guide（速度为 ${distinctSpeeds.join('/')}x）。游戏能够读入这些 Guide，但预览时它们可能闪到面板上方并停住，直到 Guide 结束才消失。建议减少同时出现的 Guide，或把它们与全局变速错开。`,
-      measure: first.info.source.measure,
-      positionText: getPositionText(
-        first.info.source.measure,
-        first.info.source.slotIndex,
-        first.info.source.slotTotal,
-      ),
-      trackText: `多轨道（峰值 ${peakRoots.length} 条 Guide）`,
-      markers: peakRoots.map((root, index) =>
-        makeImportMarker('source', `dense-guide-${event.sourceOrder}-${index}`, `${root.effectiveSpeed}x Guide`, root.info)),
-      sortTick: first.info.tick,
-      sortLane: Math.min(...peakRoots.map((root) => root.info.importLane)),
-    })
-  }
-}
-
 const addPreviewDiagnostics = (
-  sus: ParsedSus,
   roots: RuntimeNode[],
   diagnostics: ConflictDiagnostic[],
 ): void => {
   addRelayPreviewDiagnostics(roots, diagnostics)
   addCrossChainPreviewDiagnostics(roots, diagnostics)
-  addDenseSpeedGuideDiagnostics(sus, roots, diagnostics)
 }
 
 const deduplicateDiagnostics = (diagnostics: ConflictDiagnostic[]): ConflictDiagnostic[] => {
@@ -1766,7 +1585,7 @@ const deduplicateDiagnostics = (diagnostics: ConflictDiagnostic[]): ConflictDiag
 export const analyzeSusConflicts = (susText: string): ConflictDiagnostic[] => {
   const parsed = parseSusTextForAudit(susText)
   const { diagnostics, roots } = buildGameImport(parsed)
-  addPreviewDiagnostics(parsed, roots, diagnostics)
+  addPreviewDiagnostics(roots, diagnostics)
   const result = deduplicateDiagnostics(diagnostics)
   const severityOrder: Record<ConflictDiagnostic['severity'], number> = {
     crash: 0,

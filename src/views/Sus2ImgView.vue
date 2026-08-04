@@ -864,7 +864,7 @@ function clearForm() {
               @change="handleFileChange"
             />
             <div v-if="!isJsonInput" class="alert alert-info mt-3 py-3 text-sm">
-              <span>审核会模拟游戏读取和生成谱面的过程，并检查格式兼容性、音符覆盖、长条连接、差速及已知预览异常</span>
+              <span>SUS 读取已完全还原游戏逻辑，会自动去重和一些其他重叠处理操作</span>
             </div>
           </div>
 
