@@ -8,6 +8,7 @@ type RustDrawing = {
     setGenerator: (generator: string) => void
     setNoteHost: (noteHost: string) => void
     setNoteAssetExtension: (extension: string) => void
+    setStyleSheet: (styleSheet?: string) => void
     svg: (score: RustScore) => string
     noteSize: number
     timeHeight: number
@@ -39,6 +40,25 @@ export type RustRendererInput = {
 }
 
 let modulePromise: Promise<RustRendererModule> | null = null
+
+const RUST_LIGHT_STYLE = `
+.bar-count-flag { stroke: #606060; }
+.bar-count-text { fill: #606060; }
+.event-flag { stroke: #7f0000; }
+.event-text { fill: #808080; }
+.lyric-text { fill: #606060; }
+.tick-text { fill: #000000; }
+.tick-line { stroke: #808080; }
+.title, .subtitle { fill: #000000; }
+`
+
+// The current Rust SVG build preserves the source PNG's aspect ratio in the
+// extremely wide middle nine-slice symbol. That collapses the visible center
+// while leaving both end caps intact.
+const fixRustSvgNoteSlices = (svg: string): string => svg.replace(
+    /(<symbol id="notes-\d+-middle"[^>]*>\s*<image)(?![^>]*\bpreserveAspectRatio=)/gu,
+    '$1 preserveAspectRatio="none"',
+)
 
 const publicAssetUrl = (path: string): string => {
     const base = import.meta.env.BASE_URL || '/'
@@ -79,10 +99,11 @@ export const renderCustomScoreJsonWithRust = async (input: RustRendererInput): P
         drawing = new module.Drawing()
         drawing.setNoteHost(input.noteHost)
         drawing.setNoteAssetExtension('png')
+        drawing.setStyleSheet(RUST_LIGHT_STYLE)
         drawing.setGenerator('Uni PJSK Viewer / pjsekai-scores-rs')
         drawing.noteSize = input.noteSize
         drawing.timeHeight = input.timeHeight
-        return drawing.svg(score)
+        return fixRustSvgNoteSlices(drawing.svg(score))
     } finally {
         drawing?.free()
         if (score !== sourceScore) {
