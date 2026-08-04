@@ -15,6 +15,12 @@ type SusToJsonFactory = (options: {
 
 let modulePromise: Promise<SusToJsonModule> | null = null
 
+// Keep the Emscripten glue and binary on content-addressed URLs. They must be
+// deployed and cached as a pair: different Emscripten builds use incompatible
+// import module names (for example `env` versus minified `a`).
+const SUS_TO_JSON_GLUE_PATH = 'wasm/sus-to-json/sus_to_json_wasm.f519fc16.js'
+const SUS_TO_JSON_BINARY_PATH = 'wasm/sus-to-json/sus_to_json_wasm.5d16616d.wasm'
+
 const publicAssetUrl = (path: string): string => {
     const base = import.meta.env.BASE_URL || '/'
     const normalizedBase = base.endsWith('/') ? base : `${base}/`
@@ -23,10 +29,12 @@ const publicAssetUrl = (path: string): string => {
 
 const loadSusToJsonModule = async (): Promise<SusToJsonModule> => {
     if (!modulePromise) {
-        const moduleUrl = publicAssetUrl('wasm/sus-to-json/sus_to_json_wasm.js')
+        const moduleUrl = publicAssetUrl(SUS_TO_JSON_GLUE_PATH)
         modulePromise = import(/* @vite-ignore */ moduleUrl).then((module) =>
             (module as { default: SusToJsonFactory }).default({
-                locateFile: (file: string) => publicAssetUrl(`wasm/sus-to-json/${file}`),
+                locateFile: (file: string) => file.endsWith('.wasm')
+                    ? publicAssetUrl(SUS_TO_JSON_BINARY_PATH)
+                    : publicAssetUrl(`wasm/sus-to-json/${file}`),
             }),
         )
     }
