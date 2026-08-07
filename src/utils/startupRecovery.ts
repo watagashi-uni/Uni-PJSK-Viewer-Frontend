@@ -39,7 +39,7 @@ function isAssetLoadError(reason: unknown): boolean {
   return ASSET_ERROR_PATTERN.test(errorMessage(reason))
 }
 
-function renderStartupFailure(message: string) {
+function renderStartupFailure(message: string, requiresBrowserRestart = false) {
   const app = document.getElementById('app')
   if (!app) return
 
@@ -56,11 +56,24 @@ function renderStartupFailure(message: string) {
 
   const retry = document.createElement('button')
   retry.type = 'button'
-  retry.textContent = '重新加载'
+  retry.textContent = requiresBrowserRestart ? '再次尝试切换版本' : '重新加载'
   retry.style.cssText = 'border:0;border-radius:.75rem;padding:.75rem 1.25rem;background:#ff85a1;color:white;font-weight:700;cursor:pointer'
-  retry.addEventListener('click', () => {
+  retry.addEventListener('click', async () => {
     clearRecoveryAttempt()
-    window.location.reload()
+    retry.disabled = true
+    retry.textContent = '正在切换版本……'
+    try {
+      const ready = await checkForPwaUpdate()
+      if (ready) {
+        window.location.reload()
+        return
+      }
+    } catch (error) {
+      console.error('PWA: Manual update recovery failed', error)
+    }
+    description.textContent = '浏览器仍在使用旧版本。请关闭本站所有标签页后重新打开；如果仍未恢复，请彻底退出并重启浏览器。'
+    retry.disabled = false
+    retry.textContent = '再次尝试切换版本'
   })
 
   panel.append(title, description, retry)
@@ -83,10 +96,18 @@ async function recoverFromAssetLoadFailure(reason: unknown) {
   }
 
   writeRecoveryAttempt()
+  let updateReady = true
   try {
-    await checkForPwaUpdate()
+    updateReady = await checkForPwaUpdate()
   } catch (error) {
     console.error('PWA: Update check during startup recovery failed', error)
+  }
+  if (!updateReady) {
+    renderStartupFailure(
+      '新版本已找到，但浏览器未能让它接管当前页面。请关闭本站所有标签页后重新打开；如果仍未恢复，请彻底退出并重启浏览器。',
+      true,
+    )
+    return
   }
   window.location.reload()
 }

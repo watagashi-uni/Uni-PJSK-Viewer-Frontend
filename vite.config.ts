@@ -14,6 +14,9 @@ export default defineConfig({
       injectRegister: 'auto',
       workbox: {
         importScripts: ['push-sw.js'],
+        // 用户确认更新或启动恢复发送 SKIP_WAITING 后，立即接管现有页面，
+        // 避免普通刷新仍由旧 SW 控制，直到浏览器完全退出才完成切换。
+        clientsClaim: true,
         // 只预缓存入口与 PWA 元数据；页面 chunk 继续按实际访问情况写入运行时缓存。
         globPatterns: ['**/*.{html,ico,svg,webmanifest}'],
         // 2. 排除隐藏页面和特定文件的预缓存

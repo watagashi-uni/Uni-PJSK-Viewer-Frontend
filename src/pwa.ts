@@ -48,19 +48,27 @@ export async function applyPwaUpdate(): Promise<void> {
   await updateServiceWorker(true)
 }
 
-function waitForWorkerState(worker: ServiceWorker, targetStates: ReadonlySet<ServiceWorkerState>): Promise<void> {
+function waitForWorkerState(
+  worker: ServiceWorker,
+  targetStates: ReadonlySet<ServiceWorkerState>,
+): Promise<boolean> {
   if (targetStates.has(worker.state) || worker.state === 'redundant') {
-    return Promise.resolve()
+    return Promise.resolve(targetStates.has(worker.state))
   }
 
   return new Promise((resolve) => {
-    const timeout = window.setTimeout(resolve, 8_000)
-    worker.addEventListener('statechange', () => {
+    const finish = (result: boolean) => {
+      window.clearTimeout(timeout)
+      worker.removeEventListener('statechange', handleStateChange)
+      resolve(result)
+    }
+    const handleStateChange = () => {
       if (targetStates.has(worker.state) || worker.state === 'redundant') {
-        window.clearTimeout(timeout)
-        resolve()
+        finish(targetStates.has(worker.state))
       }
-    })
+    }
+    const timeout = window.setTimeout(() => finish(false), 20_000)
+    worker.addEventListener('statechange', handleStateChange)
   })
 }
 
@@ -68,22 +76,25 @@ function waitForWorkerState(worker: ServiceWorker, targetStates: ReadonlySet<Ser
  * Ask the browser to check for a complete new app shell. This never clears
  * user data or runtime data caches; it is only used by startup recovery.
  */
-export async function checkForPwaUpdate(): Promise<void> {
-  if (!('serviceWorker' in navigator)) return
+export async function checkForPwaUpdate(): Promise<boolean> {
+  if (!('serviceWorker' in navigator)) return true
 
   const currentRegistration = registration ?? await navigator.serviceWorker.getRegistration()
-  if (!currentRegistration) return
+  if (!currentRegistration) return true
 
   registration = await currentRegistration.update()
-  if (registration.installing) {
-    await waitForWorkerState(registration.installing, new Set(['installed', 'activated']))
+  const installingWorker = registration.installing
+  if (installingWorker) {
+    const installed = await waitForWorkerState(installingWorker, new Set(['installed', 'activated']))
+    if (!installed) return false
   }
 
   const waitingWorker = registration.waiting
+    ?? (installingWorker?.state === 'installed' ? installingWorker : undefined)
   if (waitingWorker) {
     waitingWorker.postMessage({ type: 'SKIP_WAITING' })
-    // registerType=prompt 不会主动 claim 当前页面。等新 SW 真正激活后再由调用方刷新，
-    // 可避免刷新请求仍被旧 SW 接管一次。
-    await waitForWorkerState(waitingWorker, new Set(['activated']))
+    return waitForWorkerState(waitingWorker, new Set(['activated']))
   }
+
+  return !registration.installing
 }

@@ -1,4 +1,66 @@
 /* global clients */
+// Permanent compatibility bridge for clients that can only load an older
+// cached index.html. The migration runs once per browser profile, even if the
+// user skips several releases, then all later updates return to prompt mode.
+const lifecycleMigrationCache = 'pwa-lifecycle-migration-v1';
+const lifecycleMigrationPending = '/__pwa_lifecycle_migration_pending__';
+const lifecycleMigrationComplete = '/__pwa_lifecycle_migration_complete__';
+
+self.addEventListener('install', function (e) {
+    e.waitUntil(
+        caches.open(lifecycleMigrationCache).then(async function (cache) {
+            if (await cache.match(lifecycleMigrationComplete)) {
+                return;
+            }
+
+            // Only migrated updates need to force-navigate existing windows.
+            // A first-ever install has no active worker and should stay quiet.
+            const migrationType = self.registration.active ? 'update' : 'initial';
+            await cache.put(lifecycleMigrationPending, new Response(migrationType));
+            await self.skipWaiting();
+        })
+    );
+});
+
+self.addEventListener('activate', function (e) {
+    e.waitUntil(
+        caches.open(lifecycleMigrationCache).then(async function (cache) {
+            if (await cache.match(lifecycleMigrationComplete)) {
+                return;
+            }
+
+            const pendingMigration = await cache.match(lifecycleMigrationPending);
+            const migrationType = pendingMigration ? await pendingMigration.text() : 'update';
+
+            // Persist completion before navigating so a reload can never repeat
+            // the migration or enter a controller-change loop.
+            await cache.put(lifecycleMigrationComplete, new Response('complete'));
+            await cache.delete(lifecycleMigrationPending);
+            await clients.claim();
+
+            if (migrationType !== 'update') {
+                return;
+            }
+
+            const windowClients = await clients.matchAll({
+                type: 'window',
+                includeUncontrolled: true
+            });
+            await Promise.all(windowClients.map(function (client) {
+                if (
+                    new URL(client.url).origin === self.location.origin &&
+                    'navigate' in client
+                ) {
+                    return client.navigate(client.url).catch(function () {
+                        return null;
+                    });
+                }
+                return null;
+            }));
+        })
+    );
+});
+
 self.addEventListener('push', function (e) {
     if (!(self.Notification && self.Notification.permission === 'granted')) {
         return;

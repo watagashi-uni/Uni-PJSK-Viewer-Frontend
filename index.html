@@ -22,9 +22,30 @@
       const app = document.getElementById('app')
       const recoveryAttemptKey = 'pwa_asset_recovery_attempted'
       let rendered = false
+      let switchInProgress = false
+      let fallbackDescription
+      let fallbackRetry
+      const initialController = 'serviceWorker' in navigator
+        ? navigator.serviceWorker.controller
+        : null
+
+      // When a new SW claims this page, reload immediately so the document and
+      // all hashed chunks come from the same deployment. Ignore first install,
+      // where there was no previous controller to replace.
+      if (initialController) {
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (navigator.serviceWorker.controller !== initialController) {
+            window.location.reload()
+          }
+        }, { once: true })
+      }
 
       const renderFallback = (message = '应用资源没有成功加载，请检查网络后重新加载。') => {
-        if (rendered || !app || app.childElementCount > 0) return
+        if (rendered) {
+          if (fallbackDescription) fallbackDescription.textContent = message
+          return
+        }
+        if (!app || app.childElementCount > 0) return
         rendered = true
 
         const panel = document.createElement('main')
@@ -35,20 +56,96 @@
         const description = document.createElement('p')
         description.textContent = message
         description.style.cssText = 'line-height:1.7;margin:0 0 1.5rem'
+        fallbackDescription = description
         const retry = document.createElement('button')
         retry.type = 'button'
-        retry.textContent = '重新加载'
+        retry.textContent = '尝试切换并重新加载'
         retry.style.cssText = 'border:0;border-radius:.75rem;padding:.75rem 1.25rem;background:#ff85a1;color:white;font-weight:700;cursor:pointer'
-        retry.addEventListener('click', () => {
-          try {
-            sessionStorage.removeItem(recoveryAttemptKey)
-          } catch {
-            // Ignore unavailable storage.
-          }
-          window.location.reload()
-        })
+        retry.addEventListener('click', () => void reloadWithLatestWorker())
+        fallbackRetry = retry
         panel.append(title, description, retry)
         app.replaceChildren(panel)
+      }
+
+      const waitForWorkerState = (worker, targetStates, timeoutMs = 20_000) => {
+        const desiredStates = new Set(targetStates)
+        if (desiredStates.has(worker.state) || worker.state === 'redundant') {
+          return Promise.resolve(desiredStates.has(worker.state))
+        }
+
+        return new Promise((resolve) => {
+          const finish = (result) => {
+            window.clearTimeout(timeout)
+            worker.removeEventListener('statechange', handleStateChange)
+            resolve(result)
+          }
+          const handleStateChange = () => {
+            if (desiredStates.has(worker.state) || worker.state === 'redundant') {
+              finish(desiredStates.has(worker.state))
+            }
+          }
+          const timeout = window.setTimeout(() => finish(false), timeoutMs)
+          worker.addEventListener('statechange', handleStateChange)
+        })
+      }
+
+      const prepareLatestWorker = async () => {
+        if (!('serviceWorker' in navigator)) return true
+
+        const registration = await navigator.serviceWorker.getRegistration()
+        if (!registration) return true
+
+        let installingWorker = registration.installing
+        if (!registration.waiting && !installingWorker) {
+          await registration.update()
+          installingWorker = registration.installing
+        }
+
+        if (installingWorker) {
+          const installed = installingWorker.state === 'activated'
+            || await waitForWorkerState(installingWorker, ['installed', 'activated'])
+          if (!installed) return false
+        }
+
+        const waitingWorker = registration.waiting
+          || (installingWorker?.state === 'installed' ? installingWorker : undefined)
+        if (!waitingWorker) return true
+
+        waitingWorker.postMessage({ type: 'SKIP_WAITING' })
+        return waitForWorkerState(waitingWorker, ['activated'])
+      }
+
+      const reloadWithLatestWorker = async () => {
+        if (switchInProgress) return
+        switchInProgress = true
+
+        try {
+          sessionStorage.removeItem(recoveryAttemptKey)
+        } catch {
+          // Ignore unavailable storage.
+        }
+
+        if (fallbackRetry) {
+          fallbackRetry.disabled = true
+          fallbackRetry.textContent = '正在切换版本……'
+        }
+        renderFallback('正在确认并切换到最新应用版本，请稍候……')
+
+        try {
+          if (await prepareLatestWorker()) {
+            window.location.reload()
+            return
+          }
+        } catch (error) {
+          console.error('PWA: Inline startup recovery failed', error)
+        }
+
+        renderFallback('浏览器仍在使用旧版本。请关闭本站所有标签页后重新打开；如果仍未恢复，请彻底退出并重启浏览器。')
+        if (fallbackRetry) {
+          fallbackRetry.disabled = false
+          fallbackRetry.textContent = '再次尝试切换版本'
+        }
+        switchInProgress = false
       }
 
       const recoverFromEntryFailure = () => {
@@ -60,15 +157,15 @@
         try {
           if (sessionStorage.getItem(recoveryAttemptKey) !== '1') {
             sessionStorage.setItem(recoveryAttemptKey, '1')
-            renderFallback('应用资源没有成功加载，正在重新获取最新版本……')
-            window.setTimeout(() => window.location.reload(), 1_500)
+            renderFallback('应用资源没有成功加载，正在尝试切换到最新版本……')
+            void reloadWithLatestWorker()
             return
           }
         } catch {
           // Storage may be unavailable; show a manual recovery action instead.
         }
 
-        renderFallback()
+        renderFallback('应用资源仍未加载成功。请尝试切换版本；如果仍未恢复，请关闭本站所有标签页或重启浏览器。')
       }
 
       const timeout = window.setTimeout(renderFallback, 15_000)
