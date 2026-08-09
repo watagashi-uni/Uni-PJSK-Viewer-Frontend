@@ -25,6 +25,15 @@ interface UserCharacter {
   total_exp?: number
 }
 
+interface UserCharacterLiveUsage {
+  characterId?: number
+  character_id?: number
+  characterLiveUsageType?: string
+  character_live_usage_type?: string
+  usageCount?: number
+  usage_count?: number
+}
+
 interface CharacterRank {
   characterId: number
   characterRank: number
@@ -53,6 +62,7 @@ const stamps = ref<StampData[]>([])
 const characterRanks = ref<CharacterRank[]>([])
 const levels = ref<CharacterLevel[]>([])
 const searchQuery = ref('')
+const sortMode = ref<'default' | 'rank' | 'leader' | 'member'>('default')
 const isLoading = ref(true)
 const loadError = ref('')
 
@@ -82,6 +92,22 @@ const userCharacterMap = computed(() => {
   for (const row of rows as UserCharacter[]) {
     const id = Number(row.characterId ?? row.character_id)
     if (Number.isFinite(id)) result.set(id, row)
+  }
+  return result
+})
+
+const liveUsageMap = computed(() => {
+  const result = new Map<number, { leader: number; member: number }>()
+  const rows = suite.value?.userCharacterLiveUsageCounts ?? suite.value?.user_character_live_usage_counts
+  if (!Array.isArray(rows)) return result
+  for (const row of rows as UserCharacterLiveUsage[]) {
+    const id = Number(row.characterId ?? row.character_id)
+    const type = String(row.characterLiveUsageType ?? row.character_live_usage_type ?? '')
+    const count = Number(row.usageCount ?? row.usage_count ?? 0)
+    if (!Number.isFinite(id) || (type !== 'leader' && type !== 'member')) continue
+    const usage = result.get(id) || { leader: 0, member: 0 }
+    usage[type] = Number.isFinite(count) ? count : 0
+    result.set(id, usage)
   }
   return result
 })
@@ -131,6 +157,11 @@ const selectedCharacterRankBonus = computed(() => {
   return characterRankMap.value.get(`${selectedCharacter.value.id}_${rank}`) || null
 })
 
+const selectedCharacterLiveUsage = computed(() => {
+  if (!selectedCharacter.value) return null
+  return liveUsageMap.value.get(selectedCharacter.value.id) || null
+})
+
 const cardCounts = computed(() => {
   const result = new Map<number, number>()
   for (const card of cards.value) result.set(card.characterId, (result.get(card.characterId) || 0) + 1)
@@ -161,7 +192,17 @@ const groupedCharacters = computed(() => {
             character.id,
           ].some(value => String(value || '').toLocaleLowerCase().includes(query))
         })
-        .sort((a, b) => a.seq - b.seq)
+        .sort((a, b) => {
+          if (sortMode.value === 'rank') {
+            const aRank = userCharacterMap.value.get(a.id)
+            const bRank = userCharacterMap.value.get(b.id)
+            return (bRank ? getUserCharacterRank(bRank) : 0) - (aRank ? getUserCharacterRank(aRank) : 0) || a.seq - b.seq
+          }
+          if (sortMode.value === 'leader' || sortMode.value === 'member') {
+            return (liveUsageMap.value.get(b.id)?.[sortMode.value] || 0) - (liveUsageMap.value.get(a.id)?.[sortMode.value] || 0) || a.seq - b.seq
+          }
+          return a.seq - b.seq
+        })
       return { unit, profile, items }
     })
     .filter(group => group.items.length > 0)
@@ -221,6 +262,10 @@ function getRankProgress(row: UserCharacter) {
 
 function formatBonus(value: number): string {
   return Number(value || 0).toLocaleString('zh-CN', { maximumFractionDigits: 2 })
+}
+
+function formatCount(value: number): string {
+  return Number(value || 0).toLocaleString('zh-CN')
 }
 
 function openCharacter(character: GameCharacterData) {
@@ -357,6 +402,17 @@ onMounted(async () => {
               当前账号没有这个角色的成长记录。
             </div>
 
+            <div v-if="selectedCharacterLiveUsage" class="grid grid-cols-2 gap-3">
+              <div class="rounded-lg bg-base-200/70 p-3">
+                <p class="text-xs text-base-content/50">队长 Live 使用</p>
+                <p class="text-xl font-bold mt-1">{{ formatCount(selectedCharacterLiveUsage.leader) }}<span class="text-xs font-normal text-base-content/50 ml-1">次</span></p>
+              </div>
+              <div class="rounded-lg bg-base-200/70 p-3">
+                <p class="text-xs text-base-content/50">成员 Live 使用</p>
+                <p class="text-xl font-bold mt-1">{{ formatCount(selectedCharacterLiveUsage.member) }}<span class="text-xs font-normal text-base-content/50 ml-1">次</span></p>
+              </div>
+            </div>
+
             <dl v-if="selectedProfile" class="grid sm:grid-cols-2 gap-3 text-sm">
               <div v-if="selectedProfile.birthday" class="bg-base-200/70 rounded-lg p-3">
                 <dt class="text-base-content/50 text-xs">生日</dt><dd class="font-medium mt-1">{{ selectedProfile.birthday }}</dd>
@@ -416,6 +472,12 @@ onMounted(async () => {
           <div v-if="accountStore.accounts.length" class="w-full sm:w-56">
             <AccountSelector v-model="selectedUserId" />
           </div>
+          <select v-model="sortMode" class="select select-bordered w-full sm:w-40 bg-base-100">
+            <option value="default">默认顺序</option>
+            <option value="rank">Rank 由高到低</option>
+            <option value="leader">队长次数排序</option>
+            <option value="member">成员次数排序</option>
+          </select>
           <label class="input input-bordered flex items-center gap-2 w-full sm:w-72 bg-base-100">
             <Search class="w-4 h-4 opacity-50" />
             <input v-model="searchQuery" class="grow" placeholder="搜索角色或组合…" />
@@ -471,6 +533,9 @@ onMounted(async () => {
               <h3 class="font-bold truncate">{{ getCharacterName(character) }}</h3>
               <p class="text-[10px] tracking-wider text-base-content/45 truncate uppercase">{{ getEnglishName(character) }}</p>
               <p class="text-[11px] text-base-content/55 mt-2">{{ cardCounts.get(character.id) || 0 }} 卡牌 · {{ stampCounts.get(character.id) || 0 }} 贴图</p>
+              <p v-if="liveUsageMap.get(character.id)" class="text-[10px] text-base-content/45 mt-1 truncate">
+                队长 {{ formatCount(liveUsageMap.get(character.id)!.leader) }} · 成员 {{ formatCount(liveUsageMap.get(character.id)!.member) }}
+              </p>
             </div>
           </button>
         </div>
