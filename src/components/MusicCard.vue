@@ -20,6 +20,9 @@ const props = defineProps<{
   assetbundleName: string
   difficulties: Record<string, number>
   categories: string[]
+  ownershipStatus?: 'owned' | 'locked'
+  achievementClaimed?: number
+  achievementTotal?: number
   // 成绩数据: difficulty -> 'AP' | 'FC' | 'C' | ''
   results?: Record<string, string>
 }>()
@@ -161,6 +164,15 @@ function selectArtist() {
           <ListFilter class="h-3 w-3 shrink-0" />
           <span class="truncate">{{ composer }}</span>
         </button>
+      </div>
+
+      <div v-if="ownershipStatus || achievementClaimed !== undefined" class="flex items-center justify-between gap-2 text-[10px]">
+        <span v-if="ownershipStatus" class="badge badge-xs" :class="ownershipStatus === 'owned' ? 'badge-success badge-outline' : 'badge-ghost'">
+          {{ ownershipStatus === 'owned' ? '已解锁' : '未解锁' }}
+        </span>
+        <span v-if="achievementClaimed !== undefined && achievementTotal" class="ml-auto text-base-content/50">
+          成就 {{ achievementClaimed }}/{{ achievementTotal }}
+        </span>
       </div>
 
       <!-- 难度条 -->
