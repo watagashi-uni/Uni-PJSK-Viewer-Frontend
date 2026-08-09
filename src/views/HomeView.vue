@@ -7,7 +7,7 @@ import {
   Music, Calendar, Clock, 
   ChevronRight, Sparkles, BarChart3,
   CreditCard, User, Gift, Palette,
-  ExternalLink, Link, CalendarDays, History, House, Layers3
+  ExternalLink, Link, CalendarDays, History, House, Layers3, BookOpen, Image as ImageIcon, Users
 } from 'lucide-vue-next'
 import AssetImage from '@/components/AssetImage.vue'
 import type { EventData, MusicData } from '@/types/master'
@@ -276,9 +276,15 @@ const currentUserProfileData = computed(() => {
   return accountStore.getProfileCache(currentUserProfile.value.userId)
 })
 
-const ownedCardCount = computed<number | null>(() => {
-  const cards = currentUserProfileData.value?.userCards || currentUserSuite.value?.userCards
-  return Array.isArray(cards) ? cards.length : null
+const accountDataTime = computed(() => {
+  if (!currentUserProfile.value) return ''
+  const hasSuiteTime = Boolean(currentUserProfile.value.uploadTime)
+  const timestamp = hasSuiteTime
+    ? Number(currentUserProfile.value.uploadTime) * 1000
+    : Number(currentUserProfile.value.lastRefresh)
+  if (!Number.isFinite(timestamp) || timestamp <= 0) return ''
+  const label = hasSuiteTime ? 'Suite 数据' : '资料刷新'
+  return `${label}：${new Date(timestamp).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })}`
 })
 
 onMounted(async () => {
@@ -424,14 +430,26 @@ onMounted(async () => {
 
       <section class="card border border-base-200 bg-base-100 shadow-sm">
         <div class="card-body gap-3 p-4 md:p-5">
-          <div><h2 class="text-lg font-bold">账号工作台</h2><p v-if="currentUserProfile" class="mt-0.5 text-xs text-base-content/45">{{ currentUserProfile.name }}<span v-if="ownedCardCount !== null"> · 已持有 {{ ownedCardCount }} 张卡片</span></p><p v-else class="mt-0.5 text-xs text-base-content/45">绑定账号后可快速查看养成与履历</p></div>
-          <div v-if="currentUserProfile" class="grid grid-cols-2 gap-2">
-            <RouterLink to="/card-collection" class="btn h-auto justify-start gap-2 border-base-200 bg-base-200/45 px-3 py-2.5"><Layers3 class="h-4 w-4 text-primary" /><span class="text-xs">养成进度</span></RouterLink>
-            <RouterLink to="/account-records" class="btn h-auto justify-start gap-2 border-base-200 bg-base-200/45 px-3 py-2.5"><History class="h-4 w-4 text-secondary" /><span class="text-xs">账号记录</span></RouterLink>
-            <RouterLink to="/mysekai" class="btn h-auto justify-start gap-2 border-base-200 bg-base-200/45 px-3 py-2.5"><House class="h-4 w-4 text-accent" /><span class="text-xs">MySekai</span></RouterLink>
-            <RouterLink to="/profile" class="btn h-auto justify-start gap-2 border-base-200 bg-base-200/45 px-3 py-2.5"><User class="h-4 w-4" /><span class="text-xs">个人信息</span></RouterLink>
+          <div><h2 class="text-lg font-bold">{{ currentUserProfile ? '账号工作台' : '常用工具' }}</h2><p v-if="currentUserProfile" class="mt-0.5 text-xs text-base-content/45">{{ currentUserProfile.name }}</p><p v-else class="mt-0.5 text-xs text-base-content/45">无需绑定账号也可以直接使用</p></div>
+          <template v-if="currentUserProfile">
+            <div class="grid grid-cols-2 gap-2">
+              <RouterLink to="/card-collection" class="btn h-auto justify-start gap-2 border-base-200 bg-base-200/45 px-3 py-2.5"><Layers3 class="h-4 w-4 text-primary" /><span class="text-xs">养成进度</span></RouterLink>
+              <RouterLink to="/account-records" class="btn h-auto justify-start gap-2 border-base-200 bg-base-200/45 px-3 py-2.5"><History class="h-4 w-4 text-secondary" /><span class="text-xs">账号记录</span></RouterLink>
+              <RouterLink to="/deck-recommend" class="btn h-auto justify-start gap-2 border-base-200 bg-base-200/45 px-3 py-2.5"><Sparkles class="h-4 w-4 text-warning" /><span class="text-xs">卡组推荐</span></RouterLink>
+              <RouterLink to="/mysekai" class="btn h-auto justify-start gap-2 border-base-200 bg-base-200/45 px-3 py-2.5"><House class="h-4 w-4 text-accent" /><span class="text-xs">MySekai</span></RouterLink>
+              <RouterLink to="/characters" class="btn h-auto justify-start gap-2 border-base-200 bg-base-200/45 px-3 py-2.5"><Users class="h-4 w-4 text-info" /><span class="text-xs">角色成长</span></RouterLink>
+              <RouterLink to="/profile" class="btn h-auto justify-start gap-2 border-base-200 bg-base-200/45 px-3 py-2.5"><User class="h-4 w-4" /><span class="text-xs">个人信息</span></RouterLink>
+            </div>
+            <p v-if="accountDataTime" class="mt-auto text-center text-[10px] text-base-content/35">{{ accountDataTime }}</p>
+          </template>
+          <div v-else class="grid grid-cols-2 gap-2">
+            <RouterLink to="/calendar" class="btn h-auto justify-start gap-2 border-base-200 bg-base-200/45 px-3 py-2.5"><CalendarDays class="h-4 w-4 text-primary" /><span class="text-xs">游戏日历</span></RouterLink>
+            <RouterLink to="/deck-recommend" class="btn h-auto justify-start gap-2 border-base-200 bg-base-200/45 px-3 py-2.5"><Sparkles class="h-4 w-4 text-warning" /><span class="text-xs">卡组推荐</span></RouterLink>
+            <RouterLink to="/stories" class="btn h-auto justify-start gap-2 border-base-200 bg-base-200/45 px-3 py-2.5"><BookOpen class="h-4 w-4 text-secondary" /><span class="text-xs">故事档案</span></RouterLink>
+            <RouterLink to="/sus2img" class="btn h-auto justify-start gap-2 border-base-200 bg-base-200/45 px-3 py-2.5"><Music class="h-4 w-4 text-info" /><span class="text-xs">谱面图片</span></RouterLink>
+            <RouterLink to="/thumbnail" class="btn h-auto justify-start gap-2 border-base-200 bg-base-200/45 px-3 py-2.5"><ImageIcon class="h-4 w-4 text-accent" /><span class="text-xs">缩略图工具</span></RouterLink>
+            <RouterLink to="/profile" class="btn h-auto justify-start gap-2 border-primary/35 bg-primary/8 px-3 py-2.5"><User class="h-4 w-4 text-primary" /><span class="text-xs">添加账号</span></RouterLink>
           </div>
-          <RouterLink v-else to="/profile" class="btn btn-primary btn-sm mt-auto">添加账号</RouterLink>
         </div>
       </section>
     </div>
