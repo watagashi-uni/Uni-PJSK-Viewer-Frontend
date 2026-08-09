@@ -39,3 +39,59 @@ export interface CardData {
     attr: string
     assetbundleName: string
 }
+
+export interface GameCharacterData {
+    id: number
+    seq: number
+    resourceId: number
+    firstName?: string
+    givenName: string
+    firstNameEnglish?: string
+    givenNameEnglish?: string
+    unit: string
+}
+
+export interface CharacterProfileData {
+    characterId: number
+    characterVoice?: string
+    birthday?: string
+    height?: string
+    school?: string
+    schoolYear?: string
+    hobby?: string
+    specialSkill?: string
+    favoriteFood?: string
+    hatedFood?: string
+    weak?: string
+    introduction?: string
+    scenarioId?: string
+}
+
+export interface UnitProfileData {
+    unit: string
+    unitName: string
+    unitProfileName: string
+    seq: number
+    profileSentence?: string
+    colorCode?: string
+}
+
+export type StampType =
+    | 'illustration'
+    | 'text'
+    | 'cheerful_carnival_message'
+    | 'non_character_illustration'
+
+export interface StampData {
+    id: number
+    stampType: StampType | string
+    seq: number
+    name: string
+    assetbundleName: string
+    balloonAssetbundleName?: string
+    characterId1?: number
+    characterId2?: number
+    gameCharacterUnitId?: number
+    archivePublishedAt: number
+    description?: string
+}

@@ -1,0 +1,316 @@
+<script setup lang="ts">
+import { computed, onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { ArrowLeft, CreditCard, Search, Smile, UserRound, Users } from 'lucide-vue-next'
+import AssetImage from '@/components/AssetImage.vue'
+import { useMasterStore } from '@/stores/master'
+import { useSettingsStore } from '@/stores/settings'
+import type {
+  CardData,
+  CharacterProfileData,
+  GameCharacterData,
+  StampData,
+  UnitProfileData,
+} from '@/types/master'
+
+const route = useRoute()
+const router = useRouter()
+const masterStore = useMasterStore()
+const settingsStore = useSettingsStore()
+
+const characters = ref<GameCharacterData[]>([])
+const profiles = ref<CharacterProfileData[]>([])
+const unitProfiles = ref<UnitProfileData[]>([])
+const cards = ref<CardData[]>([])
+const stamps = ref<StampData[]>([])
+const searchQuery = ref('')
+const isLoading = ref(true)
+const loadError = ref('')
+
+const unitOrder = ['light_sound', 'idol', 'street', 'theme_park', 'school_refusal', 'piapro']
+const unitFallbackNames: Record<string, string> = {
+  light_sound: 'Leo/need',
+  idol: 'MORE MORE JUMP!',
+  street: 'Vivid BAD SQUAD',
+  theme_park: 'Wonderlands×Showtime',
+  school_refusal: '25时、Nightcord见。',
+  piapro: 'VIRTUAL SINGER',
+}
+
+const assetsHost = computed(() => settingsStore.assetsHost)
+const profileMap = computed(() => new Map(profiles.value.map(profile => [profile.characterId, profile])))
+const unitProfileMap = computed(() => new Map(unitProfiles.value.map(profile => [profile.unit, profile])))
+
+const selectedCharacter = computed(() => {
+  const id = Number(route.params.id)
+  if (!id) return null
+  return characters.value.find(character => character.id === id) || undefined
+})
+
+const selectedProfile = computed(() => {
+  if (!selectedCharacter.value) return null
+  return profileMap.value.get(selectedCharacter.value.id) || null
+})
+
+const selectedUnitProfile = computed(() => {
+  if (!selectedCharacter.value) return null
+  return unitProfileMap.value.get(selectedCharacter.value.unit) || null
+})
+
+const cardCounts = computed(() => {
+  const result = new Map<number, number>()
+  for (const card of cards.value) result.set(card.characterId, (result.get(card.characterId) || 0) + 1)
+  return result
+})
+
+const stampCounts = computed(() => {
+  const result = new Map<number, number>()
+  for (const stamp of stamps.value) {
+    if (stamp.characterId1) result.set(stamp.characterId1, (result.get(stamp.characterId1) || 0) + 1)
+  }
+  return result
+})
+
+const groupedCharacters = computed(() => {
+  const query = searchQuery.value.trim().toLocaleLowerCase()
+  return unitOrder
+    .map(unit => {
+      const profile = unitProfileMap.value.get(unit)
+      const items = characters.value
+        .filter(character => character.unit === unit)
+        .filter(character => {
+          if (!query) return true
+          return [
+            getCharacterName(character),
+            getEnglishName(character),
+            profile?.unitName,
+            character.id,
+          ].some(value => String(value || '').toLocaleLowerCase().includes(query))
+        })
+        .sort((a, b) => a.seq - b.seq)
+      return { unit, profile, items }
+    })
+    .filter(group => group.items.length > 0)
+})
+
+function getCharacterName(character: GameCharacterData): string {
+  return `${character.firstName || ''}${character.givenName}`
+}
+
+function getEnglishName(character: GameCharacterData): string {
+  return [character.firstNameEnglish, character.givenNameEnglish].filter(Boolean).join(' ')
+}
+
+function getUnitName(unit: string): string {
+  return unitProfileMap.value.get(unit)?.unitName || unitFallbackNames[unit] || unit
+}
+
+function getUnitColor(unit: string): string {
+  return unitProfileMap.value.get(unit)?.colorCode || '#33aaee'
+}
+
+function getStandingUrl(character: GameCharacterData): string {
+  const resourceId = String(character.resourceId).padStart(3, '0')
+  return `${assetsHost.value}/startapp/character/member_cutout_trm/res${resourceId}_no001/normal.png`
+}
+
+function cleanText(value?: string): string {
+  return (value || '').replace(/\n/g, '')
+}
+
+function openCharacter(character: GameCharacterData) {
+  void router.push(`/characters/${character.id}`)
+}
+
+function closeDetail() {
+  void router.push('/characters')
+}
+
+onMounted(async () => {
+  try {
+    const [characterData, profileData, unitData, cardData, stampData] = await Promise.all([
+      masterStore.getMaster<GameCharacterData>('gameCharacters'),
+      masterStore.getMaster<CharacterProfileData>('characterProfiles'),
+      masterStore.getMaster<UnitProfileData>('unitProfiles'),
+      masterStore.getMaster<CardData>('cards'),
+      masterStore.getMaster<StampData>('stamps'),
+    ])
+    characters.value = characterData
+    profiles.value = profileData
+    unitProfiles.value = unitData
+    cards.value = cardData
+    stamps.value = stampData
+  } catch (error) {
+    console.error('加载角色图鉴失败:', error)
+    loadError.value = error instanceof Error ? error.message : 'Master 数据加载失败'
+  } finally {
+    isLoading.value = false
+  }
+})
+</script>
+
+<template>
+  <div class="max-w-7xl mx-auto space-y-6">
+    <template v-if="route.params.id">
+      <button class="btn btn-ghost btn-sm gap-2" @click="closeDetail">
+        <ArrowLeft class="w-4 h-4" /> 返回角色图鉴
+      </button>
+
+      <div v-if="isLoading" class="grid lg:grid-cols-[360px_1fr] gap-6">
+        <div class="skeleton h-[520px] rounded-2xl"></div>
+        <div class="skeleton h-[520px] rounded-2xl"></div>
+      </div>
+
+      <div v-else-if="loadError" class="alert alert-error">角色资料加载失败：{{ loadError }}</div>
+
+      <div v-else-if="selectedCharacter === undefined" class="hero min-h-96 bg-base-100 rounded-2xl border border-base-200">
+        <div class="hero-content text-center">
+          <div>
+            <UserRound class="w-14 h-14 opacity-30 mx-auto mb-3" />
+            <h1 class="text-2xl font-bold">找不到这个角色</h1>
+            <RouterLink to="/characters" class="btn btn-primary btn-sm mt-4">返回图鉴</RouterLink>
+          </div>
+        </div>
+      </div>
+
+      <div v-else-if="selectedCharacter" class="grid lg:grid-cols-[minmax(300px,380px)_1fr] gap-6 items-stretch">
+        <section
+          class="relative min-h-[520px] rounded-2xl overflow-hidden border border-base-200 bg-base-100"
+          :style="{ background: `linear-gradient(160deg, ${getUnitColor(selectedCharacter.unit)}25, transparent 55%), var(--color-base-100)` }"
+        >
+          <div class="absolute inset-x-0 bottom-0 h-3/4 bg-gradient-to-t from-base-200/70 to-transparent"></div>
+          <AssetImage
+            :src="getStandingUrl(selectedCharacter)"
+            :alt="getCharacterName(selectedCharacter)"
+            :lazy="false"
+            class="absolute inset-0 w-full h-full object-contain object-bottom p-3"
+          />
+          <div class="absolute left-5 top-5">
+            <span class="badge border-0 text-white" :style="{ backgroundColor: getUnitColor(selectedCharacter.unit) }">
+              {{ getUnitName(selectedCharacter.unit) }}
+            </span>
+          </div>
+        </section>
+
+        <section class="card bg-base-100 border border-base-200 shadow-sm">
+          <div class="card-body p-6 md:p-8 gap-6">
+            <header>
+              <p class="text-sm tracking-[0.18em] text-base-content/45 uppercase">{{ getEnglishName(selectedCharacter) }}</p>
+              <h1 class="text-3xl md:text-4xl font-bold mt-1">{{ getCharacterName(selectedCharacter) }}</h1>
+              <p v-if="selectedProfile?.characterVoice" class="text-sm text-base-content/60 mt-2">CV：{{ selectedProfile.characterVoice }}</p>
+            </header>
+
+            <p v-if="selectedProfile?.introduction" class="leading-7 text-base-content/80 whitespace-pre-line">
+              {{ selectedProfile.introduction }}
+            </p>
+
+            <dl v-if="selectedProfile" class="grid sm:grid-cols-2 gap-3 text-sm">
+              <div v-if="selectedProfile.birthday" class="bg-base-200/70 rounded-lg p-3">
+                <dt class="text-base-content/50 text-xs">生日</dt><dd class="font-medium mt-1">{{ selectedProfile.birthday }}</dd>
+              </div>
+              <div v-if="selectedProfile.height" class="bg-base-200/70 rounded-lg p-3">
+                <dt class="text-base-content/50 text-xs">身高</dt><dd class="font-medium mt-1">{{ selectedProfile.height }}</dd>
+              </div>
+              <div v-if="selectedProfile.school" class="bg-base-200/70 rounded-lg p-3">
+                <dt class="text-base-content/50 text-xs">学校 / 年级</dt><dd class="font-medium mt-1">{{ selectedProfile.school }} {{ selectedProfile.schoolYear }}</dd>
+              </div>
+              <div v-if="selectedProfile.hobby" class="bg-base-200/70 rounded-lg p-3">
+                <dt class="text-base-content/50 text-xs">兴趣</dt><dd class="font-medium mt-1">{{ cleanText(selectedProfile.hobby) }}</dd>
+              </div>
+              <div v-if="selectedProfile.specialSkill" class="bg-base-200/70 rounded-lg p-3">
+                <dt class="text-base-content/50 text-xs">特长</dt><dd class="font-medium mt-1">{{ cleanText(selectedProfile.specialSkill) }}</dd>
+              </div>
+              <div v-if="selectedProfile.favoriteFood" class="bg-base-200/70 rounded-lg p-3">
+                <dt class="text-base-content/50 text-xs">喜欢的食物</dt><dd class="font-medium mt-1">{{ cleanText(selectedProfile.favoriteFood) }}</dd>
+              </div>
+              <div v-if="selectedProfile.hatedFood" class="bg-base-200/70 rounded-lg p-3">
+                <dt class="text-base-content/50 text-xs">不喜欢的食物</dt><dd class="font-medium mt-1">{{ cleanText(selectedProfile.hatedFood) }}</dd>
+              </div>
+              <div v-if="selectedProfile.weak" class="bg-base-200/70 rounded-lg p-3">
+                <dt class="text-base-content/50 text-xs">不擅长</dt><dd class="font-medium mt-1">{{ cleanText(selectedProfile.weak) }}</dd>
+              </div>
+            </dl>
+
+            <div class="flex flex-wrap gap-3 mt-auto">
+              <RouterLink :to="{ path: '/cards', query: { charaIds: String(selectedCharacter.id) } }" class="btn btn-primary gap-2">
+                <CreditCard class="w-4 h-4" /> 查看 {{ cardCounts.get(selectedCharacter.id) || 0 }} 张卡牌
+              </RouterLink>
+              <RouterLink :to="{ path: '/stamps', query: { character: String(selectedCharacter.id) } }" class="btn btn-outline gap-2">
+                <Smile class="w-4 h-4" /> 查看 {{ stampCounts.get(selectedCharacter.id) || 0 }} 张贴图
+              </RouterLink>
+            </div>
+          </div>
+        </section>
+
+        <section v-if="selectedUnitProfile?.profileSentence" class="card bg-base-100 border border-base-200 lg:col-span-2">
+          <div class="card-body p-5">
+            <h2 class="font-bold flex items-center gap-2"><Users class="w-5 h-5" /> {{ selectedUnitProfile.unitName }}</h2>
+            <p class="text-sm leading-6 text-base-content/70">{{ selectedUnitProfile.profileSentence }}</p>
+          </div>
+        </section>
+      </div>
+    </template>
+
+    <template v-else>
+      <header class="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div>
+          <h1 class="text-3xl font-bold flex items-center gap-3">
+            <Users class="w-8 h-8 text-primary" /> 角色图鉴
+          </h1>
+          <p class="text-sm text-base-content/60 mt-2">角色档案、组合介绍，以及对应卡牌与表情贴图的快捷入口。</p>
+        </div>
+        <label class="input input-bordered flex items-center gap-2 w-full md:w-72 bg-base-100">
+          <Search class="w-4 h-4 opacity-50" />
+          <input v-model="searchQuery" class="grow" placeholder="搜索角色或组合…" />
+        </label>
+      </header>
+
+      <div v-if="isLoading" class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div v-for="index in 12" :key="index" class="skeleton h-72 rounded-xl"></div>
+      </div>
+
+      <div v-else-if="loadError" class="alert alert-error">角色资料加载失败：{{ loadError }}</div>
+
+      <div v-else-if="groupedCharacters.length === 0" class="hero min-h-64 bg-base-100 rounded-xl border border-base-200">
+        <div class="hero-content text-center"><p class="font-bold">没有匹配的角色</p></div>
+      </div>
+
+      <section v-for="group in groupedCharacters" :key="group.unit" class="space-y-3">
+        <div class="flex items-center gap-3">
+          <span class="w-1.5 h-7 rounded-full" :style="{ backgroundColor: getUnitColor(group.unit) }"></span>
+          <div>
+            <h2 class="text-xl font-bold">{{ group.profile?.unitName || getUnitName(group.unit) }}</h2>
+            <p class="text-[11px] text-base-content/45">{{ group.items.length }} 名角色</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-3">
+          <button
+            v-for="character in group.items"
+            :key="character.id"
+            type="button"
+            class="card bg-base-100 border border-base-200 hover:-translate-y-1 hover:shadow-lg transition-all overflow-hidden text-left group"
+            @click="openCharacter(character)"
+          >
+            <figure
+              class="relative h-52 overflow-hidden"
+              :style="{ background: `linear-gradient(150deg, ${getUnitColor(character.unit)}30, transparent 65%), var(--color-base-200)` }"
+            >
+              <AssetImage
+                :src="getStandingUrl(character)"
+                :alt="getCharacterName(character)"
+                class="w-full h-full object-contain object-bottom pt-2 group-hover:scale-105 transition-transform duration-300"
+              />
+              <span class="absolute top-2 right-2 badge badge-sm bg-base-100/80 border-0">#{{ character.id }}</span>
+            </figure>
+            <div class="card-body p-3 gap-0">
+              <h3 class="font-bold truncate">{{ getCharacterName(character) }}</h3>
+              <p class="text-[10px] tracking-wider text-base-content/45 truncate uppercase">{{ getEnglishName(character) }}</p>
+              <p class="text-[11px] text-base-content/55 mt-2">{{ cardCounts.get(character.id) || 0 }} 卡牌 · {{ stampCounts.get(character.id) || 0 }} 贴图</p>
+            </div>
+          </button>
+        </div>
+      </section>
+    </template>
+  </div>
+</template>

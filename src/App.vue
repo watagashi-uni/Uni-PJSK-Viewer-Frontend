@@ -8,7 +8,7 @@ import { useSettingsStore } from '@/stores/settings'
 import { useAccountStore } from '@/stores/account'
 import { useOAuthStore } from '@/stores/oauth'
 import { useNotificationStore } from '@/stores/notification'
-import { Music, Image, BarChart3, Info, Settings, Calendar, Gift, Zap, User, RefreshCw, Github, House, Radio, Shirt, Dices } from 'lucide-vue-next'
+import { Music, Image, BarChart3, Info, Settings, Calendar, Gift, Zap, User, RefreshCw, Github, House, Radio, Shirt, Dices, Smile, Users, Trophy } from 'lucide-vue-next'
 import AccountSelector from '@/components/AccountSelector.vue'
 
 const route = useRoute()
@@ -116,6 +116,21 @@ async function handleSuiteRefresh() {
           <li>
             <RouterLink to="/cards" active-class="active">
               <Image class="w-5 h-5" /> 卡片查询
+            </RouterLink>
+          </li>
+          <li>
+            <RouterLink to="/stamps" active-class="active">
+              <Smile class="w-5 h-5" /> 表情贴图
+            </RouterLink>
+          </li>
+          <li>
+            <RouterLink to="/characters" active-class="active">
+              <Users class="w-5 h-5" /> 角色图鉴
+            </RouterLink>
+          </li>
+          <li>
+            <RouterLink to="/honors" active-class="active">
+              <Trophy class="w-5 h-5" /> 称号图鉴
             </RouterLink>
           </li>
           <li>
