@@ -4,7 +4,7 @@ import { CalendarDays, ChevronLeft, ChevronRight, Music2 } from 'lucide-vue-next
 import PageHeader from '@/components/PageHeader.vue'
 import { useMasterStore } from '@/stores/master'
 
-type CalendarCategory = 'event' | 'gacha' | 'music' | 'virtual_live' | 'birthday'
+type CalendarCategory = 'event' | 'gacha' | 'music' | 'virtual_live' | 'login_bonus' | 'birthday'
 
 interface EventInfo {
   id: number
@@ -53,6 +53,13 @@ interface CharacterProfile {
   birthday?: string
 }
 
+interface LoginBonusInfo {
+  id: number
+  name: string
+  startAt: number
+  endAt: number
+}
+
 interface CalendarEntry {
   key: string
   category: CalendarCategory
@@ -84,11 +91,13 @@ const musics = ref<MusicInfo[]>([])
 const virtualLives = ref<VirtualLiveInfo[]>([])
 const characters = ref<CharacterInfo[]>([])
 const characterProfiles = ref<CharacterProfile[]>([])
+const loginBonuses = ref<LoginBonusInfo[]>([])
 const categoryEnabled = ref<Record<CalendarCategory, boolean>>({
   event: true,
   gacha: true,
   music: true,
   virtual_live: true,
+  login_bonus: true,
   birthday: true,
 })
 
@@ -97,9 +106,10 @@ const categoryMeta: Record<CalendarCategory, { label: string; dot: string; badge
   gacha: { label: '卡池', dot: 'bg-secondary', badge: 'badge-secondary' },
   music: { label: '歌曲', dot: 'bg-info', badge: 'badge-info' },
   virtual_live: { label: 'Virtual Live', dot: 'bg-warning', badge: 'badge-warning' },
+  login_bonus: { label: '登录活动', dot: 'bg-accent', badge: 'badge-accent' },
   birthday: { label: '生日', dot: 'bg-success', badge: 'badge-success' },
 }
-const categoryOrder: CalendarCategory[] = ['event', 'gacha', 'music', 'virtual_live', 'birthday']
+const categoryOrder: CalendarCategory[] = ['event', 'gacha', 'music', 'virtual_live', 'login_bonus', 'birthday']
 const weekdayLabels = ['一', '二', '三', '四', '五', '六', '日']
 
 function toDateKey(date: Date | number): string {
@@ -143,6 +153,10 @@ const permanentEntries = computed<CalendarEntry[]>(() => {
     } else if (live.startAt) {
       rows.push({ key: `vlive-${live.id}`, category: 'virtual_live', timestamp: Number(live.startAt), title: live.name, subtitle: 'Virtual Live 开始', route: `/vlives/${live.id}` })
     }
+  }
+  for (const campaign of loginBonuses.value) {
+    rows.push({ key: `login-bonus-start-${campaign.id}`, category: 'login_bonus', timestamp: Number(campaign.startAt), title: campaign.name, subtitle: '登录活动开始', route: `/login-bonuses?id=${campaign.id}` })
+    rows.push({ key: `login-bonus-end-${campaign.id}`, category: 'login_bonus', timestamp: Number(campaign.endAt), title: campaign.name, subtitle: '登录活动结束', route: `/login-bonuses?id=${campaign.id}` })
   }
   return rows.filter(row => Number.isFinite(row.timestamp) && row.timestamp > 0)
 })
@@ -248,13 +262,14 @@ function timeLabel(entry: CalendarEntry): string {
 
 onMounted(async () => {
   try {
-    const [eventData, gachaData, musicData, liveData, characterData, profileData] = await Promise.all([
+    const [eventData, gachaData, musicData, liveData, characterData, profileData, loginBonusData] = await Promise.all([
       masterStore.getMaster<EventInfo>('events'),
       masterStore.getMaster<GachaInfo>('gachas'),
       masterStore.getMaster<MusicInfo>('musics'),
       masterStore.getMaster<VirtualLiveInfo>('virtualLives'),
       masterStore.getMaster<CharacterInfo>('gameCharacters'),
       masterStore.getMaster<CharacterProfile>('characterProfiles'),
+      masterStore.getMaster<LoginBonusInfo>('limitedLoginBonuses'),
     ])
     events.value = eventData
     gachas.value = gachaData
@@ -262,6 +277,7 @@ onMounted(async () => {
     virtualLives.value = liveData
     characters.value = characterData.filter(row => row.id <= 26)
     characterProfiles.value = profileData
+    loginBonuses.value = loginBonusData
   } catch (error) {
     console.error('加载游戏日历失败:', error)
     loadError.value = error instanceof Error ? error.message : 'Master 数据加载失败'
@@ -273,7 +289,7 @@ onMounted(async () => {
 
 <template>
   <div class="max-w-7xl mx-auto space-y-6">
-    <PageHeader title="游戏日历" description="在同一时间轴查看活动、卡池、歌曲发布、Virtual Live 场次与角色生日。">
+    <PageHeader title="游戏日历" description="在同一时间轴查看活动、卡池、歌曲发布、Virtual Live、登录活动与角色生日。">
       <template #icon><CalendarDays class="w-8 h-8 text-primary" /></template>
     </PageHeader>
 
