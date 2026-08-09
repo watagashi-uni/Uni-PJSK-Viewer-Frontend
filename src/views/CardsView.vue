@@ -454,7 +454,7 @@ onMounted(() => {
 
         <div class="divider divider-horizontal mx-0"></div>
         <RouterLink class="btn btn-sm btn-primary" to="/card-collection">
-          图鉴状态
+          养成进度
         </RouterLink>
       </div>
     </div>

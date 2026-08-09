@@ -90,7 +90,7 @@ const routes: RouteRecordRaw[] = [
         path: '/card-collection',
         name: 'CardCollection',
         component: () => import('@/views/CardCollectionView.vue'),
-        meta: { title: '图鉴状态' },
+        meta: { title: '卡片养成进度' },
     },
     {
         path: '/costumes',
