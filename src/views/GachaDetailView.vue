@@ -5,7 +5,7 @@ import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
 import { 
   ChevronLeft, Gift, Calendar, Clock, Percent, 
-  Dices, RotateCcw, CreditCard, Sparkles, EyeOff
+  Dices, RotateCcw, CreditCard, Sparkles, EyeOff, Target
 } from 'lucide-vue-next'
 import SekaiCard from '@/components/SekaiCard.vue'
 import AssetImage from '@/components/AssetImage.vue'
@@ -31,6 +31,20 @@ const currentBgIndex = ref(1)
 const maxValidBgIndex = ref(1)
 const hasNextBg = ref(false)
 const isCheckingNext = ref(false)
+
+interface GachaCeilExchangeSummary {
+  gachaId: number
+  gachaCeilExchanges?: Array<{
+    gachaCeilExchangeCost?: {
+      resourceType?: string
+      quantity?: number
+    }
+  }>
+}
+
+const gachaCeilExchangeSummaries = ref<GachaCeilExchangeSummary[]>([])
+const selectedPickupCardId = ref(0)
+const probabilityPulls = ref(100)
 
 const currentBgUrl = computed(() => {
   if (!gacha.value) return ''
@@ -167,7 +181,7 @@ const featuredCards = computed(() => {
   return gacha.value.gachaPickups
     .map(pickup => {
       const card = cards.value.find(c => c.id === pickup.cardId)
-      return card ? { id: card.id, assetbundleName: card.assetbundleName, cardRarityType: card.cardRarityType, attr: card.attr } : null
+      return card ? { id: card.id, prefix: card.prefix, assetbundleName: card.assetbundleName, cardRarityType: card.cardRarityType, attr: card.attr } : null
     })
     .filter(Boolean)
 })
@@ -179,6 +193,87 @@ const rarityTypeToNum: Record<string, number> = {
   'rarity_4': 4,
   'rarity_birthday': 4
 }
+
+const sparkPulls = computed(() => {
+  const summary = gachaCeilExchangeSummaries.value.find(row => row.gachaId === gacha.value?.id)
+  const quantities = (summary?.gachaCeilExchanges || [])
+    .map(row => row.gachaCeilExchangeCost)
+    .filter(cost => cost?.resourceType === 'gacha_ceil_item' && Number(cost.quantity) >= 100)
+    .map(cost => Number(cost?.quantity))
+  return quantities.length ? Math.min(...quantities) : 0
+})
+
+const selectedPickupCard = computed(() => cards.value.find(card => card.id === selectedPickupCardId.value))
+
+const probabilityAnalysis = computed(() => {
+  const currentGacha = gacha.value
+  const target = selectedPickupCard.value
+  if (!currentGacha || !target) return null
+
+  const allRates = currentGacha.gachaCardRarityRates || []
+  const matchingRates = (currentGacha.gachaCardRarityRates || []).filter(rate => rate.cardRarityType === target.cardRarityType)
+  if (matchingRates.length !== 1 || new Set(allRates.map(rate => rate.cardRarityType)).size !== allRates.length) {
+    return { error: '该卡池使用自选或分阶段概率，无法仅凭基础权重给出唯一概率。' }
+  }
+
+  const targetDetail = (currentGacha.gachaDetails || []).find(detail => detail.cardId === target.id)
+  const rarityDetails = (currentGacha.gachaDetails || []).filter(detail => {
+    const card = cards.value.find(row => row.id === detail.cardId)
+    return card?.cardRarityType === target.cardRarityType
+  })
+  const totalWeight = rarityDetails.reduce((sum, detail) => sum + Number(detail.weight || 0), 0)
+  if (!targetDetail || totalWeight <= 0 || matchingRates[0]!.rate <= 0) {
+    return { error: '当前 master 缺少这张卡的完整概率权重。' }
+  }
+
+  const singleRate = matchingRates[0]!.rate / 100 * Number(targetDetail.weight || 0) / totalWeight
+  const tenPullBehavior = (currentGacha.gachaBehaviors || []).find(behavior =>
+    behavior.spinCount === 10 &&
+    (behavior.gachaBehaviorType.includes('over_rarity_3') || behavior.gachaBehaviorType.includes('over_rarity_4')),
+  )
+  const guaranteeRarity = tenPullBehavior?.gachaBehaviorType.includes('over_rarity_4') ? 4 : 3
+  const guaranteedPoolRate = allRates
+    .filter(rate => (rarityTypeToNum[rate.cardRarityType] || 0) >= guaranteeRarity)
+    .reduce((sum, rate) => sum + Number(rate.rate || 0) / 100, 0)
+  const targetGuaranteedRate = tenPullBehavior && (rarityTypeToNum[target.cardRarityType] || 0) >= guaranteeRarity && guaranteedPoolRate > 0
+    ? singleRate / guaranteedPoolRate
+    : 0
+  const lowRarityRate = 1 - guaranteedPoolRate
+  const targetIsGuaranteedRarity = targetGuaranteedRate > 0
+  const lowRarityNoTargetRate = Math.max(0, lowRarityRate - (targetIsGuaranteedRarity ? 0 : singleRate))
+  const packNoTarget = tenPullBehavior
+    ? (Math.pow(1 - singleRate, 9) - Math.pow(lowRarityNoTargetRate, 9)) * (1 - singleRate) + Math.pow(lowRarityNoTargetRate, 9) * (1 - targetGuaranteedRate)
+    : 0
+  const noTargetProbability = (count: number) => {
+    if (!tenPullBehavior) return Math.pow(1 - singleRate, count)
+    const packs = Math.floor(count / 10)
+    const remainder = count % 10
+    return Math.pow(packNoTarget, packs) * Math.pow(1 - singleRate, remainder)
+  }
+  const probabilityAt = (count: number) => 1 - noTargetProbability(count)
+  const pullsFor = (probability: number) => {
+    for (let count = 1; count <= 10000; count += 1) {
+      if (probabilityAt(count) >= probability) return count
+    }
+    return 10000
+  }
+  let expectedPulls = 0
+  for (let count = 0; count < 10000; count += 1) expectedPulls += noTargetProbability(count)
+  const pulls = Math.max(1, Math.floor(probabilityPulls.value || 1))
+  const naturalProbability = probabilityAt(pulls)
+  return {
+    singleRate,
+    naturalProbability,
+    pulls,
+    expectedPulls,
+    pulls50: pullsFor(0.5),
+    pulls90: pullsFor(0.9),
+    pulls95: pullsFor(0.95),
+    pulls99: pullsFor(0.99),
+    withCeiling: sparkPulls.value > 0 && pulls >= sparkPulls.value ? 1 : naturalProbability,
+    usesTenPullGuarantee: Boolean(tenPullBehavior),
+  }
+})
 
 
 
@@ -199,6 +294,18 @@ function formatDateTime(timestamp: number): string {
 function getRateDisplay(rate: GachaCardRarityRate): string {
   const rarity = rarityTypeToNum[rate.cardRarityType] || 1
   return `${rarity}★: ${rate.rate}%`
+}
+
+function formatProbability(value: number): string {
+  const percent = value * 100
+  if (percent >= 99.995) return '100%'
+  if (percent >= 10) return `${percent.toFixed(1)}%`
+  if (percent >= 1) return `${percent.toFixed(2)}%`
+  return `${percent.toFixed(4)}%`
+}
+
+function formatPullCount(value: number): string {
+  return Math.round(value).toLocaleString('zh-CN')
 }
 
 function simulateSinglePull(isGuaranteed: boolean = false): SimulationResult {
@@ -352,14 +459,19 @@ async function loadData() {
   maxValidBgIndex.value = 1
   hasBanner.value = false
   hasLogo.value = false
+  selectedPickupCardId.value = 0
+  probabilityPulls.value = 100
   try {
-    const [gachasData, cardsData] = await Promise.all([
+    const [gachasData, cardsData, ceilData] = await Promise.all([
       masterStore.getMaster<Gacha>('gachas'),
-      masterStore.getMaster<Card>('cards')
+      masterStore.getMaster<Card>('cards'),
+      masterStore.getMaster<GachaCeilExchangeSummary>('gachaCeilExchangeSummaries'),
     ])
 
     gacha.value = gachasData.find(g => g.id === gachaId.value) || null
     cards.value = cardsData
+    gachaCeilExchangeSummaries.value = ceilData
+    selectedPickupCardId.value = gacha.value?.gachaPickups?.find(pickup => cardsData.some(card => card.id === pickup.cardId))?.cardId || 0
 
     if (gacha.value) {
       document.title = `${gacha.value.name} - PJSK Viewer`
@@ -552,6 +664,59 @@ watch(() => route.params.id, loadData)
               />
             </router-link>
           </div>
+        </div>
+      </div>
+
+      <!-- 目标卡概率分析 -->
+      <div v-if="featuredCards.length > 0" class="card bg-base-100 shadow-lg">
+        <div class="card-body gap-5">
+          <div>
+            <h2 class="text-lg font-medium flex items-center gap-2">
+              <Target class="w-5 h-5 text-primary" />
+              目标 Pickup 概率
+            </h2>
+            <p class="text-xs text-base-content/50 mt-1">依据该卡池的稀有度概率、卡片权重和十连保底计算，不使用随机模拟。</p>
+          </div>
+
+          <div class="flex flex-wrap gap-2">
+            <button
+              v-for="card in featuredCards"
+              :key="`probability-${card?.id}`"
+              class="w-16 sm:w-20 rounded-xl border-2 p-1 transition-colors"
+              :class="selectedPickupCardId === card?.id ? 'border-primary bg-primary/10' : 'border-transparent bg-base-200 hover:border-primary/30'"
+              :title="card?.prefix"
+              @click="selectedPickupCardId = card?.id || 0"
+            >
+              <SekaiCard v-if="card" :card="card" :trained="useAfterTrainingStar(card.cardRarityType)" />
+            </button>
+          </div>
+
+          <div v-if="probabilityAnalysis && 'error' in probabilityAnalysis" class="alert alert-warning py-3">
+            {{ probabilityAnalysis.error }}
+          </div>
+          <template v-else-if="probabilityAnalysis && !('error' in probabilityAnalysis)">
+            <div class="grid lg:grid-cols-[minmax(14rem,1fr)_minmax(0,2fr)] gap-5 items-start">
+              <div class="rounded-xl bg-base-200 p-4 space-y-3">
+                <div class="flex justify-between items-end gap-3"><label class="font-medium">计划抽数</label><div class="join"><input v-model.number="probabilityPulls" type="number" min="1" :max="Math.max(1000, sparkPulls)" class="input input-bordered input-sm join-item w-24 text-right" /><span class="btn btn-sm join-item pointer-events-none">抽</span></div></div>
+                <input v-model.number="probabilityPulls" type="range" min="1" :max="Math.max(500, sparkPulls)" class="range range-primary range-sm" />
+                <div class="flex justify-between text-[10px] text-base-content/45"><span>1</span><button class="link" @click="probabilityPulls = 100">100</button><button v-if="sparkPulls" class="link" @click="probabilityPulls = sparkPulls">天井 {{ sparkPulls }}</button><span>{{ Math.max(500, sparkPulls) }}</span></div>
+                <div class="pt-2 border-t border-base-300 text-xs text-base-content/55 space-y-1"><p>预计水晶：<strong class="text-base-content">{{ (probabilityAnalysis.pulls * 300).toLocaleString() }}</strong></p><p v-if="sparkPulls">交换门槛：<strong class="text-base-content">{{ sparkPulls }} 抽</strong></p><p>{{ probabilityAnalysis.usesTenPullGuarantee ? '已计入十连保底格' : '按独立单抽概率计算' }}</p></div>
+              </div>
+
+              <div class="space-y-3">
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-2">
+                  <div class="stat rounded-xl bg-primary/10 p-3"><div class="stat-title text-[11px]">单抽命中</div><div class="stat-value text-xl text-primary">{{ formatProbability(probabilityAnalysis.singleRate) }}</div></div>
+                  <div class="stat rounded-xl bg-secondary/10 p-3"><div class="stat-title text-[11px]">{{ probabilityAnalysis.pulls }} 抽命中</div><div class="stat-value text-xl text-secondary">{{ formatProbability(probabilityAnalysis.naturalProbability) }}</div></div>
+                  <div class="stat rounded-xl bg-base-200 p-3"><div class="stat-title text-[11px]">含交换保障</div><div class="stat-value text-xl">{{ formatProbability(probabilityAnalysis.withCeiling) }}</div></div>
+                  <div class="stat rounded-xl bg-base-200 p-3"><div class="stat-title text-[11px]">平均首次获得</div><div class="stat-value text-xl">{{ formatPullCount(probabilityAnalysis.expectedPulls) }}</div><div class="stat-desc">抽</div></div>
+                </div>
+                <div class="grid grid-cols-4 gap-2 text-center">
+                  <div v-for="threshold in [{ label: '50%', pulls: probabilityAnalysis.pulls50 }, { label: '90%', pulls: probabilityAnalysis.pulls90 }, { label: '95%', pulls: probabilityAnalysis.pulls95 }, { label: '99%', pulls: probabilityAnalysis.pulls99 }]" :key="threshold.label" class="rounded-lg border border-base-200 px-2 py-2"><p class="text-[10px] text-base-content/45">达到 {{ threshold.label }}</p><p class="font-bold">{{ threshold.pulls }} 抽</p></div>
+                </div>
+                <p class="text-[11px] leading-relaxed text-base-content/45">“含交换保障”仅在该卡池 master 存在 Pickup 交换门槛且计划抽数达到门槛时计为 100%；未扣除可使用的招募券。付费必中、自选和分阶段概率卡池会停止计算并显示提示。</p>
+              </div>
+            </div>
+          </template>
         </div>
       </div>
 
