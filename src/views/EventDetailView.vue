@@ -7,7 +7,7 @@ import { useSettingsStore } from '@/stores/settings'
 import { useAccountStore } from '@/stores/account'
 import { 
   Calendar, Clock, Trophy, Music, CreditCard, 
-  Sparkles, ChevronLeft, ChevronRight, BarChart3, ShoppingBasket, Minus, Plus, RotateCcw
+  Sparkles, ChevronLeft, ChevronRight, BarChart3, ShoppingBasket, Minus, Plus, RotateCcw, Swords
 } from 'lucide-vue-next'
 import SekaiCard from '@/components/SekaiCard.vue'
 import AssetImage from '@/components/AssetImage.vue'
@@ -133,6 +133,23 @@ interface MysekaiMaterialInfo {
   iconAssetbundleName: string
 }
 
+interface CheerfulCarnivalSummary {
+  id: number
+  eventId: number
+  theme: string
+  midtermAnnounce1At?: number
+  midtermAnnounce2At?: number
+  assetbundleName: string
+}
+
+interface CheerfulCarnivalTeam {
+  id: number
+  eventId: number
+  seq: number
+  teamName: string
+  assetbundleName: string
+}
+
 interface ExchangeView {
   id: number
   seq: number
@@ -157,6 +174,9 @@ const skillPracticeTickets = ref<TicketInfo[]>([])
 const boostItems = ref<BoostItemInfo[]>([])
 const eventItems = ref<EventItemInfo[]>([])
 const mysekaiMaterials = ref<MysekaiMaterialInfo[]>([])
+const cheerfulCarnivalSummaries = ref<CheerfulCarnivalSummary[]>([])
+const cheerfulCarnivalTeams = ref<CheerfulCarnivalTeam[]>([])
+const missingCheerfulTeamImages = ref<Set<number>>(new Set())
 const exchangeQuantities = ref<Record<number, number>>({})
 const manualBadgeCount = ref(0)
 
@@ -225,6 +245,13 @@ const accountEventResult = computed(() => {
   if (!Array.isArray(rows)) return null
   return rows.find((row: any) => Number(row?.eventId ?? row?.event_id) === event.value?.id) || null
 })
+
+const cheerfulSummary = computed(() => cheerfulCarnivalSummaries.value
+  .find(summary => summary.eventId === event.value?.id) || null)
+
+const cheerfulTeams = computed(() => cheerfulCarnivalTeams.value
+  .filter(team => team.eventId === event.value?.id)
+  .sort((a, b) => a.seq - b.seq))
 
 // 活动类型映射
 const eventTypeMap: Record<string, { label: string; color: string }> = {
@@ -527,6 +554,17 @@ function eventBadgeIcon(): string {
   return `${assetsHost.value}/startapp/thumbnail/common_event/${bundle}/icon_eventbadge_3.png`
 }
 
+function cheerfulTeamImage(team: CheerfulCarnivalTeam): string {
+  const eventBundle = cheerfulSummary.value?.assetbundleName || event.value?.assetbundleName || ''
+  return `${assetsHost.value}/ondemand/event/${eventBundle}/team_image/${team.assetbundleName}.png`
+}
+
+function markCheerfulTeamImageMissing(teamId: number) {
+  const missing = new Set(missingCheerfulTeamImages.value)
+  missing.add(teamId)
+  missingCheerfulTeamImages.value = missing
+}
+
 async function loadData() {
   isLoading.value = true
   try {
@@ -535,7 +573,7 @@ async function loadData() {
     const [eventsData, eventMusicsData, eventCardsData, eventBonusesData,
            gameCharUnitsData, musicsData, cardsData, musicVocalsData, resourceBoxesData,
            exchangeData, materialData, practiceData, skillPracticeData, boostData, eventItemData,
-           mysekaiMaterialData] = await Promise.all([
+           mysekaiMaterialData, cheerfulSummaryData, cheerfulTeamData] = await Promise.all([
       masterStore.getMaster<EventData>('events'),
       masterStore.getMaster<EventMusic>('eventMusics'),
       masterStore.getMaster<EventCard>('eventCards'),
@@ -552,6 +590,8 @@ async function loadData() {
       masterStore.getMaster<BoostItemInfo>('boostItems'),
       masterStore.getMaster<EventItemInfo>('eventItems'),
       masterStore.getMaster<MysekaiMaterialInfo>('mysekaiMaterials'),
+      masterStore.getMaster<CheerfulCarnivalSummary>('cheerfulCarnivalSummaries'),
+      masterStore.getMaster<CheerfulCarnivalTeam>('cheerfulCarnivalTeams'),
     ])
 
     event.value = eventsData.find(e => e.id === eventId) || null
@@ -570,6 +610,9 @@ async function loadData() {
     boostItems.value = boostData
     eventItems.value = eventItemData
     mysekaiMaterials.value = mysekaiMaterialData
+    cheerfulCarnivalSummaries.value = cheerfulSummaryData
+    cheerfulCarnivalTeams.value = cheerfulTeamData
+    missingCheerfulTeamImages.value = new Set()
     resetExchangePlan()
     manualBadgeCount.value = 0
   } catch (e) {
@@ -728,6 +771,56 @@ watch(() => route.params.id, loadData)
             <span class="font-medium text-primary">账号活动成绩</span>
             <span>活动点数：<strong>{{ formatNumber(Number(accountEventResult.eventPoint ?? accountEventResult.event_point ?? 0)) }}</strong></span>
             <span v-if="accountEventResult.rank">排名：<strong>#{{ formatNumber(Number(accountEventResult.rank)) }}</strong></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Cheerful Carnival 阵营 -->
+      <div v-if="cheerfulSummary && cheerfulTeams.length === 2" class="card bg-base-100 shadow-lg">
+        <div class="card-body gap-4">
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <div class="min-w-0">
+              <h3 class="text-lg font-medium flex items-center gap-2">
+                <Swords class="w-5 h-5 text-secondary" />
+                Cheerful Carnival
+              </h3>
+              <p class="mt-1 text-sm text-base-content/60">对战主题</p>
+              <p class="font-semibold leading-snug">{{ cheerfulSummary.theme }}</p>
+            </div>
+            <div class="flex flex-wrap gap-2 text-xs text-base-content/60">
+              <span v-if="cheerfulSummary.midtermAnnounce1At" class="badge badge-ghost gap-1">
+                中期发表 1 · {{ formatDateTime(cheerfulSummary.midtermAnnounce1At) }}
+              </span>
+              <span v-if="cheerfulSummary.midtermAnnounce2At" class="badge badge-ghost gap-1">
+                中期发表 2 · {{ formatDateTime(cheerfulSummary.midtermAnnounce2At) }}
+              </span>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-[minmax(0,1fr)_2.5rem_minmax(0,1fr)] items-stretch gap-2 sm:gap-3">
+            <template v-for="(team, index) in cheerfulTeams" :key="team.id">
+              <div class="min-w-0 rounded-xl border border-base-200 bg-base-200/35 p-2.5 sm:p-3 flex flex-col sm:flex-row items-center gap-2 sm:gap-3">
+                <div class="w-16 h-16 sm:w-20 sm:h-20 shrink-0 rounded-xl bg-base-200 overflow-hidden">
+                  <AssetImage
+                    v-if="!missingCheerfulTeamImages.has(team.id)"
+                    :src="cheerfulTeamImage(team)"
+                    :alt="team.teamName"
+                    class="w-full h-full object-contain"
+                    @error="markCheerfulTeamImageMissing(team.id)"
+                  />
+                  <div v-else class="w-full h-full grid place-items-center text-base-content/30">
+                    <Swords class="w-7 h-7" />
+                  </div>
+                </div>
+                <div class="min-w-0 text-center sm:text-left">
+                  <span class="text-[11px] uppercase tracking-wide text-base-content/45">Team {{ team.seq }}</span>
+                  <p class="font-bold text-sm sm:text-base break-words">{{ team.teamName }}</p>
+                </div>
+              </div>
+              <div v-if="index === 0" class="flex items-center justify-center" aria-hidden="true">
+                <span class="w-9 h-9 rounded-full bg-secondary text-secondary-content text-xs font-black grid place-items-center shadow-sm">VS</span>
+              </div>
+            </template>
           </div>
         </div>
       </div>
