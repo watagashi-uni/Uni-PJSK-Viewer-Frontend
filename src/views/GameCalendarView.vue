@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { CalendarDays, ChevronLeft, ChevronRight, Music2 } from 'lucide-vue-next'
+import { CalendarDays, ChevronLeft, ChevronRight, Gift, Music2, X } from 'lucide-vue-next'
+import AssetImage from '@/components/AssetImage.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import { useMasterStore } from '@/stores/master'
+import { useSettingsStore } from '@/stores/settings'
 
 type CalendarCategory = 'event' | 'gacha' | 'music' | 'virtual_live' | 'login_bonus' | 'birthday'
 
@@ -58,6 +60,41 @@ interface LoginBonusInfo {
   name: string
   startAt: number
   endAt: number
+  limitedLoginBonusDetails?: LoginBonusDetail[]
+}
+
+interface LoginBonusDetail {
+  id: number
+  limitedLoginBonusId: number
+  day: number
+  resourceBoxId: number
+}
+
+interface ResourceDetail {
+  seq: number
+  resourceType: string
+  resourceId?: number
+  resourceQuantity: number
+}
+
+interface ResourceBox {
+  id: number
+  resourceBoxPurpose: string
+  details: ResourceDetail[]
+}
+
+interface NamedResource {
+  id: number
+  name?: string
+  prefix?: string
+  assetbundleName?: string
+  iconAssetbundleName?: string
+}
+
+interface RewardDay {
+  day: number
+  boxId: number
+  rewards: ResourceDetail[]
 }
 
 interface CalendarEntry {
@@ -66,8 +103,9 @@ interface CalendarEntry {
   timestamp: number
   title: string
   subtitle: string
-  route: string
+  route?: string
   characterId?: number
+  loginBonusId?: number
 }
 
 interface CalendarDay {
@@ -80,6 +118,7 @@ interface CalendarDay {
 }
 
 const masterStore = useMasterStore()
+const settingsStore = useSettingsStore()
 const today = new Date()
 const currentMonth = ref(new Date(today.getFullYear(), today.getMonth(), 1))
 const selectedDateKey = ref(toDateKey(today))
@@ -92,6 +131,12 @@ const virtualLives = ref<VirtualLiveInfo[]>([])
 const characters = ref<CharacterInfo[]>([])
 const characterProfiles = ref<CharacterProfile[]>([])
 const loginBonuses = ref<LoginBonusInfo[]>([])
+const selectedLoginBonusId = ref(0)
+const resourceBoxes = ref<ResourceBox[]>([])
+const resourceMaps = ref(new Map<string, Map<number, NamedResource>>())
+const rewardLoading = ref(false)
+const rewardLoaded = ref(false)
+const rewardError = ref('')
 const categoryEnabled = ref<Record<CalendarCategory, boolean>>({
   event: true,
   gacha: true,
@@ -155,8 +200,8 @@ const permanentEntries = computed<CalendarEntry[]>(() => {
     }
   }
   for (const campaign of loginBonuses.value) {
-    rows.push({ key: `login-bonus-start-${campaign.id}`, category: 'login_bonus', timestamp: Number(campaign.startAt), title: campaign.name, subtitle: '登录活动开始', route: `/login-bonuses?id=${campaign.id}` })
-    rows.push({ key: `login-bonus-end-${campaign.id}`, category: 'login_bonus', timestamp: Number(campaign.endAt), title: campaign.name, subtitle: '登录活动结束', route: `/login-bonuses?id=${campaign.id}` })
+    rows.push({ key: `login-bonus-start-${campaign.id}`, category: 'login_bonus', timestamp: Number(campaign.startAt), title: campaign.name, subtitle: '登录活动开始', loginBonusId: campaign.id })
+    rows.push({ key: `login-bonus-end-${campaign.id}`, category: 'login_bonus', timestamp: Number(campaign.endAt), title: campaign.name, subtitle: '登录活动结束', loginBonusId: campaign.id })
   }
   return rows.filter(row => Number.isFinite(row.timestamp) && row.timestamp > 0)
 })
@@ -180,7 +225,12 @@ const birthdayEntries = computed<CalendarEntry[]>(() => {
 })
 
 const allEntries = computed(() => [...permanentEntries.value, ...birthdayEntries.value])
-const filteredEntries = computed(() => allEntries.value.filter(row => categoryEnabled.value[row.category]))
+const spoilerSafeEntries = computed(() => allEntries.value.filter(row => {
+  if (settingsStore.showSpoilers) return true
+  if (row.category === 'birthday') return toDateKey(row.timestamp) <= toDateKey(new Date())
+  return row.timestamp <= Date.now()
+}))
+const filteredEntries = computed(() => spoilerSafeEntries.value.filter(row => categoryEnabled.value[row.category]))
 const entriesByDate = computed(() => {
   const result = new Map<string, CalendarEntry[]>()
   for (const entry of filteredEntries.value) {
@@ -220,7 +270,7 @@ const visibleMonthEntries = computed(() => {
 const monthCategoryCounts = computed(() => {
   const key = monthKey(currentMonth.value)
   const result = Object.fromEntries(categoryOrder.map(category => [category, 0])) as Record<CalendarCategory, number>
-  for (const entry of allEntries.value) {
+  for (const entry of spoilerSafeEntries.value) {
     if (toDateKey(entry.timestamp).startsWith(key)) result[entry.category] += 1
   }
   return result
@@ -233,9 +283,27 @@ const selectedDateLabel = computed(() => {
   return new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' }).format(new Date(year || 0, (month || 1) - 1, day || 1))
 })
 const monthLabel = computed(() => new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: 'long' }).format(currentMonth.value))
+const canGoNextMonth = computed(() => settingsStore.showSpoilers || monthKey(currentMonth.value) < monthKey(today))
+const assetsHost = computed(() => settingsStore.assetsHost)
+const selectedLoginBonus = computed(() => loginBonuses.value.find(row => row.id === selectedLoginBonusId.value) || null)
+const loginBonusBoxMap = computed(() => new Map(resourceBoxes.value
+  .filter(box => box.resourceBoxPurpose === 'login_bonus')
+  .map(box => [box.id, box])))
+const selectedRewardDays = computed<RewardDay[]>(() => {
+  if (!selectedLoginBonus.value || !rewardLoaded.value) return []
+  return [...(selectedLoginBonus.value.limitedLoginBonusDetails || [])]
+    .sort((a, b) => a.day - b.day)
+    .map(detail => ({
+      day: detail.day,
+      boxId: detail.resourceBoxId,
+      rewards: [...(loginBonusBoxMap.value.get(detail.resourceBoxId)?.details || [])].sort((a, b) => a.seq - b.seq),
+    }))
+})
 
 function setMonth(offset: number) {
-  currentMonth.value = new Date(currentMonth.value.getFullYear(), currentMonth.value.getMonth() + offset, 1)
+  const nextMonth = new Date(currentMonth.value.getFullYear(), currentMonth.value.getMonth() + offset, 1)
+  if (!settingsStore.showSpoilers && monthKey(nextMonth) > monthKey(today)) return
+  currentMonth.value = nextMonth
   selectedDateKey.value = toDateKey(currentMonth.value)
 }
 
@@ -258,6 +326,102 @@ function toggleCategory(category: CalendarCategory) {
 function timeLabel(entry: CalendarEntry): string {
   if (entry.category === 'birthday') return '全天'
   return new Date(entry.timestamp).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false })
+}
+
+function formatDate(timestamp: number): string {
+  return new Date(timestamp).toLocaleString('zh-CN', {
+    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false,
+  })
+}
+
+function formatNumber(value: number): string {
+  return Number(value || 0).toLocaleString('zh-CN')
+}
+
+function openLoginBonus(id?: number) {
+  if (!id) return
+  selectedLoginBonusId.value = id
+  void ensureRewardData()
+}
+
+function closeLoginBonus() {
+  selectedLoginBonusId.value = 0
+}
+
+async function ensureRewardData() {
+  if (rewardLoaded.value || rewardLoading.value) return
+  rewardLoading.value = true
+  rewardError.value = ''
+  try {
+    const [boxes, materials, boosts, practice, skill, tickets, cards, stamps, mysekaiMaterials, mysekaiTools, fixtures, avatars, profileResources] = await Promise.all([
+      masterStore.getMaster<ResourceBox>('resourceBoxes'),
+      masterStore.getMaster<NamedResource>('materials'),
+      masterStore.getMaster<NamedResource>('boostItems'),
+      masterStore.getMaster<NamedResource>('practiceTickets'),
+      masterStore.getMaster<NamedResource>('skillPracticeTickets'),
+      masterStore.getMaster<NamedResource>('gachaTickets'),
+      masterStore.getMaster<NamedResource>('cards'),
+      masterStore.getMaster<NamedResource>('stamps'),
+      masterStore.getMaster<NamedResource>('mysekaiMaterials'),
+      masterStore.getMaster<NamedResource>('mysekaiTools'),
+      masterStore.getMaster<NamedResource>('mysekaiFixtures'),
+      masterStore.getMaster<NamedResource>('avatarCoordinates'),
+      masterStore.getMaster<NamedResource>('customProfileCollectionResources'),
+    ])
+    resourceBoxes.value = boxes
+    resourceMaps.value = new Map([
+      ['material', new Map(materials.map(row => [row.id, row]))],
+      ['boost_item', new Map(boosts.map(row => [row.id, row]))],
+      ['practice_ticket', new Map(practice.map(row => [row.id, row]))],
+      ['skill_practice_ticket', new Map(skill.map(row => [row.id, row]))],
+      ['gacha_ticket', new Map(tickets.map(row => [row.id, row]))],
+      ['card', new Map(cards.map(row => [row.id, row]))],
+      ['stamp', new Map(stamps.map(row => [row.id, row]))],
+      ['mysekai_material', new Map(mysekaiMaterials.map(row => [row.id, row]))],
+      ['mysekai_tool', new Map(mysekaiTools.map(row => [row.id, row]))],
+      ['mysekai_fixture', new Map(fixtures.map(row => [row.id, row]))],
+      ['avatar_coordinate', new Map(avatars.map(row => [row.id, row]))],
+      ['custom_profile_collection_resource', new Map(profileResources.map(row => [row.id, row]))],
+    ])
+    rewardLoaded.value = true
+  } catch (error) {
+    rewardError.value = error instanceof Error ? error.message : '奖励数据加载失败'
+  } finally {
+    rewardLoading.value = false
+  }
+}
+
+const resourceTypeLabels: Record<string, string> = {
+  jewel: '水晶', coin: '金币', virtual_coin: '虚拟币', material: '素材', boost_item: '体力道具',
+  practice_ticket: '练习券', skill_practice_ticket: '技能券', gacha_ticket: '招募券', card: '成员',
+  stamp: '表情贴图', mysekai_material: 'MySekai 素材', mysekai_tool: 'MySekai 工具',
+  mysekai_fixture: 'MySekai 家具', avatar_coordinate: '虚拟形象套装',
+  custom_profile_collection_resource: '个人资料素材',
+}
+
+function resourceName(resource: ResourceDetail): string {
+  const typeLabel = resourceTypeLabels[resource.resourceType] || resource.resourceType
+  const id = Number(resource.resourceId || 0)
+  if (!id) return typeLabel
+  const row = resourceMaps.value.get(resource.resourceType)?.get(id)
+  if (resource.resourceType === 'card' && row?.prefix) return `「${row.prefix}」`
+  if (resource.resourceType === 'stamp' && row?.name) return row.name.replace(/^\[スタンプ\]/, '')
+  return row?.name || `${typeLabel} #${id}`
+}
+
+function resourceIcon(resource: ResourceDetail): string {
+  const id = Number(resource.resourceId || 0)
+  const row = resourceMaps.value.get(resource.resourceType)?.get(id)
+  if (['jewel', 'coin', 'virtual_coin'].includes(resource.resourceType)) return `${assetsHost.value}/startapp/thumbnail/common_material/${resource.resourceType}.png`
+  if (resource.resourceType === 'material') return `${assetsHost.value}/startapp/thumbnail/material/material${id}.png`
+  if (resource.resourceType === 'boost_item') return `${assetsHost.value}/startapp/thumbnail/boost_item/boost_item${id}.png`
+  if (resource.resourceType === 'practice_ticket') return `${assetsHost.value}/startapp/thumbnail/practice_ticket/ticket${id}.png`
+  if (resource.resourceType === 'skill_practice_ticket') return `${assetsHost.value}/startapp/thumbnail/skill_practice_ticket/ticket${id}.png`
+  if (resource.resourceType === 'gacha_ticket' && row?.assetbundleName) return `${assetsHost.value}/startapp/thumbnail/gacha_ticket/${row.assetbundleName}.png`
+  if (resource.resourceType === 'card' && row?.assetbundleName) return `${assetsHost.value}/startapp/thumbnail/chara/${row.assetbundleName}_normal.png`
+  if (resource.resourceType === 'stamp' && row?.assetbundleName) return `${assetsHost.value}/startapp/stamp/${row.assetbundleName}/${row.assetbundleName}.png`
+  if (resource.resourceType === 'mysekai_material' && row?.iconAssetbundleName) return `${assetsHost.value}/ondemand/mysekai/thumbnail/material/${row.iconAssetbundleName}.png`
+  return ''
 }
 
 onMounted(async () => {
@@ -299,12 +463,13 @@ onMounted(async () => {
       <div class="card bg-base-100 shadow-sm border border-base-200">
         <div class="card-body p-4 gap-4">
           <div class="flex flex-wrap items-center justify-between gap-3">
-            <div class="join"><button class="btn btn-sm join-item" aria-label="上个月" @click="setMonth(-1)"><ChevronLeft class="w-4 h-4" /></button><button class="btn btn-sm join-item min-w-32" @click="goToday">{{ monthLabel }}</button><button class="btn btn-sm join-item" aria-label="下个月" @click="setMonth(1)"><ChevronRight class="w-4 h-4" /></button></div>
+            <div class="join"><button class="btn btn-sm join-item" aria-label="上个月" @click="setMonth(-1)"><ChevronLeft class="w-4 h-4" /></button><button class="btn btn-sm join-item min-w-32" @click="goToday">{{ monthLabel }}</button><button class="btn btn-sm join-item" aria-label="下个月" :disabled="!canGoNextMonth" @click="setMonth(1)"><ChevronRight class="w-4 h-4" /></button></div>
             <div class="flex gap-4 text-sm"><span><strong class="text-primary">{{ visibleMonthEntries.length }}</strong> 条日程</span><span><strong>{{ activeDays }}</strong> 个活跃日期</span><button class="link link-primary" @click="goToday">回到今天</button></div>
           </div>
           <div class="flex flex-wrap gap-2">
             <button v-for="category in categoryOrder" :key="category" class="btn btn-xs gap-1.5" :class="categoryEnabled[category] ? 'btn-neutral' : 'btn-ghost opacity-45'" @click="toggleCategory(category)"><span class="w-2 h-2 rounded-full" :class="categoryMeta[category].dot"></span>{{ categoryMeta[category].label }} <span class="opacity-60">{{ monthCategoryCounts[category] }}</span></button>
           </div>
+          <p v-if="!settingsStore.showSpoilers" class="text-xs text-base-content/45">剧透已关闭，仅显示当前时刻及以前的日程；可在设置中开启未来内容。</p>
         </div>
       </div>
 
@@ -333,16 +498,55 @@ onMounted(async () => {
           <div class="card-body p-4 gap-3">
             <div><p class="text-xs text-base-content/45">日期详情</p><h2 class="font-bold">{{ selectedDateLabel }}</h2></div>
             <div v-if="selectedEntries.length" class="divide-y divide-base-200">
-              <RouterLink v-for="entry in selectedEntries" :key="entry.key" :to="entry.route" class="flex gap-3 py-3 group">
-                <img v-if="entry.characterId" :src="characterIcon(entry.characterId)" :alt="entry.title" class="w-10 h-10 rounded-full bg-base-200 shrink-0" />
-                <div v-else class="w-10 h-10 rounded-lg grid place-items-center shrink-0" :class="categoryMeta[entry.category].dot"><Music2 v-if="entry.category === 'music'" class="w-4 h-4 text-white" /><span v-else class="text-white text-[10px] font-bold">{{ timeLabel(entry) }}</span></div>
-                <div class="min-w-0"><div class="flex items-center gap-2"><span class="badge badge-xs" :class="categoryMeta[entry.category].badge">{{ entry.subtitle }}</span><span class="text-[10px] text-base-content/40">{{ timeLabel(entry) }}</span></div><p class="text-sm font-medium mt-1 group-hover:text-primary line-clamp-2">{{ entry.title }}</p></div>
-              </RouterLink>
+              <template v-for="entry in selectedEntries" :key="entry.key">
+                <RouterLink v-if="entry.route" :to="entry.route" class="group flex gap-3 py-3">
+                  <img v-if="entry.characterId" :src="characterIcon(entry.characterId)" :alt="entry.title" class="h-10 w-10 shrink-0 rounded-full bg-base-200" />
+                  <div v-else class="grid h-10 w-10 shrink-0 place-items-center rounded-lg" :class="categoryMeta[entry.category].dot"><Music2 v-if="entry.category === 'music'" class="h-4 w-4 text-white" /><span v-else class="text-[10px] font-bold text-white">{{ timeLabel(entry) }}</span></div>
+                  <div class="min-w-0"><div class="flex items-center gap-2"><span class="badge badge-xs" :class="categoryMeta[entry.category].badge">{{ entry.subtitle }}</span><span class="text-[10px] text-base-content/40">{{ timeLabel(entry) }}</span></div><p class="mt-1 line-clamp-2 text-sm font-medium group-hover:text-primary">{{ entry.title }}</p></div>
+                </RouterLink>
+                <button v-else class="group flex w-full gap-3 py-3 text-left" @click="openLoginBonus(entry.loginBonusId)">
+                  <div class="grid h-10 w-10 shrink-0 place-items-center rounded-lg" :class="categoryMeta[entry.category].dot"><Gift class="h-4 w-4 text-white" /></div>
+                  <div class="min-w-0"><div class="flex items-center gap-2"><span class="badge badge-xs" :class="categoryMeta[entry.category].badge">{{ entry.subtitle }}</span><span class="text-[10px] text-base-content/40">{{ timeLabel(entry) }}</span></div><p class="mt-1 line-clamp-2 text-sm font-medium group-hover:text-primary">{{ entry.title }}</p><p class="mt-0.5 text-[10px] text-base-content/40">点击查看每日奖励</p></div>
+                </button>
+              </template>
             </div>
             <div v-else class="py-10 text-center text-sm text-base-content/40">这一天没有符合筛选条件的日程</div>
           </div>
         </aside>
       </div>
     </template>
+
+    <dialog class="modal" :class="{ 'modal-open': selectedLoginBonus }">
+      <div v-if="selectedLoginBonus" class="modal-box max-w-4xl p-0">
+        <div class="relative h-20 overflow-hidden bg-gradient-to-br from-primary/20 via-secondary/15 to-accent/20">
+          <div class="absolute inset-0 grid place-items-center"><Gift class="h-10 w-10 text-primary/20" /></div>
+          <button class="btn btn-circle btn-sm absolute right-3 top-3 border-0 bg-base-100/85" aria-label="关闭" @click="closeLoginBonus"><X class="h-4 w-4" /></button>
+        </div>
+        <header class="relative -mt-5 space-y-2 border-b border-base-200 px-5 pb-4">
+          <div class="flex flex-wrap items-center gap-2"><span class="badge badge-accent">登录活动</span><span class="badge badge-ghost">#{{ selectedLoginBonus.id }}</span><span class="badge badge-ghost">{{ selectedLoginBonus.limitedLoginBonusDetails?.length || 0 }} 天</span></div>
+          <h2 class="text-lg font-bold md:text-xl">{{ selectedLoginBonus.name }}</h2>
+          <p class="text-xs text-base-content/55">{{ formatDate(selectedLoginBonus.startAt) }} — {{ formatDate(selectedLoginBonus.endAt) }}</p>
+        </header>
+        <div class="max-h-[58vh] overflow-y-auto bg-base-200/40 p-4">
+          <div v-if="rewardLoading" class="flex justify-center py-16"><span class="loading loading-spinner loading-lg text-primary"></span></div>
+          <div v-else-if="rewardError" class="alert alert-error"><span>{{ rewardError }}</span><button class="btn btn-sm" @click="ensureRewardData">重试</button></div>
+          <div v-else-if="selectedRewardDays.length" class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            <div v-for="day in selectedRewardDays" :key="`${selectedLoginBonus.id}-${day.day}`" class="rounded-xl border border-base-200 bg-base-100 p-3">
+              <div class="mb-2 flex items-center justify-between"><span class="font-bold text-primary">Day {{ day.day }}</span><span class="text-[10px] text-base-content/35">Box #{{ day.boxId }}</span></div>
+              <div v-if="day.rewards.length" class="space-y-2">
+                <div v-for="reward in day.rewards" :key="`${reward.seq}-${reward.resourceType}-${reward.resourceId || 0}`" class="flex items-center gap-2">
+                  <AssetImage v-if="resourceIcon(reward)" :src="resourceIcon(reward)" :alt="resourceName(reward)" class="h-9 w-9 shrink-0 object-contain" />
+                  <div v-else class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary/10"><Gift class="h-4 w-4 text-primary" /></div>
+                  <div class="min-w-0 flex-1"><p class="truncate text-xs" :title="resourceName(reward)">{{ resourceName(reward) }}</p><p class="font-bold">× {{ formatNumber(reward.resourceQuantity) }}</p></div>
+                </div>
+              </div>
+              <p v-else class="text-xs text-base-content/40">奖励箱数据缺失</p>
+            </div>
+          </div>
+          <div v-else class="py-12 text-center text-sm text-base-content/40">该登录活动没有每日奖励记录</div>
+        </div>
+      </div>
+      <form method="dialog" class="modal-backdrop"><button @click="closeLoginBonus">关闭</button></form>
+    </dialog>
   </div>
 </template>

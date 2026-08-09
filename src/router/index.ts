@@ -129,18 +129,6 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '游戏日历' },
     },
     {
-        path: '/login-bonuses',
-        name: 'LoginBonuses',
-        component: () => import('@/views/LoginBonusesView.vue'),
-        meta: { title: '登录活动档案' },
-    },
-    {
-        path: '/omikuji',
-        name: 'Omikuji',
-        component: () => import('@/views/OmikujiView.vue'),
-        meta: { title: '御神签档案' },
-    },
-    {
         path: '/vlives',
         name: 'VirtualLives',
         component: () => import('@/views/VirtualLivesView.vue'),
