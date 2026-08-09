@@ -1,13 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { BookOpen, Calendar, CheckCircle2, ChevronRight, FastForward, Library, Play, RefreshCw, Search, Sparkles, X } from 'lucide-vue-next'
+import { BookOpen, Calendar, ChevronRight, Library, Play, Search, Sparkles, X } from 'lucide-vue-next'
 import AssetImage from '@/components/AssetImage.vue'
-import AccountSelector from '@/components/AccountSelector.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import Pagination from '@/components/Pagination.vue'
 import StoryReader from '@/components/StoryReader.vue'
-import { useAccountStore } from '@/stores/account'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
 import type { EventData } from '@/types/master'
@@ -71,16 +69,6 @@ interface SpecialStory {
 
 type StoryTab = 'event' | 'unit' | 'special'
 type StoryKind = StoryTab
-type EpisodeAccountStatus = 'read' | 'skipped' | 'unread' | 'unknown'
-
-interface UserEpisodeStatus {
-  storyType?: string
-  episodeId?: number
-  episode_id?: number
-  status?: string
-  isNotSkipped?: boolean
-  is_not_skipped?: boolean
-}
 
 interface SelectedStory {
   kind: StoryKind
@@ -97,7 +85,6 @@ const route = useRoute()
 const router = useRouter()
 const masterStore = useMasterStore()
 const settingsStore = useSettingsStore()
-const accountStore = useAccountStore()
 
 const events = ref<EventData[]>([])
 const eventStories = ref<EventStory[]>([])
@@ -115,7 +102,6 @@ const eventPage = ref(1)
 const specialPage = ref(1)
 const selectedStory = ref<SelectedStory | null>(null)
 const selectedEpisode = ref<StoryEpisode | null>(null)
-const refreshError = ref('')
 const pageSize = 12
 const now = Date.now()
 
@@ -136,56 +122,6 @@ const activeTab = computed<StoryTab>(() => {
 })
 const eventMap = computed(() => new Map(events.value.map(event => [event.id, event])))
 const unitEpisodeGroupMap = computed(() => new Map(unitEpisodeGroups.value.map(group => [group.id, group])))
-const suiteData = computed<any | null>(() => accountStore.currentUserId
-  ? accountStore.getSuiteCache(accountStore.currentUserId)
-  : null)
-
-function suiteRows(...keys: string[]): UserEpisodeStatus[] | null {
-  for (const key of keys) {
-    const rows = suiteData.value?.[key]
-    if (Array.isArray(rows)) return rows
-  }
-  return null
-}
-
-const unitEpisodeStatusRows = computed(() => suiteRows('userUnitEpisodeStatuses', 'user_unit_episode_statuses'))
-const specialEpisodeStatusRows = computed(() => suiteRows('userSpecialEpisodeStatuses', 'user_special_episode_statuses'))
-const eventEpisodeStatusRows = computed(() => suiteRows('userEventEpisodeStatuses', 'user_event_episode_statuses'))
-const archiveEventEpisodeStatusRows = computed(() => suiteRows('userArchiveEventEpisodeStatuses', 'user_archive_event_episode_statuses'))
-const hasAnyStoryStatusData = computed(() => [
-  unitEpisodeStatusRows.value,
-  specialEpisodeStatusRows.value,
-  eventEpisodeStatusRows.value,
-  archiveEventEpisodeStatusRows.value,
-].some(rows => rows !== null))
-
-function rowsForStoryKind(kind: StoryKind): UserEpisodeStatus[] | null {
-  if (kind === 'unit') return unitEpisodeStatusRows.value
-  if (kind === 'special') return specialEpisodeStatusRows.value
-  const sources = [eventEpisodeStatusRows.value, archiveEventEpisodeStatusRows.value]
-  if (sources.every(rows => rows === null)) return null
-  return sources.flatMap(rows => rows || [])
-}
-
-function episodeStatusMap(kind: StoryKind): Map<number, EpisodeAccountStatus> | null {
-  const rows = rowsForStoryKind(kind)
-  if (rows === null) return null
-  const map = new Map<number, EpisodeAccountStatus>()
-  for (const row of rows) {
-    const episodeId = Number(row.episodeId ?? row.episode_id)
-    if (!Number.isFinite(episodeId) || row.status !== 'already_read') continue
-    const isNotSkipped = row.isNotSkipped ?? row.is_not_skipped ?? false
-    const status: EpisodeAccountStatus = isNotSkipped ? 'read' : 'skipped'
-    if (status === 'read' || map.get(episodeId) !== 'read') map.set(episodeId, status)
-  }
-  return map
-}
-
-const episodeStatusMaps = computed(() => ({
-  event: episodeStatusMap('event'),
-  unit: episodeStatusMap('unit'),
-  special: episodeStatusMap('special'),
-}))
 
 const storyStats = computed(() => ({
   events: eventStories.value.length,
@@ -290,10 +226,6 @@ const selectedEpisodeIndex = computed(() => {
   return selectedStory.value.episodes.findIndex(episode => episode.id === selectedEpisode.value?.id)
 })
 
-const selectedStoryProgress = computed(() => selectedStory.value
-  ? storyProgress(selectedStory.value.kind, selectedStory.value.episodes)
-  : { available: false, read: 0, skipped: 0, unread: 0, total: 0 })
-
 watch([searchQuery, selectedUnit], () => {
   eventPage.value = 1
   specialPage.value = 1
@@ -334,38 +266,6 @@ function eventBanner(story: EventStory): string {
 function unitChapterOutline(chapter: UnitStoryChapter): string {
   const groupId = chapter.episodes[0]?.unitStoryEpisodeGroupId
   return groupId ? unitEpisodeGroupMap.value.get(groupId)?.outline || '' : ''
-}
-
-function getEpisodeAccountStatus(kind: StoryKind, episodeId: number): EpisodeAccountStatus {
-  const map = episodeStatusMaps.value[kind]
-  if (map === null) return 'unknown'
-  return map.get(episodeId) || 'unread'
-}
-
-function storyProgress(kind: StoryKind, episodes: StoryEpisode[]) {
-  const available = episodeStatusMaps.value[kind] !== null
-  let read = 0
-  let skipped = 0
-  for (const episode of episodes) {
-    const status = getEpisodeAccountStatus(kind, episode.id)
-    if (status === 'read') read += 1
-    else if (status === 'skipped') skipped += 1
-  }
-  return { available, read, skipped, unread: Math.max(0, episodes.length - read - skipped), total: episodes.length }
-}
-
-function progressWidth(value: number, total: number): string {
-  return total > 0 ? `${(value / total) * 100}%` : '0%'
-}
-
-async function handleSuiteRefresh() {
-  if (!accountStore.currentUserId) return
-  refreshError.value = ''
-  try {
-    await accountStore.refreshSuite(accountStore.currentUserId)
-  } catch (error) {
-    refreshError.value = error instanceof Error ? error.message : 'Suite 更新失败'
-  }
 }
 
 function openEpisode(episode: StoryEpisode) {
@@ -439,7 +339,7 @@ onMounted(async () => {
 
 <template>
   <div class="max-w-7xl mx-auto space-y-6">
-    <PageHeader title="故事档案" description="活动、组合主线与特殊故事的统一目录，支持剧本阅读、台词搜索和账号阅读状态。"><template #icon><BookOpen class="w-8 h-8 text-primary" /></template></PageHeader>
+    <PageHeader title="故事档案" description="活动、组合主线与特殊故事的统一目录，支持剧本阅读和台词搜索。"><template #icon><BookOpen class="w-8 h-8 text-primary" /></template></PageHeader>
 
     <section class="grid grid-cols-2 md:grid-cols-4 gap-2">
       <div class="rounded-xl bg-base-100 border border-base-200 px-3 py-2"><p class="text-[11px] text-base-content/45">活动故事</p><p class="font-bold text-lg">{{ storyStats.events }}</p></div>
@@ -464,19 +364,7 @@ onMounted(async () => {
           <option value="">全部组合</option>
           <option v-for="unit in unitOptions" :key="unit.value" :value="unit.value">{{ unit.label }}</option>
         </select>
-        <div class="md:col-span-2 flex flex-wrap items-center gap-2 border-t border-base-200 pt-3">
-          <div v-if="accountStore.accounts.length" class="w-full sm:w-56">
-            <AccountSelector :model-value="accountStore.currentUserId" @update:model-value="accountStore.selectAccount" />
-          </div>
-          <span v-else class="text-xs text-base-content/55">绑定账号后可查看游戏内阅读状态</span>
-          <button v-if="accountStore.currentUserId" class="btn btn-xs btn-ghost gap-1" :disabled="accountStore.suiteRefreshing" @click="handleSuiteRefresh">
-            <RefreshCw class="w-3.5 h-3.5" :class="{ 'animate-spin': accountStore.suiteRefreshing }" />刷新 Suite
-          </button>
-          <span v-if="refreshError" class="text-xs text-error">{{ refreshError }}</span>
-          <span v-else-if="accountStore.currentUserId && !hasAnyStoryStatusData" class="text-xs text-warning">当前 Suite API 未返回故事阅读字段，因此暂时无法展示账号状态</span>
-          <span v-else-if="hasAnyStoryStatusData" class="text-xs text-base-content/55"><span class="text-success">绿色为读完</span>，<span class="text-warning">黄色为跳过</span></span>
-          <p class="w-full text-xs text-base-content/45">本站打开故事不会记录或修改进度；页面状态只来自游戏账号 Suite。</p>
-        </div>
+        <p class="md:col-span-2 text-xs text-base-content/45">本站仅提供故事浏览与检索，不记录阅读进度。</p>
       </div>
     </section>
 
@@ -492,11 +380,7 @@ onMounted(async () => {
             <div class="flex items-center justify-between gap-2"><img v-if="getUnitLogo(mainUnitByEventStory.get(story.id))" :src="getUnitLogo(mainUnitByEventStory.get(story.id))" class="h-5 max-w-24 object-contain object-left" /><span class="text-[11px] text-base-content/45">{{ formatDate(eventMap.get(story.eventId)?.startAt) }}</span></div>
             <h2 class="font-bold line-clamp-2 leading-5">{{ eventMap.get(story.eventId)?.name || `活动故事 #${story.id}` }}</h2>
             <p class="text-xs leading-5 text-base-content/55 line-clamp-2 min-h-10">{{ story.outline }}</p>
-            <div v-if="storyProgress('event', story.eventStoryEpisodes).available" class="flex items-center gap-2 pt-1">
-              <div class="flex h-1.5 flex-1 overflow-hidden rounded-full bg-base-200"><span class="bg-success" :style="{ width: progressWidth(storyProgress('event', story.eventStoryEpisodes).read, story.eventStoryEpisodes.length) }"></span><span class="bg-warning" :style="{ width: progressWidth(storyProgress('event', story.eventStoryEpisodes).skipped, story.eventStoryEpisodes.length) }"></span></div>
-              <span class="text-[11px] text-base-content/50 whitespace-nowrap">{{ storyProgress('event', story.eventStoryEpisodes).read }} 读完 · {{ storyProgress('event', story.eventStoryEpisodes).skipped }} 跳过</span>
-            </div>
-            <p v-else class="text-[11px] text-base-content/40 pt-1">共 {{ story.eventStoryEpisodes.length }} 话</p>
+            <p class="text-[11px] text-base-content/40 pt-1">共 {{ story.eventStoryEpisodes.length }} 话</p>
           </div>
         </button>
       </div>
@@ -511,11 +395,7 @@ onMounted(async () => {
             <div class="flex items-center justify-between gap-3"><img :src="getUnitLogo(chapter.unit)" :alt="getUnitLabel(chapter.unit)" class="h-8 max-w-40 object-contain object-left" /><span class="badge badge-sm badge-ghost">Chapter {{ chapter.chapterNo }}</span></div>
             <h2 class="font-bold leading-5">{{ chapter.title }}</h2>
             <p class="text-xs leading-5 text-base-content/55 line-clamp-3 min-h-[3.75rem]">{{ unitChapterOutline(chapter) || `${getUnitLabel(chapter.unit)} 的组合主线故事。` }}</p>
-            <div v-if="storyProgress('unit', chapter.episodes).available" class="flex items-center gap-2">
-              <div class="flex h-1.5 flex-1 overflow-hidden rounded-full bg-base-200"><span class="bg-success" :style="{ width: progressWidth(storyProgress('unit', chapter.episodes).read, chapter.episodes.length) }"></span><span class="bg-warning" :style="{ width: progressWidth(storyProgress('unit', chapter.episodes).skipped, chapter.episodes.length) }"></span></div>
-              <span class="text-[11px] text-base-content/50">{{ storyProgress('unit', chapter.episodes).read }} 读完 · {{ storyProgress('unit', chapter.episodes).skipped }} 跳过</span><ChevronRight class="w-4 h-4 opacity-40 group-hover:translate-x-0.5 transition-transform" />
-            </div>
-            <div v-else class="flex items-center gap-2 text-[11px] text-base-content/40"><span class="flex-1">共 {{ chapter.episodes.length }} 话</span><ChevronRight class="w-4 h-4 opacity-40 group-hover:translate-x-0.5 transition-transform" /></div>
+            <div class="flex items-center gap-2 text-[11px] text-base-content/40"><span class="flex-1">共 {{ chapter.episodes.length }} 话</span><ChevronRight class="w-4 h-4 opacity-40 group-hover:translate-x-0.5 transition-transform" /></div>
           </div>
         </button>
       </div>
@@ -529,11 +409,7 @@ onMounted(async () => {
             <div class="flex justify-between gap-3"><span class="badge badge-secondary badge-outline badge-sm">特殊故事</span><span class="text-xs text-base-content/45">#{{ story.id }}</span></div>
             <h2 class="font-bold line-clamp-2 leading-5 min-h-10">{{ story.title }}</h2>
             <p class="text-xs text-base-content/55 flex items-center gap-2"><Calendar class="w-4 h-4" />{{ formatDate(story.startAt) }}</p>
-            <div v-if="storyProgress('special', story.episodes).available" class="flex items-center gap-2">
-              <div class="flex h-1.5 flex-1 overflow-hidden rounded-full bg-base-200"><span class="bg-success" :style="{ width: progressWidth(storyProgress('special', story.episodes).read, story.episodes.length) }"></span><span class="bg-warning" :style="{ width: progressWidth(storyProgress('special', story.episodes).skipped, story.episodes.length) }"></span></div>
-              <span class="text-[11px] text-base-content/50">{{ storyProgress('special', story.episodes).read }} 读完 · {{ storyProgress('special', story.episodes).skipped }} 跳过</span><ChevronRight class="w-4 h-4 opacity-40 group-hover:translate-x-0.5 transition-transform" />
-            </div>
-            <div v-else class="flex items-center gap-2 text-[11px] text-base-content/40"><span class="flex-1">共 {{ story.episodes.length }} 话</span><ChevronRight class="w-4 h-4 opacity-40 group-hover:translate-x-0.5 transition-transform" /></div>
+            <div class="flex items-center gap-2 text-[11px] text-base-content/40"><span class="flex-1">共 {{ story.episodes.length }} 话</span><ChevronRight class="w-4 h-4 opacity-40 group-hover:translate-x-0.5 transition-transform" /></div>
           </div>
         </button>
       </div>
@@ -563,7 +439,6 @@ onMounted(async () => {
               <div class="flex flex-wrap items-center gap-2 mb-2">
                 <span class="badge badge-primary">{{ selectedStory.kind === 'event' ? '活动故事' : selectedStory.kind === 'unit' ? '组合主线' : '特殊故事' }}</span>
                 <span v-if="selectedStory.unit" class="badge badge-ghost">{{ getUnitLabel(selectedStory.unit) }}</span>
-                <template v-if="selectedStoryProgress.available"><span class="badge badge-success badge-outline">读完 {{ selectedStoryProgress.read }}</span><span class="badge badge-warning badge-outline">跳过 {{ selectedStoryProgress.skipped }}</span><span class="badge badge-ghost">未读 {{ selectedStoryProgress.unread }}</span></template>
               </div>
               <h2 class="font-bold text-xl">{{ selectedStory.title }}</h2>
               <p v-if="selectedStory.outline" class="text-sm leading-6 text-base-content/65 mt-2 whitespace-pre-line">{{ selectedStory.outline }}</p>
@@ -573,11 +448,8 @@ onMounted(async () => {
           <div class="p-4 border-b border-base-200 bg-base-100"><label class="input input-sm input-bordered flex items-center gap-2"><Search class="w-4 h-4 opacity-40" /><input v-model="episodeSearch" class="grow" placeholder="搜索本篇章节标题或剧本 ID…" /><button v-if="episodeSearch" class="btn btn-xs btn-circle btn-ghost" @click="episodeSearch = ''"><X class="w-3 h-3" /></button></label></div>
           <div class="p-3 md:p-4 max-h-[58vh] overflow-y-auto space-y-2 bg-base-200/50">
             <button v-for="episode in selectedStoryEpisodes" :key="episode.id" class="group w-full flex items-center gap-3 bg-base-100 border border-base-200 rounded-xl p-3 text-left hover:border-primary/50 hover:shadow-sm transition-all" @click="openEpisode(episode)">
-              <span class="grid w-10 h-10 place-items-center rounded-lg shrink-0" :class="getEpisodeAccountStatus(selectedStory.kind, episode.id) === 'read' ? 'bg-success/10 text-success' : getEpisodeAccountStatus(selectedStory.kind, episode.id) === 'skipped' ? 'bg-warning/10 text-warning' : 'bg-primary/10 text-primary'"><CheckCircle2 v-if="getEpisodeAccountStatus(selectedStory.kind, episode.id) === 'read'" class="w-5 h-5" /><FastForward v-else-if="getEpisodeAccountStatus(selectedStory.kind, episode.id) === 'skipped'" class="w-5 h-5" /><Play v-else class="w-4 h-4" /></span>
+              <span class="grid w-10 h-10 place-items-center rounded-lg shrink-0 bg-primary/10 text-primary"><Play class="w-4 h-4" /></span>
               <span class="min-w-0 flex-1"><span class="text-[11px] text-base-content/45">{{ episode.episodeNoLabel || `第 ${episode.episodeNo} 话` }} · {{ episode.scenarioId }}</span><span class="font-medium block truncate">{{ episode.title }}</span></span>
-              <span v-if="getEpisodeAccountStatus(selectedStory.kind, episode.id) === 'read'" class="badge badge-success badge-outline badge-xs">读完</span>
-              <span v-else-if="getEpisodeAccountStatus(selectedStory.kind, episode.id) === 'skipped'" class="badge badge-warning badge-outline badge-xs">跳过</span>
-              <span v-else-if="getEpisodeAccountStatus(selectedStory.kind, episode.id) === 'unread'" class="badge badge-ghost badge-xs">未读</span>
               <ChevronRight class="w-4 h-4 shrink-0 opacity-40 group-hover:translate-x-0.5 transition-transform" />
             </button>
             <div v-if="selectedStoryEpisodes.length === 0" class="py-16 text-center text-sm text-base-content/45">没有匹配的章节</div>
