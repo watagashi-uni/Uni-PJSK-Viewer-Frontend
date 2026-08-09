@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Search, Trophy, Users, X } from 'lucide-vue-next'
+import { CheckCircle2, Search, Trophy, Users, X } from 'lucide-vue-next'
 import Pagination from '@/components/Pagination.vue'
 import SekaiHonor from '@/components/SekaiHonor.vue'
 import SekaiHonorBonds from '@/components/SekaiHonorBonds.vue'
+import AccountSelector from '@/components/AccountSelector.vue'
 import { useMasterStore } from '@/stores/master'
+import { useAccountStore } from '@/stores/account'
 import type { GameCharacterData } from '@/types/master'
 
 interface HonorLevel {
@@ -70,6 +72,7 @@ type HonorTab = 'normal' | 'bonds'
 const route = useRoute()
 const router = useRouter()
 const masterStore = useMasterStore()
+const accountStore = useAccountStore()
 
 const honors = ref<HonorData[]>([])
 const honorGroups = ref<HonorGroup[]>([])
@@ -87,6 +90,7 @@ const selectedEventGroup = ref(0)
 const normalPage = ref(1)
 const selectedHonor = ref<HonorData | null>(null)
 const selectedHonorLevel = ref(1)
+const normalOwnedOnly = ref(false)
 
 const bondsSearch = ref('')
 const selectedBondsCharacter = ref(0)
@@ -96,6 +100,7 @@ const selectedBondsHonor = ref<BondsHonor | null>(null)
 const selectedBondsLevel = ref(1)
 const selectedBondsWordId = ref(0)
 const reverseBonds = ref(false)
+const bondsOwnedOnly = ref(false)
 
 const normalPageSize = 24
 const bondsPageSize = 12
@@ -116,9 +121,40 @@ const rarityOptions = [
 ]
 
 const activeTab = computed<HonorTab>(() => route.query.tab === 'bonds' ? 'bonds' : 'normal')
+const selectedUserId = computed({
+  get: () => accountStore.currentUserId || '',
+  set: value => { void accountStore.selectAccount(value) },
+})
+const suite = computed<any | null>(() => selectedUserId.value ? accountStore.getSuiteCache(selectedUserId.value) : null)
 const honorGroupMap = computed(() => new Map(honorGroups.value.map(group => [group.id, group])))
 const characterMap = computed(() => new Map(characters.value.map(character => [character.id, character])))
 const characterUnitMap = computed(() => new Map(gameCharacterUnits.value.map(unit => [unit.id, unit])))
+const normalOwnedMap = computed(() => {
+  const rows = suite.value?.userHonors ?? suite.value?.user_honors
+  const map = new Map<number, number>()
+  if (!Array.isArray(rows)) return map
+  for (const row of rows) {
+    const id = Number(row?.honorId ?? row?.honor_id)
+    const level = Number(row?.level || 1)
+    if (Number.isFinite(id)) map.set(id, level)
+  }
+  return map
+})
+const bondsOwnedMap = computed(() => {
+  const rows = suite.value?.userBondsHonors ?? suite.value?.user_bonds_honors
+  const map = new Map<number, number>()
+  if (!Array.isArray(rows)) return map
+  for (const row of rows) {
+    const id = Number(row?.bondsHonorId ?? row?.bonds_honor_id)
+    const level = Number(row?.level || 1)
+    if (Number.isFinite(id)) map.set(id, level)
+  }
+  return map
+})
+const hasNormalOwnership = computed(() => Array.isArray(suite.value?.userHonors ?? suite.value?.user_honors))
+const hasBondsOwnership = computed(() => Array.isArray(suite.value?.userBondsHonors ?? suite.value?.user_bonds_honors))
+const visibleNormalOwnedCount = computed(() => honors.value.filter(honor => normalOwnedMap.value.has(honor.id)).length)
+const visibleBondsOwnedCount = computed(() => bondsHonors.value.filter(honor => bondsOwnedMap.value.has(honor.id)).length)
 
 const wordsByBondsGroup = computed(() => {
   const map = new Map<number, BondsHonorWord[]>()
@@ -138,6 +174,7 @@ const eventGroupOptions = computed(() => honorGroups.value
 const filteredHonors = computed(() => {
   const query = normalSearch.value.trim().toLocaleLowerCase()
   return honors.value
+    .filter(honor => !normalOwnedOnly.value || normalOwnedMap.value.has(honor.id))
     .filter(honor => {
       const group = honorGroupMap.value.get(honor.groupId)
       if (selectedHonorType.value && group?.honorType !== selectedHonorType.value) return false
@@ -161,6 +198,7 @@ const characterOptions = computed(() => [...characters.value].sort((a, b) => a.s
 const filteredBondsHonors = computed(() => {
   const query = bondsSearch.value.trim().toLocaleLowerCase()
   return bondsHonors.value
+    .filter(honor => !bondsOwnedOnly.value || bondsOwnedMap.value.has(honor.id))
     .filter(honor => {
       const unit1 = characterUnitMap.value.get(honor.gameCharacterUnitId1)
       const unit2 = characterUnitMap.value.get(honor.gameCharacterUnitId2)
@@ -186,8 +224,14 @@ const selectedBondsWords = computed(() => selectedBondsHonor.value
   ? wordsByBondsGroup.value.get(selectedBondsHonor.value.bondsGroupId) || []
   : [])
 
-watch([normalSearch, selectedHonorType, selectedRarity, selectedEventGroup], () => { normalPage.value = 1 })
-watch([bondsSearch, selectedBondsCharacter, selectedBondsRarity], () => { bondsPage.value = 1 })
+watch([normalSearch, selectedHonorType, selectedRarity, selectedEventGroup, normalOwnedOnly], () => { normalPage.value = 1 })
+watch([bondsSearch, selectedBondsCharacter, selectedBondsRarity, bondsOwnedOnly], () => { bondsPage.value = 1 })
+watch(selectedUserId, () => {
+  normalPage.value = 1
+  bondsPage.value = 1
+})
+watch(hasNormalOwnership, value => { if (!value) normalOwnedOnly.value = false })
+watch(hasBondsOwnership, value => { if (!value) bondsOwnedOnly.value = false })
 watch(normalTotalPages, total => { normalPage.value = Math.min(normalPage.value, total) })
 watch(bondsTotalPages, total => { bondsPage.value = Math.min(bondsPage.value, total) })
 watch(selectedHonorType, type => {
@@ -223,7 +267,7 @@ function scrollToTop() {
 
 function openHonor(honor: HonorData) {
   selectedHonor.value = honor
-  selectedHonorLevel.value = maxLevel(honor.levels)
+  selectedHonorLevel.value = normalOwnedMap.value.get(honor.id) || maxLevel(honor.levels)
 }
 
 function getCharacterNameByUnitId(unitId: number): string {
@@ -238,7 +282,7 @@ function firstWordId(honor: BondsHonor): number {
 
 function openBondsHonor(honor: BondsHonor) {
   selectedBondsHonor.value = honor
-  selectedBondsLevel.value = maxLevel(honor.levels)
+  selectedBondsLevel.value = bondsOwnedMap.value.get(honor.id) || maxLevel(honor.levels)
   selectedBondsWordId.value = firstWordId(honor)
   reverseBonds.value = false
 }
@@ -270,11 +314,9 @@ onMounted(async () => {
 
 <template>
   <div class="max-w-7xl mx-auto space-y-6">
-    <header>
-      <h1 class="text-3xl font-bold flex items-center gap-3">
-        <Trophy class="w-8 h-8 text-warning" /> 称号图鉴
-      </h1>
-      <p class="text-sm text-base-content/60 mt-2">浏览普通称号、活动排名称号和角色羁绊称号，并预览不同等级与文字组合。</p>
+    <header class="flex flex-wrap items-start justify-between gap-4">
+      <div><h1 class="text-3xl font-bold flex items-center gap-3"><Trophy class="w-8 h-8 text-warning" /> 称号图鉴</h1><p class="text-sm text-base-content/60 mt-2">浏览普通称号、活动排名称号和角色羁绊称号，并可结合账号查看持有状态。</p></div>
+      <div class="min-w-56"><AccountSelector v-if="accountStore.accounts.length" v-model="selectedUserId" /></div>
     </header>
 
     <div role="tablist" class="tabs tabs-box bg-base-100 border border-base-200 w-fit">
@@ -313,7 +355,10 @@ onMounted(async () => {
               <option v-for="group in eventGroupOptions" :key="group.id" :value="group.id">#{{ group.id }} {{ group.name }}</option>
             </select>
           </div>
-          <p class="text-sm text-base-content/55">找到 {{ filteredHonors.length }} 个称号</p>
+          <div class="flex flex-wrap items-center gap-4">
+            <p class="text-sm text-base-content/55">找到 {{ filteredHonors.length }} 个称号<span v-if="hasNormalOwnership"> · 当前 master 可显示 {{ visibleNormalOwnedCount }} / {{ honors.length }} 个已拥有称号<span v-if="visibleNormalOwnedCount !== normalOwnedMap.size">（账号记录 {{ normalOwnedMap.size }}）</span></span></p>
+            <label class="label cursor-pointer gap-2 ml-auto"><input v-model="normalOwnedOnly" type="checkbox" class="checkbox checkbox-sm checkbox-primary" :disabled="!hasNormalOwnership" /><span class="label-text">仅看已拥有</span></label>
+          </div>
         </div>
       </section>
 
@@ -326,7 +371,7 @@ onMounted(async () => {
           @click="openHonor(honor)"
         >
           <div class="card-body p-4 gap-3">
-            <SekaiHonor :honor-id="honor.id" :honor-level="maxLevel(honor.levels)" />
+            <div class="relative"><SekaiHonor :honor-id="honor.id" :honor-level="normalOwnedMap.get(honor.id) || maxLevel(honor.levels)" /><span v-if="normalOwnedMap.has(honor.id)" class="absolute -top-2 -right-2 badge badge-success badge-sm gap-1"><CheckCircle2 class="w-3 h-3" />Lv.{{ normalOwnedMap.get(honor.id) }}</span></div>
             <div class="min-w-0">
               <div class="flex flex-wrap gap-2 mb-1">
                 <span class="badge badge-sm badge-ghost">#{{ honor.id }}</span>
@@ -368,7 +413,10 @@ onMounted(async () => {
               <option v-for="option in rarityOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
             </select>
           </div>
-          <p class="text-sm text-base-content/55">找到 {{ filteredBondsHonors.length }} 个羁绊称号</p>
+          <div class="flex flex-wrap items-center gap-4">
+            <p class="text-sm text-base-content/55">找到 {{ filteredBondsHonors.length }} 个羁绊称号<span v-if="hasBondsOwnership"> · 当前 master 可显示 {{ visibleBondsOwnedCount }} / {{ bondsHonors.length }} 个已拥有称号<span v-if="visibleBondsOwnedCount !== bondsOwnedMap.size">（账号记录 {{ bondsOwnedMap.size }}）</span></span></p>
+            <label class="label cursor-pointer gap-2 ml-auto"><input v-model="bondsOwnedOnly" type="checkbox" class="checkbox checkbox-sm checkbox-secondary" :disabled="!hasBondsOwnership" /><span class="label-text">仅看已拥有</span></label>
+          </div>
         </div>
       </section>
 
@@ -381,11 +429,14 @@ onMounted(async () => {
           @click="openBondsHonor(honor)"
         >
           <div class="card-body p-4 gap-3">
-            <SekaiHonorBonds
-              :honor-id="honor.id"
-              :honor-level="maxLevel(honor.levels)"
-              :bonds-honor-word-id="firstWordId(honor)"
-            />
+            <div class="relative">
+              <SekaiHonorBonds
+                :honor-id="honor.id"
+                :honor-level="bondsOwnedMap.get(honor.id) || maxLevel(honor.levels)"
+                :bonds-honor-word-id="firstWordId(honor)"
+              />
+              <span v-if="bondsOwnedMap.has(honor.id)" class="absolute -top-2 -right-2 badge badge-success badge-sm gap-1"><CheckCircle2 class="w-3 h-3" />Lv.{{ bondsOwnedMap.get(honor.id) }}</span>
+            </div>
             <div>
               <div class="flex flex-wrap gap-2 mb-1">
                 <span class="badge badge-sm badge-ghost">#{{ honor.id }}</span>
@@ -413,7 +464,7 @@ onMounted(async () => {
       <div v-if="selectedHonor" class="modal-box max-w-2xl">
         <button class="btn btn-sm btn-circle btn-ghost absolute right-3 top-3" aria-label="关闭" @click="selectedHonor = null"><X class="w-4 h-4" /></button>
         <h2 class="font-bold text-xl pr-10">{{ honorGroupMap.get(selectedHonor.groupId)?.name || selectedHonor.name }}</h2>
-        <p class="text-sm text-base-content/55 mt-1">称号 #{{ selectedHonor.id }} · {{ getTypeLabel(honorGroupMap.get(selectedHonor.groupId)?.honorType) }}</p>
+        <p class="text-sm text-base-content/55 mt-1">称号 #{{ selectedHonor.id }} · {{ getTypeLabel(honorGroupMap.get(selectedHonor.groupId)?.honorType) }}<span v-if="normalOwnedMap.has(selectedHonor.id)" class="text-success font-medium"> · 已拥有 Lv.{{ normalOwnedMap.get(selectedHonor.id) }}</span></p>
         <div class="bg-base-200 rounded-xl p-4 my-5"><SekaiHonor :honor-id="selectedHonor.id" :honor-level="selectedHonorLevel" /></div>
         <label class="form-control w-full">
           <span class="label-text mb-2">展示等级</span>
@@ -429,7 +480,7 @@ onMounted(async () => {
       <div v-if="selectedBondsHonor" class="modal-box max-w-2xl">
         <button class="btn btn-sm btn-circle btn-ghost absolute right-3 top-3" aria-label="关闭" @click="selectedBondsHonor = null"><X class="w-4 h-4" /></button>
         <h2 class="font-bold text-xl pr-10">{{ getCharacterNameByUnitId(selectedBondsHonor.gameCharacterUnitId1) }} × {{ getCharacterNameByUnitId(selectedBondsHonor.gameCharacterUnitId2) }}</h2>
-        <p class="text-sm text-base-content/55 mt-1">羁绊称号 #{{ selectedBondsHonor.id }}</p>
+        <p class="text-sm text-base-content/55 mt-1">羁绊称号 #{{ selectedBondsHonor.id }}<span v-if="bondsOwnedMap.has(selectedBondsHonor.id)" class="text-success font-medium"> · 已拥有 Lv.{{ bondsOwnedMap.get(selectedBondsHonor.id) }}</span></p>
         <div class="bg-base-200 rounded-xl p-4 my-5">
           <SekaiHonorBonds
             :honor-id="selectedBondsHonor.id"
