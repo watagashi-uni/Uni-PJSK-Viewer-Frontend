@@ -168,11 +168,24 @@ const filteredCards = computed(() => {
       return [card.id, card.prefix, character?.firstName, character?.givenName]
         .some(value => String(value || '').toLocaleLowerCase().includes(query))
     })
-    .sort((a, b) => b.id - a.id)
+    .sort((a, b) => {
+      const rarityDiff = rarityOrder.indexOf(a.cardRarityType) - rarityOrder.indexOf(b.cardRarityType)
+      return rarityDiff || b.id - a.id
+    })
 })
 
 const totalPages = computed(() => Math.max(1, Math.ceil(filteredCards.value.length / pageSize)))
 const paginatedCards = computed(() => filteredCards.value.slice((page.value - 1) * pageSize, page.value * pageSize))
+const paginatedCardGroups = computed(() => rarityOrder.map(rarity => {
+  const allCards = filteredCards.value.filter(card => card.cardRarityType === rarity)
+  return {
+    rarity,
+    label: rarityLabels[rarity] || rarity,
+    cards: paginatedCards.value.filter(card => card.cardRarityType === rarity),
+    total: allCards.length,
+    owned: allCards.filter(card => userCardsMap.value.has(card.id)).length,
+  }
+}).filter(group => group.cards.length > 0))
 const selectedCharacterStats = computed(() => characterStats.value.find(row => row.character.id === selectedCharacterId.value))
 const isSelectedFullCollection = computed(() => Boolean(
   hasCardData.value &&
@@ -242,7 +255,7 @@ onMounted(async () => {
 
 <template>
   <div class="max-w-7xl mx-auto space-y-6">
-    <PageHeader title="卡片养成进度" description="集中查看卡片收集、特训、Master Rank、技能等级与支线剧情阅读状态。">
+    <PageHeader title="卡片养成进度" description="集中查看卡片收集、特训、突破、技能等级与支线剧情阅读状态。">
       <template #icon><BookOpen class="w-8 h-8 text-primary" /></template>
       <template v-if="accountStore.accounts.length" #actions><div class="sm:w-56"><AccountSelector v-model="selectedUserId" /></div></template>
     </PageHeader>
@@ -257,7 +270,7 @@ onMounted(async () => {
         <div class="stat bg-base-100 shadow-sm rounded-xl p-4 lg:col-span-1"><div class="stat-title text-xs">卡片收集</div><div class="stat-value text-2xl text-primary">{{ hasCardData ? collectionSummary.owned : '—' }} / {{ collectionSummary.total }}</div><div class="stat-desc"><template v-if="hasCardData">{{ formatPercent(collectionSummary.collectionRate) }}<template v-if="collectionSummary.unmapped"> · Suite {{ collectionSummary.suiteTotal }}，{{ collectionSummary.unmapped }} 张待 master</template></template><template v-else>当前 master 收录</template></div></div>
         <div class="stat bg-base-100 shadow-sm rounded-xl p-4"><div class="stat-title text-xs">完成特训</div><div class="stat-value text-2xl">{{ hasCardData ? `${collectionSummary.trained} / ${collectionSummary.trainable}` : '—' }}</div><div class="stat-desc">已拥有的 3★ / 4★</div></div>
         <div class="stat bg-base-100 shadow-sm rounded-xl p-4"><div class="stat-title text-xs">剧情已读</div><div class="stat-value text-2xl text-secondary">{{ hasCardData ? `${collectionSummary.storyRead} / ${collectionSummary.storyTotal}` : '—' }}</div><div class="stat-desc">前篇与后篇</div></div>
-        <div class="stat bg-base-100 shadow-sm rounded-xl p-4"><div class="stat-title text-xs">MR / 技能双满</div><div class="stat-value text-2xl">{{ hasCardData ? collectionSummary.maxed : '—' }}</div><div class="stat-desc">Master Rank 5 · Skill 4</div></div>
+        <div class="stat bg-base-100 shadow-sm rounded-xl p-4"><div class="stat-title text-xs">突破 / 技能双满</div><div class="stat-value text-2xl">{{ hasCardData ? collectionSummary.maxed : '—' }}</div><div class="stat-desc">突破 5 · 技能 4</div></div>
         <div class="stat bg-base-100 shadow-sm rounded-xl p-4 col-span-2 lg:col-span-1"><div class="stat-title text-xs">当前角色</div><div class="stat-value text-xl truncate">{{ selectedCharacterId ? characterName(selectedCharacterStats?.character) : '全部角色' }}</div><div class="stat-desc">{{ selectedCharacterStats ? `${hasCardData ? selectedCharacterStats.owned : '—'} / ${selectedCharacterStats.total}${hasCardData ? ` · 未读 ${selectedCharacterStats.unread}` : ''}` : `${filteredCards.length} 张结果` }}</div></div>
       </div>
 
@@ -285,29 +298,37 @@ onMounted(async () => {
               </div>
               <div class="flex flex-wrap gap-2">
                 <div class="join"><button v-for="option in [{ value: 'all', label: '全部' }, { value: 'owned', label: '已拥有' }, { value: 'missing', label: '未拥有' }]" :key="option.value" class="btn btn-xs join-item" :class="{ 'btn-primary': ownershipFilter === option.value }" @click="ownershipFilter = option.value as OwnershipFilter">{{ option.label }}</button></div>
-                <div class="join"><button v-for="option in [{ value: 'all', label: '全部养成' }, { value: 'story_unread', label: '剧情未读' }, { value: 'untrained', label: '尚未特训' }, { value: 'not_maxed', label: 'MR / 技能未满' }]" :key="option.value" class="btn btn-xs join-item" :class="{ 'btn-secondary': progressFilter === option.value }" :disabled="!hasCardData && option.value !== 'all'" @click="progressFilter = option.value as ProgressFilter">{{ option.label }}</button></div>
+                <div class="join"><button v-for="option in [{ value: 'all', label: '全部养成' }, { value: 'story_unread', label: '剧情未读' }, { value: 'untrained', label: '尚未特训' }, { value: 'not_maxed', label: '突破 / 技能未满' }]" :key="option.value" class="btn btn-xs join-item" :class="{ 'btn-secondary': progressFilter === option.value }" :disabled="!hasCardData && option.value !== 'all'" @click="progressFilter = option.value as ProgressFilter">{{ option.label }}</button></div>
               </div>
               <div class="flex items-center justify-between text-xs text-base-content/50"><span>找到 {{ filteredCards.length }} 张卡片</span><span v-if="hasCardData"><Sparkles class="w-3.5 h-3.5 inline mr-1" />点击卡片可查看详情</span></div>
             </div>
           </div>
 
-          <div v-if="paginatedCards.length" class="grid grid-cols-4 sm:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 gap-2.5">
-            <RouterLink v-for="card in paginatedCards" :key="card.id" :to="`/cards/${card.id}`" class="group card bg-base-100 border border-base-200 shadow-sm overflow-hidden hover:border-primary/40 hover:shadow-md transition-all">
-              <div class="relative">
-                <SekaiCard :card="card" :trained="isTrained(card)" :master-rank="userCardsMap.get(card.id)?.masterRank || 0" class="transition-transform group-hover:scale-[1.02]" :class="{ 'grayscale opacity-40': hasCardData && !userCardsMap.has(card.id) }" />
-                <span class="absolute top-1 left-1 badge badge-xs bg-base-100/85 border-0">#{{ card.id }}</span>
-                <div v-if="hasCardData && !userCardsMap.has(card.id)" class="absolute inset-0 grid place-items-center"><span class="badge badge-neutral badge-sm">未拥有</span></div>
-                <span v-else-if="isTrained(card)" class="absolute top-1 right-1 badge badge-secondary badge-xs">特训</span>
+          <div v-if="paginatedCardGroups.length" class="space-y-6">
+            <section v-for="group in paginatedCardGroups" :key="group.rarity" class="space-y-2.5">
+              <div class="flex items-end justify-between gap-3 border-b border-base-300 pb-2">
+                <h3 class="text-lg font-bold">{{ group.label }}</h3>
+                <p class="text-xs text-base-content/50"><template v-if="hasCardData">拥有 {{ group.owned }} / </template>筛选结果 {{ group.total }}</p>
               </div>
-              <div class="p-2 space-y-1.5 min-w-0">
-                <p class="text-xs font-bold truncate" :title="card.prefix">{{ card.prefix }}</p>
-                <template v-if="userCardsMap.has(card.id)">
-                  <div class="flex flex-wrap gap-1 text-[10px]"><span class="badge badge-xs badge-outline">Lv.{{ userCardsMap.get(card.id)?.level }}</span><span class="badge badge-xs badge-outline">MR {{ userCardsMap.get(card.id)?.masterRank || 0 }}</span><span class="badge badge-xs badge-outline">SLv.{{ userCardsMap.get(card.id)?.skillLevel || 1 }}</span></div>
-                  <div class="flex items-center justify-between text-[10px]" :class="episodeStats(card.id).read === episodeStats(card.id).total ? 'text-success' : 'text-secondary'"><span class="flex items-center gap-1"><CheckCircle2 class="w-3 h-3" />剧情</span><span>{{ episodeStats(card.id).read }} / {{ episodeStats(card.id).total }}</span></div>
-                </template>
-                <p v-else class="text-[10px] text-base-content/40 truncate">{{ rarityLabels[card.cardRarityType] || card.cardRarityType }}</p>
+              <div class="grid grid-cols-4 sm:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 gap-2.5">
+                <RouterLink v-for="card in group.cards" :key="card.id" :to="`/cards/${card.id}`" class="group card bg-base-100 border border-base-200 shadow-sm overflow-hidden hover:border-primary/40 hover:shadow-md transition-all">
+                  <div class="relative">
+                    <SekaiCard :card="card" :trained="isTrained(card)" :master-rank="userCardsMap.get(card.id)?.masterRank || 0" class="transition-transform group-hover:scale-[1.02]" :class="{ 'grayscale opacity-40': hasCardData && !userCardsMap.has(card.id) }" />
+                    <span class="absolute top-1 left-1 badge badge-xs bg-base-100/85 border-0">#{{ card.id }}</span>
+                    <div v-if="hasCardData && !userCardsMap.has(card.id)" class="absolute inset-0 grid place-items-center"><span class="badge badge-neutral badge-sm">未拥有</span></div>
+                    <span v-else-if="isTrained(card)" class="absolute top-1 right-1 badge badge-secondary badge-xs">特训</span>
+                  </div>
+                  <div class="p-2 space-y-1.5 min-w-0">
+                    <p class="text-xs font-bold truncate" :title="card.prefix">{{ card.prefix }}</p>
+                    <template v-if="userCardsMap.has(card.id)">
+                      <div class="flex flex-wrap gap-1 text-[10px]"><span class="badge badge-xs badge-outline">Lv.{{ userCardsMap.get(card.id)?.level }}</span><span class="badge badge-xs badge-outline">突破 {{ userCardsMap.get(card.id)?.masterRank || 0 }}</span><span class="badge badge-xs badge-outline">技能 {{ userCardsMap.get(card.id)?.skillLevel || 1 }}</span></div>
+                      <div class="flex items-center justify-between text-[10px]" :class="episodeStats(card.id).read === episodeStats(card.id).total ? 'text-success' : 'text-secondary'"><span class="flex items-center gap-1"><CheckCircle2 class="w-3 h-3" />剧情</span><span>{{ episodeStats(card.id).read }} / {{ episodeStats(card.id).total }}</span></div>
+                    </template>
+                    <p v-else class="text-[10px] text-base-content/40 truncate">{{ rarityLabels[card.cardRarityType] || card.cardRarityType }}</p>
+                  </div>
+                </RouterLink>
               </div>
-            </RouterLink>
+            </section>
           </div>
           <div v-else class="card bg-base-100 border border-base-200"><div class="card-body items-center py-14 text-center"><BookOpen class="w-10 h-10 text-base-content/20" /><p class="font-bold">没有匹配的卡片</p><button class="btn btn-sm btn-ghost" @click="resetFilters">清除筛选</button></div></div>
           <Pagination v-if="totalPages > 1" :current-page="page" :total-pages="totalPages" base-url="/card-collection" @page-change="page = $event" />
