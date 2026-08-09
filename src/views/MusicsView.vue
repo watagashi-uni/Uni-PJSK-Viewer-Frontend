@@ -18,6 +18,7 @@ interface StoredMusicsViewState {
   viewMode: 'grid' | 'list' | 'b30' | 'level'
   showUserResults: boolean
   resultFilter: 'all' | 'no_fc' | 'no_ap'
+  collectionFilter: 'all' | 'owned' | 'locked' | 'achievement_incomplete'
   filterDifficulty: string
 }
 
@@ -42,6 +43,7 @@ function loadStoredMusicsViewState(): StoredMusicsViewState | null {
       viewMode: ['grid', 'list', 'b30', 'level'].includes(parsed.viewMode) ? parsed.viewMode : 'grid',
       showUserResults: parsed.showUserResults === true,
       resultFilter: ['all', 'no_fc', 'no_ap'].includes(parsed.resultFilter) ? parsed.resultFilter : 'all',
+      collectionFilter: ['all', 'owned', 'locked', 'achievement_incomplete'].includes(parsed.collectionFilter) ? parsed.collectionFilter : 'all',
       filterDifficulty: typeof parsed.filterDifficulty === 'string' ? parsed.filterDifficulty : 'master',
     }
   } catch {
@@ -134,6 +136,11 @@ interface UserMusicResult {
   playType: string
 }
 
+interface MusicAchievement {
+  id: number
+  musicDifficultyType?: string
+}
+
 const route = useRoute()
 const router = useRouter()
 const masterStore = useMasterStore()
@@ -172,6 +179,7 @@ const characters = ref<Character[]>([])
 const gameCharacterUnits = ref<GameCharacterUnit[]>([])
 const outsideCharacters = ref<OutsideCharacter[]>([])
 const releaseConditions = ref<ReleaseCondition[]>([])
+const musicAchievements = ref<MusicAchievement[]>([])
 const pjskb30Map = ref<Map<string, number>>(new Map())
 const usePjskb30 = ref(true)
 const translations = toRef(masterStore, 'translations')
@@ -202,12 +210,17 @@ const viewMode = ref<'grid' | 'list' | 'b30' | 'level'>(restored?.viewMode ?? 'g
 // 成绩数据（从缓存加载，不自动刷新）
 // Suite 成绩数据量很大，使用 shallowRef 避免深层响应式代理导致卡顿
 const musicResultsMap = shallowRef<Record<number, Record<string, string>>>({})
+const ownedMusicIds = shallowRef<Set<number>>(new Set())
+const musicAchievementCountMap = shallowRef<Record<number, number>>({})
+const hasOwnershipData = ref(false)
+const hasAchievementData = ref(false)
 const showUserResults = ref(restored?.showUserResults ?? false)
 const isDataLoaded = ref(false)
 const hasSuiteData = computed(() => showUserResults.value && isDataLoaded.value)
 
 // 成绩筛选
 const resultFilter = ref<'all' | 'no_fc' | 'no_ap'>(restored?.resultFilter ?? 'all')
+const collectionFilter = ref<'all' | 'owned' | 'locked' | 'achievement_incomplete'>(restored?.collectionFilter ?? 'all')
 const filterDifficulty = ref<string>(restored?.filterDifficulty ?? 'master')
 
 // 定数表展开状态
@@ -276,6 +289,10 @@ function loadFromCache() {
   const uid = accountStore.currentUserId
   if (!uid) {
     musicResultsMap.value = {}
+    ownedMusicIds.value = new Set()
+    musicAchievementCountMap.value = {}
+    hasOwnershipData.value = false
+    hasAchievementData.value = false
     isDataLoaded.value = false
     return
   }
@@ -285,6 +302,10 @@ function loadFromCache() {
     isDataLoaded.value = true
   } else {
     musicResultsMap.value = {}
+    ownedMusicIds.value = new Set()
+    musicAchievementCountMap.value = {}
+    hasOwnershipData.value = false
+    hasAchievementData.value = false
     isDataLoaded.value = false
   }
 }
@@ -305,7 +326,7 @@ async function handleSuiteRefresh() {
 
 function parseSuiteData(data: any) {
   const results: Record<number, Record<string, string>> = {}
-  const userMusicResults: UserMusicResult[] = data.userMusicResults || []
+  const userMusicResults: UserMusicResult[] = data.userMusicResults || data.user_music_results || []
 
   for (const r of userMusicResults) {
     if (!results[r.musicId]) results[r.musicId] = {}
@@ -321,6 +342,28 @@ function parseSuiteData(data: any) {
   }
   // 使用不可变替换触发更新，减少深层追踪成本
   musicResultsMap.value = results
+
+  const userMusics = data.userMusics ?? data.user_musics
+  hasOwnershipData.value = Array.isArray(userMusics)
+  ownedMusicIds.value = new Set((Array.isArray(userMusics) ? userMusics : [])
+    .map((row: any) => Number(row?.musicId ?? row?.music_id))
+    .filter((id: number) => Number.isFinite(id)))
+
+  const userAchievements = data.userMusicAchievements ?? data.user_music_achievements
+  hasAchievementData.value = Array.isArray(userAchievements)
+  const achievementCounts: Record<number, number> = {}
+  for (const row of Array.isArray(userAchievements) ? userAchievements : []) {
+    const musicId = Number(row?.musicId ?? row?.music_id)
+    if (!Number.isFinite(musicId)) continue
+    achievementCounts[musicId] = (achievementCounts[musicId] || 0) + 1
+  }
+  musicAchievementCountMap.value = achievementCounts
+  if ((collectionFilter.value === 'owned' || collectionFilter.value === 'locked') && !hasOwnershipData.value) {
+    collectionFilter.value = 'all'
+  }
+  if (collectionFilter.value === 'achievement_incomplete' && !hasAchievementData.value) {
+    collectionFilter.value = 'all'
+  }
 }
 
 // B30 计算
@@ -466,6 +509,24 @@ const musicDifficultiesMap = computed(() => {
   })
   return map
 })
+
+const musicAchievementTotalMap = computed(() => {
+  const result: Record<number, number> = {}
+  for (const music of musics.value) {
+    const available = musicDifficultiesMap.value[music.id] || EMPTY_OBJ
+    result[music.id] = musicAchievements.value.filter(achievement =>
+      !achievement.musicDifficultyType || available[achievement.musicDifficultyType] !== undefined).length
+  }
+  return result
+})
+
+function getAchievementCount(musicId: number): number {
+  return musicAchievementCountMap.value[musicId] || 0
+}
+
+function getAchievementTotal(musicId: number): number {
+  return musicAchievementTotalMap.value[musicId] || 0
+}
 
 const musicTagMap = computed(() => {
   const map: Record<number, Set<string>> = {}
@@ -863,6 +924,16 @@ const filteredMusics = computed(() => {
     })
   }
 
+  if (hasSuiteData.value && collectionFilter.value !== 'all') {
+    if (collectionFilter.value === 'owned' && hasOwnershipData.value) {
+      result = result.filter(music => ownedMusicIds.value.has(music.id))
+    } else if (collectionFilter.value === 'locked' && hasOwnershipData.value) {
+      result = result.filter(music => !ownedMusicIds.value.has(music.id))
+    } else if (collectionFilter.value === 'achievement_incomplete' && hasAchievementData.value) {
+      result = result.filter(music => getAchievementCount(music.id) < getAchievementTotal(music.id))
+    }
+  }
+
   result.sort((a, b) => {
     if (searchScores.size > 0) {
       const searchCmp = (searchScores.get(b.id) || 0) - (searchScores.get(a.id) || 0)
@@ -924,6 +995,7 @@ async function loadData() {
       gameCharacterUnitData,
       outsideCharacterData,
       releaseConditionData,
+      achievementData,
     ] = await Promise.all([
       masterStore.getMaster<Music>('musics'),
       masterStore.getMaster<MusicDifficulty>('musicDifficulties'),
@@ -934,6 +1006,7 @@ async function loadData() {
       masterStore.getMaster<GameCharacterUnit>('gameCharacterUnits'),
       masterStore.getMaster<OutsideCharacter>('outsideCharacters'),
       masterStore.getMaster<ReleaseCondition>('releaseConditions'),
+      masterStore.getMaster<MusicAchievement>('musicAchievements'),
     ])
     musics.value = musicData
     musicDifficulties.value = diffData
@@ -944,6 +1017,7 @@ async function loadData() {
     gameCharacterUnits.value = gameCharacterUnitData
     outsideCharacters.value = outsideCharacterData
     releaseConditions.value = releaseConditionData
+    musicAchievements.value = achievementData
     
     // 背景加载翻译，不阻塞主列表渲染
     masterStore.getTranslations().catch(e => console.error('加载翻译失败:', e))
@@ -1118,7 +1192,7 @@ onUnmounted(() => {
 })
 
 // 监听过滤/排序变化 -> 重置显示数量
-watch([searchText, selectedArtist, sortKey, sortOrder, resultFilter, filterDifficulty, extraFilterSignature], () => {
+watch([searchText, selectedArtist, sortKey, sortOrder, resultFilter, collectionFilter, filterDifficulty, extraFilterSignature], () => {
   displayedCount.value = 30
   resetToFirstPage()
   window.scrollTo({ top: 0, behavior: 'auto' })
@@ -1128,7 +1202,7 @@ watch([searchText, selectedArtist, sortKey, sortOrder, resultFilter, filterDiffi
 watch(
   [searchText, selectedArtist, sortKey, sortOrder, selectedDiffType, isFilterPanelOpen,
     selectedMusicTags, selectedMvTypes, selectedVocalCharacters, selectedReleaseConditionIds,
-    viewMode, showUserResults, resultFilter, filterDifficulty],
+    viewMode, showUserResults, resultFilter, collectionFilter, filterDifficulty],
   () => {
     const state: StoredMusicsViewState = {
       searchText: searchText.value,
@@ -1144,6 +1218,7 @@ watch(
       viewMode: viewMode.value,
       showUserResults: showUserResults.value,
       resultFilter: resultFilter.value,
+      collectionFilter: collectionFilter.value,
       filterDifficulty: filterDifficulty.value,
     }
     try {
@@ -1323,8 +1398,14 @@ watch(totalPages, (pages) => {
 
       <!-- 成绩筛选 (有数据时显示) -->
       <template v-if="hasSuiteData">
+        <select v-model="collectionFilter" class="select select-bordered select-sm">
+          <option value="all">收藏：全部</option>
+          <option value="owned" :disabled="!hasOwnershipData">已解锁歌曲</option>
+          <option value="locked" :disabled="!hasOwnershipData">未解锁歌曲</option>
+          <option value="achievement_incomplete" :disabled="!hasAchievementData">成就奖励未完成</option>
+        </select>
         <select v-model="resultFilter" class="select select-bordered select-sm">
-          <option value="all">全部</option>
+          <option value="all">成绩：全部</option>
           <option value="no_fc">未FC</option>
           <option value="no_ap">未AP</option>
         </select>
@@ -1703,6 +1784,8 @@ watch(totalPages, (pages) => {
                     </button>
                     <div v-if="isLimitedTime(music.id)" class="badge badge-sm badge-warning text-warning-content font-bold shadow-sm whitespace-nowrap">期间限定</div>
                     <div v-else-if="isExpired(music.id)" class="badge badge-sm bg-base-300 text-base-content/60 font-bold border-none whitespace-nowrap">已过期</div>
+                    <div v-if="hasSuiteData && hasOwnershipData" class="badge badge-sm" :class="ownedMusicIds.has(music.id) ? 'badge-success badge-outline' : 'badge-ghost'">{{ ownedMusicIds.has(music.id) ? '已解锁' : '未解锁' }}</div>
+                    <div v-if="hasSuiteData && hasAchievementData" class="badge badge-sm badge-ghost">成就 {{ getAchievementCount(music.id) }}/{{ getAchievementTotal(music.id) }}</div>
                   </div>
                 </td>
                 <td v-for="d in allDifficulties" :key="d" class="text-center p-2">
@@ -1776,6 +1859,8 @@ watch(totalPages, (pages) => {
                   <span class="truncate">{{ music.composer }}</span>
                 </button>
                 <div v-if="isLimitedTime(music.id)" class="badge badge-xs badge-warning text-warning-content font-bold shadow-sm whitespace-nowrap">限定</div>
+                <div v-if="hasSuiteData && hasOwnershipData" class="badge badge-xs" :class="ownedMusicIds.has(music.id) ? 'badge-success badge-outline' : 'badge-ghost'">{{ ownedMusicIds.has(music.id) ? '已解锁' : '未解锁' }}</div>
+                <div v-if="hasSuiteData && hasAchievementData" class="badge badge-xs badge-ghost">{{ getAchievementCount(music.id) }}/{{ getAchievementTotal(music.id) }}</div>
               </div>
 
               <div class="grid grid-cols-6 gap-0.5 mt-auto">
@@ -1845,6 +1930,9 @@ watch(totalPages, (pages) => {
             :assets-host="assetsHost"
             :categories="music.categories || EMPTY_ARR"
             :results="hasSuiteData && showUserResults ? (musicResultsMap[music.id] || EMPTY_OBJ) : undefined"
+            :ownership-status="hasSuiteData && hasOwnershipData ? (ownedMusicIds.has(music.id) ? 'owned' : 'locked') : undefined"
+            :achievement-claimed="hasSuiteData && hasAchievementData ? getAchievementCount(music.id) : undefined"
+            :achievement-total="hasSuiteData && hasAchievementData ? getAchievementTotal(music.id) : undefined"
             :class="{ 'animate-fade-in-up': enableHeavyAnimation }"
             class="cv-auto-card"
             @artist-click="filterByArtist"
