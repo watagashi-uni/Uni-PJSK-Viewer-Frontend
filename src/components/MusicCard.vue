@@ -21,6 +21,7 @@ const props = defineProps<{
   difficulties: Record<string, number>
   categories: string[]
   ownershipStatus?: 'owned' | 'locked'
+  ownershipLabel?: string
   achievementClaimed?: number
   achievementTotal?: number
   // 成绩数据: difficulty -> 'AP' | 'FC' | 'C' | ''
@@ -168,7 +169,7 @@ function selectArtist() {
 
       <div v-if="ownershipStatus || achievementClaimed !== undefined" class="flex items-center justify-between gap-2 text-[10px]">
         <span v-if="ownershipStatus" class="badge badge-xs" :class="ownershipStatus === 'owned' ? 'badge-success badge-outline' : 'badge-ghost'">
-          {{ ownershipStatus === 'owned' ? '已解锁' : '未解锁' }}
+          {{ ownershipLabel || (ownershipStatus === 'owned' ? '已持有' : '未持有') }}
         </span>
         <span v-if="achievementClaimed !== undefined && achievementTotal" class="ml-auto text-base-content/50">
           成就 {{ achievementClaimed }}/{{ achievementTotal }}
