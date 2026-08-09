@@ -106,6 +106,14 @@ interface MusicOriginal {
   videoLink: string
 }
 
+interface MusicAssetVariant {
+  id: number
+  musicVocalId: number
+  seq: number
+  musicAssetType: string
+  assetbundleName: string
+}
+
 type PreviewPayload = {
   sus: string
   bgm?: string
@@ -139,6 +147,7 @@ const limitedMusics = ref<LimitedTimeMusic[]>([])
 const releaseConditions = ref<ReleaseCondition[]>([])
 const musicCollaborations = ref<MusicCollaboration[]>([])
 const musicOriginals = ref<MusicOriginal[]>([])
+const musicAssetVariants = ref<MusicAssetVariant[]>([])
 const isLoading = ref(true)
 
 const assetsHost = computed(() => settingsStore.assetsHost)
@@ -651,8 +660,15 @@ function difficultyCardStyle(difficulty: string) {
 // 封面图片 URL (startapp)
 const coverUrl = computed(() => {
   if (!music.value) return ''
-  return `${assetsHost.value}/startapp/music/jacket/${music.value.assetbundleName}/${music.value.assetbundleName}.png`
+  const fileName = currentVocal.value
+    ? musicAssetVariants.value.find(variant => variant.musicVocalId === currentVocal.value?.id && variant.musicAssetType === 'jacket')?.assetbundleName
+    : ''
+  return `${assetsHost.value}/startapp/music/jacket/${music.value.assetbundleName}/${fileName || music.value.assetbundleName}.png`
 })
+
+function hasVocalJacket(vocalId: number): boolean {
+  return musicAssetVariants.value.some(variant => variant.musicVocalId === vocalId && variant.musicAssetType === 'jacket')
+}
 
 // 格式化发布时间（包含具体时分秒）
 function formatDate(timestamp: number): string {
@@ -962,6 +978,7 @@ async function loadData() {
       releaseConditionData,
       musicCollaborationData,
       musicOriginalData,
+      musicAssetVariantData,
     ] = await Promise.all([
       masterStore.getMaster<Music>('musics'),
       masterStore.getMaster<MusicDifficulty>('musicDifficulties'),
@@ -976,6 +993,7 @@ async function loadData() {
       masterStore.getMaster<ReleaseCondition>('releaseConditions'),
       masterStore.getMaster<MusicCollaboration>('musicCollaborations'),
       masterStore.getMaster<MusicOriginal>('musicOriginals'),
+      masterStore.getMaster<MusicAssetVariant>('musicAssetVariants'),
     ])
     
     // 设置角色数据
@@ -987,6 +1005,7 @@ async function loadData() {
     releaseConditions.value = releaseConditionData
     musicCollaborations.value = musicCollaborationData
     musicOriginals.value = musicOriginalData
+    musicAssetVariants.value = musicAssetVariantData
 
     // 获取歌曲数据
     music.value = musicsData.find(m => m.id === musicId.value) || null
@@ -1474,6 +1493,7 @@ const isExpired = computed(() => {
                     <LockKeyhole v-else class="w-3 h-3" />
                     {{ getVocalAccountLabel(currentVocal) }}
                   </span>
+                  <span v-if="currentVocal && hasVocalJacket(currentVocal.id)" class="badge badge-sm badge-secondary badge-outline">专属封面</span>
                 </div>
                 <p v-if="currentVocal && getVocalSingers(currentVocal)" class="text-sm text-base-content/60 flex items-center gap-1 mt-1">
                   <Mic class="w-3 h-3 shrink-0" />
@@ -1593,7 +1613,10 @@ const isExpired = computed(() => {
                         {{ getVocalSingers(vocal) }}
                       </p>
                     </div>
-                    <span v-if="getVocalAccountStatus(vocal)" class="badge badge-xs shrink-0" :class="isVocalAvailable(vocal) ? 'badge-success' : 'badge-ghost'">{{ getVocalAccountLabel(vocal) }}</span>
+                    <div class="flex shrink-0 flex-col items-end gap-1">
+                      <span v-if="getVocalAccountStatus(vocal)" class="badge badge-xs" :class="isVocalAvailable(vocal) ? 'badge-success' : 'badge-ghost'">{{ getVocalAccountLabel(vocal) }}</span>
+                      <span v-if="hasVocalJacket(vocal.id)" class="badge badge-xs badge-secondary badge-outline">专属封面</span>
+                    </div>
                   </button>
                 </div>
               </div>
