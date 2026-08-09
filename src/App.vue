@@ -185,12 +185,12 @@ async function handleSuiteRefresh() {
           </li>
           <li>
             <RouterLink to="/stories" active-class="active">
-              <BookOpen class="w-5 h-5" /> 故事档案
+              <BookOpen class="w-5 h-5" /> 剧情档案
             </RouterLink>
           </li>
           <li>
             <RouterLink to="/area-items" active-class="active">
-              <Wrench class="w-5 h-5" /> 区域道具规划
+              <Wrench class="w-5 h-5" /> 区域道具
             </RouterLink>
           </li>
           <li>

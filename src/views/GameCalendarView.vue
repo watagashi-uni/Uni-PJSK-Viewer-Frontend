@@ -474,11 +474,11 @@ onMounted(async () => {
         </div>
       </div>
 
-      <div class="grid xl:grid-cols-[minmax(0,1fr)_20rem] gap-5 items-start">
-        <div class="hidden md:block card bg-base-100 border border-base-200 shadow-sm overflow-hidden">
+      <div class="grid items-start gap-5 xl:h-[calc(100dvh-6rem)] xl:min-h-[40rem] xl:max-h-[50rem] xl:grid-cols-[minmax(0,1fr)_20rem]">
+        <div class="card hidden overflow-hidden border border-base-200 bg-base-100 shadow-sm md:flex md:flex-col xl:h-full">
           <div class="grid grid-cols-7 border-b border-base-200 bg-base-200/55"><div v-for="weekday in weekdayLabels" :key="weekday" class="py-2 text-center text-xs font-bold text-base-content/55">周{{ weekday }}</div></div>
-          <div class="grid grid-cols-7">
-            <button v-for="day in calendarDays" :key="day.key" class="min-h-32 border-r border-b border-base-200 p-2 text-left align-top overflow-hidden transition-colors" :class="[day.currentMonth ? 'bg-base-100 hover:bg-base-200/45' : 'bg-base-200/35 text-base-content/30', selectedDateKey === day.key ? 'ring-2 ring-inset ring-primary' : '']" @click="selectDay(day)">
+          <div class="grid flex-1 grid-cols-7 xl:min-h-0 xl:grid-rows-6">
+            <button v-for="day in calendarDays" :key="day.key" class="min-h-32 overflow-hidden border-r border-b border-base-200 p-2 text-left align-top transition-colors xl:min-h-0" :class="[day.currentMonth ? 'bg-base-100 hover:bg-base-200/45' : 'bg-base-200/35 text-base-content/30', selectedDateKey === day.key ? 'ring-2 ring-inset ring-primary' : '']" @click="selectDay(day)">
               <span class="inline-grid place-items-center w-6 h-6 rounded-full text-xs font-bold" :class="day.today ? 'bg-primary text-primary-content' : ''">{{ day.day }}</span>
               <div class="mt-1 space-y-1">
                 <div v-for="entry in day.entries.slice(0, 3)" :key="entry.key" class="flex items-center gap-1 min-w-0 text-[10px] leading-4"><span class="w-1.5 h-1.5 rounded-full shrink-0" :class="categoryMeta[entry.category].dot"></span><span class="truncate">{{ entry.title }}</span></div>
@@ -513,10 +513,10 @@ onMounted(async () => {
           <div v-if="!calendarDays.some(row => row.currentMonth && (row.entries.length || row.today))" class="card bg-base-100 border border-base-200"><div class="card-body items-center py-12 text-base-content/45">当前筛选在本月没有日程</div></div>
         </div>
 
-        <aside class="card bg-base-100 border border-base-200 shadow-sm xl:sticky xl:top-20">
-          <div class="card-body p-4 gap-3">
-            <div><p class="text-xs text-base-content/45">日期详情</p><h2 class="font-bold">{{ selectedDateLabel }}</h2></div>
-            <div v-if="selectedEntries.length" class="divide-y divide-base-200">
+        <aside class="card border border-base-200 bg-base-100 shadow-sm xl:sticky xl:top-20 xl:h-full xl:min-h-0 xl:overflow-hidden">
+          <div class="card-body flex flex-col gap-3 p-4 xl:h-full xl:min-h-0 xl:overflow-hidden">
+            <div class="shrink-0"><p class="text-xs text-base-content/45">日期详情</p><h2 class="font-bold">{{ selectedDateLabel }}</h2></div>
+            <div v-if="selectedEntries.length" class="divide-y divide-base-200 xl:min-h-0 xl:flex-1 xl:overflow-y-auto xl:overscroll-contain xl:pr-1 [scrollbar-gutter:stable]">
               <template v-for="entry in selectedEntries" :key="entry.key">
                 <RouterLink v-if="entry.route" :to="entry.route" class="group flex gap-3 py-3">
                   <img v-if="entry.characterId" :src="characterIcon(entry.characterId)" :alt="entry.title" class="h-10 w-10 shrink-0 rounded-full bg-base-200" />
