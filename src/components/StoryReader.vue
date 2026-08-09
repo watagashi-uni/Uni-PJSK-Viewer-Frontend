@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { Copy, Search, X } from 'lucide-vue-next'
+import { ChevronLeft, ChevronRight, Copy, Search, X } from 'lucide-vue-next'
 
 interface ScenarioTalk {
   WindowDisplayName?: string
@@ -12,14 +12,22 @@ interface ScenarioData {
   TalkData?: ScenarioTalk[]
 }
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   title: string
+  episodeLabel?: string
   scenarioId: string
   scenarioUrls: string[]
   episodeImageUrl?: string
-}>()
+  hasPrevious?: boolean
+  hasNext?: boolean
+}>(), {
+  episodeLabel: '',
+  episodeImageUrl: undefined,
+  hasPrevious: false,
+  hasNext: false,
+})
 
-const emit = defineEmits<{ close: [] }>()
+const emit = defineEmits<{ close: []; loaded: []; previous: []; next: [] }>()
 
 const talks = ref<ScenarioTalk[]>([])
 const isLoading = ref(true)
@@ -69,6 +77,7 @@ async function loadScenario() {
       talks.value = data.TalkData.filter(talk => talk.Body || talk.WindowDisplayName)
       loadedUrl.value = url
       isLoading.value = false
+      emit('loaded')
       return
     } catch (error) {
       failures.push(`${error instanceof Error ? error.message : '请求失败'} ${url}`)
@@ -85,11 +94,11 @@ onMounted(loadScenario)
 </script>
 
 <template>
-  <div class="flex flex-col max-h-[88vh]">
-    <header class="px-5 py-4 border-b border-base-200 flex items-start gap-3 shrink-0">
+  <div class="flex flex-col h-[88vh] max-h-[88vh]">
+    <header class="px-4 md:px-5 py-3.5 border-b border-base-200 flex items-center gap-3 shrink-0 bg-gradient-to-r from-primary/10 via-base-100 to-base-100">
       <div class="min-w-0 flex-1">
-        <p class="text-xs text-base-content/45 font-mono">{{ scenarioId }}</p>
-        <h2 class="font-bold text-xl truncate">{{ title }}</h2>
+        <div class="flex items-center gap-2 text-xs text-base-content/45"><span v-if="episodeLabel" class="badge badge-primary badge-sm">{{ episodeLabel }}</span><span class="font-mono truncate">{{ scenarioId }}</span></div>
+        <h2 class="font-bold text-lg md:text-xl truncate mt-1">{{ title }}</h2>
       </div>
       <button class="btn btn-sm btn-circle btn-ghost" aria-label="关闭阅读器" @click="emit('close')"><X class="w-4 h-4" /></button>
     </header>
@@ -105,7 +114,7 @@ onMounted(loadScenario)
     </div>
 
     <template v-else>
-      <div class="p-4 border-b border-base-200 flex flex-col sm:flex-row gap-3 shrink-0 bg-base-100">
+      <div class="p-3 border-b border-base-200 flex flex-col sm:flex-row gap-2 shrink-0 bg-base-100">
         <label class="input input-sm input-bordered flex items-center gap-2 flex-1">
           <Search class="w-4 h-4 opacity-50" />
           <input v-model="searchQuery" class="grow" placeholder="在本话台词中搜索…" />
@@ -113,27 +122,26 @@ onMounted(loadScenario)
         <button class="btn btn-sm btn-outline gap-2" @click="copyScript"><Copy class="w-4 h-4" />复制全文</button>
       </div>
 
-      <div class="overflow-y-auto overscroll-contain p-4 md:p-6 bg-base-200/60">
-        <img v-if="episodeImageUrl" :src="episodeImageUrl" :alt="title" class="w-full max-w-lg mx-auto rounded-xl mb-6 border border-base-300" />
-        <div class="max-w-3xl mx-auto space-y-3">
+      <div class="overflow-y-auto overscroll-contain p-3 md:p-5 bg-base-200/60">
+        <img v-if="episodeImageUrl" :src="episodeImageUrl" :alt="title" class="w-full max-w-md mx-auto rounded-xl mb-5 border border-base-300 shadow-sm" />
+        <div class="max-w-3xl mx-auto space-y-2">
           <article
             v-for="item in filteredTalks"
             :key="item.index"
-            class="bg-base-100 rounded-xl border border-base-200 p-4 shadow-sm"
+            class="bg-base-100 rounded-xl border border-base-200 p-3 md:p-4 shadow-sm grid sm:grid-cols-[7.5rem_minmax(0,1fr)] gap-2 sm:gap-4"
+            :class="{ 'border-l-4 border-l-primary/50': item.talk.WindowDisplayName }"
           >
-            <div class="flex items-center justify-between gap-3 mb-2">
-              <h3 class="font-bold text-primary">{{ item.talk.WindowDisplayName || '旁白' }}</h3>
-            </div>
-            <p class="whitespace-pre-line leading-7">{{ item.talk.Body }}</p>
+            <div class="flex sm:block items-center justify-between gap-2"><h3 class="font-bold text-sm" :class="item.talk.WindowDisplayName ? 'text-primary' : 'text-base-content/45'">{{ item.talk.WindowDisplayName || '旁白' }}</h3><span class="text-[10px] text-base-content/30">#{{ item.index + 1 }}</span></div>
+            <p class="whitespace-pre-line leading-7 text-[15px]">{{ item.talk.Body }}</p>
           </article>
           <div v-if="filteredTalks.length === 0" class="text-center py-16 text-base-content/50">没有匹配的台词</div>
         </div>
       </div>
 
-      <footer class="px-5 py-3 border-t border-base-200 flex justify-between gap-3 text-xs text-base-content/45 shrink-0">
-        <span>{{ filteredTalks.length }} / {{ talks.length }} 段台词</span>
-        <span v-if="actionMessage" class="text-primary">{{ actionMessage }}</span>
-        <span v-else class="truncate hidden sm:block" :title="loadedUrl">资源已加载</span>
+      <footer class="px-3 md:px-5 py-2.5 border-t border-base-200 flex items-center justify-between gap-3 text-xs text-base-content/45 shrink-0 bg-base-100">
+        <button class="btn btn-sm btn-ghost gap-1" :disabled="!hasPrevious" @click="emit('previous')"><ChevronLeft class="w-4 h-4" />上一话</button>
+        <div class="text-center min-w-0"><span v-if="actionMessage" class="text-primary block">{{ actionMessage }}</span><span v-else class="truncate block" :title="loadedUrl">{{ filteredTalks.length }} / {{ talks.length }} 段台词</span></div>
+        <button class="btn btn-sm btn-primary gap-1" :disabled="!hasNext" @click="emit('next')">下一话<ChevronRight class="w-4 h-4" /></button>
       </footer>
     </template>
   </div>

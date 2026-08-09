@@ -280,9 +280,11 @@ onMounted(async () => {
 
 <template>
   <div class="max-w-7xl mx-auto space-y-6">
-    <header>
-      <h1 class="text-3xl font-bold flex items-center gap-3"><Wrench class="w-8 h-8 text-primary" />区域道具规划</h1>
-      <p class="text-sm text-base-content/60 mt-2">查看区域道具加成，按当前等级精确计算升到目标等级所需的材料与金币。</p>
+    <header class="rounded-2xl border border-primary/15 bg-gradient-to-br from-primary/10 via-base-100 to-base-100 p-5 md:p-6">
+      <div class="flex items-center gap-4">
+        <span class="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-primary/15 text-primary"><Wrench class="w-6 h-6" /></span>
+        <div><h1 class="text-2xl md:text-3xl font-bold">区域道具规划</h1><p class="text-sm text-base-content/60 mt-1">快速查看道具加成，并按账号等级精确计算升级素材与金币。</p></div>
+      </div>
     </header>
 
     <section class="card bg-base-100 border border-base-200 shadow-sm">
@@ -297,20 +299,20 @@ onMounted(async () => {
       </div>
     </section>
 
-    <div v-if="isLoading" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4"><div v-for="index in 15" :key="index" class="skeleton h-64 rounded-xl"></div></div>
+    <div v-if="isLoading" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 gap-3"><div v-for="index in 18" :key="index" class="skeleton h-52 rounded-xl"></div></div>
     <div v-else-if="loadError" class="alert alert-error">区域道具数据加载失败：{{ loadError }}</div>
-    <div v-else class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-      <button v-for="item in filteredItems" :key="item.id" class="card bg-base-100 border border-base-200 hover:shadow-lg hover:-translate-y-0.5 transition-all overflow-hidden text-left" @click="openItem(item)">
-        <figure class="relative aspect-square bg-base-200/70 p-4"><AssetImage :src="itemImage(item)" :alt="item.name" class="w-full h-full object-contain" /><span v-if="currentLevelMap.has(item.id)" class="absolute top-2 right-2 badge badge-primary">Lv.{{ currentLevelMap.get(item.id) }}</span></figure>
-        <div class="card-body p-3 gap-1"><span class="text-[10px] text-base-content/45 truncate">{{ areaMap.get(item.areaId)?.name || `区域 #${item.areaId}` }}</span><h2 class="font-bold text-sm line-clamp-2 min-h-10">{{ item.name }}</h2><span class="badge badge-sm badge-outline mt-1">{{ getTargetLabel(item) }}</span><p class="text-[11px] text-primary mt-1">最高 +{{ getLevel(item, 20)?.power1BonusRate || 0 }}%</p></div>
+    <div v-else class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+      <button v-for="item in filteredItems" :key="item.id" class="group card bg-base-100 border border-base-200 hover:border-primary/30 hover:shadow-md hover:-translate-y-0.5 transition-all overflow-hidden text-left" @click="openItem(item)">
+        <figure class="relative h-28 sm:h-32 bg-gradient-to-br from-base-200 to-base-100 p-2.5"><AssetImage :src="itemImage(item)" :alt="item.name" class="w-full h-full object-contain group-hover:scale-105 transition-transform" /><span v-if="currentLevelMap.has(item.id)" class="absolute top-2 right-2 badge badge-primary badge-sm shadow-sm">Lv.{{ currentLevelMap.get(item.id) }}</span></figure>
+        <div class="card-body p-3 gap-1"><span class="text-[10px] text-base-content/45 truncate">{{ areaMap.get(item.areaId)?.name || `区域 #${item.areaId}` }}</span><h2 class="font-bold text-sm line-clamp-2 min-h-10 leading-5">{{ item.name }}</h2><div class="flex items-center justify-between gap-1 mt-1"><span class="badge badge-xs badge-outline max-w-[70%] truncate">{{ getTargetLabel(item) }}</span><span class="text-[10px] font-semibold text-primary whitespace-nowrap">+{{ getLevel(item, 20)?.power1BonusRate || 0 }}%</span></div></div>
       </button>
     </div>
 
     <dialog class="modal" :class="{ 'modal-open': selectedItem }">
       <div v-if="selectedItem" class="modal-box max-w-3xl p-0 overflow-hidden">
         <button class="btn btn-sm btn-circle btn-ghost absolute right-3 top-3 z-10" aria-label="关闭" @click="selectedItem = null"><X class="w-4 h-4" /></button>
-        <div class="grid md:grid-cols-[240px_1fr]">
-          <div class="bg-base-200 p-6 flex flex-col items-center justify-center"><AssetImage :src="itemImage(selectedItem)" :alt="selectedItem.name" class="w-full aspect-square object-contain" /><span class="badge badge-outline mt-3">{{ areaMap.get(selectedItem.areaId)?.name }}</span></div>
+        <div class="grid md:grid-cols-[190px_1fr]">
+          <div class="bg-gradient-to-br from-base-200 to-base-100 p-5 flex flex-col items-center justify-center"><AssetImage :src="itemImage(selectedItem)" :alt="selectedItem.name" class="w-36 h-36 object-contain" /><span class="badge badge-outline badge-sm mt-3">{{ areaMap.get(selectedItem.areaId)?.name }}</span></div>
           <div class="p-6 space-y-5">
             <div><p class="text-xs text-base-content/45">区域道具 #{{ selectedItem.id }}</p><h2 class="font-bold text-2xl">{{ selectedItem.name }}</h2><p class="text-sm text-base-content/60 mt-1">加成对象：{{ getTargetLabel(selectedItem) }}</p></div>
             <div class="grid grid-cols-2 gap-3">
