@@ -126,6 +126,7 @@ interface OutsideCharacter {
 interface ReleaseCondition {
   id: number
   sentence: string
+  releaseConditionType: string
 }
 
 interface UserMusicResult {
@@ -551,6 +552,12 @@ const musicVocalCharacterMap = computed(() => {
 const releaseConditionMap = computed(() => {
   return Object.fromEntries(releaseConditions.value.map(condition => [condition.id, condition]))
 })
+
+const musicShopReleaseConditionIds = computed(() => new Set(
+  releaseConditions.value
+    .filter(condition => condition.releaseConditionType === 'music_shop')
+    .map(condition => condition.id),
+))
 
 const musicTagOptions = [
   { value: 'all', label: 'All', shortLabel: 'All' },
@@ -1117,6 +1124,13 @@ function getReleaseConditionLabel(releaseConditionId: number): string {
   return releaseConditionMap.value[releaseConditionId]?.sentence || `#${releaseConditionId}`
 }
 
+function getMusicOwnershipLabel(music: Music): string {
+  const isOwned = ownedMusicIds.value.has(music.id)
+  const isMusicShopPurchase = musicShopReleaseConditionIds.value.has(music.releaseConditionId)
+  if (isMusicShopPurchase) return isOwned ? '已购买' : '未购买'
+  return isOwned ? '已获取' : '未获取'
+}
+
 function resetExtraFilters() {
   selectedMusicTags.value = new Set()
   selectedMvTypes.value = new Set()
@@ -1400,8 +1414,8 @@ watch(totalPages, (pages) => {
       <template v-if="hasSuiteData">
         <select v-model="collectionFilter" class="select select-bordered select-sm">
           <option value="all">收藏：全部</option>
-          <option value="owned" :disabled="!hasOwnershipData">已解锁歌曲</option>
-          <option value="locked" :disabled="!hasOwnershipData">未解锁歌曲</option>
+          <option value="owned" :disabled="!hasOwnershipData">账号已持有</option>
+          <option value="locked" :disabled="!hasOwnershipData">账号未持有</option>
           <option value="achievement_incomplete" :disabled="!hasAchievementData">成就奖励未完成</option>
         </select>
         <select v-model="resultFilter" class="select select-bordered select-sm">
@@ -1784,7 +1798,7 @@ watch(totalPages, (pages) => {
                     </button>
                     <div v-if="isLimitedTime(music.id)" class="badge badge-sm badge-warning text-warning-content font-bold shadow-sm whitespace-nowrap">期间限定</div>
                     <div v-else-if="isExpired(music.id)" class="badge badge-sm bg-base-300 text-base-content/60 font-bold border-none whitespace-nowrap">已过期</div>
-                    <div v-if="hasSuiteData && hasOwnershipData" class="badge badge-sm" :class="ownedMusicIds.has(music.id) ? 'badge-success badge-outline' : 'badge-ghost'">{{ ownedMusicIds.has(music.id) ? '已解锁' : '未解锁' }}</div>
+                    <div v-if="hasSuiteData && hasOwnershipData" class="badge badge-sm" :class="ownedMusicIds.has(music.id) ? 'badge-success badge-outline' : 'badge-ghost'">{{ getMusicOwnershipLabel(music) }}</div>
                     <div v-if="hasSuiteData && hasAchievementData" class="badge badge-sm badge-ghost">成就 {{ getAchievementCount(music.id) }}/{{ getAchievementTotal(music.id) }}</div>
                   </div>
                 </td>
@@ -1859,7 +1873,7 @@ watch(totalPages, (pages) => {
                   <span class="truncate">{{ music.composer }}</span>
                 </button>
                 <div v-if="isLimitedTime(music.id)" class="badge badge-xs badge-warning text-warning-content font-bold shadow-sm whitespace-nowrap">限定</div>
-                <div v-if="hasSuiteData && hasOwnershipData" class="badge badge-xs" :class="ownedMusicIds.has(music.id) ? 'badge-success badge-outline' : 'badge-ghost'">{{ ownedMusicIds.has(music.id) ? '已解锁' : '未解锁' }}</div>
+                <div v-if="hasSuiteData && hasOwnershipData" class="badge badge-xs" :class="ownedMusicIds.has(music.id) ? 'badge-success badge-outline' : 'badge-ghost'">{{ getMusicOwnershipLabel(music) }}</div>
                 <div v-if="hasSuiteData && hasAchievementData" class="badge badge-xs badge-ghost">{{ getAchievementCount(music.id) }}/{{ getAchievementTotal(music.id) }}</div>
               </div>
 
@@ -1931,6 +1945,7 @@ watch(totalPages, (pages) => {
             :categories="music.categories || EMPTY_ARR"
             :results="hasSuiteData && showUserResults ? (musicResultsMap[music.id] || EMPTY_OBJ) : undefined"
             :ownership-status="hasSuiteData && hasOwnershipData ? (ownedMusicIds.has(music.id) ? 'owned' : 'locked') : undefined"
+            :ownership-label="hasSuiteData && hasOwnershipData ? getMusicOwnershipLabel(music) : undefined"
             :achievement-claimed="hasSuiteData && hasAchievementData ? getAchievementCount(music.id) : undefined"
             :achievement-total="hasSuiteData && hasAchievementData ? getAchievementTotal(music.id) : undefined"
             :class="{ 'animate-fade-in-up': enableHeavyAnimation }"

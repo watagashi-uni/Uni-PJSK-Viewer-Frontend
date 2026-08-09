@@ -76,6 +76,7 @@ interface LimitedTimeMusic {
 interface ReleaseCondition {
   id: number
   sentence: string
+  releaseConditionType: string
 }
 
 type PreviewPayload = {
@@ -177,17 +178,55 @@ const pendingAutoPlay = ref(false)  // 待恢复的播放状态
 
 // 当前选中的声乐
 const currentVocal = computed(() => vocals.value[currentVocalIndex.value] || null)
-const vocalOwnershipRows = computed<any[] | null>(() => {
+const suiteData = computed<any | null>(() => {
   if (!accountStore.currentUserId) return null
-  const suite = accountStore.getSuiteCache(accountStore.currentUserId)
-  const rows = suite?.userMusicVocals ?? suite?.user_music_vocals
+  return accountStore.getSuiteCache(accountStore.currentUserId) || null
+})
+const musicOwnershipRows = computed<any[] | null>(() => {
+  const rows = suiteData.value?.userMusics ?? suiteData.value?.user_musics
+  return Array.isArray(rows) ? rows : null
+})
+const ownedMusicIds = computed(() => new Set((musicOwnershipRows.value || [])
+  .map(row => Number(row?.musicId ?? row?.music_id))
+  .filter(Number.isFinite)))
+const hasMusicOwnership = computed(() => musicOwnershipRows.value !== null)
+const isCurrentMusicOwned = computed(() => ownedMusicIds.value.has(musicId.value))
+const vocalOwnershipRows = computed<any[] | null>(() => {
+  const rows = suiteData.value?.userMusicVocals ?? suiteData.value?.user_music_vocals
   return Array.isArray(rows) ? rows : null
 })
 const ownedVocalIds = computed(() => new Set((vocalOwnershipRows.value || [])
   .map(row => Number(row?.musicVocalId ?? row?.music_vocal_id))
   .filter(Number.isFinite)))
 const hasVocalOwnership = computed(() => vocalOwnershipRows.value !== null)
-const ownedVocalCount = computed(() => vocals.value.filter(vocal => ownedVocalIds.value.has(vocal.id)).length)
+const separatelyPurchasedVocalTypes = new Set(['another_vocal', 'streaming_live'])
+const purchasableVocals = computed(() => vocals.value.filter(vocal => separatelyPurchasedVocalTypes.has(vocal.musicVocalType)))
+const purchasedVocalCount = computed(() => purchasableVocals.value.filter(vocal => ownedVocalIds.value.has(vocal.id)).length)
+
+type VocalAccountStatus = 'available' | 'purchased' | 'not_purchased' | 'music_missing'
+
+function getVocalAccountStatus(vocal: MusicVocal): VocalAccountStatus | null {
+  if (separatelyPurchasedVocalTypes.has(vocal.musicVocalType)) {
+    if (!hasVocalOwnership.value) return null
+    return ownedVocalIds.value.has(vocal.id) ? 'purchased' : 'not_purchased'
+  }
+  if (!hasMusicOwnership.value) return null
+  return isCurrentMusicOwned.value ? 'available' : 'music_missing'
+}
+
+function getVocalAccountLabel(vocal: MusicVocal): string {
+  const status = getVocalAccountStatus(vocal)
+  if (status === 'available') return '随歌曲可用'
+  if (status === 'purchased') return '已购买'
+  if (status === 'not_purchased') return '未购买'
+  if (status === 'music_missing') return '歌曲未获取'
+  return ''
+}
+
+function isVocalAvailable(vocal: MusicVocal): boolean {
+  const status = getVocalAccountStatus(vocal)
+  return status === 'available' || status === 'purchased'
+}
 
 const audioTrimStartSec = computed(() => {
   if (!music.value) return 0
@@ -988,6 +1027,13 @@ const musicReleaseConditionText = computed(() => {
   return releaseConditionMap.value[id]?.sentence || `#${id}`
 })
 
+const musicOwnershipLabel = computed(() => {
+  if (!music.value || !hasMusicOwnership.value) return ''
+  const isMusicShopPurchase = releaseConditionMap.value[music.value.releaseConditionId]?.releaseConditionType === 'music_shop'
+  if (isMusicShopPurchase) return isCurrentMusicOwned.value ? '已购买' : '未购买'
+  return isCurrentMusicOwned.value ? '已获取' : '未获取'
+})
+
 // 注音 (furigana) - 实验性
 const furiganaSegments = computed(() => {
   if (!music.value?.pronunciation) return []
@@ -1124,6 +1170,7 @@ const isExpired = computed(() => {
               </span>
             </div>
             <div v-else-if="isExpired" class="badge bg-base-300 text-base-content/60 font-bold border-none mb-2">已过期</div>
+            <div v-if="musicOwnershipLabel" class="badge mb-2" :class="isCurrentMusicOwned ? 'badge-success badge-outline' : 'badge-ghost'">{{ musicOwnershipLabel }}</div>
               
             <h1 v-if="music.pronunciation && hasFurigana" class="text-2xl font-bold text-base-content select-all leading-relaxed">
               <template v-for="(seg, i) in furiganaSegments" :key="i">
@@ -1307,10 +1354,10 @@ const isExpired = computed(() => {
               <div class="mb-4 p-3 bg-base-200/30 rounded-xl">
                 <div class="flex flex-wrap items-center gap-2">
                   <p class="font-semibold text-base-content">{{ currentVocal?.caption || '加载中...' }}</p>
-                  <span v-if="currentVocal && hasVocalOwnership" class="badge badge-sm gap-1" :class="ownedVocalIds.has(currentVocal.id) ? 'badge-success' : 'badge-ghost'">
-                    <CheckCircle2 v-if="ownedVocalIds.has(currentVocal.id)" class="w-3 h-3" />
+                  <span v-if="currentVocal && getVocalAccountStatus(currentVocal)" class="badge badge-sm gap-1" :class="isVocalAvailable(currentVocal) ? 'badge-success' : 'badge-ghost'">
+                    <CheckCircle2 v-if="isVocalAvailable(currentVocal)" class="w-3 h-3" />
                     <LockKeyhole v-else class="w-3 h-3" />
-                    {{ ownedVocalIds.has(currentVocal.id) ? '已解锁' : '未解锁' }}
+                    {{ getVocalAccountLabel(currentVocal) }}
                   </span>
                 </div>
                 <p v-if="currentVocal && getVocalSingers(currentVocal)" class="text-sm text-base-content/60 flex items-center gap-1 mt-1">
@@ -1393,7 +1440,10 @@ const isExpired = computed(() => {
 
               <!-- 版本选择列表 -->
               <div v-if="vocals.length > 1" class="mt-5 pt-4 border-t border-base-200/50">
-                <p class="text-xs text-base-content/60 mb-3 font-medium">选择版本 ({{ vocals.length }})<span v-if="hasVocalOwnership"> · 账号已解锁 {{ ownedVocalCount }}/{{ vocals.length }}</span></p>
+                <p class="text-xs text-base-content/60 mb-3 font-medium">
+                  选择版本 ({{ vocals.length }})
+                  <span v-if="hasVocalOwnership && purchasableVocals.length"> · 特殊版本已购买 {{ purchasedVocalCount }}/{{ purchasableVocals.length }}</span>
+                </p>
                 <div class="max-h-48 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
                   <button
                     v-for="(vocal, index) in vocals"
@@ -1428,7 +1478,7 @@ const isExpired = computed(() => {
                         {{ getVocalSingers(vocal) }}
                       </p>
                     </div>
-                    <span v-if="hasVocalOwnership" class="badge badge-xs shrink-0" :class="ownedVocalIds.has(vocal.id) ? 'badge-success' : 'badge-ghost'">{{ ownedVocalIds.has(vocal.id) ? '已解锁' : '未解锁' }}</span>
+                    <span v-if="getVocalAccountStatus(vocal)" class="badge badge-xs shrink-0" :class="isVocalAvailable(vocal) ? 'badge-success' : 'badge-ghost'">{{ getVocalAccountLabel(vocal) }}</span>
                   </button>
                 </div>
               </div>
