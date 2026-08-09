@@ -169,6 +169,11 @@ async function handleSuiteRefresh() {
             </RouterLink>
           </li>
           <li>
+            <RouterLink to="/login-bonuses" active-class="active">
+              <Gift class="w-5 h-5" /> 登录活动
+            </RouterLink>
+          </li>
+          <li>
             <RouterLink to="/vlives" active-class="active">
               <Radio class="w-5 h-5" /> 虚拟 Live
             </RouterLink>
