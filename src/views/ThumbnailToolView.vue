@@ -424,7 +424,7 @@ function copyMusicTitle() {
               <p class="text-xs text-base-content/60">Level: {{ currentLevel }}</p>
             </div>
             <button 
-              class="btn btn-xs btn-ghost btn-square absolute right-2 opacity-50 hover:opacity-100" 
+              class="btn btn-xs btn-ghost btn-square absolute! right-2 opacity-50 hover:opacity-100"
               title="复制歌名"
               @click="copyMusicTitle"
             >

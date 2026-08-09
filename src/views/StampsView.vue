@@ -243,7 +243,7 @@ onMounted(async () => {
 
     <dialog class="modal" :class="{ 'modal-open': selectedStamp }">
       <div v-if="selectedStamp" class="modal-box max-w-2xl p-0 overflow-hidden">
-        <button class="btn btn-sm btn-circle btn-ghost absolute right-3 top-3 z-20 bg-base-100/80" aria-label="关闭" @click="selectedStamp = null">
+        <button class="btn btn-sm btn-circle btn-ghost absolute! right-3 top-3 z-20 bg-base-100/80" aria-label="关闭" @click="selectedStamp = null">
           <X class="w-4 h-4" />
         </button>
         <div class="grid md:grid-cols-[minmax(0,320px)_1fr]">
