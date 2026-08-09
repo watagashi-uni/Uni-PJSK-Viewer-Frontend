@@ -67,6 +67,21 @@ interface OutsideCharacter {
   name: string
 }
 
+interface GameCharacterUnit {
+  id: number
+  gameCharacterId: number
+  unit: string
+}
+
+interface MusicVideoCharacter {
+  id: number
+  musicId: number
+  defaultMusicType: 'sekai' | 'original_music'
+  gameCharacterUnitId: number
+  dancePriority: number
+  seq: number
+}
+
 interface LimitedTimeMusic {
   id: number
   musicId: number
@@ -118,6 +133,8 @@ const translation = computed(() => masterStore.translations[musicId.value] || ''
 const relatedEvent = ref<EventData | null>(null)
 const characters = ref<Character[]>([])
 const outsideCharacters = ref<OutsideCharacter[]>([])
+const gameCharacterUnits = ref<GameCharacterUnit[]>([])
+const musicVideoCharacters = ref<MusicVideoCharacter[]>([])
 const limitedMusics = ref<LimitedTimeMusic[]>([])
 const releaseConditions = ref<ReleaseCondition[]>([])
 const musicCollaborations = ref<MusicCollaboration[]>([])
@@ -939,6 +956,8 @@ async function loadData() {
       eventMusicsData,
       charactersData,
       outsideCharactersData,
+      gameCharacterUnitData,
+      musicVideoCharacterData,
       limitedData,
       releaseConditionData,
       musicCollaborationData,
@@ -951,6 +970,8 @@ async function loadData() {
       masterStore.getMaster<EventMusic>('eventMusics'),
       masterStore.getMaster<Character>('gameCharacters'),
       masterStore.getMaster<OutsideCharacter>('outsideCharacters'),
+      masterStore.getMaster<GameCharacterUnit>('gameCharacterUnits'),
+      masterStore.getMaster<MusicVideoCharacter>('musicVideoCharacters'),
       masterStore.getMaster<LimitedTimeMusic>('limitedTimeMusics'),
       masterStore.getMaster<ReleaseCondition>('releaseConditions'),
       masterStore.getMaster<MusicCollaboration>('musicCollaborations'),
@@ -960,6 +981,8 @@ async function loadData() {
     // 设置角色数据
     characters.value = charactersData
     outsideCharacters.value = outsideCharactersData
+    gameCharacterUnits.value = gameCharacterUnitData
+    musicVideoCharacters.value = musicVideoCharacterData
     limitedMusics.value = limitedData
     releaseConditions.value = releaseConditionData
     musicCollaborations.value = musicCollaborationData
@@ -1057,6 +1080,37 @@ const musicOriginalLink = computed(() => {
   const link = musicOriginals.value.find(original => original.musicId === musicId.value)?.videoLink || ''
   return /^https?:\/\//i.test(link) ? link : ''
 })
+
+const musicVideoLineup = computed(() => {
+  const unitMap = new Map(gameCharacterUnits.value.map(unit => [unit.id, unit]))
+  return musicVideoCharacters.value
+    .filter(row => row.musicId === musicId.value)
+    .sort((a, b) => a.seq - b.seq || a.dancePriority - b.dancePriority)
+    .map(row => {
+      const unit = unitMap.get(row.gameCharacterUnitId)
+      return {
+        ...row,
+        gameCharacterId: unit?.gameCharacterId || row.gameCharacterUnitId,
+        unit: unit?.unit || '',
+      }
+    })
+})
+
+const musicVideoVersionLabel = computed(() => {
+  const type = musicVideoLineup.value[0]?.defaultMusicType
+  return type === 'original_music' ? 'Original ver.' : type === 'sekai' ? 'SEKAI ver.' : ''
+})
+
+function getCharacterName(characterId: number): string {
+  const character = characters.value.find(row => row.id === characterId)
+  if (!character) return `角色 #${characterId}`
+  return `${character.firstName || ''}${character.givenName}`
+}
+
+function getCharacterIcon(characterId: number): string {
+  if (characterId <= 20) return `/img/chr_ts/chr_ts_90_${characterId}.png`
+  return `/img/chr_ts/chr_ts_90_${characterId}_2.png`
+}
 
 const musicOwnershipLabel = computed(() => {
   if (!music.value || !hasMusicOwnership.value) return ''
@@ -1298,6 +1352,29 @@ const isExpired = computed(() => {
             <div class="flex justify-between items-center text-sm border-b border-base-200 pb-2">
               <span class="text-base-content/60">ID</span>
               <span class="font-medium font-mono">#{{ music.id }}</span>
+            </div>
+          </div>
+
+          <div v-if="musicVideoLineup.length" class="w-full mt-7">
+            <div class="mb-2 flex items-center justify-between gap-3">
+              <h3 class="text-sm font-bold text-base-content/60 flex items-center gap-2">
+                <PlayCircle class="w-4 h-4" /> 3D MV 默认编队
+              </h3>
+              <span class="badge badge-sm badge-ghost">{{ musicVideoVersionLabel }}</span>
+            </div>
+            <div class="grid grid-cols-3 gap-2 sm:grid-cols-6">
+              <RouterLink
+                v-for="member in musicVideoLineup"
+                :key="member.id"
+                :to="`/characters/${member.gameCharacterId}`"
+                class="group rounded-xl border border-base-200 bg-base-100 p-2 text-center transition-colors hover:border-primary/40 hover:bg-primary/5"
+              >
+                <div class="relative mx-auto h-11 w-11">
+                  <img :src="getCharacterIcon(member.gameCharacterId)" :alt="getCharacterName(member.gameCharacterId)" class="h-full w-full rounded-full bg-base-200 object-cover ring-1 ring-base-300" />
+                  <span class="absolute -bottom-1 -right-1 grid h-4 min-w-4 place-items-center rounded-full bg-primary px-1 text-[9px] font-bold text-primary-content">{{ member.dancePriority }}</span>
+                </div>
+                <p class="mt-1.5 truncate text-[11px] font-medium" :title="getCharacterName(member.gameCharacterId)">{{ getCharacterName(member.gameCharacterId) }}</p>
+              </RouterLink>
             </div>
           </div>
 
