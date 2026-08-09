@@ -489,10 +489,28 @@ onMounted(async () => {
         </div>
 
         <div class="md:hidden space-y-3">
-          <template v-for="day in calendarDays.filter(row => row.currentMonth && row.entries.length)" :key="day.key">
-            <button class="w-full card bg-base-100 border text-left" :class="selectedDateKey === day.key ? 'border-primary' : 'border-base-200'" @click="selectDay(day)"><div class="card-body p-3"><div class="flex justify-between"><strong>{{ day.date.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'short' }) }}</strong><span class="badge badge-sm">{{ day.entries.length }}</span></div><div class="flex flex-wrap gap-1"><span v-for="entry in day.entries.slice(0, 4)" :key="entry.key" class="badge badge-sm badge-outline" :class="categoryMeta[entry.category].badge">{{ entry.subtitle }}</span><span v-if="day.entries.length > 4" class="badge badge-sm">+{{ day.entries.length - 4 }}</span></div></div></button>
+          <template v-for="day in calendarDays.filter(row => row.currentMonth && (row.entries.length || row.today))" :key="day.key">
+            <button
+              class="w-full card border text-left transition-colors"
+              :class="day.today
+                ? 'border-primary bg-primary/10 ring-2 ring-inset ring-primary'
+                : selectedDateKey === day.key ? 'border-primary bg-base-100' : 'border-base-200 bg-base-100'"
+              @click="selectDay(day)"
+            >
+              <div class="card-body p-3">
+                <div class="flex items-center justify-between gap-2">
+                  <div class="flex min-w-0 items-center gap-2">
+                    <strong>{{ day.date.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'short' }) }}</strong>
+                    <span v-if="day.today" class="badge badge-primary badge-sm shrink-0">今天</span>
+                  </div>
+                  <span v-if="day.entries.length" class="badge badge-sm shrink-0">{{ day.entries.length }}</span>
+                </div>
+                <div v-if="day.entries.length" class="flex flex-wrap gap-1"><span v-for="entry in day.entries.slice(0, 4)" :key="entry.key" class="badge badge-sm badge-outline" :class="categoryMeta[entry.category].badge">{{ entry.subtitle }}</span><span v-if="day.entries.length > 4" class="badge badge-sm">+{{ day.entries.length - 4 }}</span></div>
+                <p v-else class="text-xs text-base-content/50">今天没有符合筛选条件的日程</p>
+              </div>
+            </button>
           </template>
-          <div v-if="!calendarDays.some(row => row.currentMonth && row.entries.length)" class="card bg-base-100 border border-base-200"><div class="card-body items-center py-12 text-base-content/45">当前筛选在本月没有日程</div></div>
+          <div v-if="!calendarDays.some(row => row.currentMonth && (row.entries.length || row.today))" class="card bg-base-100 border border-base-200"><div class="card-body items-center py-12 text-base-content/45">当前筛选在本月没有日程</div></div>
         </div>
 
         <aside class="card bg-base-100 border border-base-200 shadow-sm xl:sticky xl:top-20">
@@ -521,7 +539,7 @@ onMounted(async () => {
       <div v-if="selectedLoginBonus" class="modal-box max-w-4xl p-0">
         <div class="relative h-20 overflow-hidden bg-gradient-to-br from-primary/20 via-secondary/15 to-accent/20">
           <div class="absolute inset-0 grid place-items-center"><Gift class="h-10 w-10 text-primary/20" /></div>
-          <button class="btn btn-circle btn-sm absolute right-3 top-3 border-0 bg-base-100/85" aria-label="关闭" @click="closeLoginBonus"><X class="h-4 w-4" /></button>
+          <button class="btn btn-circle btn-sm absolute! right-3 top-3 border-0 bg-base-100/85" aria-label="关闭" @click="closeLoginBonus"><X class="h-4 w-4" /></button>
         </div>
         <header class="relative -mt-5 space-y-2 border-b border-base-200 px-5 pb-4">
           <div class="flex flex-wrap items-center gap-2"><span class="badge badge-accent">登录活动</span><span class="badge badge-ghost">#{{ selectedLoginBonus.id }}</span><span class="badge badge-ghost">{{ selectedLoginBonus.limitedLoginBonusDetails?.length || 0 }} 天</span></div>

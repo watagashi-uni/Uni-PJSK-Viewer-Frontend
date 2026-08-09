@@ -303,7 +303,7 @@ onMounted(async () => {
 
     <dialog class="modal" :class="{ 'modal-open': selectedItem }">
       <div v-if="selectedItem" class="modal-box max-w-xl">
-        <button class="btn btn-sm btn-circle btn-ghost absolute right-3 top-3" aria-label="关闭" @click="selectedItem = null"><X class="w-4 h-4" /></button>
+        <button class="btn btn-sm btn-circle btn-ghost absolute! right-3 top-3 z-20" aria-label="关闭" @click="selectedItem = null"><X class="w-4 h-4" /></button>
         <div class="flex flex-col sm:flex-row gap-6">
           <div class="w-32 h-32 bg-base-200 rounded-2xl p-3 shrink-0 self-center"><AssetImage :src="selectedItem.icon" :alt="selectedItem.name" class="w-full h-full object-contain" /></div>
           <div class="min-w-0 space-y-3"><div><span class="badge badge-outline">{{ categoryMeta[selectedItem.category].label }}</span><p class="text-xs text-base-content/45 mt-2">#{{ selectedItem.id }}</p><h2 class="font-bold text-2xl">{{ selectedItem.name }}</h2></div><p class="text-sm text-primary font-medium">{{ selectedItem.detail }}</p><p class="text-sm leading-6 text-base-content/70">{{ selectedItem.description || '暂无说明' }}</p><div v-if="hasInventory(selectedItem.category)" class="stat bg-base-200 rounded-xl p-3"><div class="stat-title text-xs">账号持有</div><div class="stat-value text-2xl text-primary">{{ formatNumber(getOwned(selectedItem)) }}</div></div><div v-if="selectedItem.convertStartAt" class="flex items-center gap-2 text-xs text-base-content/55"><CalendarClock class="w-4 h-4" />{{ formatDate(selectedItem.convertStartAt) }} 开始转换</div></div>

@@ -306,7 +306,7 @@ onMounted(async () => {
 
     <dialog class="modal" :class="{ 'modal-open': selectedItem }">
       <div v-if="selectedItem" class="modal-box flex max-h-[calc(100dvh-1rem)] max-w-3xl flex-col overflow-hidden p-0 sm:max-h-[calc(100dvh-2rem)]">
-        <button class="btn btn-sm btn-circle btn-ghost absolute right-3 top-3 z-10" aria-label="关闭" @click="selectedItem = null"><X class="w-4 h-4" /></button>
+        <button class="btn btn-sm btn-circle btn-ghost absolute! right-3 top-3 z-20 bg-base-100/85" aria-label="关闭" @click="selectedItem = null"><X class="w-4 h-4" /></button>
         <div class="min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]">
           <div class="grid md:grid-cols-[190px_1fr]">
             <div class="bg-gradient-to-br from-base-200 to-base-100 p-5 flex flex-col items-center justify-center"><AssetImage :src="itemImage(selectedItem)" :alt="selectedItem.name" class="w-36 h-36 object-contain" /><span class="badge badge-outline badge-sm mt-3">{{ areaMap.get(selectedItem.areaId)?.name }}</span></div>

@@ -269,6 +269,10 @@ function lastDescription(levels: Array<{ description: string }>): string {
   return levels[levels.length - 1]?.description || ''
 }
 
+function levelDescription(levels: Array<{ level: number; description: string }>, level: number): string {
+  return levels.find(item => item.level === level)?.description || ''
+}
+
 function scrollToTop() {
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
@@ -469,24 +473,25 @@ onMounted(async () => {
     </template>
 
     <dialog class="modal" :class="{ 'modal-open': selectedHonor }">
-      <div v-if="selectedHonor" class="modal-box max-w-2xl">
-        <button class="btn btn-sm btn-circle btn-ghost absolute right-3 top-3" aria-label="关闭" @click="selectedHonor = null"><X class="w-4 h-4" /></button>
+      <div v-if="selectedHonor" class="modal-box max-w-2xl overflow-x-hidden">
+        <button class="btn btn-sm btn-circle btn-ghost absolute! right-3 top-3 z-20" aria-label="关闭" @click="selectedHonor = null"><X class="w-4 h-4" /></button>
         <h2 class="font-bold text-xl pr-10">{{ honorGroupMap.get(selectedHonor.groupId)?.name || selectedHonor.name }}</h2>
         <p class="text-sm text-base-content/55 mt-1">称号 #{{ selectedHonor.id }} · {{ getTypeLabel(honorGroupMap.get(selectedHonor.groupId)?.honorType) }}<span v-if="normalOwnedMap.has(selectedHonor.id)" class="text-success font-medium"> · 已拥有 Lv.{{ normalOwnedMap.get(selectedHonor.id) }}</span></p>
         <div class="bg-base-200 rounded-xl p-4 my-5"><div class="mx-auto w-full min-w-0 max-w-[340px]"><SekaiHonor :honor-id="selectedHonor.id" :honor-level="selectedHonorLevel" /></div></div>
         <label class="form-control w-full">
           <span class="label-text mb-2">展示等级</span>
           <select v-model.number="selectedHonorLevel" class="select select-bordered w-full min-w-0 max-w-full">
-            <option v-for="level in selectedHonor.levels" :key="level.level" :value="level.level">Lv.{{ level.level }} — {{ level.description }}</option>
+            <option v-for="level in selectedHonor.levels" :key="level.level" :value="level.level">Lv.{{ level.level }}</option>
           </select>
+          <span v-if="levelDescription(selectedHonor.levels, selectedHonorLevel)" class="mt-2 rounded-lg bg-base-200/70 px-3 py-2 text-xs leading-5 text-base-content/65 whitespace-normal break-words">{{ levelDescription(selectedHonor.levels, selectedHonorLevel) }}</span>
         </label>
       </div>
       <form method="dialog" class="modal-backdrop"><button @click="selectedHonor = null">关闭</button></form>
     </dialog>
 
     <dialog class="modal" :class="{ 'modal-open': selectedBondsHonor }">
-      <div v-if="selectedBondsHonor" class="modal-box max-w-2xl">
-        <button class="btn btn-sm btn-circle btn-ghost absolute right-3 top-3" aria-label="关闭" @click="selectedBondsHonor = null"><X class="w-4 h-4" /></button>
+      <div v-if="selectedBondsHonor" class="modal-box max-w-2xl overflow-x-hidden">
+        <button class="btn btn-sm btn-circle btn-ghost absolute! right-3 top-3 z-20" aria-label="关闭" @click="selectedBondsHonor = null"><X class="w-4 h-4" /></button>
         <h2 class="font-bold text-xl pr-10">{{ getCharacterNameByUnitId(selectedBondsHonor.gameCharacterUnitId1) }} × {{ getCharacterNameByUnitId(selectedBondsHonor.gameCharacterUnitId2) }}</h2>
         <p class="text-sm text-base-content/55 mt-1">牵绊称号 #{{ selectedBondsHonor.id }}<span v-if="bondsOwnedMap.has(selectedBondsHonor.id)" class="text-success font-medium"> · 已拥有 Lv.{{ bondsOwnedMap.get(selectedBondsHonor.id) }}</span></p>
         <div class="bg-base-200 rounded-xl p-4 my-5">
@@ -500,13 +505,14 @@ onMounted(async () => {
           </div>
         </div>
         <div class="grid md:grid-cols-2 gap-3">
-          <label class="form-control">
+          <label class="form-control min-w-0">
             <span class="label-text mb-2">展示等级</span>
             <select v-model.number="selectedBondsLevel" class="select select-bordered w-full min-w-0 max-w-full">
-              <option v-for="level in selectedBondsHonor.levels" :key="level.level" :value="level.level">Lv.{{ level.level }} — {{ level.description }}</option>
+              <option v-for="level in selectedBondsHonor.levels" :key="level.level" :value="level.level">Lv.{{ level.level }}</option>
             </select>
+            <span v-if="levelDescription(selectedBondsHonor.levels, selectedBondsLevel)" class="mt-2 rounded-lg bg-base-200/70 px-3 py-2 text-xs leading-5 text-base-content/65 whitespace-normal break-words">{{ levelDescription(selectedBondsHonor.levels, selectedBondsLevel) }}</span>
           </label>
-          <label class="form-control">
+          <label class="form-control min-w-0">
             <span class="label-text mb-2">称号文字</span>
             <select v-model.number="selectedBondsWordId" class="select select-bordered w-full min-w-0 max-w-full">
               <option v-for="word in selectedBondsWords" :key="word.id" :value="word.id">{{ word.name }}</option>
