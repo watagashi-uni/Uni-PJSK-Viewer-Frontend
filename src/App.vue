@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterView, useRoute } from 'vue-router'
+import { isRouteLoading } from '@/router'
 import AppNavbar from '@/components/AppNavbar.vue'
 import ToastContainer from '@/components/ToastContainer.vue'
 import { useMasterStore } from '@/stores/master'
@@ -67,6 +68,17 @@ async function handleSuiteRefresh() {
 </script>
 
 <template>
+  <Transition name="route-progress">
+    <div
+      v-if="isRouteLoading"
+      class="route-progress"
+      role="progressbar"
+      aria-label="页面加载中"
+    >
+      <div class="route-progress__bar"></div>
+    </div>
+  </Transition>
+
   <div v-if="isFullscreen" class="min-h-screen">
     <RouterView :key="routerViewKey" />
   </div>
@@ -307,5 +319,56 @@ async function handleSuiteRefresh() {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+.route-progress {
+  position: fixed;
+  z-index: 2000;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 4px;
+  overflow: hidden;
+  pointer-events: none;
+  background: color-mix(in srgb, var(--color-primary) 18%, transparent);
+}
+
+.route-progress__bar {
+  width: 45%;
+  height: 100%;
+  border-radius: 0 999px 999px 0;
+  background: linear-gradient(90deg, var(--color-primary), var(--color-secondary), var(--color-primary));
+  box-shadow: 0 0 10px color-mix(in srgb, var(--color-primary) 80%, transparent);
+  animation: route-progress-slide 1.1s ease-in-out infinite;
+}
+
+.route-progress-enter-active,
+.route-progress-leave-active {
+  transition: opacity 0.15s ease;
+}
+
+.route-progress-enter-from,
+.route-progress-leave-to {
+  opacity: 0;
+}
+
+@keyframes route-progress-slide {
+  0% {
+    transform: translate3d(-100%, 0, 0) scaleX(0.5);
+  }
+
+  55% {
+    transform: translate3d(80%, 0, 0) scaleX(1);
+  }
+
+  100% {
+    transform: translate3d(225%, 0, 0) scaleX(0.55);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .route-progress__bar {
+    animation: none;
+  }
 }
 </style>

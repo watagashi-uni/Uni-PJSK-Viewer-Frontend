@@ -1,5 +1,36 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
+import { shallowRef } from 'vue'
+
+const ROUTE_LOADING_DELAY_MS = 150
+
+export const isRouteLoading = shallowRef(false)
+
+let activeNavigationId = 0
+let loadingTimer: ReturnType<typeof setTimeout> | undefined
+const navigationIds = new WeakMap<object, number>()
+
+function beginRouteLoading(to: object) {
+    const navigationId = ++activeNavigationId
+    navigationIds.set(to, navigationId)
+
+    if (loadingTimer) clearTimeout(loadingTimer)
+    loadingTimer = setTimeout(() => {
+        if (navigationId === activeNavigationId) {
+            isRouteLoading.value = true
+        }
+    }, ROUTE_LOADING_DELAY_MS)
+}
+
+function finishRouteLoading(to: object) {
+    if (navigationIds.get(to) !== activeNavigationId) return
+
+    if (loadingTimer) {
+        clearTimeout(loadingTimer)
+        loadingTimer = undefined
+    }
+    isRouteLoading.value = false
+}
 
 const routes: RouteRecordRaw[] = [
     {
@@ -269,9 +300,18 @@ const router = createRouter({
 
 // 路由守卫：设置页面标题
 router.beforeEach((to, _from, next) => {
+    beginRouteLoading(to)
     const title = to.meta.title as string
     document.title = title ? `${title} - Uni PJSK Viewer` : 'Uni PJSK Viewer'
     next()
+})
+
+router.afterEach((to) => {
+    finishRouteLoading(to)
+})
+
+router.onError((_error, to) => {
+    finishRouteLoading(to)
 })
 
 export default router
