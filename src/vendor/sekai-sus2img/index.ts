@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { Score, Tap, Directional, Slide } from './model'
-import { applyRebase } from './rebase'
+import { applyRebase, stringifyRebaseFromScore } from './rebase'
+import { parseSusText } from './parser'
 import { renderScoreToSvg } from './renderer'
 import { scoreFromCustomScoreJson } from './customScoreJson'
 import { convertSusToCustomScoreJson } from './susToJsonWasm'
@@ -11,6 +12,14 @@ export { analyzeSusConflicts, type ConflictDiagnostic } from '@/utils/susConflic
 export { buildGhostNotesFromDiagnostics, buildCrashMarkersFromDiagnostics, buildFocusAnchorsFromDiagnostics, type CrashMarkerRender } from './ghostNote'
 export { convertSusToCustomScoreJson, calculateSusComboCount } from './susToJsonWasm'
 export { convertCustomScoreJsonToSus, type JsonToSusOptions } from './jsonToSusWasm'
+
+export const generateRebaseJsonFromSus = (sus: string): string =>
+    stringifyRebaseFromScore(parseSusText(sus))
+
+export const generateRebaseJsonFromCustomScore = (
+    scoreJson: unknown,
+    meta: import('./customScoreJson').CustomScoreJsonRenderInputMeta = {},
+): string => stringifyRebaseFromScore(scoreFromCustomScoreJson(scoreJson, meta))
 
 export type Sus2ImgSkin = 'custom01' | 'custom02'
 

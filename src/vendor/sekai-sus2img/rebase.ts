@@ -31,6 +31,56 @@ export type LoadedRebase = {
     meta: Meta
 }
 
+const rebaseMetaKeys = [
+    'title',
+    'subtitle',
+    'artist',
+    'genre',
+    'designer',
+    'difficulty',
+    'playlevel',
+    'songid',
+    'wave',
+    'waveoffset',
+    'jacket',
+    'background',
+    'movie',
+    'movieoffset',
+    'basebpm',
+] as const
+
+export const createRebaseInputFromScore = (score: Score): RebaseInput => {
+    const meta: Record<string, string | number> = {}
+    for (const key of rebaseMetaKeys) {
+        const value = score.meta[key]
+        if (value !== null && value !== undefined && value !== '') {
+            meta[key] = value
+        }
+    }
+
+    const events = score.events.flatMap((event): RebaseEventInput[] => {
+        const serialized: RebaseEventInput = { bar: event.bar.toNumber() }
+        if (event.bpm !== null) serialized.bpm = event.bpm.toNumber()
+        if (event.barLength !== null) serialized.barLength = event.barLength.toNumber()
+        if (event.sentenceLength !== null) serialized.sentenceLength = event.sentenceLength
+        if (event.seVolume !== null) serialized.seVolume = event.seVolume
+        if (event.section !== null && event.section !== '') serialized.section = event.section
+        if (event.text !== null && event.text !== '') serialized.text = event.text
+
+        // highspeed 会由 applyRebase 从原谱面按新时间轴自动迁移，不属于 rebase.json 字段。
+        return Object.keys(serialized).length > 1 ? [serialized] : []
+    })
+
+    return {
+        offset: 0,
+        events,
+        meta: meta as Partial<Meta>,
+    }
+}
+
+export const stringifyRebaseFromScore = (score: Score): string =>
+    `${JSON.stringify(createRebaseInputFromScore(score), null, 2)}\n`
+
 const loadMeta = (value: Partial<Meta> | undefined): Meta => {
     if (!value) {
         return new Meta()
