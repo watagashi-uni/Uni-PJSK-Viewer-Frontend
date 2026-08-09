@@ -8,7 +8,7 @@ import { useSettingsStore } from '@/stores/settings'
 import { useAccountStore } from '@/stores/account'
 import { useOAuthStore } from '@/stores/oauth'
 import { useNotificationStore } from '@/stores/notification'
-import { Music, Image, BarChart3, Info, Settings, Calendar, CalendarDays, Gift, Zap, User, RefreshCw, Github, House, Radio, Shirt, Dices, Smile, Users, Trophy, BookOpen, Wrench, Boxes, History, ScrollText } from 'lucide-vue-next'
+import { Music, Image, BarChart3, Info, Settings, Calendar, CalendarDays, Gift, Zap, User, RefreshCw, Github, House, Radio, Shirt, Dices, Smile, Users, Trophy, BookOpen, Wrench, Boxes, History } from 'lucide-vue-next'
 import AccountSelector from '@/components/AccountSelector.vue'
 
 const route = useRoute()
@@ -119,6 +119,56 @@ async function handleSuiteRefresh() {
             </RouterLink>
           </li>
           <li>
+            <RouterLink to="/costumes" active-class="active">
+              <Shirt class="w-5 h-5" /> 衣装
+            </RouterLink>
+          </li>
+          <li>
+            <RouterLink to="/costumes/custom" active-class="active">
+              <Dices class="w-5 h-5" /> 衣装自由搭配
+            </RouterLink>
+          </li>
+          <li>
+            <RouterLink to="/events" active-class="active">
+              <Calendar class="w-5 h-5" /> 活动
+            </RouterLink>
+          </li>
+          <li>
+            <RouterLink to="/vlives" active-class="active">
+              <Radio class="w-5 h-5" /> 虚拟 Live
+            </RouterLink>
+          </li>
+          <li>
+            <RouterLink to="/ranking" active-class="active">
+              <BarChart3 class="w-5 h-5" /> 实时榜线
+            </RouterLink>
+          </li>
+          <li>
+            <RouterLink to="/gachas" active-class="active">
+              <Gift class="w-5 h-5" /> 卡池
+            </RouterLink>
+          </li>
+          <li>
+            <RouterLink to="/sus2img" active-class="active">
+              <BarChart3 class="w-5 h-5" /> 谱面转图片
+            </RouterLink>
+          </li>
+          <li>
+            <RouterLink to="/custom-score-maker" active-class="active">
+              <Music class="w-5 h-5" /> 谱面 Maker
+            </RouterLink>
+          </li>
+          <li>
+            <RouterLink to="/deck-recommend" active-class="active">
+              <Zap class="w-5 h-5" /> 自动组队
+            </RouterLink>
+          </li>
+          <li>
+            <RouterLink to="/mysekai" active-class="active">
+              <House class="w-5 h-5" /> MySekai
+            </RouterLink>
+          </li>
+          <li>
             <RouterLink to="/stamps" active-class="active">
               <Smile class="w-5 h-5" /> 表情贴图
             </RouterLink>
@@ -149,81 +199,16 @@ async function handleSuiteRefresh() {
             </RouterLink>
           </li>
           <li>
-            <RouterLink to="/costumes" active-class="active">
-              <Shirt class="w-5 h-5" /> 衣装
-            </RouterLink>
-          </li>
-          <li>
-            <RouterLink to="/costumes/custom" active-class="active">
-              <Dices class="w-5 h-5" /> 衣装自由搭配
-            </RouterLink>
-          </li>
-          <li>
-            <RouterLink to="/events" active-class="active">
-              <Calendar class="w-5 h-5" /> 活动
-            </RouterLink>
-          </li>
-          <li>
-            <RouterLink to="/calendar" active-class="active">
-              <CalendarDays class="w-5 h-5" /> 游戏日历
-            </RouterLink>
-          </li>
-          <li>
-            <RouterLink to="/login-bonuses" active-class="active">
-              <Gift class="w-5 h-5" /> 登录活动
-            </RouterLink>
-          </li>
-          <li>
-            <RouterLink to="/omikuji" active-class="active">
-              <ScrollText class="w-5 h-5" /> 御神签档案
-            </RouterLink>
-          </li>
-          <li>
-            <RouterLink to="/vlives" active-class="active">
-              <Radio class="w-5 h-5" /> 虚拟 Live
-            </RouterLink>
-          </li>
-          <li>
-            <RouterLink to="/ranking" active-class="active">
-              <BarChart3 class="w-5 h-5" /> 实时榜线
-            </RouterLink>
-          </li>
-          <li>
-            <RouterLink to="/gachas" active-class="active">
-              <Gift class="w-5 h-5" /> 卡池
-            </RouterLink>
-          </li>
-          <li>
-            <RouterLink to="/sus2img" active-class="active">
-              <BarChart3 class="w-5 h-5" /> 谱面转图片
-            </RouterLink>
-          </li>
-          <li>
-            <RouterLink to="/custom-score-maker" active-class="active">
-              <Music class="w-5 h-5" /> 谱面Maker
-            </RouterLink>
-          </li>
-          <li>
-            <RouterLink to="/deck-recommend" active-class="active">
-              <Zap class="w-5 h-5" /> 自动组队
-            </RouterLink>
-          </li>
-          <li>
-            <RouterLink to="/mysekai" active-class="active">
-              <House class="w-5 h-5" /> MySekai
-            </RouterLink>
-          </li>
-          <li>
-            <RouterLink to="/profile" active-class="active">
-              <User class="w-5 h-5" /> 个人信息
-            </RouterLink>
-          </li>
-          <li>
             <RouterLink to="/account-records" active-class="active">
               <History class="w-5 h-5" /> 账号记录
             </RouterLink>
           </li>
 
+          <li>
+            <RouterLink to="/calendar" active-class="active">
+              <CalendarDays class="w-5 h-5" /> 游戏日历
+            </RouterLink>
+          </li>
           <div class="divider my-1"></div>
 
           <!-- 账号管理 -->
@@ -278,6 +263,11 @@ async function handleSuiteRefresh() {
           <li>
             <RouterLink to="/about" active-class="active">
               <Info class="w-5 h-5" /> 关于项目
+            </RouterLink>
+          </li>
+          <li>
+            <RouterLink to="/profile" active-class="active">
+              <User class="w-5 h-5" /> 个人信息
             </RouterLink>
           </li>
           <li>
