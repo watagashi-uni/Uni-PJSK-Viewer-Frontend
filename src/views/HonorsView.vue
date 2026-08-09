@@ -314,8 +314,8 @@ onMounted(async () => {
 
 <template>
   <div class="max-w-7xl mx-auto space-y-6">
-    <header class="flex flex-wrap items-start justify-between gap-4">
-      <div><h1 class="text-3xl font-bold flex items-center gap-3"><Trophy class="w-8 h-8 text-warning" /> 称号图鉴</h1><p class="text-sm text-base-content/60 mt-2">浏览普通称号、活动排名称号和角色羁绊称号，并可结合账号查看持有状态。</p></div>
+    <header class="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-warning/15 bg-gradient-to-br from-warning/10 via-base-100 to-base-100 p-5 md:p-6">
+      <div class="flex items-center gap-4"><span class="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-warning/15 text-warning"><Trophy class="w-6 h-6" /></span><div><h1 class="text-2xl md:text-3xl font-bold">称号图鉴</h1><p class="text-sm text-base-content/60 mt-1">浏览普通、活动排名与角色羁绊称号，并结合账号查看持有状态。</p></div></div>
       <div class="min-w-56"><AccountSelector v-if="accountStore.accounts.length" v-model="selectedUserId" /></div>
     </header>
 
@@ -328,8 +328,8 @@ onMounted(async () => {
       </button>
     </div>
 
-    <div v-if="isLoading" class="grid md:grid-cols-2 gap-4">
-      <div v-for="index in 10" :key="index" class="skeleton h-36 rounded-xl"></div>
+    <div v-if="isLoading" class="grid sm:grid-cols-2 xl:grid-cols-3 gap-3">
+      <div v-for="index in 12" :key="index" class="skeleton h-36 rounded-xl"></div>
     </div>
     <div v-else-if="loadError" class="alert alert-error">称号数据加载失败：{{ loadError }}</div>
 
@@ -362,16 +362,16 @@ onMounted(async () => {
         </div>
       </section>
 
-      <div v-if="paginatedHonors.length" class="grid md:grid-cols-2 gap-4">
+      <div v-if="paginatedHonors.length" class="grid sm:grid-cols-2 xl:grid-cols-3 gap-3">
         <button
           v-for="honor in paginatedHonors"
           :key="honor.id"
           type="button"
-          class="card bg-base-100 border border-base-200 hover:border-primary/50 hover:shadow-md transition-all text-left"
+          class="group card bg-base-100 border border-base-200 hover:border-primary/50 hover:shadow-md hover:-translate-y-0.5 transition-all text-left"
           @click="openHonor(honor)"
         >
-          <div class="card-body p-4 gap-3">
-            <div class="relative"><SekaiHonor :honor-id="honor.id" :honor-level="normalOwnedMap.get(honor.id) || maxLevel(honor.levels)" /><span v-if="normalOwnedMap.has(honor.id)" class="absolute -top-2 -right-2 badge badge-success badge-sm gap-1"><CheckCircle2 class="w-3 h-3" />Lv.{{ normalOwnedMap.get(honor.id) }}</span></div>
+          <div class="card-body p-3 gap-2.5">
+            <div class="relative w-full max-w-[280px] mx-auto"><SekaiHonor :honor-id="honor.id" :honor-level="normalOwnedMap.get(honor.id) || maxLevel(honor.levels)" /><span v-if="normalOwnedMap.has(honor.id)" class="absolute -top-1.5 -right-1.5 badge badge-success badge-xs gap-1 shadow-sm"><CheckCircle2 class="w-3 h-3" />Lv.{{ normalOwnedMap.get(honor.id) }}</span></div>
             <div class="min-w-0">
               <div class="flex flex-wrap gap-2 mb-1">
                 <span class="badge badge-sm badge-ghost">#{{ honor.id }}</span>
@@ -420,22 +420,22 @@ onMounted(async () => {
         </div>
       </section>
 
-      <div v-if="paginatedBondsHonors.length" class="grid md:grid-cols-2 gap-4">
+      <div v-if="paginatedBondsHonors.length" class="grid sm:grid-cols-2 xl:grid-cols-3 gap-3">
         <button
           v-for="honor in paginatedBondsHonors"
           :key="honor.id"
           type="button"
-          class="card bg-base-100 border border-base-200 hover:border-secondary/50 hover:shadow-md transition-all text-left"
+          class="group card bg-base-100 border border-base-200 hover:border-secondary/50 hover:shadow-md hover:-translate-y-0.5 transition-all text-left"
           @click="openBondsHonor(honor)"
         >
-          <div class="card-body p-4 gap-3">
-            <div class="relative">
+          <div class="card-body p-3 gap-2.5">
+            <div class="relative w-full max-w-[280px] mx-auto">
               <SekaiHonorBonds
                 :honor-id="honor.id"
                 :honor-level="bondsOwnedMap.get(honor.id) || maxLevel(honor.levels)"
                 :bonds-honor-word-id="firstWordId(honor)"
               />
-              <span v-if="bondsOwnedMap.has(honor.id)" class="absolute -top-2 -right-2 badge badge-success badge-sm gap-1"><CheckCircle2 class="w-3 h-3" />Lv.{{ bondsOwnedMap.get(honor.id) }}</span>
+              <span v-if="bondsOwnedMap.has(honor.id)" class="absolute -top-1.5 -right-1.5 badge badge-success badge-xs gap-1 shadow-sm"><CheckCircle2 class="w-3 h-3" />Lv.{{ bondsOwnedMap.get(honor.id) }}</span>
             </div>
             <div>
               <div class="flex flex-wrap gap-2 mb-1">
@@ -465,7 +465,7 @@ onMounted(async () => {
         <button class="btn btn-sm btn-circle btn-ghost absolute right-3 top-3" aria-label="关闭" @click="selectedHonor = null"><X class="w-4 h-4" /></button>
         <h2 class="font-bold text-xl pr-10">{{ honorGroupMap.get(selectedHonor.groupId)?.name || selectedHonor.name }}</h2>
         <p class="text-sm text-base-content/55 mt-1">称号 #{{ selectedHonor.id }} · {{ getTypeLabel(honorGroupMap.get(selectedHonor.groupId)?.honorType) }}<span v-if="normalOwnedMap.has(selectedHonor.id)" class="text-success font-medium"> · 已拥有 Lv.{{ normalOwnedMap.get(selectedHonor.id) }}</span></p>
-        <div class="bg-base-200 rounded-xl p-4 my-5"><SekaiHonor :honor-id="selectedHonor.id" :honor-level="selectedHonorLevel" /></div>
+        <div class="bg-base-200 rounded-xl p-4 my-5"><div class="max-w-[340px] mx-auto"><SekaiHonor :honor-id="selectedHonor.id" :honor-level="selectedHonorLevel" /></div></div>
         <label class="form-control w-full">
           <span class="label-text mb-2">展示等级</span>
           <select v-model.number="selectedHonorLevel" class="select select-bordered">
@@ -482,12 +482,14 @@ onMounted(async () => {
         <h2 class="font-bold text-xl pr-10">{{ getCharacterNameByUnitId(selectedBondsHonor.gameCharacterUnitId1) }} × {{ getCharacterNameByUnitId(selectedBondsHonor.gameCharacterUnitId2) }}</h2>
         <p class="text-sm text-base-content/55 mt-1">羁绊称号 #{{ selectedBondsHonor.id }}<span v-if="bondsOwnedMap.has(selectedBondsHonor.id)" class="text-success font-medium"> · 已拥有 Lv.{{ bondsOwnedMap.get(selectedBondsHonor.id) }}</span></p>
         <div class="bg-base-200 rounded-xl p-4 my-5">
-          <SekaiHonorBonds
-            :honor-id="selectedBondsHonor.id"
-            :honor-level="selectedBondsLevel"
-            :bonds-honor-word-id="selectedBondsWordId"
-            :bonds-honor-view-type="reverseBonds ? 'reverse' : 'normal'"
-          />
+          <div class="max-w-[340px] mx-auto">
+            <SekaiHonorBonds
+              :honor-id="selectedBondsHonor.id"
+              :honor-level="selectedBondsLevel"
+              :bonds-honor-word-id="selectedBondsWordId"
+              :bonds-honor-view-type="reverseBonds ? 'reverse' : 'normal'"
+            />
+          </div>
         </div>
         <div class="grid md:grid-cols-2 gap-3">
           <label class="form-control">
