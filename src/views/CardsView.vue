@@ -573,7 +573,7 @@ onMounted(() => {
     </div>
 
     <!-- 卡片网格 -->
-    <div v-else class="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-5">
+    <div v-else class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
       <RouterLink
         v-for="card in paginatedCards"
         :key="card.id"
@@ -581,7 +581,7 @@ onMounted(() => {
         class="group animate-fade-in-up"
       >
         <!-- 卡片背景框 -->
-        <div class="bg-base-100 rounded-xl p-3 shadow-md border border-base-200 hover:shadow-lg hover:border-primary/30 transition-all relative overflow-hidden">
+        <div class="bg-base-100 rounded-xl p-2.5 shadow-md border border-base-200 hover:shadow-lg hover:border-primary/30 transition-all relative overflow-hidden">
           <!-- 全卡片遮罩 (仅在开启遮罩模式下显示，Hover时消失) -->
           <div
             v-if="isLeak(card.releaseAt) && settingsStore.maskSpoilers"
@@ -600,7 +600,7 @@ onMounted(() => {
           <!-- 统一大小的卡片容器 -->
           <div class="flex gap-1 justify-center relative">
             <!-- 普通卡面 -->
-            <div class="w-20 sm:w-24 flex-shrink-0" :class="{ 'mx-auto': !hasTrainedCard(card.cardRarityType) }">
+            <div class="w-16 sm:w-20 flex-shrink-0" :class="{ 'mx-auto': !hasTrainedCard(card.cardRarityType) }">
               <div class="relative aspect-square">
                 <SekaiCard
                   :card="card"
@@ -617,7 +617,7 @@ onMounted(() => {
             </div>
 
             <!-- 觉醒卡面 (3星/4星) -->
-            <div v-if="hasTrainedCard(card.cardRarityType)" class="w-20 sm:w-24 flex-shrink-0">
+            <div v-if="hasTrainedCard(card.cardRarityType)" class="w-16 sm:w-20 flex-shrink-0">
               <div class="relative aspect-square">
                 <SekaiCard
                   :card="card"

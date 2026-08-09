@@ -502,7 +502,7 @@ onMounted(async () => {
           </div>
         </div>
 
-        <div class="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-3">
+        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 gap-2.5">
           <button
             v-for="character in group.items"
             :key="character.id"
@@ -511,7 +511,7 @@ onMounted(async () => {
             @click="openCharacter(character)"
           >
             <figure
-              class="relative h-52 overflow-hidden"
+              class="relative h-40 sm:h-44 overflow-hidden"
               :style="{ background: `linear-gradient(150deg, ${getUnitColor(character.unit)}30, transparent 65%), var(--color-base-200)` }"
             >
               <AssetImage
@@ -527,7 +527,7 @@ onMounted(async () => {
               </span>
               <span class="absolute top-2 right-2 badge badge-sm bg-base-100/80 border-0">#{{ character.id }}</span>
             </figure>
-            <div class="card-body p-3 gap-0">
+            <div class="card-body p-2.5 gap-0">
               <h3 class="font-bold truncate">{{ getCharacterName(character) }}</h3>
               <p class="text-[10px] tracking-wider text-base-content/45 truncate uppercase">{{ getEnglishName(character) }}</p>
               <p class="text-[11px] text-base-content/55 mt-2">{{ cardCounts.get(character.id) || 0 }} 卡牌 · {{ stampCounts.get(character.id) || 0 }} 贴图</p>

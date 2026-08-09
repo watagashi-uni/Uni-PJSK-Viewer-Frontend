@@ -291,7 +291,7 @@ onMounted(async () => {
             </div>
           </div>
 
-          <div v-if="paginatedCards.length" class="grid grid-cols-3 sm:grid-cols-4 xl:grid-cols-6 gap-3">
+          <div v-if="paginatedCards.length" class="grid grid-cols-4 sm:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 gap-2.5">
             <RouterLink v-for="card in paginatedCards" :key="card.id" :to="`/cards/${card.id}`" class="group card bg-base-100 border border-base-200 shadow-sm overflow-hidden hover:border-primary/40 hover:shadow-md transition-all">
               <div class="relative">
                 <SekaiCard :card="card" :trained="isTrained(card)" :master-rank="userCardsMap.get(card.id)?.masterRank || 0" class="transition-transform group-hover:scale-[1.02]" :class="{ 'grayscale opacity-40': hasCardData && !userCardsMap.has(card.id) }" />
