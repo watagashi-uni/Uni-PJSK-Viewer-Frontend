@@ -252,7 +252,12 @@ onMounted(() => {
   if (saved) {
     try {
       const parsed = JSON.parse(saved)
-      Object.assign(form.value, parsed)
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        delete parsed.rebase
+        Object.assign(form.value, parsed)
+        sessionStorage.setItem(FORM_STORAGE_KEY, JSON.stringify(parsed))
+      }
+      form.value.rebase = ''
       if (form.value.engine !== 'rust') {
         form.value.engine = 'frontend'
       }
@@ -263,13 +268,14 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  form.value.rebase = ''
   resetFrontendResult()
 })
 
 watch(
   form,
   (newVal) => {
-    sessionStorage.setItem(FORM_STORAGE_KEY, JSON.stringify(newVal))
+    sessionStorage.setItem(FORM_STORAGE_KEY, JSON.stringify({ ...newVal, rebase: undefined }))
   },
   { deep: true },
 )
@@ -287,12 +293,14 @@ watch(
 watch(
   () => form.value.inputType,
   () => {
+    form.value.rebase = ''
     chartFile.value = null
     resetAuditState()
     resetRenderState()
     resetConversionState()
     rebaseGenerationError.value = null
     rebaseGenerationMessage.value = null
+    showRebaseHelp.value = false
   },
 )
 
@@ -998,6 +1006,12 @@ function clearForm() {
                 </label>
               </div>
             </div>
+          </div>
+
+          <div v-if="!isConvertMode && form.rebase.trim()" class="alert alert-warning items-center gap-3 py-2.5 text-sm">
+            <TriangleAlert class="h-5 w-5 shrink-0" />
+            <div class="min-w-0 flex-1"><strong>已填写 rebase.json</strong><span class="ml-1 text-xs opacity-80">生成谱面图时会应用这份时间轴。</span></div>
+            <button type="button" class="btn btn-ghost btn-xs shrink-0" @click="showOptionalSettings = true">展开查看</button>
           </div>
 
           <div v-if="!isConvertMode" class="collapse collapse-arrow bg-base-200/60 border border-base-300 rounded-lg">
