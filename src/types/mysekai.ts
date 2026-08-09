@@ -88,7 +88,7 @@ export interface ResourceStat {
     rarity: RarityLevel
 }
 
-export type TabKey = 'furniture' | 'gate' | 'record'
+export type TabKey = 'furniture' | 'canvas' | 'gate' | 'record'
 
 export interface FixtureRow {
     id: number
