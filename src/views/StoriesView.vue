@@ -167,11 +167,6 @@ const scenarioUrls = computed(() => {
   return []
 })
 
-const selectedEpisodeImageUrl = computed(() => {
-  if (selectedStory.value?.kind !== 'event' || !selectedEpisode.value) return undefined
-  return `${assetsHost.value}/ondemand/event_story/${selectedStory.value.assetbundleName}/episode_image/${selectedEpisode.value.assetbundleName}.png`
-})
-
 const selectedStoryBannerUrl = computed(() => selectedStory.value?.kind === 'event'
   ? `${assetsHost.value}/startapp/home/banner/${selectedStory.value.assetbundleName}/${selectedStory.value.assetbundleName}.png`
   : '')
@@ -226,6 +221,11 @@ function formatDate(timestamp?: number): string {
 
 function eventBanner(story: EventStory): string {
   return `${assetsHost.value}/startapp/home/banner/${story.assetbundleName}/${story.assetbundleName}.png`
+}
+
+function episodeImage(episode: StoryEpisode): string {
+  if (selectedStory.value?.kind !== 'event') return ''
+  return `${assetsHost.value}/ondemand/event_story/${selectedStory.value.assetbundleName}/episode_image/${episode.assetbundleName}.png`
 }
 
 function unitChapterOutline(chapter: UnitStoryChapter): string {
@@ -364,7 +364,6 @@ onMounted(async () => {
           :episode-label="selectedEpisode.episodeNoLabel || `第 ${selectedEpisode.episodeNo} 话`"
           :scenario-id="selectedEpisode.scenarioId"
           :scenario-urls="scenarioUrls"
-          :episode-image-url="selectedEpisodeImageUrl"
           :has-previous="selectedEpisodeIndex > 0"
           :has-next="selectedStory ? selectedEpisodeIndex < selectedStory.episodes.length - 1 : false"
           @close="selectedEpisode = null"
@@ -386,8 +385,9 @@ onMounted(async () => {
           </header>
           <div class="p-4 border-b border-base-200 bg-base-100"><label class="input input-sm input-bordered flex items-center gap-2"><Search class="w-4 h-4 opacity-40" /><input v-model="episodeSearch" class="grow" placeholder="搜索本篇章节标题或剧本 ID…" /><button v-if="episodeSearch" class="btn btn-xs btn-circle btn-ghost" @click="episodeSearch = ''"><X class="w-3 h-3" /></button></label></div>
           <div class="p-3 md:p-4 max-h-[58vh] overflow-y-auto space-y-2 bg-base-200/50">
-            <button v-for="episode in selectedStoryEpisodes" :key="episode.id" class="group w-full flex items-center gap-3 bg-base-100 border border-base-200 rounded-xl p-3 text-left hover:border-primary/50 hover:shadow-sm transition-all" @click="openEpisode(episode)">
-              <span class="grid w-10 h-10 place-items-center rounded-lg shrink-0 bg-primary/10 text-primary"><Play class="w-4 h-4" /></span>
+            <button v-for="episode in selectedStoryEpisodes" :key="episode.id" class="group w-full flex items-center gap-3 bg-base-100 border border-base-200 rounded-xl p-2.5 text-left hover:border-primary/50 hover:shadow-sm transition-all" @click="openEpisode(episode)">
+              <span v-if="selectedStory.kind === 'event'" class="relative aspect-[35/18] w-24 shrink-0 overflow-hidden rounded-lg bg-base-200 sm:w-32"><AssetImage :src="episodeImage(episode)" :alt="episode.title" class="h-full w-full object-cover transition-transform group-hover:scale-[1.03]" /><span class="absolute inset-0 grid place-items-center bg-black/10 opacity-0 transition-opacity group-hover:opacity-100"><span class="grid h-8 w-8 place-items-center rounded-full bg-base-100/90 text-primary shadow"><Play class="h-3.5 w-3.5" /></span></span></span>
+              <span v-else class="grid w-10 h-10 place-items-center rounded-lg shrink-0 bg-primary/10 text-primary"><Play class="w-4 h-4" /></span>
               <span class="min-w-0 flex-1"><span class="text-[11px] text-base-content/45">{{ episode.episodeNoLabel || `第 ${episode.episodeNo} 话` }} · {{ episode.scenarioId }}</span><span class="font-medium block truncate">{{ episode.title }}</span></span>
               <ChevronRight class="w-4 h-4 shrink-0 opacity-40 group-hover:translate-x-0.5 transition-transform" />
             </button>
