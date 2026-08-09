@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useAccountStore } from '@/stores/account'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
 import AccountSelector from '@/components/AccountSelector.vue'
 import AssetImage from '@/components/AssetImage.vue'
-import { RefreshCw, Sofa, DoorOpen, Disc3, Search } from 'lucide-vue-next'
+import SekaiCard from '@/components/SekaiCard.vue'
+import { RefreshCw, Sofa, DoorOpen, Disc3, Images, Search } from 'lucide-vue-next'
 
 import type {
   TabKey, FixtureRow, BlueprintRow, GenreRow, BlueprintMaterialCostRow,
@@ -27,9 +28,41 @@ const settingsStore = useSettingsStore()
 
 const tabOptions: Array<{ key: TabKey, label: string }> = [
   { key: 'furniture', label: '家具库存' },
+  { key: 'canvas', label: '画布收藏' },
   { key: 'gate', label: '大门' },
   { key: 'record', label: '唱片' },
 ]
+
+interface CanvasCardRow {
+  id: number
+  characterId: number
+  cardRarityType: string
+  attr: string
+  assetbundleName: string
+  prefix: string
+}
+
+interface CanvasBonusRow {
+  cardRarityType: string
+  power1BonusFixed: number
+  power2BonusFixed: number
+  power3BonusFixed: number
+}
+
+interface UserCanvasRow {
+  cardId: number
+  isSpecialTraining: boolean
+  quantity: number
+  lastObtainedAt: number
+  mysekaiFixtureId: number
+}
+
+interface CanvasViewItem extends UserCanvasRow {
+  key: string
+  card: CanvasCardRow
+  fixture: FixtureRow | null
+  bonus: CanvasBonusRow | null
+}
 
 const unitAliasMap: Record<string, string> = {
   light_sound: 'ln',
@@ -70,6 +103,10 @@ const selectedFixtureId = ref<number | null>(null)
 const furnitureSearch = ref('')
 const selectedMainGenre = ref(0)
 const onlyOwned = ref(false)
+const canvasSearch = ref('')
+const selectedCanvasFixtureId = ref(0)
+const selectedCanvasTraining = ref<'all' | 'normal' | 'trained'>('all')
+const canvasSort = ref<'obtained' | 'card' | 'rarity'>('obtained')
 const selectedTalkCharacterId = ref(0)
 const selectedTalkUnit = ref('')
 
@@ -97,10 +134,13 @@ const mysekaiCharacterTalks = ref<MysekaiCharacterTalkRow[]>([])
 const mysekaiGameCharacterUnitGroups = ref<MysekaiGameCharacterUnitGroupRow[]>([])
 const characterArchiveMysekaiCharacterTalkGroups = ref<CharacterArchiveMysekaiCharacterTalkGroupRow[]>([])
 const mysekaiGateCharacterLotteries = ref<MysekaiGateCharacterLotteryRow[]>([])
+const canvasCards = ref<CanvasCardRow[]>([])
+const canvasBonuses = ref<CanvasBonusRow[]>([])
 
 const mysekaiAssetsHost = computed(() => String(settingsStore.ASSETS_HOST_GLOBAL || '').replace(/\/+$/, ''))
 
 function parseTab(value: unknown): TabKey {
+  if (value === 'canvas') return 'canvas'
   if (value === 'gate') return 'gate'
   if (value === 'record') return 'record'
   return 'furniture'
@@ -148,6 +188,11 @@ const hasRecordData = computed(() => {
 
 const hasSuiteTalkData = computed(() => {
   const rows = currentSuiteCache.value?.userMysekaiCharacterTalks
+  return showUserData.value && Array.isArray(rows)
+})
+
+const hasSuiteCanvasData = computed(() => {
+  const rows = currentSuiteCache.value?.userMysekaiCanvases
   return showUserData.value && Array.isArray(rows)
 })
 
@@ -207,7 +252,7 @@ function isFixtureOwnedByAccount(row: FixtureRow): boolean {
 
 const allFurniture = computed(() => {
   return fixtures.value
-    .filter((row) => row.fixtureType !== 'gate')
+    .filter((row) => row.fixtureType !== 'gate' && row.fixtureType !== 'canvas')
     .sort((a, b) => a.id - b.id)
 })
 
@@ -565,6 +610,87 @@ const fixtureMapById = computed(() => {
   return map
 })
 
+const canvasCardMap = computed(() => new Map(canvasCards.value.map(card => [card.id, card])))
+const canvasBonusMap = computed(() => new Map(canvasBonuses.value.map(bonus => [bonus.cardRarityType, bonus])))
+
+const canvasItems = computed<CanvasViewItem[]>(() => {
+  if (!hasSuiteCanvasData.value) return []
+  const rows = currentSuiteCache.value?.userMysekaiCanvases as UserCanvasRow[]
+  const items: CanvasViewItem[] = []
+  for (const raw of rows) {
+    const cardId = Number(raw?.cardId)
+    const fixtureId = Number(raw?.mysekaiFixtureId)
+    const card = canvasCardMap.value.get(cardId)
+    if (!card || !Number.isFinite(fixtureId)) continue
+    items.push({
+      key: `${cardId}-${raw?.isSpecialTraining ? 'trained' : 'normal'}-${fixtureId}`,
+      cardId,
+      isSpecialTraining: raw?.isSpecialTraining === true,
+      quantity: Math.max(0, Number(raw?.quantity) || 0),
+      lastObtainedAt: Number(raw?.lastObtainedAt) || 0,
+      mysekaiFixtureId: fixtureId,
+      card,
+      fixture: fixtureMapById.value.get(fixtureId) || null,
+      bonus: canvasBonusMap.value.get(card.cardRarityType) || null,
+    })
+  }
+  return items
+})
+
+const canvasFixtureOptions = computed(() => {
+  const ids = [...new Set(canvasItems.value.map(item => item.mysekaiFixtureId))].sort((a, b) => a - b)
+  return ids.map(id => ({ id, label: fixtureMapById.value.get(id)?.name || `画布 #${id}` }))
+})
+
+const filteredCanvasItems = computed(() => {
+  const query = canvasSearch.value.trim().toLocaleLowerCase()
+  const rarityOrder: Record<string, number> = {
+    rarity_1: 1,
+    rarity_2: 2,
+    rarity_3: 3,
+    rarity_birthday: 4,
+    rarity_4: 5,
+  }
+  const rows = canvasItems.value.filter(item => {
+    if (selectedCanvasFixtureId.value && item.mysekaiFixtureId !== selectedCanvasFixtureId.value) return false
+    if (selectedCanvasTraining.value === 'normal' && item.isSpecialTraining) return false
+    if (selectedCanvasTraining.value === 'trained' && !item.isSpecialTraining) return false
+    if (!query) return true
+    const character = gameCharacterNameMap.value.get(item.card.characterId) || ''
+    return [item.cardId, item.card.prefix, character, item.fixture?.name]
+      .some(value => String(value || '').toLocaleLowerCase().includes(query))
+  })
+  rows.sort((a, b) => {
+    if (canvasSort.value === 'card') return a.cardId - b.cardId || Number(a.isSpecialTraining) - Number(b.isSpecialTraining)
+    if (canvasSort.value === 'rarity') {
+      return (rarityOrder[b.card.cardRarityType] || 0) - (rarityOrder[a.card.cardRarityType] || 0) || b.lastObtainedAt - a.lastObtainedAt
+    }
+    return b.lastObtainedAt - a.lastObtainedAt || b.cardId - a.cardId
+  })
+  return rows
+})
+
+const canvasSummary = computed(() => {
+  let quantity = 0
+  let trained = 0
+  const cardIds = new Set<number>()
+  const bonusValues: number[] = []
+  for (const item of canvasItems.value) {
+    quantity += item.quantity
+    if (item.isSpecialTraining) trained += 1
+    cardIds.add(item.cardId)
+    if (item.bonus) bonusValues.push(item.bonus.power1BonusFixed)
+  }
+  return {
+    rows: canvasItems.value.length,
+    quantity,
+    trained,
+    cards: cardIds.size,
+    minBonus: bonusValues.length ? Math.min(...bonusValues) : 0,
+    maxBonus: bonusValues.length ? Math.max(...bonusValues) : 0,
+  }
+})
+
 const blueprintByFixtureId = computed(() => {
   const map = new Map<number, BlueprintRow>()
   for (const row of blueprints.value) {
@@ -875,7 +1001,8 @@ watch(selectedUserId, (userId) => {
     Array.isArray(mysekaiCached?.updatedResources?.userMysekaiBlueprints) ||
     Array.isArray(mysekaiCached?.updatedResources?.userMysekaiMusicRecords) ||
     Array.isArray(suiteCached?.userMysekaiGates) ||
-    Array.isArray(suiteCached?.userMysekaiMaterials)
+    Array.isArray(suiteCached?.userMysekaiMaterials) ||
+    Array.isArray(suiteCached?.userMysekaiCanvases)
 
   if (hasLocalData) {
     showUserData.value = true
@@ -914,6 +1041,8 @@ async function loadMasterData() {
       talkCharacterUnitGroupRaw,
       archiveTalkGroupRaw,
       gateCharacterLotteryRaw,
+      canvasCardRaw,
+      canvasBonusRaw,
     ] = await Promise.all([
       getFirstAvailableMaster(['mysekaiFixtures', 'mysekai_fixtures']),
       getFirstAvailableMaster(['mysekaiBlueprints', 'mysekai_blueprints']),
@@ -935,6 +1064,8 @@ async function loadMasterData() {
       getFirstAvailableMaster(['mysekaiGameCharacterUnitGroups', 'mysekai_game_character_unit_groups']),
       getFirstAvailableMaster(['characterArchiveMysekaiCharacterTalkGroups', 'character_archive_mysekai_character_talk_groups']),
       getFirstAvailableMaster(['mysekaiGateCharacterLotteries', 'mysekai_gate_character_lotteries']),
+      getFirstAvailableMaster(['cards']),
+      getFirstAvailableMaster(['cardMysekaiCanvasBonuses', 'card_mysekai_canvas_bonuses']),
     ])
 
     fixtures.value = fixtureRaw.map((row: any) => {
@@ -1090,6 +1221,22 @@ async function loadMasterData() {
     mysekaiGateCharacterLotteries.value = gateCharacterLotteryRaw.map((row: any) => ({
       gameCharacterUnitId: pickNumber(row, ['gameCharacterUnitId']) || 0,
     })).filter((row: MysekaiGateCharacterLotteryRow) => row.gameCharacterUnitId > 0)
+
+    canvasCards.value = canvasCardRaw.map((row: any) => ({
+      id: pickNumber(row, ['id', 'cardId']) || 0,
+      characterId: pickNumber(row, ['characterId']) || 0,
+      cardRarityType: pickString(row, ['cardRarityType']) || '',
+      attr: pickString(row, ['attr']) || '',
+      assetbundleName: pickString(row, ['assetbundleName']) || '',
+      prefix: pickString(row, ['prefix']) || `卡片 #${pickNumber(row, ['id', 'cardId']) || '?'}`,
+    })).filter((row: CanvasCardRow) => row.id > 0 && !!row.assetbundleName)
+
+    canvasBonuses.value = canvasBonusRaw.map((row: any) => ({
+      cardRarityType: pickString(row, ['cardRarityType']) || '',
+      power1BonusFixed: pickNumber(row, ['power1BonusFixed']) || 0,
+      power2BonusFixed: pickNumber(row, ['power2BonusFixed']) || 0,
+      power3BonusFixed: pickNumber(row, ['power3BonusFixed']) || 0,
+    })).filter((row: CanvasBonusRow) => !!row.cardRarityType)
   } catch (e) {
     console.error('加载 MySekai master 数据失败', e)
     errorMsg.value = '加载 master 数据失败，请稍后重试'
@@ -1166,6 +1313,28 @@ function normalizeUnixSeconds(timestamp: unknown): number | null {
     return Math.floor(value / 1000)
   }
   return Math.floor(value)
+}
+
+function formatCanvasDate(timestamp: number): string {
+  if (!timestamp) return '时间未知'
+  return new Date(timestamp).toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+}
+
+function getCanvasFixtureLabel(fixtureId: number): string {
+  const labels: Record<number, string> = {
+    439: '壁挂 S',
+    441: '壁挂 L',
+    442: '桌面 S',
+    444: '桌面 L',
+  }
+  return labels[fixtureId] || fixtureMapById.value.get(fixtureId)?.name || `画布 #${fixtureId}`
 }
 
 function getGateLabel(gateId: number): string {
@@ -1360,6 +1529,7 @@ function closeFixtureDetail() {
         @click="activeTab = tab.key"
       >
         <Sofa v-if="tab.key === 'furniture'" class="w-4 h-4 mr-1.5" />
+        <Images v-else-if="tab.key === 'canvas'" class="w-4 h-4 mr-1.5" />
         <DoorOpen v-else-if="tab.key === 'gate'" class="w-4 h-4 mr-1.5" />
         <Disc3 v-else class="w-4 h-4 mr-1.5" />
         {{ tab.label }}
@@ -1569,6 +1739,52 @@ function closeFixtureDetail() {
             </div>
           </details>
         </div>
+      </div>
+
+      <div v-else-if="activeTab === 'canvas'" class="space-y-4">
+        <div v-if="!showUserData" class="alert">
+          <Images class="w-5 h-5" />
+          <span>开启上方“显示账号状态”后，可查看 Suite API 中的画布收藏。</span>
+        </div>
+        <div v-else-if="!selectedUserId" class="alert alert-warning">
+          请先选择一个账号。
+        </div>
+        <div v-else-if="!hasSuiteCanvasData" class="alert alert-info">
+          当前 Suite API 没有返回画布收藏数据。
+        </div>
+        <template v-else>
+          <div class="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+            <div class="stat rounded-xl bg-base-100 shadow-sm p-3"><div class="stat-title text-xs">画布款式</div><div class="stat-value text-2xl text-primary">{{ canvasSummary.rows }}</div><div class="stat-desc">账号记录</div></div>
+            <div class="stat rounded-xl bg-base-100 shadow-sm p-3"><div class="stat-title text-xs">画布数量</div><div class="stat-value text-2xl">{{ canvasSummary.quantity }}</div><div class="stat-desc">含重复数量</div></div>
+            <div class="stat rounded-xl bg-base-100 shadow-sm p-3"><div class="stat-title text-xs">特训后画布</div><div class="stat-value text-2xl text-secondary">{{ canvasSummary.trained }}</div><div class="stat-desc">普通 {{ canvasSummary.rows - canvasSummary.trained }}</div></div>
+            <div class="stat rounded-xl bg-base-100 shadow-sm p-3"><div class="stat-title text-xs">受加成卡片</div><div class="stat-value text-2xl text-accent">{{ canvasSummary.cards }}</div><div class="stat-desc">对应卡片三项各 +{{ canvasSummary.minBonus }}<template v-if="canvasSummary.maxBonus !== canvasSummary.minBonus">～{{ canvasSummary.maxBonus }}</template></div></div>
+          </div>
+
+          <div class="card bg-base-100 shadow-sm border border-base-200">
+            <div class="card-body p-3 md:p-4 gap-3">
+              <div class="grid sm:grid-cols-2 lg:grid-cols-[minmax(12rem,1fr)_auto_auto_auto] gap-2">
+                <label class="input input-sm input-bordered flex items-center gap-2"><Search class="w-4 h-4 opacity-50" /><input v-model="canvasSearch" class="grow min-w-0" placeholder="搜索卡片、角色或 ID…" /></label>
+                <select v-model.number="selectedCanvasFixtureId" class="select select-sm select-bordered"><option :value="0">全部画布类型</option><option v-for="option in canvasFixtureOptions" :key="option.id" :value="option.id">{{ getCanvasFixtureLabel(option.id) }} · {{ option.label }}</option></select>
+                <select v-model="selectedCanvasTraining" class="select select-sm select-bordered"><option value="all">全部卡面</option><option value="normal">特训前</option><option value="trained">特训后</option></select>
+                <select v-model="canvasSort" class="select select-sm select-bordered"><option value="obtained">最近获得</option><option value="card">卡片 ID</option><option value="rarity">稀有度</option></select>
+              </div>
+              <p class="text-xs text-base-content/50">显示 {{ filteredCanvasItems.length }} / {{ canvasItems.length }} 幅；每幅画布只为对应卡片提供三项固定加成，数值依据卡片稀有度 master。</p>
+            </div>
+          </div>
+
+          <div v-if="filteredCanvasItems.length" class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 gap-2.5">
+            <RouterLink v-for="item in filteredCanvasItems" :key="item.key" :to="`/cards/${item.cardId}`" class="group card bg-base-100 border border-base-200 shadow-sm overflow-hidden hover:border-primary/40 hover:shadow-md transition-all">
+              <div class="relative"><SekaiCard :card="item.card" :trained="item.isSpecialTraining" class="transition-transform group-hover:scale-[1.02]" /><span class="absolute top-1 right-1 badge badge-xs border-0 bg-base-100/90">{{ getCanvasFixtureLabel(item.mysekaiFixtureId) }}</span><span v-if="item.quantity > 1" class="absolute bottom-1 right-1 badge badge-primary badge-xs">×{{ item.quantity }}</span></div>
+              <div class="p-2 space-y-1 min-w-0">
+                <p class="text-xs font-bold truncate" :title="item.card.prefix">{{ item.card.prefix }}</p>
+                <p class="text-[10px] text-base-content/50 truncate">{{ gameCharacterNameMap.get(item.card.characterId) || `角色 #${item.card.characterId}` }} · #{{ item.cardId }}</p>
+                <div class="flex items-center justify-between gap-1 text-[10px]"><span class="badge badge-xs" :class="item.isSpecialTraining ? 'badge-secondary badge-outline' : 'badge-ghost'">{{ item.isSpecialTraining ? '特训后' : '特训前' }}</span><span v-if="item.bonus" class="text-accent font-medium">各 +{{ item.bonus.power1BonusFixed }}</span></div>
+                <p class="text-[9px] text-base-content/35 truncate" :title="formatCanvasDate(item.lastObtainedAt)">{{ formatCanvasDate(item.lastObtainedAt) }}</p>
+              </div>
+            </RouterLink>
+          </div>
+          <div v-else class="card bg-base-100 border border-base-200"><div class="card-body items-center py-12 text-sm text-base-content/55">没有匹配的画布</div></div>
+        </template>
       </div>
 
       <div v-else-if="activeTab === 'gate'" class="space-y-4">
