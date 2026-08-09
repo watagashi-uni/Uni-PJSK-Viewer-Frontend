@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, onMounted, watch, onBeforeUnmount } from 'vue'
-import { ArrowLeftRight, ClipboardCopy, Download, FileImage, Play, Search, Settings2, Sparkles, Trash2, TriangleAlert } from 'lucide-vue-next'
+import { ArrowLeftRight, CircleHelp, ClipboardCopy, Download, ExternalLink, FileImage, Play, Search, Settings2, Sparkles, Trash2, TriangleAlert, X } from 'lucide-vue-next'
 import {
   renderCustomScoreJsonToPng,
   renderCustomScoreJsonToPngWithRust,
@@ -59,6 +59,7 @@ const isDownloadingPng = ref(false)
 const isGeneratingRebase = ref(false)
 const rebaseGenerationError = ref<string | null>(null)
 const rebaseGenerationMessage = ref<string | null>(null)
+const showRebaseHelp = ref(false)
 
 // 可选设置折叠状态（默认折叠，不持久化）
 const showOptionalSettings = ref(false)
@@ -379,7 +380,7 @@ async function generateRebaseFromCurrentChart() {
           playlevel: form.value.playlevel,
         })
       : generateRebaseJsonFromSus(chartText)
-    rebaseGenerationMessage.value = '已根据当前谱面填入，可直接继续修改。'
+    rebaseGenerationMessage.value = '已根据当前谱面填入；只有理解 rebase 时间轴时才需要修改。'
   } catch (rebaseReason) {
     rebaseGenerationError.value = rebaseReason instanceof Error ? rebaseReason.message : '生成 rebase.json 失败'
   } finally {
@@ -1009,7 +1010,12 @@ function clearForm() {
             <div class="collapse-content space-y-6">
               <div class="form-control w-full">
                 <label class="label flex-wrap gap-2">
-                  <span class="label-text font-medium">rebase.json 内容（可选）</span>
+                  <span class="flex items-center gap-1">
+                    <span class="label-text font-medium">rebase.json 内容（可选）</span>
+                    <button type="button" class="btn btn-circle btn-ghost btn-xs" aria-label="查看 rebase.json 说明" title="rebase.json 是什么？" @click="showRebaseHelp = true">
+                      <CircleHelp class="h-4 w-4" />
+                    </button>
+                  </span>
                   <button type="button" class="btn btn-xs btn-outline btn-primary gap-1.5" :disabled="isGeneratingRebase" @click="generateRebaseFromCurrentChart">
                     <span v-if="isGeneratingRebase" class="loading loading-spinner loading-xs"></span>
                     <Sparkles v-else class="w-3.5 h-3.5" />
@@ -1337,6 +1343,49 @@ function clearForm() {
         </div>
       </section>
     </div>
+
+    <dialog class="modal" :class="{ 'modal-open': showRebaseHelp }">
+      <div class="modal-box max-h-[calc(100dvh-1rem)] max-w-2xl overflow-y-auto">
+        <div class="flex items-start gap-3">
+          <CircleHelp class="mt-0.5 h-6 w-6 shrink-0 text-primary" />
+          <div class="min-w-0 flex-1">
+            <h2 class="text-lg font-bold">rebase.json 是什么？</h2>
+            <p class="mt-1 text-sm leading-6 text-base-content/65">它为谱面图提供一条新的时间轴。渲染器会保留原谱面中每个音符的实际时间，再按照这里定义的 BPM、拍号和偏移重新计算音符所在的小节位置。</p>
+          </div>
+          <button type="button" class="btn btn-circle btn-ghost btn-sm shrink-0" aria-label="关闭 rebase.json 说明" @click="showRebaseHelp = false"><X class="h-4 w-4" /></button>
+        </div>
+
+        <div class="mt-5 space-y-4 text-sm leading-6">
+          <div class="rounded-xl bg-base-200/65 p-4">
+            <p class="font-bold">它通常用来做什么</p>
+            <ul class="mt-2 list-disc space-y-1 pl-8 marker:text-primary text-base-content/70 sm:pl-9">
+              <li>补充或调整 BPM、拍号等时间轴事件。</li>
+              <li>用 <code>section</code> 和 <code>sentenceLength</code> 控制段落标记与谱面图分栏。</li>
+              <li>用 <code>offset</code> 处理整张谱面的时间偏移；用 <code>meta</code> 补充标题等资料。</li>
+            </ul>
+          </div>
+
+          <div class="rounded-xl border border-base-300 p-4">
+            <p class="font-bold">“根据当前谱面生成”不会自动修谱</p>
+            <p class="mt-1 text-base-content/70">这个按钮只是提取当前谱面的时间轴事件和资料，生成一个可继续编辑的起点。初始内容通常不会让谱面图自动变得更正确，也不会替你判断应该怎样调整。</p>
+          </div>
+
+          <div class="alert alert-warning items-start">
+            <TriangleAlert class="mt-0.5 h-5 w-5 shrink-0" />
+            <div>
+              <p class="font-bold">不懂这些字段时请直接留空，不要瞎写。</p>
+              <p class="mt-1 text-sm">不要凭感觉修改，也不要把其他歌曲的 rebase 随便复制过来。错误的 BPM、拍号或 offset 会重新映射整张谱面的音符位置，可能造成整体错位。</p>
+            </div>
+          </div>
+
+          <div class="flex flex-col gap-3 rounded-xl border border-base-300 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div class="min-w-0"><p class="font-bold">参考现有 rebase</p><p class="text-xs text-base-content/55">仓库按歌曲 ID 保存示例，只应参考与当前歌曲对应的文件。</p></div>
+            <a href="https://gitlab.com/pjsekai/musics/-/tree/main/rebases" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline btn-primary shrink-0">打开示例仓库 <ExternalLink class="h-3.5 w-3.5" /></a>
+          </div>
+        </div>
+      </div>
+      <form method="dialog" class="modal-backdrop"><button @click="showRebaseHelp = false">关闭</button></form>
+    </dialog>
 
     <footer class="text-center text-sm text-base-content/60 mt-8 space-y-2">
       <a
