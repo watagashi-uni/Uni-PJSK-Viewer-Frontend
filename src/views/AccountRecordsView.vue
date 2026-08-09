@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { CalendarDays, Flower2, History, LayoutGrid, Search, Swords } from 'lucide-vue-next'
+import { CalendarDays, Flower2, History, LayoutGrid, Search, Star, Swords } from 'lucide-vue-next'
 import AccountSelector from '@/components/AccountSelector.vue'
 import SekaiCard from '@/components/SekaiCard.vue'
 import { useAccountStore } from '@/stores/account'
 import { useMasterStore } from '@/stores/master'
 import type { GameCharacterData } from '@/types/master'
 
-type RecordsTab = 'events' | 'world_bloom' | 'rank' | 'decks'
+type RecordsTab = 'events' | 'world_bloom' | 'challenge' | 'rank' | 'decks'
 
 interface EventInfo {
   id: number
@@ -41,6 +41,26 @@ interface UserWorldBloomRow {
   worldBloomChapterPoint?: number
   world_bloom_chapter_point?: number
   rank?: number
+}
+
+interface UserChallengeDeck {
+  characterId: number
+  leader?: number
+  support1?: number
+  support2?: number
+  support3?: number
+  support4?: number
+}
+
+interface UserChallengeResult {
+  characterId: number
+  highScore: number
+}
+
+interface UserChallengeStage {
+  characterId: number
+  rank: number
+  challengeLiveStageStatus: string
 }
 
 interface RankMatchSeason {
@@ -122,6 +142,8 @@ const eventSearch = ref('')
 const rankedOnly = ref(false)
 const bloomSearch = ref('')
 const bloomRankedOnly = ref(false)
+const challengeSearch = ref('')
+const challengeSort = ref<'character' | 'score' | 'stage'>('score')
 
 const selectedUserId = computed({
   get: () => accountStore.currentUserId || '',
@@ -147,6 +169,9 @@ function suiteArray<T>(camelKey: string, snakeKey: string): T[] {
 
 const userEvents = computed(() => suiteArray<UserEventRow>('userEvents', 'user_events'))
 const userWorldBlooms = computed(() => suiteArray<UserWorldBloomRow>('userWorldBlooms', 'user_world_blooms'))
+const userChallengeDecks = computed(() => suiteArray<UserChallengeDeck>('userChallengeLiveSoloDecks', 'user_challenge_live_solo_decks'))
+const userChallengeResults = computed(() => suiteArray<UserChallengeResult>('userChallengeLiveSoloResults', 'user_challenge_live_solo_results'))
+const userChallengeStages = computed(() => suiteArray<UserChallengeStage>('userChallengeLiveSoloStages', 'user_challenge_live_solo_stages'))
 const userRankSeasons = computed(() => suiteArray<UserRankMatchSeason>('userRankMatchSeasons', 'user_rank_match_seasons'))
 const userDecks = computed(() => suiteArray<UserDeckInfo>('userDecks', 'user_decks'))
 const userCards = computed(() => suiteArray<UserCardInfo>('userCards', 'user_cards'))
@@ -220,6 +245,54 @@ const worldBloomSummary = computed(() => {
   }
 })
 
+const challengeResultMap = computed(() => new Map(userChallengeResults.value.map(row => [
+  Number(row.characterId),
+  Number(row.highScore || 0),
+])))
+
+const challengeStageMap = computed(() => {
+  const result = new Map<number, number>()
+  for (const row of userChallengeStages.value) {
+    if (row.challengeLiveStageStatus !== 'complete') continue
+    const id = Number(row.characterId)
+    const rank = Number(row.rank || 0)
+    result.set(id, Math.max(result.get(id) || 0, rank))
+  }
+  return result
+})
+
+const challengeRows = computed(() => {
+  const query = challengeSearch.value.trim().toLocaleLowerCase()
+  return userChallengeDecks.value.map(deck => ({
+    deck,
+    character: characterMap.value.get(Number(deck.characterId)),
+    highScore: challengeResultMap.value.get(Number(deck.characterId)) || 0,
+    maxStage: challengeStageMap.value.get(Number(deck.characterId)) || 0,
+  })).filter(row => !query || [
+    row.deck.characterId,
+    row.character ? getCharacterName(row.character) : '',
+  ].some(value => String(value || '').toLocaleLowerCase().includes(query)))
+    .sort((a, b) => {
+      if (challengeSort.value === 'score') return b.highScore - a.highScore || a.deck.characterId - b.deck.characterId
+      if (challengeSort.value === 'stage') return b.maxStage - a.maxStage || b.highScore - a.highScore
+      return a.deck.characterId - b.deck.characterId
+    })
+})
+
+const challengeSummary = computed(() => {
+  const rows = userChallengeDecks.value.map(deck => ({
+    characterId: Number(deck.characterId),
+    highScore: challengeResultMap.value.get(Number(deck.characterId)) || 0,
+    maxStage: challengeStageMap.value.get(Number(deck.characterId)) || 0,
+  }))
+  return {
+    deckCount: rows.length,
+    totalScore: rows.reduce((sum, row) => sum + row.highScore, 0),
+    bestScore: rows.reduce((best, row) => row.highScore > best.highScore ? row : best, { characterId: 0, highScore: 0, maxStage: 0 }),
+    maxStage: rows.reduce((best, row) => row.maxStage > best.maxStage ? row : best, { characterId: 0, highScore: 0, maxStage: 0 }),
+  }
+})
+
 const rankRows = computed(() => userRankSeasons.value.map(row => {
   const tier = tierMap.value.get(row.rankMatchTierId)
   return {
@@ -243,6 +316,13 @@ const rankSummary = computed(() => {
 
 function deckCards(deck: UserDeckInfo) {
   return [deck.member1, deck.member2, deck.member3, deck.member4, deck.member5]
+    .map(cardId => ({ cardId, master: cardMap.value.get(cardId), user: userCardMap.value.get(cardId) }))
+    .filter(row => row.master)
+}
+
+function challengeDeckCards(deck: UserChallengeDeck) {
+  return [deck.leader, deck.support1, deck.support2, deck.support3, deck.support4]
+    .filter((cardId): cardId is number => Number(cardId) > 0)
     .map(cardId => ({ cardId, master: cardMap.value.get(cardId), user: userCardMap.value.get(cardId) }))
     .filter(row => row.master)
 }
@@ -308,9 +388,10 @@ onMounted(async () => {
     <div v-else-if="loadError" class="alert alert-error">账号记录加载失败：{{ loadError }}</div>
     <div v-else-if="!selectedUserId" class="alert alert-info"><span>请先在个人信息页添加账号并刷新 Suite。</span><RouterLink to="/profile" class="btn btn-sm btn-primary">前往个人信息</RouterLink></div>
     <template v-else>
-      <div class="tabs tabs-boxed bg-base-100 p-1 w-fit shadow-sm">
+      <div class="tabs tabs-boxed bg-base-100 p-1 w-fit max-w-full h-auto flex-wrap shadow-sm">
         <button class="tab gap-2" :class="{ 'tab-active': activeTab === 'events' }" @click="activeTab = 'events'"><CalendarDays class="w-4 h-4" />活动履历</button>
         <button class="tab gap-2" :class="{ 'tab-active': activeTab === 'world_bloom' }" @click="activeTab = 'world_bloom'"><Flower2 class="w-4 h-4" />世界开花</button>
+        <button class="tab gap-2" :class="{ 'tab-active': activeTab === 'challenge' }" @click="activeTab = 'challenge'"><Star class="w-4 h-4" />挑战 Live</button>
         <button class="tab gap-2" :class="{ 'tab-active': activeTab === 'rank' }" @click="activeTab = 'rank'"><Swords class="w-4 h-4" />排位赛</button>
         <button class="tab gap-2" :class="{ 'tab-active': activeTab === 'decks' }" @click="activeTab = 'decks'"><LayoutGrid class="w-4 h-4" />保存卡组</button>
       </div>
@@ -340,6 +421,35 @@ onMounted(async () => {
           </div>
           <div class="card bg-base-100 shadow-sm"><div class="card-body p-4"><div class="flex flex-wrap gap-3"><label class="input input-bordered input-sm flex items-center gap-2 grow max-w-lg"><Search class="w-4 h-4 opacity-50" /><input v-model="bloomSearch" class="grow" placeholder="搜索活动、角色或 ID…" /></label><label class="label cursor-pointer gap-2"><input v-model="bloomRankedOnly" type="checkbox" class="checkbox checkbox-sm checkbox-primary" /><span class="label-text">仅显示有排名</span></label></div></div></div>
           <div class="card bg-base-100 shadow-sm overflow-hidden"><div class="overflow-x-auto"><table class="table table-zebra"><thead><tr><th>活动 / 章节</th><th>角色</th><th>日期</th><th class="text-right">章节点</th><th class="text-right">排名</th></tr></thead><tbody><tr v-for="row in filteredWorldBloomRows" :key="`${row.eventId}_${row.characterId}`"><td><RouterLink v-if="row.event" :to="`/events/${row.eventId}`" class="link link-hover font-medium">{{ row.event.name }}</RouterLink><span v-else class="font-medium">活动 #{{ row.eventId }}</span><p class="text-xs text-base-content/45">#{{ row.eventId }}<template v-if="row.chapter?.chapterNo"> · Chapter {{ row.chapter.chapterNo }}</template></p></td><td><RouterLink v-if="row.character" :to="`/characters/${row.characterId}`" class="link link-hover font-medium">{{ getCharacterName(row.character) }}</RouterLink><span v-else>角色 #{{ row.characterId }}</span></td><td class="text-sm whitespace-nowrap">{{ formatDate(row.chapter?.chapterStartAt || row.event?.startAt) }}</td><td class="text-right font-medium">{{ formatNumber(row.point) }}</td><td class="text-right"><span v-if="row.rank" class="badge badge-secondary badge-outline">#{{ formatNumber(row.rank) }}</span><span v-else class="text-base-content/35">—</span></td></tr></tbody></table></div></div>
+        </template>
+      </section>
+
+      <section v-else-if="activeTab === 'challenge'" class="space-y-4">
+        <div v-if="!userChallengeDecks.length" class="alert alert-info">当前 Suite 没有挑战 Live 卡组数据。</div>
+        <template v-else>
+          <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div class="stat bg-base-100 shadow-sm rounded-xl p-4"><div class="stat-title text-xs">角色卡组</div><div class="stat-value text-2xl">{{ challengeSummary.deckCount }}</div></div>
+            <div class="stat bg-base-100 shadow-sm rounded-xl p-4"><div class="stat-title text-xs">角色最高分合计</div><div class="stat-value text-xl text-primary">{{ formatNumber(challengeSummary.totalScore) }}</div></div>
+            <div class="stat bg-base-100 shadow-sm rounded-xl p-4"><div class="stat-title text-xs">单角色最高分</div><div class="stat-value text-xl">{{ formatNumber(challengeSummary.bestScore.highScore) }}</div><div class="stat-desc">{{ characterMap.get(challengeSummary.bestScore.characterId) ? getCharacterName(characterMap.get(challengeSummary.bestScore.characterId)!) : '-' }}</div></div>
+            <div class="stat bg-base-100 shadow-sm rounded-xl p-4"><div class="stat-title text-xs">最高完成 Stage</div><div class="stat-value text-xl text-secondary">{{ challengeSummary.maxStage.maxStage }}</div><div class="stat-desc">{{ characterMap.get(challengeSummary.maxStage.characterId) ? getCharacterName(characterMap.get(challengeSummary.maxStage.characterId)!) : '-' }}</div></div>
+          </div>
+          <div class="card bg-base-100 shadow-sm"><div class="card-body p-4"><div class="flex flex-wrap gap-3"><label class="input input-bordered input-sm flex items-center gap-2 grow max-w-lg"><Search class="w-4 h-4 opacity-50" /><input v-model="challengeSearch" class="grow" placeholder="搜索角色或 ID…" /></label><select v-model="challengeSort" class="select select-bordered select-sm"><option value="score">最高分排序</option><option value="stage">Stage 排序</option><option value="character">角色顺序</option></select></div></div></div>
+          <div class="grid lg:grid-cols-2 gap-4">
+            <article v-for="row in challengeRows" :key="row.deck.characterId" class="card bg-base-100 shadow-sm border border-base-200">
+              <div class="card-body p-4 gap-3">
+                <div class="flex items-center justify-between gap-3">
+                  <div><RouterLink v-if="row.character" :to="`/characters/${row.deck.characterId}`" class="link link-hover font-bold">{{ getCharacterName(row.character) }}</RouterLink><span v-else class="font-bold">角色 #{{ row.deck.characterId }}</span><p class="text-xs text-base-content/45">挑战 Live 专用卡组</p></div>
+                  <div class="flex gap-2 text-right"><span class="badge badge-primary badge-outline">{{ formatNumber(row.highScore) }} 分</span><span class="badge badge-secondary badge-outline">Stage {{ row.maxStage }}</span></div>
+                </div>
+                <div class="grid grid-cols-5 gap-2">
+                  <div v-for="(card, index) in challengeDeckCards(row.deck)" :key="card.cardId" class="min-w-0">
+                    <RouterLink :to="`/cards/${card.cardId}`" class="block hover:scale-105 transition-transform"><SekaiCard v-if="card.master" :card="card.master" :trained="card.user?.defaultImage === 'special_training'" :master-rank="card.user?.masterRank || 0" /></RouterLink>
+                    <p class="text-[10px] text-center mt-1 truncate"><span v-if="index === 0" class="text-primary font-bold">Leader · </span>Lv.{{ card.user?.level || '?' }}</p>
+                  </div>
+                </div>
+              </div>
+            </article>
+          </div>
         </template>
       </section>
 
