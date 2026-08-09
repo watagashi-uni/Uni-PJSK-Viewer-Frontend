@@ -39,6 +39,30 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '卡片详情' },
     },
     {
+        path: '/stamps',
+        name: 'Stamps',
+        component: () => import('@/views/StampsView.vue'),
+        meta: { title: '表情贴图图鉴' },
+    },
+    {
+        path: '/characters',
+        name: 'Characters',
+        component: () => import('@/views/CharactersView.vue'),
+        meta: { title: '角色图鉴' },
+    },
+    {
+        path: '/characters/:id',
+        name: 'CharacterDetail',
+        component: () => import('@/views/CharactersView.vue'),
+        meta: { title: '角色资料' },
+    },
+    {
+        path: '/honors',
+        name: 'Honors',
+        component: () => import('@/views/HonorsView.vue'),
+        meta: { title: '称号图鉴' },
+    },
+    {
         path: '/card-collection',
         name: 'CardCollection',
         component: () => import('@/views/CardCollectionView.vue'),
