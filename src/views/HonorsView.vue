@@ -87,7 +87,7 @@ const loadError = ref('')
 const normalSearch = ref('')
 const selectedHonorType = ref('')
 const selectedRarity = ref('')
-const selectedEventGroup = ref(0)
+const selectedHonorGroup = ref(0)
 const normalPage = ref(1)
 const selectedHonor = ref<HonorData | null>(null)
 const selectedHonorLevel = ref(1)
@@ -168,9 +168,18 @@ const wordsByBondsGroup = computed(() => {
   return map
 })
 
-const eventGroupOptions = computed(() => honorGroups.value
-  .filter(group => group.honorType === 'event')
-  .sort((a, b) => b.id - a.id))
+const honorGroupCountMap = computed(() => {
+  const map = new Map<number, number>()
+  for (const honor of honors.value) map.set(honor.groupId, (map.get(honor.groupId) || 0) + 1)
+  return map
+})
+
+const honorGroupOptions = computed(() => honorGroups.value
+  .filter(group => !selectedHonorType.value || group.honorType === selectedHonorType.value)
+  .filter(group => honorGroupCountMap.value.has(group.id))
+  .sort((a, b) => selectedHonorType.value === 'event'
+    ? b.id - a.id
+    : a.honorType.localeCompare(b.honorType) || a.id - b.id))
 
 const filteredHonors = computed(() => {
   const query = normalSearch.value.trim().toLocaleLowerCase()
@@ -180,7 +189,7 @@ const filteredHonors = computed(() => {
       const group = honorGroupMap.value.get(honor.groupId)
       if (selectedHonorType.value && group?.honorType !== selectedHonorType.value) return false
       if (selectedRarity.value && honor.honorRarity !== selectedRarity.value) return false
-      if (selectedEventGroup.value && honor.groupId !== selectedEventGroup.value) return false
+      if (selectedHonorGroup.value && honor.groupId !== selectedHonorGroup.value) return false
       if (!query) return true
       return [honor.id, honor.name, group?.name, group?.pronunciation, ...honor.levels.map(level => level.description)]
         .some(value => String(value || '').toLocaleLowerCase().includes(query))
@@ -225,7 +234,7 @@ const selectedBondsWords = computed(() => selectedBondsHonor.value
   ? wordsByBondsGroup.value.get(selectedBondsHonor.value.bondsGroupId) || []
   : [])
 
-watch([normalSearch, selectedHonorType, selectedRarity, selectedEventGroup, normalOwnedOnly], () => { normalPage.value = 1 })
+watch([normalSearch, selectedHonorType, selectedRarity, selectedHonorGroup, normalOwnedOnly], () => { normalPage.value = 1 })
 watch([bondsSearch, selectedBondsCharacter, selectedBondsRarity, bondsOwnedOnly], () => { bondsPage.value = 1 })
 watch(selectedUserId, () => {
   normalPage.value = 1
@@ -235,9 +244,7 @@ watch(hasNormalOwnership, value => { if (!value) normalOwnedOnly.value = false }
 watch(hasBondsOwnership, value => { if (!value) bondsOwnedOnly.value = false })
 watch(normalTotalPages, total => { normalPage.value = Math.min(normalPage.value, total) })
 watch(bondsTotalPages, total => { bondsPage.value = Math.min(bondsPage.value, total) })
-watch(selectedHonorType, type => {
-  if (type !== 'event') selectedEventGroup.value = 0
-})
+watch(selectedHonorType, () => { selectedHonorGroup.value = 0 })
 
 function setTab(tab: HonorTab) {
   const query = { ...route.query }
@@ -315,7 +322,7 @@ onMounted(async () => {
 
 <template>
   <div class="mx-auto max-w-7xl min-w-0 space-y-6">
-    <PageHeader title="称号图鉴" description="浏览普通、活动排名与角色羁绊称号，并结合账号查看持有状态。">
+    <PageHeader title="称号图鉴" description="浏览普通、活动排名与角色牵绊称号，并结合账号查看持有状态。">
       <template #icon><Trophy class="w-8 h-8 text-warning" /></template>
       <template v-if="accountStore.accounts.length" #actions><div class="w-full min-w-0 sm:w-56"><AccountSelector v-model="selectedUserId" /></div></template>
     </PageHeader>
@@ -325,7 +332,7 @@ onMounted(async () => {
         <Trophy class="w-4 h-4" /> 普通称号
       </button>
       <button role="tab" class="tab gap-2" :class="{ 'tab-active': activeTab === 'bonds' }" @click="setTab('bonds')">
-        <Users class="w-4 h-4" /> 羁绊称号
+        <Users class="w-4 h-4" /> 牵绊称号
       </button>
     </div>
 
@@ -351,9 +358,9 @@ onMounted(async () => {
               <option value="">全部稀有度</option>
               <option v-for="option in rarityOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
             </select>
-            <select v-model.number="selectedEventGroup" class="select select-bordered w-full min-w-0 max-w-full" :disabled="selectedHonorType !== 'event'">
-              <option :value="0">全部活动</option>
-              <option v-for="group in eventGroupOptions" :key="group.id" :value="group.id">#{{ group.id }} {{ group.name }}</option>
+            <select v-model.number="selectedHonorGroup" class="select select-bordered w-full min-w-0 max-w-full" :disabled="!selectedHonorType">
+              <option :value="0">{{ selectedHonorType ? '全部大组' : '请先选择类型' }}</option>
+              <option v-for="group in honorGroupOptions" :key="group.id" :value="group.id">{{ group.name }}（{{ honorGroupCountMap.get(group.id) || 0 }}）</option>
             </select>
           </div>
           <div class="flex flex-wrap items-center gap-4">
@@ -402,7 +409,7 @@ onMounted(async () => {
           <div class="grid min-w-0 grid-cols-1 md:grid-cols-[minmax(240px,1fr)_220px_180px] gap-3">
             <label class="input input-bordered flex min-w-0 max-w-full items-center gap-2">
               <Search class="w-4 h-4 opacity-50" />
-              <input v-model="bondsSearch" class="grow min-w-0" placeholder="搜索角色、羁绊文字或 ID…" />
+              <input v-model="bondsSearch" class="grow min-w-0" placeholder="搜索角色、牵绊文字或 ID…" />
               <button v-if="bondsSearch" class="btn btn-ghost btn-xs btn-circle" aria-label="清空" @click="bondsSearch = ''"><X class="w-3 h-3" /></button>
             </label>
             <select v-model.number="selectedBondsCharacter" class="select select-bordered w-full min-w-0 max-w-full">
@@ -415,7 +422,7 @@ onMounted(async () => {
             </select>
           </div>
           <div class="flex flex-wrap items-center gap-4">
-            <p class="text-sm text-base-content/55">找到 {{ filteredBondsHonors.length }} 个羁绊称号<span v-if="hasBondsOwnership"> · 资料库可匹配 {{ visibleBondsOwnedCount }} / {{ bondsHonors.length }} 个已拥有称号<span v-if="visibleBondsOwnedCount !== bondsOwnedMap.size">（账号记录 {{ bondsOwnedMap.size }}）</span></span></p>
+            <p class="text-sm text-base-content/55">找到 {{ filteredBondsHonors.length }} 个牵绊称号<span v-if="hasBondsOwnership"> · 资料库可匹配 {{ visibleBondsOwnedCount }} / {{ bondsHonors.length }} 个已拥有称号<span v-if="visibleBondsOwnedCount !== bondsOwnedMap.size">（账号记录 {{ bondsOwnedMap.size }}）</span></span></p>
             <label class="label cursor-pointer gap-2 ml-auto"><input v-model="bondsOwnedOnly" type="checkbox" class="checkbox checkbox-sm checkbox-secondary" :disabled="!hasBondsOwnership" /><span class="label-text">仅看已拥有</span></label>
           </div>
         </div>
@@ -450,7 +457,7 @@ onMounted(async () => {
           </div>
         </button>
       </div>
-      <div v-else class="hero min-h-56 bg-base-100 rounded-xl border border-base-200"><p class="font-bold">没有匹配的羁绊称号</p></div>
+      <div v-else class="hero min-h-56 bg-base-100 rounded-xl border border-base-200"><p class="font-bold">没有匹配的牵绊称号</p></div>
 
       <Pagination
         v-if="bondsTotalPages > 1"
@@ -481,7 +488,7 @@ onMounted(async () => {
       <div v-if="selectedBondsHonor" class="modal-box max-w-2xl">
         <button class="btn btn-sm btn-circle btn-ghost absolute right-3 top-3" aria-label="关闭" @click="selectedBondsHonor = null"><X class="w-4 h-4" /></button>
         <h2 class="font-bold text-xl pr-10">{{ getCharacterNameByUnitId(selectedBondsHonor.gameCharacterUnitId1) }} × {{ getCharacterNameByUnitId(selectedBondsHonor.gameCharacterUnitId2) }}</h2>
-        <p class="text-sm text-base-content/55 mt-1">羁绊称号 #{{ selectedBondsHonor.id }}<span v-if="bondsOwnedMap.has(selectedBondsHonor.id)" class="text-success font-medium"> · 已拥有 Lv.{{ bondsOwnedMap.get(selectedBondsHonor.id) }}</span></p>
+        <p class="text-sm text-base-content/55 mt-1">牵绊称号 #{{ selectedBondsHonor.id }}<span v-if="bondsOwnedMap.has(selectedBondsHonor.id)" class="text-success font-medium"> · 已拥有 Lv.{{ bondsOwnedMap.get(selectedBondsHonor.id) }}</span></p>
         <div class="bg-base-200 rounded-xl p-4 my-5">
           <div class="mx-auto w-full min-w-0 max-w-[340px]">
             <SekaiHonorBonds
