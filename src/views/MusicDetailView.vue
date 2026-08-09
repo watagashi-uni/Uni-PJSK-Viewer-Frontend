@@ -10,7 +10,7 @@ import {
   Play, Pause, BarChart2, Eye, Download, ChevronLeft, ChevronDown,
   Disc3, Sparkles, Mic, Volume2, VolumeX, SkipBack, SkipForward,
   PlayCircle, Zap, X, FileImage, Loader2, ZoomIn, ZoomOut, Maximize,
-  Activity, CheckCircle2, LockKeyhole
+  Activity, CheckCircle2, LockKeyhole, ExternalLink
 } from 'lucide-vue-next'
 import AssetImage from '@/components/AssetImage.vue'
 import { alignFurigana } from '@/utils/furigana'
@@ -31,6 +31,7 @@ interface Music {
   categories: string[]
   assetbundleName: string
   releaseConditionId: number
+  musicCollaborationId?: number
 }
 
 interface MusicDifficulty {
@@ -79,6 +80,17 @@ interface ReleaseCondition {
   releaseConditionType: string
 }
 
+interface MusicCollaboration {
+  id: number
+  label: string
+}
+
+interface MusicOriginal {
+  id: number
+  musicId: number
+  videoLink: string
+}
+
 type PreviewPayload = {
   sus: string
   bgm?: string
@@ -108,6 +120,8 @@ const characters = ref<Character[]>([])
 const outsideCharacters = ref<OutsideCharacter[]>([])
 const limitedMusics = ref<LimitedTimeMusic[]>([])
 const releaseConditions = ref<ReleaseCondition[]>([])
+const musicCollaborations = ref<MusicCollaboration[]>([])
+const musicOriginals = ref<MusicOriginal[]>([])
 const isLoading = ref(true)
 
 const assetsHost = computed(() => settingsStore.assetsHost)
@@ -927,6 +941,8 @@ async function loadData() {
       outsideCharactersData,
       limitedData,
       releaseConditionData,
+      musicCollaborationData,
+      musicOriginalData,
     ] = await Promise.all([
       masterStore.getMaster<Music>('musics'),
       masterStore.getMaster<MusicDifficulty>('musicDifficulties'),
@@ -937,6 +953,8 @@ async function loadData() {
       masterStore.getMaster<OutsideCharacter>('outsideCharacters'),
       masterStore.getMaster<LimitedTimeMusic>('limitedTimeMusics'),
       masterStore.getMaster<ReleaseCondition>('releaseConditions'),
+      masterStore.getMaster<MusicCollaboration>('musicCollaborations'),
+      masterStore.getMaster<MusicOriginal>('musicOriginals'),
     ])
     
     // 设置角色数据
@@ -944,6 +962,8 @@ async function loadData() {
     outsideCharacters.value = outsideCharactersData
     limitedMusics.value = limitedData
     releaseConditions.value = releaseConditionData
+    musicCollaborations.value = musicCollaborationData
+    musicOriginals.value = musicOriginalData
 
     // 获取歌曲数据
     music.value = musicsData.find(m => m.id === musicId.value) || null
@@ -1025,6 +1045,17 @@ const musicReleaseConditionText = computed(() => {
   if (id === 5) return '音乐商店购买'
   if (id === 10) return '礼物箱收取'
   return releaseConditionMap.value[id]?.sentence || `#${id}`
+})
+
+const musicCollaborationLabel = computed(() => {
+  const id = Number(music.value?.musicCollaborationId)
+  if (!Number.isFinite(id)) return ''
+  return musicCollaborations.value.find(collaboration => collaboration.id === id)?.label || ''
+})
+
+const musicOriginalLink = computed(() => {
+  const link = musicOriginals.value.find(original => original.musicId === musicId.value)?.videoLink || ''
+  return /^https?:\/\//i.test(link) ? link : ''
 })
 
 const musicOwnershipLabel = computed(() => {
@@ -1190,6 +1221,7 @@ const isExpired = computed(() => {
             >
               贡献翻译 →
             </a>
+            <div v-if="musicCollaborationLabel" class="badge badge-secondary badge-outline mt-3 max-w-full h-auto py-1 text-center whitespace-normal">{{ musicCollaborationLabel }}</div>
           </div>
           
           <div class="mt-6 w-full space-y-3 px-4">
@@ -1256,6 +1288,12 @@ const isExpired = computed(() => {
             <div class="flex justify-between items-center gap-3 text-sm border-b border-base-200 pb-2">
               <span class="text-base-content/60 shrink-0">乐曲获取方式</span>
               <span class="font-medium text-right select-all">{{ musicReleaseConditionText }}</span>
+            </div>
+            <div v-if="musicOriginalLink" class="flex justify-between items-center gap-3 text-sm border-b border-base-200 pb-2">
+              <span class="text-base-content/60 shrink-0">原曲链接</span>
+              <a :href="musicOriginalLink" target="_blank" rel="noopener noreferrer" class="link link-primary inline-flex items-center gap-1 font-medium">
+                打开官方收录链接 <ExternalLink class="w-3.5 h-3.5" />
+              </a>
             </div>
             <div class="flex justify-between items-center text-sm border-b border-base-200 pb-2">
               <span class="text-base-content/60">ID</span>
