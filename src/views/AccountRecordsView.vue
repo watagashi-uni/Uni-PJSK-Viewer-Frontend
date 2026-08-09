@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { CalendarDays, History, LayoutGrid, Search, Swords } from 'lucide-vue-next'
+import { CalendarDays, Flower2, History, LayoutGrid, Search, Swords } from 'lucide-vue-next'
 import AccountSelector from '@/components/AccountSelector.vue'
 import SekaiCard from '@/components/SekaiCard.vue'
 import { useAccountStore } from '@/stores/account'
 import { useMasterStore } from '@/stores/master'
+import type { GameCharacterData } from '@/types/master'
 
-type RecordsTab = 'events' | 'rank' | 'decks'
+type RecordsTab = 'events' | 'world_bloom' | 'rank' | 'decks'
 
 interface EventInfo {
   id: number
@@ -22,6 +23,24 @@ interface UserEventRow {
   event_point?: number
   rank?: number
   rankingRewardReceivedAt?: number
+}
+
+interface WorldBloomInfo {
+  eventId: number
+  gameCharacterId: number
+  chapterNo: number
+  chapterStartAt: number
+  aggregateAt: number
+}
+
+interface UserWorldBloomRow {
+  eventId?: number
+  event_id?: number
+  gameCharacterId?: number
+  game_character_id?: number
+  worldBloomChapterPoint?: number
+  world_bloom_chapter_point?: number
+  rank?: number
 }
 
 interface RankMatchSeason {
@@ -94,11 +113,15 @@ const rankMatchTiers = ref<RankMatchTier[]>([])
 const rankMatchGrades = ref<NamedMaster[]>([])
 const rankMatchClasses = ref<NamedMaster[]>([])
 const cards = ref<CardInfo[]>([])
+const worldBlooms = ref<WorldBloomInfo[]>([])
+const characters = ref<GameCharacterData[]>([])
 const isLoading = ref(true)
 const loadError = ref('')
 const activeTab = ref<RecordsTab>('events')
 const eventSearch = ref('')
 const rankedOnly = ref(false)
+const bloomSearch = ref('')
+const bloomRankedOnly = ref(false)
 
 const selectedUserId = computed({
   get: () => accountStore.currentUserId || '',
@@ -111,6 +134,11 @@ const tierMap = computed(() => new Map(rankMatchTiers.value.map(tier => [tier.id
 const gradeMap = computed(() => new Map(rankMatchGrades.value.map(grade => [grade.id, grade])))
 const classMap = computed(() => new Map(rankMatchClasses.value.map(item => [item.id, item])))
 const cardMap = computed(() => new Map(cards.value.map(card => [card.id, card])))
+const characterMap = computed(() => new Map(characters.value.map(character => [character.id, character])))
+const worldBloomMap = computed(() => new Map(worldBlooms.value.map(row => [
+  `${row.eventId}_${row.gameCharacterId}`,
+  row,
+])))
 
 function suiteArray<T>(camelKey: string, snakeKey: string): T[] {
   const value = suite.value?.[camelKey] ?? suite.value?.[snakeKey]
@@ -118,6 +146,7 @@ function suiteArray<T>(camelKey: string, snakeKey: string): T[] {
 }
 
 const userEvents = computed(() => suiteArray<UserEventRow>('userEvents', 'user_events'))
+const userWorldBlooms = computed(() => suiteArray<UserWorldBloomRow>('userWorldBlooms', 'user_world_blooms'))
 const userRankSeasons = computed(() => suiteArray<UserRankMatchSeason>('userRankMatchSeasons', 'user_rank_match_seasons'))
 const userDecks = computed(() => suiteArray<UserDeckInfo>('userDecks', 'user_decks'))
 const userCards = computed(() => suiteArray<UserCardInfo>('userCards', 'user_cards'))
@@ -147,6 +176,45 @@ const eventSummary = computed(() => {
   return {
     count: eventRows.value.length,
     totalPoint: eventRows.value.reduce((sum, row) => sum + row.point, 0),
+    maxPoint,
+    bestRank,
+  }
+})
+
+const worldBloomRows = computed(() => userWorldBlooms.value.map(row => {
+  const eventId = Number(row.eventId ?? row.event_id)
+  const characterId = Number(row.gameCharacterId ?? row.game_character_id)
+  return {
+    eventId,
+    characterId,
+    event: eventMap.value.get(eventId),
+    character: characterMap.value.get(characterId),
+    chapter: worldBloomMap.value.get(`${eventId}_${characterId}`),
+    point: Number(row.worldBloomChapterPoint ?? row.world_bloom_chapter_point ?? 0),
+    rank: Number(row.rank || 0),
+  }
+}).sort((a, b) => b.eventId - a.eventId || (b.chapter?.chapterNo || 0) - (a.chapter?.chapterNo || 0)))
+
+const filteredWorldBloomRows = computed(() => {
+  const query = bloomSearch.value.trim().toLocaleLowerCase()
+  return worldBloomRows.value
+    .filter(row => !bloomRankedOnly.value || row.rank > 0)
+    .filter(row => !query || [
+      row.eventId,
+      row.event?.name,
+      row.characterId,
+      row.character ? getCharacterName(row.character) : '',
+    ].some(value => String(value || '').toLocaleLowerCase().includes(query)))
+})
+
+const worldBloomSummary = computed(() => {
+  const ranked = worldBloomRows.value.filter(row => row.rank > 0)
+  const maxPoint = worldBloomRows.value.reduce((best, row) => row.point > best.point ? row : best, { point: 0 } as typeof worldBloomRows.value[number])
+  const bestRank = ranked.reduce((best, row) => !best || row.rank < best.rank ? row : best, null as typeof ranked[number] | null)
+  return {
+    count: worldBloomRows.value.length,
+    eventCount: new Set(worldBloomRows.value.map(row => row.eventId)).size,
+    totalPoint: worldBloomRows.value.reduce((sum, row) => sum + row.point, 0),
     maxPoint,
     bestRank,
   }
@@ -184,6 +252,10 @@ function tierLabel(row: typeof rankRows.value[number]): string {
   return `${row.grade?.name || ''} ${row.rankClass?.name || ''}`.trim()
 }
 
+function getCharacterName(character: GameCharacterData): string {
+  return `${character.firstName || ''}${character.givenName}`
+}
+
 function formatNumber(value: number): string {
   return new Intl.NumberFormat('zh-CN').format(value)
 }
@@ -198,13 +270,15 @@ function formatDate(value?: number): string {
 
 onMounted(async () => {
   try {
-    const [eventData, seasonData, tierData, gradeData, classData, cardData] = await Promise.all([
+    const [eventData, seasonData, tierData, gradeData, classData, cardData, bloomData, characterData] = await Promise.all([
       masterStore.getMaster<EventInfo>('events'),
       masterStore.getMaster<RankMatchSeason>('rankMatchSeasons'),
       masterStore.getMaster<RankMatchTier>('rankMatchTiers'),
       masterStore.getMaster<NamedMaster>('rankMatchGrades'),
       masterStore.getMaster<NamedMaster>('rankMatchClasses'),
       masterStore.getMaster<CardInfo>('cards'),
+      masterStore.getMaster<WorldBloomInfo>('worldBlooms'),
+      masterStore.getMaster<GameCharacterData>('gameCharacters'),
     ])
     events.value = eventData
     rankMatchSeasons.value = seasonData
@@ -212,6 +286,8 @@ onMounted(async () => {
     rankMatchGrades.value = gradeData
     rankMatchClasses.value = classData
     cards.value = cardData
+    worldBlooms.value = bloomData
+    characters.value = characterData
   } catch (error) {
     console.error('加载账号记录数据失败:', error)
     loadError.value = error instanceof Error ? error.message : 'Master 数据加载失败'
@@ -224,7 +300,7 @@ onMounted(async () => {
 <template>
   <div class="max-w-7xl mx-auto space-y-6">
     <header class="flex flex-wrap items-start justify-between gap-4">
-      <div><h1 class="text-3xl font-bold flex items-center gap-3"><History class="w-8 h-8 text-primary" />账号记录</h1><p class="text-sm text-base-content/60 mt-2">查看 Suite 中的活动履历、排位赛季成绩和全部保存卡组。</p></div>
+      <div><h1 class="text-3xl font-bold flex items-center gap-3"><History class="w-8 h-8 text-primary" />账号记录</h1><p class="text-sm text-base-content/60 mt-2">查看 Suite 中的活动、世界开花章节、排位赛季成绩和全部保存卡组。</p></div>
       <div class="min-w-56"><AccountSelector v-if="accountStore.accounts.length" v-model="selectedUserId" /></div>
     </header>
 
@@ -234,6 +310,7 @@ onMounted(async () => {
     <template v-else>
       <div class="tabs tabs-boxed bg-base-100 p-1 w-fit shadow-sm">
         <button class="tab gap-2" :class="{ 'tab-active': activeTab === 'events' }" @click="activeTab = 'events'"><CalendarDays class="w-4 h-4" />活动履历</button>
+        <button class="tab gap-2" :class="{ 'tab-active': activeTab === 'world_bloom' }" @click="activeTab = 'world_bloom'"><Flower2 class="w-4 h-4" />世界开花</button>
         <button class="tab gap-2" :class="{ 'tab-active': activeTab === 'rank' }" @click="activeTab = 'rank'"><Swords class="w-4 h-4" />排位赛</button>
         <button class="tab gap-2" :class="{ 'tab-active': activeTab === 'decks' }" @click="activeTab = 'decks'"><LayoutGrid class="w-4 h-4" />保存卡组</button>
       </div>
@@ -249,6 +326,20 @@ onMounted(async () => {
           </div>
           <div class="card bg-base-100 shadow-sm"><div class="card-body p-4"><div class="flex flex-wrap gap-3"><label class="input input-bordered input-sm flex items-center gap-2 grow max-w-lg"><Search class="w-4 h-4 opacity-50" /><input v-model="eventSearch" class="grow" placeholder="搜索活动名称或 ID…" /></label><label class="label cursor-pointer gap-2"><input v-model="rankedOnly" type="checkbox" class="checkbox checkbox-sm checkbox-primary" /><span class="label-text">仅显示有排名</span></label></div></div></div>
           <div class="card bg-base-100 shadow-sm overflow-hidden"><div class="overflow-x-auto"><table class="table table-zebra"><thead><tr><th>活动</th><th>日期</th><th class="text-right">活动点</th><th class="text-right">排名</th></tr></thead><tbody><tr v-for="row in filteredEventRows" :key="row.id"><td><RouterLink v-if="row.master" :to="`/events/${row.id}`" class="link link-hover font-medium">{{ row.master.name }}</RouterLink><span v-else class="font-medium">活动 #{{ row.id }}</span><p class="text-xs text-base-content/45">#{{ row.id }}</p></td><td class="text-sm whitespace-nowrap">{{ formatDate(row.master?.startAt) }}</td><td class="text-right font-medium">{{ formatNumber(row.point) }}</td><td class="text-right"><span v-if="row.rank" class="badge badge-primary badge-outline">#{{ formatNumber(row.rank) }}</span><span v-else class="text-base-content/35">—</span></td></tr></tbody></table></div></div>
+        </template>
+      </section>
+
+      <section v-else-if="activeTab === 'world_bloom'" class="space-y-4">
+        <div v-if="!userWorldBlooms.length" class="alert alert-info">当前 Suite 没有世界开花章节履历数据。</div>
+        <template v-else>
+          <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div class="stat bg-base-100 shadow-sm rounded-xl p-4"><div class="stat-title text-xs">参与章节 / 活动</div><div class="stat-value text-2xl">{{ worldBloomSummary.count }} / {{ worldBloomSummary.eventCount }}</div></div>
+            <div class="stat bg-base-100 shadow-sm rounded-xl p-4"><div class="stat-title text-xs">累计章节点</div><div class="stat-value text-2xl text-primary">{{ formatNumber(worldBloomSummary.totalPoint) }}</div></div>
+            <div class="stat bg-base-100 shadow-sm rounded-xl p-4"><div class="stat-title text-xs">单章最高</div><div class="stat-value text-xl">{{ formatNumber(worldBloomSummary.maxPoint.point) }}</div><div class="stat-desc">{{ worldBloomSummary.maxPoint.character ? getCharacterName(worldBloomSummary.maxPoint.character) : '-' }}</div></div>
+            <div class="stat bg-base-100 shadow-sm rounded-xl p-4"><div class="stat-title text-xs">历史最佳章节排名</div><div class="stat-value text-xl text-secondary">#{{ worldBloomSummary.bestRank ? formatNumber(worldBloomSummary.bestRank.rank) : '-' }}</div><div class="stat-desc">{{ worldBloomSummary.bestRank?.character ? getCharacterName(worldBloomSummary.bestRank.character) : '' }}</div></div>
+          </div>
+          <div class="card bg-base-100 shadow-sm"><div class="card-body p-4"><div class="flex flex-wrap gap-3"><label class="input input-bordered input-sm flex items-center gap-2 grow max-w-lg"><Search class="w-4 h-4 opacity-50" /><input v-model="bloomSearch" class="grow" placeholder="搜索活动、角色或 ID…" /></label><label class="label cursor-pointer gap-2"><input v-model="bloomRankedOnly" type="checkbox" class="checkbox checkbox-sm checkbox-primary" /><span class="label-text">仅显示有排名</span></label></div></div></div>
+          <div class="card bg-base-100 shadow-sm overflow-hidden"><div class="overflow-x-auto"><table class="table table-zebra"><thead><tr><th>活动 / 章节</th><th>角色</th><th>日期</th><th class="text-right">章节点</th><th class="text-right">排名</th></tr></thead><tbody><tr v-for="row in filteredWorldBloomRows" :key="`${row.eventId}_${row.characterId}`"><td><RouterLink v-if="row.event" :to="`/events/${row.eventId}`" class="link link-hover font-medium">{{ row.event.name }}</RouterLink><span v-else class="font-medium">活动 #{{ row.eventId }}</span><p class="text-xs text-base-content/45">#{{ row.eventId }}<template v-if="row.chapter?.chapterNo"> · Chapter {{ row.chapter.chapterNo }}</template></p></td><td><RouterLink v-if="row.character" :to="`/characters/${row.characterId}`" class="link link-hover font-medium">{{ getCharacterName(row.character) }}</RouterLink><span v-else>角色 #{{ row.characterId }}</span></td><td class="text-sm whitespace-nowrap">{{ formatDate(row.chapter?.chapterStartAt || row.event?.startAt) }}</td><td class="text-right font-medium">{{ formatNumber(row.point) }}</td><td class="text-right"><span v-if="row.rank" class="badge badge-secondary badge-outline">#{{ formatNumber(row.rank) }}</span><span v-else class="text-base-content/35">—</span></td></tr></tbody></table></div></div>
         </template>
       </section>
 
