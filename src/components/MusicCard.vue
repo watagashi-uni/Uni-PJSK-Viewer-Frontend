@@ -20,6 +20,7 @@ const props = defineProps<{
   assetbundleName: string
   difficulties: Record<string, number>
   categories: string[]
+  collaborationLabel?: string
   ownershipStatus?: 'owned' | 'locked'
   ownershipLabel?: string
   achievementClaimed?: number
@@ -165,6 +166,10 @@ function selectArtist() {
           <ListFilter class="h-3 w-3 shrink-0" />
           <span class="truncate">{{ composer }}</span>
         </button>
+      </div>
+
+      <div v-if="collaborationLabel" class="-mt-1 flex min-w-0">
+        <span class="badge badge-xs badge-secondary badge-outline max-w-full truncate" :title="collaborationLabel">{{ collaborationLabel }}</span>
       </div>
 
       <div v-if="ownershipStatus || achievementClaimed !== undefined" class="flex items-center justify-between gap-2 text-[10px]">

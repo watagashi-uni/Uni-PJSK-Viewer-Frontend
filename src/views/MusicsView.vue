@@ -12,6 +12,7 @@ interface StoredMusicsViewState {
   selectedDiffType: string
   isFilterPanelOpen: boolean
   selectedMusicTags: string[]
+  selectedCollaborationIds: number[]
   selectedMvTypes: string[]
   selectedVocalCharacters: string[]
   selectedReleaseConditionIds: number[]
@@ -37,6 +38,7 @@ function loadStoredMusicsViewState(): StoredMusicsViewState | null {
       selectedDiffType: typeof parsed.selectedDiffType === 'string' ? parsed.selectedDiffType : 'master',
       isFilterPanelOpen: parsed.isFilterPanelOpen === true,
       selectedMusicTags: Array.isArray(parsed.selectedMusicTags) ? parsed.selectedMusicTags : [],
+      selectedCollaborationIds: Array.isArray(parsed.selectedCollaborationIds) ? parsed.selectedCollaborationIds : [],
       selectedMvTypes: Array.isArray(parsed.selectedMvTypes) ? parsed.selectedMvTypes : [],
       selectedVocalCharacters: Array.isArray(parsed.selectedVocalCharacters) ? parsed.selectedVocalCharacters : [],
       selectedReleaseConditionIds: Array.isArray(parsed.selectedReleaseConditionIds) ? parsed.selectedReleaseConditionIds : [],
@@ -77,6 +79,7 @@ interface Music {
   pronunciation: string
   categories: string[]
   releaseConditionId: number
+  musicCollaborationId?: number
 }
 
 interface MusicDifficulty {
@@ -99,6 +102,11 @@ interface MusicTag {
   musicId: number
   musicTag: string
   seq: number
+}
+
+interface MusicCollaboration {
+  id: number
+  label: string
 }
 
 interface MusicVocal {
@@ -175,6 +183,7 @@ const musics = ref<Music[]>([])
 const musicDifficulties = ref<MusicDifficulty[]>([])
 const limitedMusics = ref<LimitedTimeMusic[]>([])
 const musicTags = ref<MusicTag[]>([])
+const musicCollaborations = ref<MusicCollaboration[]>([])
 const musicVocals = ref<MusicVocal[]>([])
 const characters = ref<Character[]>([])
 const gameCharacterUnits = ref<GameCharacterUnit[]>([])
@@ -201,6 +210,7 @@ const sortOrder = ref<'asc' | 'desc'>(restored?.sortOrder ?? 'desc')
 const selectedDiffType = ref<string>(restored?.selectedDiffType ?? 'master')
 const isFilterPanelOpen = ref(restored?.isFilterPanelOpen ?? false)
 const selectedMusicTags = ref<Set<string>>(new Set(restored?.selectedMusicTags ?? []))
+const selectedCollaborationIds = ref<Set<number>>(new Set(restored?.selectedCollaborationIds ?? []))
 const selectedMvTypes = ref<Set<string>>(new Set(restored?.selectedMvTypes ?? []))
 const selectedVocalCharacters = ref<Set<string>>(new Set(restored?.selectedVocalCharacters ?? []))
 const selectedReleaseConditionIds = ref<Set<number>>(new Set(restored?.selectedReleaseConditionIds ?? []))
@@ -538,6 +548,10 @@ const musicTagMap = computed(() => {
   return map
 })
 
+const musicCollaborationMap = computed(() => new Map(
+  musicCollaborations.value.map(collaboration => [collaboration.id, collaboration.label]),
+))
+
 const musicVocalCharacterMap = computed(() => {
   const map: Record<number, Set<string>> = {}
   for (const vocal of musicVocals.value) {
@@ -617,6 +631,18 @@ const visibleMvTypeOptions = computed(() => {
     .filter(option => option.count > 0)
 })
 
+const visibleCollaborationOptions = computed(() => {
+  const counts = new Map<number, number>()
+  for (const music of visibleBaseMusics.value) {
+    const id = Number(music.musicCollaborationId)
+    if (!Number.isFinite(id) || !musicCollaborationMap.value.has(id)) continue
+    counts.set(id, (counts.get(id) || 0) + 1)
+  }
+  return musicCollaborations.value
+    .map(collaboration => ({ ...collaboration, count: counts.get(collaboration.id) || 0 }))
+    .filter(collaboration => collaboration.count > 0)
+})
+
 const gameCharacterOptions = computed(() => {
   const visibleIds = visibleBaseMusicIds.value
   const counts = new Map<string, number>()
@@ -684,6 +710,7 @@ const releaseConditionOptions = computed(() => {
 
 const hasExtraFilters = computed(() => {
   return selectedMusicTags.value.size > 0
+    || selectedCollaborationIds.value.size > 0
     || selectedMvTypes.value.size > 0
     || selectedVocalCharacters.value.size > 0
     || selectedReleaseConditionIds.value.size > 0
@@ -691,6 +718,7 @@ const hasExtraFilters = computed(() => {
 
 const activeExtraFilterCount = computed(() => {
   return selectedMusicTags.value.size
+    + selectedCollaborationIds.value.size
     + selectedMvTypes.value.size
     + selectedVocalCharacters.value.size
     + selectedReleaseConditionIds.value.size
@@ -698,6 +726,7 @@ const activeExtraFilterCount = computed(() => {
 
 const extraFilterSignature = computed(() => [
   [...selectedMusicTags.value].sort().join(','),
+  [...selectedCollaborationIds.value].sort((a, b) => a - b).join(','),
   [...selectedMvTypes.value].sort().join(','),
   [...selectedVocalCharacters.value].sort().join(','),
   [...selectedReleaseConditionIds.value].sort((a, b) => a - b).join(','),
@@ -903,6 +932,11 @@ const filteredMusics = computed(() => {
     })
   }
 
+  if (selectedCollaborationIds.value.size > 0) {
+    const selected = selectedCollaborationIds.value
+    result = result.filter(m => Number.isFinite(m.musicCollaborationId) && selected.has(Number(m.musicCollaborationId)))
+  }
+
   if (selectedMvTypes.value.size > 0) {
     const selected = selectedMvTypes.value
     result = result.filter(m => (m.categories || []).some(category => selected.has(category)))
@@ -997,6 +1031,7 @@ async function loadData() {
       diffData,
       limitedData,
       musicTagData,
+      musicCollaborationData,
       vocalData,
       characterData,
       gameCharacterUnitData,
@@ -1008,6 +1043,7 @@ async function loadData() {
       masterStore.getMaster<MusicDifficulty>('musicDifficulties'),
       masterStore.getMaster<LimitedTimeMusic>('limitedTimeMusics'),
       masterStore.getMaster<MusicTag>('musicTags'),
+      masterStore.getMaster<MusicCollaboration>('musicCollaborations'),
       masterStore.getMaster<MusicVocal>('musicVocals'),
       masterStore.getMaster<Character>('gameCharacters'),
       masterStore.getMaster<GameCharacterUnit>('gameCharacterUnits'),
@@ -1019,6 +1055,7 @@ async function loadData() {
     musicDifficulties.value = diffData
     limitedMusics.value = limitedData
     musicTags.value = musicTagData
+    musicCollaborations.value = musicCollaborationData
     musicVocals.value = vocalData
     characters.value = characterData
     gameCharacterUnits.value = gameCharacterUnitData
@@ -1133,6 +1170,7 @@ function getMusicOwnershipLabel(music: Music): string {
 
 function resetExtraFilters() {
   selectedMusicTags.value = new Set()
+  selectedCollaborationIds.value = new Set()
   selectedMvTypes.value = new Set()
   selectedVocalCharacters.value = new Set()
   selectedReleaseConditionIds.value = new Set()
@@ -1147,6 +1185,10 @@ function toggleSetValue<T>(source: Set<T>, value: T): Set<T> {
 
 function toggleMusicTag(value: string) {
   selectedMusicTags.value = toggleSetValue(selectedMusicTags.value, value)
+}
+
+function toggleCollaboration(value: number) {
+  selectedCollaborationIds.value = toggleSetValue(selectedCollaborationIds.value, value)
 }
 
 function toggleMvType(value: string) {
@@ -1215,7 +1257,7 @@ watch([searchText, selectedArtist, sortKey, sortOrder, resultFilter, collectionF
 // 用户修改筛选/排序/视图状态时写入 localStorage（Set 均为整体替换赋值，浅层监听即可）
 watch(
   [searchText, selectedArtist, sortKey, sortOrder, selectedDiffType, isFilterPanelOpen,
-    selectedMusicTags, selectedMvTypes, selectedVocalCharacters, selectedReleaseConditionIds,
+    selectedMusicTags, selectedCollaborationIds, selectedMvTypes, selectedVocalCharacters, selectedReleaseConditionIds,
     viewMode, showUserResults, resultFilter, collectionFilter, filterDifficulty],
   () => {
     const state: StoredMusicsViewState = {
@@ -1226,6 +1268,7 @@ watch(
       selectedDiffType: selectedDiffType.value,
       isFilterPanelOpen: isFilterPanelOpen.value,
       selectedMusicTags: [...selectedMusicTags.value],
+      selectedCollaborationIds: [...selectedCollaborationIds.value],
       selectedMvTypes: [...selectedMvTypes.value],
       selectedVocalCharacters: [...selectedVocalCharacters.value],
       selectedReleaseConditionIds: [...selectedReleaseConditionIds.value],
@@ -1490,6 +1533,22 @@ watch(totalPages, (pages) => {
               <img v-if="tag.image" :src="tag.image" :alt="tag.label" class="h-4 max-w-[86px] object-contain" />
               <span v-else>{{ tag.shortLabel || tag.label }}</span>
               <span class="text-[10px] opacity-60">{{ tag.count }}</span>
+            </button>
+          </div>
+        </div>
+
+        <div v-if="visibleCollaborationOptions.length">
+          <div class="text-xs font-bold text-base-content/60 mb-2">合作企划</div>
+          <div class="flex flex-wrap gap-2">
+            <button
+              v-for="collaboration in visibleCollaborationOptions"
+              :key="collaboration.id"
+              class="btn btn-sm h-8 min-h-8"
+              :class="selectedCollaborationIds.has(collaboration.id) ? 'btn-secondary' : 'btn-outline'"
+              @click="toggleCollaboration(collaboration.id)"
+            >
+              {{ collaboration.label }}
+              <span class="text-[10px] opacity-60">{{ collaboration.count }}</span>
             </button>
           </div>
         </div>
@@ -1798,6 +1857,7 @@ watch(totalPages, (pages) => {
                     </button>
                     <div v-if="isLimitedTime(music.id)" class="badge badge-sm badge-warning text-warning-content font-bold shadow-sm whitespace-nowrap">期间限定</div>
                     <div v-else-if="isExpired(music.id)" class="badge badge-sm bg-base-300 text-base-content/60 font-bold border-none whitespace-nowrap">已过期</div>
+                    <div v-if="music.musicCollaborationId && musicCollaborationMap.get(music.musicCollaborationId)" class="badge badge-sm badge-secondary badge-outline max-w-44 truncate" :title="musicCollaborationMap.get(music.musicCollaborationId)">{{ musicCollaborationMap.get(music.musicCollaborationId) }}</div>
                     <div v-if="hasSuiteData && hasOwnershipData" class="badge badge-sm" :class="ownedMusicIds.has(music.id) ? 'badge-success badge-outline' : 'badge-ghost'">{{ getMusicOwnershipLabel(music) }}</div>
                     <div v-if="hasSuiteData && hasAchievementData" class="badge badge-sm badge-ghost">成就 {{ getAchievementCount(music.id) }}/{{ getAchievementTotal(music.id) }}</div>
                   </div>
@@ -1873,6 +1933,7 @@ watch(totalPages, (pages) => {
                   <span class="truncate">{{ music.composer }}</span>
                 </button>
                 <div v-if="isLimitedTime(music.id)" class="badge badge-xs badge-warning text-warning-content font-bold shadow-sm whitespace-nowrap">限定</div>
+                <div v-if="music.musicCollaborationId && musicCollaborationMap.get(music.musicCollaborationId)" class="badge badge-xs badge-secondary badge-outline max-w-24 truncate" :title="musicCollaborationMap.get(music.musicCollaborationId)">{{ musicCollaborationMap.get(music.musicCollaborationId) }}</div>
                 <div v-if="hasSuiteData && hasOwnershipData" class="badge badge-xs" :class="ownedMusicIds.has(music.id) ? 'badge-success badge-outline' : 'badge-ghost'">{{ getMusicOwnershipLabel(music) }}</div>
                 <div v-if="hasSuiteData && hasAchievementData" class="badge badge-xs badge-ghost">{{ getAchievementCount(music.id) }}/{{ getAchievementTotal(music.id) }}</div>
               </div>
@@ -1943,6 +2004,7 @@ watch(totalPages, (pages) => {
             :is-expired="isExpired(music.id)"
             :assets-host="assetsHost"
             :categories="music.categories || EMPTY_ARR"
+            :collaboration-label="music.musicCollaborationId ? musicCollaborationMap.get(music.musicCollaborationId) : undefined"
             :results="hasSuiteData && showUserResults ? (musicResultsMap[music.id] || EMPTY_OBJ) : undefined"
             :ownership-status="hasSuiteData && hasOwnershipData ? (ownedMusicIds.has(music.id) ? 'owned' : 'locked') : undefined"
             :ownership-label="hasSuiteData && hasOwnershipData ? getMusicOwnershipLabel(music) : undefined"
