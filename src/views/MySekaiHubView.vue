@@ -7,7 +7,7 @@ import { useSettingsStore } from '@/stores/settings'
 import AccountSelector from '@/components/AccountSelector.vue'
 import AssetImage from '@/components/AssetImage.vue'
 import SekaiCard from '@/components/SekaiCard.vue'
-import { RefreshCw, Sofa, DoorOpen, Disc3, Images, Search } from 'lucide-vue-next'
+import { RefreshCw, Sofa, DoorOpen, Disc3, Images, Search, CloudSun, Music2 } from 'lucide-vue-next'
 
 import type {
   TabKey, FixtureRow, BlueprintRow, GenreRow, BlueprintMaterialCostRow,
@@ -31,6 +31,7 @@ const tabOptions: Array<{ key: TabKey, label: string }> = [
   { key: 'canvas', label: '画布收藏' },
   { key: 'gate', label: '大门' },
   { key: 'record', label: '唱片' },
+  { key: 'phenomena', label: '天气现象' },
 ]
 
 interface CanvasCardRow {
@@ -62,6 +63,33 @@ interface CanvasViewItem extends UserCanvasRow {
   card: CanvasCardRow
   fixture: FixtureRow | null
   bonus: CanvasBonusRow | null
+}
+
+interface PhenomenaRow {
+  id: number
+  name: string
+  englishName: string
+  description: string
+  timePeriodType: string
+  brightnessType: string
+  backgroundColorId: number
+  iconAssetbundleName: string
+}
+
+interface PhenomenaBackgroundColorRow {
+  id: number
+  baseColor: string
+  groundColor: string
+  gradationColor: string
+  cornerColor: string
+  groundHighlightColor: string
+}
+
+interface PhenomenaBgmRow {
+  id: number
+  mysekaiPhenomenaId: number
+  assetbundleName: string
+  cue: string
 }
 
 const unitAliasMap: Record<string, string> = {
@@ -136,6 +164,11 @@ const characterArchiveMysekaiCharacterTalkGroups = ref<CharacterArchiveMysekaiCh
 const mysekaiGateCharacterLotteries = ref<MysekaiGateCharacterLotteryRow[]>([])
 const canvasCards = ref<CanvasCardRow[]>([])
 const canvasBonuses = ref<CanvasBonusRow[]>([])
+const phenomenas = ref<PhenomenaRow[]>([])
+const phenomenaBackgroundColors = ref<PhenomenaBackgroundColorRow[]>([])
+const phenomenaBgms = ref<PhenomenaBgmRow[]>([])
+const phenomenaSearch = ref('')
+const phenomenaTimeFilter = ref('all')
 
 const mysekaiAssetsHost = computed(() => String(settingsStore.ASSETS_HOST_GLOBAL || '').replace(/\/+$/, ''))
 
@@ -143,6 +176,7 @@ function parseTab(value: unknown): TabKey {
   if (value === 'canvas') return 'canvas'
   if (value === 'gate') return 'gate'
   if (value === 'record') return 'record'
+  if (value === 'phenomena') return 'phenomena'
   return 'furniture'
 }
 
@@ -949,6 +983,43 @@ const recordOwnedCount = computed(() => {
   return count
 })
 
+const phenomenaTimeLabels: Record<string, string> = {
+  daytime: '白昼',
+  evening: '黄昏',
+  night: '夜晚',
+}
+
+const phenomenaBrightnessLabels: Record<string, string> = {
+  bright: '明亮',
+  normal: '标准',
+  dark: '昏暗',
+  none: '特殊',
+}
+
+const phenomenaBackgroundColorMap = computed(() => new Map(phenomenaBackgroundColors.value.map(row => [row.id, row])))
+const phenomenaBgmMap = computed(() => new Map(phenomenaBgms.value.map(row => [row.mysekaiPhenomenaId, row])))
+const filteredPhenomenas = computed(() => {
+  const query = phenomenaSearch.value.trim().toLocaleLowerCase()
+  return phenomenas.value
+    .filter(row => phenomenaTimeFilter.value === 'all' || row.timePeriodType === phenomenaTimeFilter.value)
+    .filter(row => !query || [row.id, row.name, row.englishName, row.description, phenomenaBgmMap.value.get(row.id)?.cue]
+      .some(value => String(value || '').toLocaleLowerCase().includes(query)))
+    .sort((a, b) => a.id - b.id)
+})
+
+const phenomenaSummary = computed(() => ({
+  total: phenomenas.value.length,
+  special: phenomenas.value.filter(row => row.brightnessType === 'none').length,
+  bgm: phenomenas.value.filter(row => phenomenaBgmMap.value.has(row.id)).length,
+  palettes: new Set(phenomenas.value.map(row => row.backgroundColorId)).size,
+}))
+
+function phenomenaGradient(row: PhenomenaRow): string {
+  const palette = phenomenaBackgroundColorMap.value.get(row.backgroundColorId)
+  if (!palette) return 'linear-gradient(135deg, #a0eeff, #5d8eff)'
+  return `linear-gradient(135deg, ${palette.baseColor} 0%, ${palette.gradationColor} 58%, ${palette.cornerColor} 100%)`
+}
+
 watch(() => route.query.tab, (value) => {
   const tab = parseTab(value)
   if (tab !== value) {
@@ -1043,6 +1114,9 @@ async function loadMasterData() {
       gateCharacterLotteryRaw,
       canvasCardRaw,
       canvasBonusRaw,
+      phenomenaRaw,
+      phenomenaBackgroundColorRaw,
+      phenomenaBgmRaw,
     ] = await Promise.all([
       getFirstAvailableMaster(['mysekaiFixtures', 'mysekai_fixtures']),
       getFirstAvailableMaster(['mysekaiBlueprints', 'mysekai_blueprints']),
@@ -1066,6 +1140,9 @@ async function loadMasterData() {
       getFirstAvailableMaster(['mysekaiGateCharacterLotteries', 'mysekai_gate_character_lotteries']),
       getFirstAvailableMaster(['cards']),
       getFirstAvailableMaster(['cardMysekaiCanvasBonuses', 'card_mysekai_canvas_bonuses']),
+      getFirstAvailableMaster(['mysekaiPhenomenas', 'mysekai_phenomenas']),
+      getFirstAvailableMaster(['mysekaiPhenomenaBackgroundColors', 'mysekai_phenomena_background_colors']),
+      getFirstAvailableMaster(['mysekaiPhenomenaBgms', 'mysekai_phenomena_bgms']),
     ])
 
     fixtures.value = fixtureRaw.map((row: any) => {
@@ -1237,6 +1314,33 @@ async function loadMasterData() {
       power2BonusFixed: pickNumber(row, ['power2BonusFixed']) || 0,
       power3BonusFixed: pickNumber(row, ['power3BonusFixed']) || 0,
     })).filter((row: CanvasBonusRow) => !!row.cardRarityType)
+
+    phenomenas.value = phenomenaRaw.map((row: any) => ({
+      id: pickNumber(row, ['id', 'mysekaiPhenomenaId']) || 0,
+      name: pickString(row, ['name']) || '',
+      englishName: pickString(row, ['englishName']) || '',
+      description: pickString(row, ['description']) || '',
+      timePeriodType: pickString(row, ['mysekaiPhenomenaTimePeriodType']) || '',
+      brightnessType: pickString(row, ['mysekaiPhenomenaBrightnessType']) || '',
+      backgroundColorId: pickNumber(row, ['mysekaiPhenomenaBackgroundColorId']) || 0,
+      iconAssetbundleName: pickString(row, ['iconAssetbundleName']) || '',
+    })).filter((row: PhenomenaRow) => row.id > 0 && !!row.name)
+
+    phenomenaBackgroundColors.value = phenomenaBackgroundColorRaw.map((row: any) => ({
+      id: pickNumber(row, ['id']) || 0,
+      baseColor: pickString(row, ['baseColor']) || '#a0eeff',
+      groundColor: pickString(row, ['groundColor']) || '#ffffff',
+      gradationColor: pickString(row, ['gradationColor']) || '#5d8eff',
+      cornerColor: pickString(row, ['cornerColor']) || '#6090ff',
+      groundHighlightColor: pickString(row, ['groundHighlightColor']) || '#cbdcfe',
+    })).filter((row: PhenomenaBackgroundColorRow) => row.id > 0)
+
+    phenomenaBgms.value = phenomenaBgmRaw.map((row: any) => ({
+      id: pickNumber(row, ['id']) || 0,
+      mysekaiPhenomenaId: pickNumber(row, ['mysekaiPhenomenaId']) || 0,
+      assetbundleName: pickString(row, ['assetbundleName']) || '',
+      cue: pickString(row, ['cue']) || '',
+    })).filter((row: PhenomenaBgmRow) => row.id > 0 && row.mysekaiPhenomenaId > 0)
   } catch (e) {
     console.error('加载 MySekai master 数据失败', e)
     errorMsg.value = '加载 master 数据失败，请稍后重试'
@@ -1531,7 +1635,8 @@ function closeFixtureDetail() {
         <Sofa v-if="tab.key === 'furniture'" class="w-4 h-4 mr-1.5" />
         <Images v-else-if="tab.key === 'canvas'" class="w-4 h-4 mr-1.5" />
         <DoorOpen v-else-if="tab.key === 'gate'" class="w-4 h-4 mr-1.5" />
-        <Disc3 v-else class="w-4 h-4 mr-1.5" />
+        <Disc3 v-else-if="tab.key === 'record'" class="w-4 h-4 mr-1.5" />
+        <CloudSun v-else class="w-4 h-4 mr-1.5" />
         {{ tab.label }}
       </button>
     </div>
@@ -1884,7 +1989,7 @@ function closeFixtureDetail() {
         <div v-else class="text-sm text-base-content/60">暂无大门数据</div>
       </div>
 
-      <div v-else class="space-y-4">
+      <div v-else-if="activeTab === 'record'" class="space-y-4">
         <div class="card bg-base-100 shadow-sm">
           <div class="card-body p-4 flex flex-wrap items-center gap-2">
             <div class="badge badge-lg">总唱片: {{ recordItems.length }}</div>
@@ -1937,6 +2042,52 @@ function closeFixtureDetail() {
             </div>
           </div>
         </details>
+      </div>
+
+      <div v-else class="space-y-4">
+        <div class="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
+          <div class="stat rounded-xl bg-base-100 p-3 shadow-sm"><div class="stat-title text-xs">天气现象</div><div class="stat-value text-2xl text-primary">{{ phenomenaSummary.total }}</div><div class="stat-desc">当前 master</div></div>
+          <div class="stat rounded-xl bg-base-100 p-3 shadow-sm"><div class="stat-title text-xs">特殊现象</div><div class="stat-value text-2xl text-secondary">{{ phenomenaSummary.special }}</div><div class="stat-desc">独立演出环境</div></div>
+          <div class="stat rounded-xl bg-base-100 p-3 shadow-sm"><div class="stat-title text-xs">专属 BGM</div><div class="stat-value text-2xl">{{ phenomenaSummary.bgm }}</div><div class="stat-desc">master 音轨映射</div></div>
+          <div class="stat rounded-xl bg-base-100 p-3 shadow-sm"><div class="stat-title text-xs">背景色板</div><div class="stat-value text-2xl">{{ phenomenaSummary.palettes }}</div><div class="stat-desc">用于场景环境色</div></div>
+        </div>
+
+        <div class="card border border-base-200 bg-base-100 shadow-sm">
+          <div class="card-body gap-3 p-3 md:p-4">
+            <div class="flex flex-col gap-2 md:flex-row md:items-center">
+              <label class="input input-sm input-bordered flex min-w-0 flex-1 items-center gap-2"><Search class="h-4 w-4 opacity-50" /><input v-model="phenomenaSearch" class="grow min-w-0" placeholder="搜索天气、英文名、BGM 或 ID…" /></label>
+              <div class="join self-start md:self-auto">
+                <button v-for="option in [{ value: 'all', label: '全部时段' }, { value: 'daytime', label: '白昼' }, { value: 'evening', label: '黄昏' }, { value: 'night', label: '夜晚' }]" :key="option.value" class="join-item btn btn-xs sm:btn-sm" :class="phenomenaTimeFilter === option.value ? 'btn-secondary' : 'btn-ghost'" @click="phenomenaTimeFilter = option.value">{{ option.label }}</button>
+              </div>
+            </div>
+            <p class="text-xs text-base-content/50">显示 {{ filteredPhenomenas.length }} / {{ phenomenas.length }} 种；视觉背景直接使用 master 中的环境色板生成。</p>
+          </div>
+        </div>
+
+        <div v-if="filteredPhenomenas.length" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <article v-for="row in filteredPhenomenas" :key="row.id" class="card overflow-hidden border border-base-200 bg-base-100 shadow-sm">
+            <div class="relative aspect-[2/1] overflow-hidden" :style="{ backgroundImage: phenomenaGradient(row) }">
+              <div class="absolute -left-8 -top-10 h-32 w-32 rounded-full bg-white/20 blur-sm"></div>
+              <div class="absolute -bottom-12 right-2 h-28 w-28 rounded-full bg-white/15 blur-md"></div>
+              <span class="absolute left-2 top-2 badge border-0 bg-black/30 text-white">{{ phenomenaTimeLabels[row.timePeriodType] || row.timePeriodType }}</span>
+              <span class="absolute right-2 top-2 text-[10px] font-medium text-white/75">#{{ row.id }}</span>
+              <div class="absolute inset-0 flex flex-col items-center justify-center px-3 text-center text-white [text-shadow:0_1px_4px_rgb(0_0_0_/_0.45)]">
+                <CloudSun class="h-8 w-8 opacity-80" />
+                <p class="mt-1 text-lg font-black tracking-wide">{{ row.englishName }}</p>
+              </div>
+            </div>
+            <div class="card-body gap-2 p-3">
+              <div class="flex items-start justify-between gap-2"><div><h3 class="font-bold">{{ row.name }}</h3><p class="text-xs text-base-content/45">{{ row.description }}</p></div><span class="badge badge-sm badge-outline">{{ phenomenaBrightnessLabels[row.brightnessType] || row.brightnessType }}</span></div>
+              <div v-if="phenomenaBackgroundColorMap.get(row.backgroundColorId)" class="flex items-center gap-1.5" title="环境色板">
+                <span v-for="color in [phenomenaBackgroundColorMap.get(row.backgroundColorId)?.baseColor, phenomenaBackgroundColorMap.get(row.backgroundColorId)?.groundColor, phenomenaBackgroundColorMap.get(row.backgroundColorId)?.gradationColor, phenomenaBackgroundColorMap.get(row.backgroundColorId)?.cornerColor, phenomenaBackgroundColorMap.get(row.backgroundColorId)?.groundHighlightColor]" :key="color" class="h-3.5 w-3.5 rounded-full border border-black/10" :style="{ backgroundColor: color }"></span>
+                <span class="ml-1 text-[10px] text-base-content/40">Palette {{ row.backgroundColorId }}</span>
+              </div>
+              <div v-if="phenomenaBgmMap.get(row.id)" class="flex min-w-0 items-center gap-1.5 rounded-lg bg-base-200/60 px-2 py-1.5 text-xs"><Music2 class="h-3.5 w-3.5 shrink-0 text-primary" /><span class="truncate" :title="phenomenaBgmMap.get(row.id)?.cue">{{ phenomenaBgmMap.get(row.id)?.cue }}</span></div>
+              <p v-else class="text-[10px] text-base-content/35">使用场地默认 BGM</p>
+            </div>
+          </article>
+        </div>
+        <div v-else class="card border border-base-200 bg-base-100"><div class="card-body items-center py-14 text-sm text-base-content/50">没有符合筛选条件的天气现象</div></div>
       </div>
     </template>
 
