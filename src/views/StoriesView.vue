@@ -295,7 +295,7 @@ onMounted(async () => {
 
 <template>
   <div class="max-w-7xl mx-auto space-y-6">
-    <PageHeader title="故事档案" description="活动故事与组合主线的统一目录，支持剧本阅读和台词搜索。"><template #icon><BookOpen class="w-8 h-8 text-primary" /></template></PageHeader>
+    <PageHeader title="剧情档案" description="活动故事与组合主线的统一目录，支持剧本阅读和台词搜索。"><template #icon><BookOpen class="w-8 h-8 text-primary" /></template></PageHeader>
 
     <section class="grid grid-cols-3 gap-2">
       <div class="rounded-xl bg-base-100 border border-base-200 px-3 py-2"><p class="text-[11px] text-base-content/45">活动故事</p><p class="font-bold text-lg">{{ storyStats.events }}</p></div>
