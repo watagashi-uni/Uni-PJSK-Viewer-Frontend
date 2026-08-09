@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { AlertTriangle, BookOpen, CheckCircle2, RefreshCw, Search, Sparkles } from 'lucide-vue-next'
+import confetti from 'canvas-confetti'
 import AccountSelector from '@/components/AccountSelector.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import Pagination from '@/components/Pagination.vue'
@@ -173,6 +174,11 @@ const filteredCards = computed(() => {
 const totalPages = computed(() => Math.max(1, Math.ceil(filteredCards.value.length / pageSize)))
 const paginatedCards = computed(() => filteredCards.value.slice((page.value - 1) * pageSize, page.value * pageSize))
 const selectedCharacterStats = computed(() => characterStats.value.find(row => row.character.id === selectedCharacterId.value))
+const isSelectedFullCollection = computed(() => Boolean(
+  hasCardData.value &&
+  selectedCharacterStats.value?.total &&
+  selectedCharacterStats.value.owned === selectedCharacterStats.value.total,
+))
 
 function characterName(character?: Character): string {
   return character ? `${character.firstName || ''}${character.givenName}` : ''
@@ -194,6 +200,17 @@ function resetFilters() {
   progressFilter.value = 'all'
 }
 
+function celebrateFullCollection() {
+  const endAt = Date.now() + 1800
+  const colors = ['#ff8fab', '#ffca3a', '#8ac926', '#4cc9f0', '#9b5de5']
+  const frame = () => {
+    confetti({ particleCount: 4, angle: 60, spread: 58, origin: { x: 0, y: 0.72 }, colors })
+    confetti({ particleCount: 4, angle: 120, spread: 58, origin: { x: 1, y: 0.72 }, colors })
+    if (Date.now() < endAt) requestAnimationFrame(frame)
+  }
+  frame()
+}
+
 async function refreshUserCards() {
   if (!selectedUserId.value) return
   await accountStore.refreshSuite(selectedUserId.value)
@@ -201,6 +218,9 @@ async function refreshUserCards() {
 
 watch([selectedCharacterId, search, selectedRarity, ownershipFilter, progressFilter], () => { page.value = 1 })
 watch(totalPages, total => { page.value = Math.min(page.value, total) })
+watch([isSelectedFullCollection, selectedCharacterId], ([isFull, characterId], [wasFull, previousCharacterId]) => {
+  if (!isLoading.value && isFull && (!wasFull || characterId !== previousCharacterId)) celebrateFullCollection()
+})
 
 onMounted(async () => {
   try {
@@ -215,6 +235,7 @@ onMounted(async () => {
     loadError.value = error instanceof Error ? error.message : 'Master 数据加载失败'
   } finally {
     isLoading.value = false
+    if (isSelectedFullCollection.value) celebrateFullCollection()
   }
 })
 </script>
