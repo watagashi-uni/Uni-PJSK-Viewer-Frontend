@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, CreditCard, Search, Smile, UserRound, Users } from 'lucide-vue-next'
+import { ArrowLeft, CreditCard, Search, Smile, Sparkles, UserRound, Users } from 'lucide-vue-next'
+import AccountSelector from '@/components/AccountSelector.vue'
 import AssetImage from '@/components/AssetImage.vue'
+import { useAccountStore } from '@/stores/account'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
 import type {
@@ -13,16 +15,43 @@ import type {
   UnitProfileData,
 } from '@/types/master'
 
+interface UserCharacter {
+  characterId?: number
+  character_id?: number
+  characterRank?: number
+  character_rank?: number
+  exp?: number
+  totalExp?: number
+  total_exp?: number
+}
+
+interface CharacterRank {
+  characterId: number
+  characterRank: number
+  power1BonusRate: number
+  power2BonusRate: number
+  power3BonusRate: number
+}
+
+interface CharacterLevel {
+  levelType: string
+  level: number
+  totalExp: number
+}
+
 const route = useRoute()
 const router = useRouter()
 const masterStore = useMasterStore()
 const settingsStore = useSettingsStore()
+const accountStore = useAccountStore()
 
 const characters = ref<GameCharacterData[]>([])
 const profiles = ref<CharacterProfileData[]>([])
 const unitProfiles = ref<UnitProfileData[]>([])
 const cards = ref<CardData[]>([])
 const stamps = ref<StampData[]>([])
+const characterRanks = ref<CharacterRank[]>([])
+const levels = ref<CharacterLevel[]>([])
 const searchQuery = ref('')
 const isLoading = ref(true)
 const loadError = ref('')
@@ -38,8 +67,38 @@ const unitFallbackNames: Record<string, string> = {
 }
 
 const assetsHost = computed(() => settingsStore.assetsHost)
+const selectedUserId = computed({
+  get: () => accountStore.currentUserId || '',
+  set: value => { void accountStore.selectAccount(value) },
+})
+const suite = computed<any | null>(() => selectedUserId.value ? accountStore.getSuiteCache(selectedUserId.value) : null)
 const profileMap = computed(() => new Map(profiles.value.map(profile => [profile.characterId, profile])))
 const unitProfileMap = computed(() => new Map(unitProfiles.value.map(profile => [profile.unit, profile])))
+
+const userCharacterMap = computed(() => {
+  const result = new Map<number, UserCharacter>()
+  const rows = suite.value?.userCharacters ?? suite.value?.user_characters
+  if (!Array.isArray(rows)) return result
+  for (const row of rows as UserCharacter[]) {
+    const id = Number(row.characterId ?? row.character_id)
+    if (Number.isFinite(id)) result.set(id, row)
+  }
+  return result
+})
+
+const hasAccountCharacterData = computed(() => {
+  const rows = suite.value?.userCharacters ?? suite.value?.user_characters
+  return Array.isArray(rows)
+})
+
+const characterRankMap = computed(() => new Map(characterRanks.value.map(row => [
+  `${row.characterId}_${row.characterRank}`,
+  row,
+])))
+
+const characterLevelMap = computed(() => new Map(levels.value
+  .filter(row => row.levelType === 'character')
+  .map(row => [row.level, row])))
 
 const selectedCharacter = computed(() => {
   const id = Number(route.params.id)
@@ -55,6 +114,21 @@ const selectedProfile = computed(() => {
 const selectedUnitProfile = computed(() => {
   if (!selectedCharacter.value) return null
   return unitProfileMap.value.get(selectedCharacter.value.unit) || null
+})
+
+const selectedUserCharacter = computed(() => {
+  if (!selectedCharacter.value) return null
+  return userCharacterMap.value.get(selectedCharacter.value.id) || null
+})
+
+const selectedCharacterProgress = computed(() => selectedUserCharacter.value
+  ? getRankProgress(selectedUserCharacter.value)
+  : null)
+
+const selectedCharacterRankBonus = computed(() => {
+  if (!selectedCharacter.value || !selectedUserCharacter.value) return null
+  const rank = getUserCharacterRank(selectedUserCharacter.value)
+  return characterRankMap.value.get(`${selectedCharacter.value.id}_${rank}`) || null
 })
 
 const cardCounts = computed(() => {
@@ -118,6 +192,37 @@ function cleanText(value?: string): string {
   return (value || '').replace(/\n/g, '')
 }
 
+function getUserCharacterRank(row: UserCharacter): number {
+  return Number(row.characterRank ?? row.character_rank ?? 0)
+}
+
+function getUserCharacterExp(row: UserCharacter): number {
+  return Number(row.exp ?? 0)
+}
+
+function getUserCharacterTotalExp(row: UserCharacter): number {
+  return Number(row.totalExp ?? row.total_exp ?? 0)
+}
+
+function getRankProgress(row: UserCharacter) {
+  const rank = getUserCharacterRank(row)
+  const currentExp = getUserCharacterExp(row)
+  const nextLevel = characterLevelMap.value.get(rank + 1)
+  const currentLevel = characterLevelMap.value.get(rank)
+  const requiredExp = nextLevel && currentLevel ? nextLevel.totalExp - currentLevel.totalExp : 0
+  return {
+    rank,
+    currentExp,
+    requiredExp,
+    totalExp: getUserCharacterTotalExp(row),
+    percentage: requiredExp > 0 ? Math.min(100, Math.max(0, currentExp / requiredExp * 100)) : 100,
+  }
+}
+
+function formatBonus(value: number): string {
+  return Number(value || 0).toLocaleString('zh-CN', { maximumFractionDigits: 2 })
+}
+
 function openCharacter(character: GameCharacterData) {
   void router.push(`/characters/${character.id}`)
 }
@@ -128,18 +233,22 @@ function closeDetail() {
 
 onMounted(async () => {
   try {
-    const [characterData, profileData, unitData, cardData, stampData] = await Promise.all([
+    const [characterData, profileData, unitData, cardData, stampData, rankData, levelData] = await Promise.all([
       masterStore.getMaster<GameCharacterData>('gameCharacters'),
       masterStore.getMaster<CharacterProfileData>('characterProfiles'),
       masterStore.getMaster<UnitProfileData>('unitProfiles'),
       masterStore.getMaster<CardData>('cards'),
       masterStore.getMaster<StampData>('stamps'),
+      masterStore.getMaster<CharacterRank>('characterRanks'),
+      masterStore.getMaster<CharacterLevel>('levels'),
     ])
     characters.value = characterData
     profiles.value = profileData
     unitProfiles.value = unitData
     cards.value = cardData
     stamps.value = stampData
+    characterRanks.value = rankData
+    levels.value = levelData
   } catch (error) {
     console.error('加载角色图鉴失败:', error)
     loadError.value = error instanceof Error ? error.message : 'Master 数据加载失败'
@@ -152,9 +261,14 @@ onMounted(async () => {
 <template>
   <div class="max-w-7xl mx-auto space-y-6">
     <template v-if="route.params.id">
-      <button class="btn btn-ghost btn-sm gap-2" @click="closeDetail">
-        <ArrowLeft class="w-4 h-4" /> 返回角色图鉴
-      </button>
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <button class="btn btn-ghost btn-sm gap-2" @click="closeDetail">
+          <ArrowLeft class="w-4 h-4" /> 返回角色图鉴
+        </button>
+        <div v-if="accountStore.accounts.length" class="w-full sm:w-56">
+          <AccountSelector v-model="selectedUserId" />
+        </div>
+      </div>
 
       <div v-if="isLoading" class="grid lg:grid-cols-[360px_1fr] gap-6">
         <div class="skeleton h-[520px] rounded-2xl"></div>
@@ -203,6 +317,45 @@ onMounted(async () => {
             <p v-if="selectedProfile?.introduction" class="leading-7 text-base-content/80 whitespace-pre-line">
               {{ selectedProfile.introduction }}
             </p>
+
+            <div
+              v-if="selectedCharacterProgress"
+              class="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-3"
+            >
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <div class="flex items-center gap-2">
+                  <Sparkles class="w-5 h-5 text-primary" />
+                  <div>
+                    <p class="text-xs text-base-content/55">账号角色 Rank</p>
+                    <p class="text-xl font-bold">Rank {{ selectedCharacterProgress.rank }}</p>
+                  </div>
+                </div>
+                <div v-if="selectedCharacterRankBonus" class="text-right">
+                  <p class="text-xs text-base-content/55">综合力加成</p>
+                  <p class="font-bold text-primary">
+                    +{{ formatBonus(selectedCharacterRankBonus.power1BonusRate) }}% / +{{ formatBonus(selectedCharacterRankBonus.power2BonusRate) }}% / +{{ formatBonus(selectedCharacterRankBonus.power3BonusRate) }}%
+                  </p>
+                </div>
+              </div>
+              <div>
+                <div class="flex justify-between text-xs mb-1.5">
+                  <span v-if="selectedCharacterProgress.requiredExp">
+                    距 Rank {{ selectedCharacterProgress.rank + 1 }}：{{ selectedCharacterProgress.currentExp }} / {{ selectedCharacterProgress.requiredExp }} EXP
+                  </span>
+                  <span v-else>已达到当前最高 Rank</span>
+                  <span>累计 {{ selectedCharacterProgress.totalExp.toLocaleString('zh-CN') }} EXP</span>
+                </div>
+                <progress
+                  class="progress progress-primary w-full"
+                  :value="selectedCharacterProgress.percentage"
+                  max="100"
+                ></progress>
+              </div>
+            </div>
+
+            <div v-else-if="hasAccountCharacterData" class="alert py-3 text-sm">
+              当前账号没有这个角色的成长记录。
+            </div>
 
             <dl v-if="selectedProfile" class="grid sm:grid-cols-2 gap-3 text-sm">
               <div v-if="selectedProfile.birthday" class="bg-base-200/70 rounded-lg p-3">
@@ -259,10 +412,15 @@ onMounted(async () => {
           </h1>
           <p class="text-sm text-base-content/60 mt-2">角色档案、组合介绍，以及对应卡牌与表情贴图的快捷入口。</p>
         </div>
-        <label class="input input-bordered flex items-center gap-2 w-full md:w-72 bg-base-100">
-          <Search class="w-4 h-4 opacity-50" />
-          <input v-model="searchQuery" class="grow" placeholder="搜索角色或组合…" />
-        </label>
+        <div class="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+          <div v-if="accountStore.accounts.length" class="w-full sm:w-56">
+            <AccountSelector v-model="selectedUserId" />
+          </div>
+          <label class="input input-bordered flex items-center gap-2 w-full sm:w-72 bg-base-100">
+            <Search class="w-4 h-4 opacity-50" />
+            <input v-model="searchQuery" class="grow" placeholder="搜索角色或组合…" />
+          </label>
+        </div>
       </header>
 
       <div v-if="isLoading" class="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -301,6 +459,12 @@ onMounted(async () => {
                 :alt="getCharacterName(character)"
                 class="w-full h-full object-contain object-bottom pt-2 group-hover:scale-105 transition-transform duration-300"
               />
+              <span
+                v-if="userCharacterMap.get(character.id)"
+                class="absolute top-2 left-2 badge badge-primary badge-sm border-0 shadow-sm"
+              >
+                Rank {{ getUserCharacterRank(userCharacterMap.get(character.id)!) }}
+              </span>
               <span class="absolute top-2 right-2 badge badge-sm bg-base-100/80 border-0">#{{ character.id }}</span>
             </figure>
             <div class="card-body p-3 gap-0">
