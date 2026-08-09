@@ -21,6 +21,7 @@ export interface GachaCardRarityRate {
     id: number
     gachaId: number
     cardRarityType: string
+    lotteryType?: string
     rate: number
 }
 
