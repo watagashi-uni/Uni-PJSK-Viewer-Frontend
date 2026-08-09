@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { BookOpen, Calendar, CheckCircle2, ChevronRight, Library, Play, Search, Sparkles, X } from 'lucide-vue-next'
 import AssetImage from '@/components/AssetImage.vue'
+import PageHeader from '@/components/PageHeader.vue'
 import Pagination from '@/components/Pagination.vue'
 import StoryReader from '@/components/StoryReader.vue'
 import { useMasterStore } from '@/stores/master'
@@ -374,15 +375,14 @@ onMounted(async () => {
 
 <template>
   <div class="max-w-7xl mx-auto space-y-6">
-    <header class="rounded-2xl border border-primary/15 bg-gradient-to-br from-primary/10 via-base-100 to-secondary/5 p-5 md:p-6 space-y-5 overflow-hidden">
-      <div class="flex items-center gap-4"><span class="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-primary/15 text-primary"><BookOpen class="w-6 h-6" /></span><div><h1 class="text-2xl md:text-3xl font-bold">故事档案</h1><p class="text-sm text-base-content/60 mt-1">活动、组合主线与特殊故事的统一目录，支持剧本阅读、台词搜索和本地阅读进度。</p></div></div>
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
-        <div class="rounded-xl bg-base-100/75 border border-base-200 px-3 py-2"><p class="text-[11px] text-base-content/45">活动故事</p><p class="font-bold text-lg">{{ storyStats.events }}</p></div>
-        <div class="rounded-xl bg-base-100/75 border border-base-200 px-3 py-2"><p class="text-[11px] text-base-content/45">主线章节</p><p class="font-bold text-lg">{{ storyStats.unitChapters }}</p></div>
-        <div class="rounded-xl bg-base-100/75 border border-base-200 px-3 py-2"><p class="text-[11px] text-base-content/45">特殊故事</p><p class="font-bold text-lg">{{ storyStats.special }}</p></div>
-        <div class="rounded-xl bg-base-100/75 border border-base-200 px-3 py-2"><p class="text-[11px] text-base-content/45">收录话数</p><p class="font-bold text-lg text-primary">{{ storyStats.episodes }}</p></div>
-      </div>
-    </header>
+    <PageHeader title="故事档案" description="活动、组合主线与特殊故事的统一目录，支持剧本阅读、台词搜索和本地阅读进度。"><template #icon><BookOpen class="w-8 h-8 text-primary" /></template></PageHeader>
+
+    <section class="grid grid-cols-2 md:grid-cols-4 gap-2">
+      <div class="rounded-xl bg-base-100 border border-base-200 px-3 py-2"><p class="text-[11px] text-base-content/45">活动故事</p><p class="font-bold text-lg">{{ storyStats.events }}</p></div>
+      <div class="rounded-xl bg-base-100 border border-base-200 px-3 py-2"><p class="text-[11px] text-base-content/45">主线章节</p><p class="font-bold text-lg">{{ storyStats.unitChapters }}</p></div>
+      <div class="rounded-xl bg-base-100 border border-base-200 px-3 py-2"><p class="text-[11px] text-base-content/45">特殊故事</p><p class="font-bold text-lg">{{ storyStats.special }}</p></div>
+      <div class="rounded-xl bg-base-100 border border-base-200 px-3 py-2"><p class="text-[11px] text-base-content/45">收录话数</p><p class="font-bold text-lg text-primary">{{ storyStats.episodes }}</p></div>
+    </section>
 
     <div role="tablist" class="tabs tabs-box bg-base-100 border border-base-200 w-full sm:w-fit p-1">
       <button role="tab" class="tab flex-1 sm:flex-none gap-1.5" :class="{ 'tab-active': activeTab === 'event' }" @click="setTab('event')"><Sparkles class="w-4 h-4" />活动 <span class="hidden sm:inline">{{ storyStats.events }}</span></button>

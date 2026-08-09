@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, CreditCard, Search, Smile, Sparkles, UserRound, Users } from 'lucide-vue-next'
 import AccountSelector from '@/components/AccountSelector.vue'
 import AssetImage from '@/components/AssetImage.vue'
+import PageHeader from '@/components/PageHeader.vue'
 import { useAccountStore } from '@/stores/account'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
@@ -461,29 +462,26 @@ onMounted(async () => {
     </template>
 
     <template v-else>
-      <header class="flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div>
-          <h1 class="text-3xl font-bold flex items-center gap-3">
-            <Users class="w-8 h-8 text-primary" /> 角色图鉴
-          </h1>
-          <p class="text-sm text-base-content/60 mt-2">角色档案、组合介绍，以及对应卡牌与表情贴图的快捷入口。</p>
-        </div>
-        <div class="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
-          <div v-if="accountStore.accounts.length" class="w-full sm:w-56">
-            <AccountSelector v-model="selectedUserId" />
+      <PageHeader title="角色图鉴" description="角色档案、账号成长数据，以及对应卡牌与表情贴图入口。">
+        <template #icon><Users class="w-8 h-8 text-primary" /></template>
+        <template #actions>
+          <div class="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
+            <div v-if="accountStore.accounts.length" class="w-full sm:w-56">
+              <AccountSelector v-model="selectedUserId" />
+            </div>
+            <select v-model="sortMode" class="select select-bordered w-full sm:w-40 bg-base-100">
+              <option value="default">默认顺序</option>
+              <option value="rank">Rank 由高到低</option>
+              <option value="leader">队长次数排序</option>
+              <option value="member">成员次数排序</option>
+            </select>
+            <label class="input input-bordered flex items-center gap-2 w-full sm:w-72 bg-base-100">
+              <Search class="w-4 h-4 opacity-50" />
+              <input v-model="searchQuery" class="grow" placeholder="搜索角色或组合…" />
+            </label>
           </div>
-          <select v-model="sortMode" class="select select-bordered w-full sm:w-40 bg-base-100">
-            <option value="default">默认顺序</option>
-            <option value="rank">Rank 由高到低</option>
-            <option value="leader">队长次数排序</option>
-            <option value="member">成员次数排序</option>
-          </select>
-          <label class="input input-bordered flex items-center gap-2 w-full sm:w-72 bg-base-100">
-            <Search class="w-4 h-4 opacity-50" />
-            <input v-model="searchQuery" class="grow" placeholder="搜索角色或组合…" />
-          </label>
-        </div>
-      </header>
+        </template>
+      </PageHeader>
 
       <div v-if="isLoading" class="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div v-for="index in 12" :key="index" class="skeleton h-72 rounded-xl"></div>

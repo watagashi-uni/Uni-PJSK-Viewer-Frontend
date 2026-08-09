@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Download, ImageDown, Search, Smile, X } from 'lucide-vue-next'
 import AssetImage from '@/components/AssetImage.vue'
+import PageHeader from '@/components/PageHeader.vue'
 import Pagination from '@/components/Pagination.vue'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
@@ -164,15 +165,7 @@ onMounted(async () => {
 
 <template>
   <div class="max-w-7xl mx-auto space-y-6">
-    <header class="flex flex-col gap-2">
-      <h1 class="text-3xl font-bold flex items-center gap-3">
-        <Smile class="w-8 h-8 text-primary" />
-        表情贴图图鉴
-      </h1>
-      <p class="text-sm text-base-content/60">
-        收录游戏内贴图，可按名称、角色、类型与来源检索并下载透明 PNG 原图。
-      </p>
-    </header>
+    <PageHeader title="表情贴图图鉴" description="按名称、角色、类型与来源检索游戏贴图，并下载透明 PNG 原图。"><template #icon><Smile class="w-8 h-8 text-primary" /></template></PageHeader>
 
     <section class="card bg-base-100 border border-base-200 shadow-sm">
       <div class="card-body p-4 gap-4">

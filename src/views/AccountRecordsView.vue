@@ -1,10 +1,14 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { CalendarDays, Flower2, History, LayoutGrid, Search, Star, Swords } from 'lucide-vue-next'
 import AccountSelector from '@/components/AccountSelector.vue'
+import AssetImage from '@/components/AssetImage.vue'
+import PageHeader from '@/components/PageHeader.vue'
+import Pagination from '@/components/Pagination.vue'
 import SekaiCard from '@/components/SekaiCard.vue'
 import { useAccountStore } from '@/stores/account'
 import { useMasterStore } from '@/stores/master'
+import { useSettingsStore } from '@/stores/settings'
 import type { GameCharacterData } from '@/types/master'
 
 type RecordsTab = 'events' | 'world_bloom' | 'challenge' | 'rank' | 'decks'
@@ -12,6 +16,7 @@ type RecordsTab = 'events' | 'world_bloom' | 'challenge' | 'rank' | 'decks'
 interface EventInfo {
   id: number
   name: string
+  assetbundleName?: string
   startAt: number
   aggregateAt: number
 }
@@ -126,6 +131,7 @@ interface UserDeckInfo {
 
 const masterStore = useMasterStore()
 const accountStore = useAccountStore()
+const settingsStore = useSettingsStore()
 
 const events = ref<EventInfo[]>([])
 const rankMatchSeasons = ref<RankMatchSeason[]>([])
@@ -140,11 +146,14 @@ const loadError = ref('')
 const activeTab = ref<RecordsTab>('events')
 const eventSearch = ref('')
 const rankedOnly = ref(false)
+const eventPage = ref(1)
 const bloomSearch = ref('')
 const bloomRankedOnly = ref(false)
 const challengeSearch = ref('')
 const challengeSort = ref<'character' | 'score' | 'stage'>('score')
+const eventPageSize = 18
 
+const assetsHost = computed(() => settingsStore.assetsHost)
 const selectedUserId = computed({
   get: () => accountStore.currentUserId || '',
   set: value => { void accountStore.selectAccount(value) },
@@ -193,6 +202,11 @@ const filteredEventRows = computed(() => {
     .filter(row => !rankedOnly.value || row.rank > 0)
     .filter(row => !query || [row.id, row.master?.name].some(value => String(value || '').toLocaleLowerCase().includes(query)))
 })
+const eventTotalPages = computed(() => Math.max(1, Math.ceil(filteredEventRows.value.length / eventPageSize)))
+const paginatedEventRows = computed(() => filteredEventRows.value.slice(
+  (eventPage.value - 1) * eventPageSize,
+  eventPage.value * eventPageSize,
+))
 
 const eventSummary = computed(() => {
   const ranked = eventRows.value.filter(row => row.rank > 0)
@@ -230,6 +244,32 @@ const filteredWorldBloomRows = computed(() => {
       row.characterId,
       row.character ? getCharacterName(row.character) : '',
     ].some(value => String(value || '').toLocaleLowerCase().includes(query)))
+})
+
+const worldBloomGroups = computed(() => {
+  const groups = new Map<number, {
+    eventId: number
+    event?: EventInfo
+    rows: typeof filteredWorldBloomRows.value
+    totalPoint: number
+    bestRank: number
+  }>()
+  for (const row of filteredWorldBloomRows.value) {
+    const group = groups.get(row.eventId) || {
+      eventId: row.eventId,
+      event: row.event,
+      rows: [],
+      totalPoint: 0,
+      bestRank: 0,
+    }
+    group.rows.push(row)
+    group.totalPoint += row.point
+    if (row.rank > 0 && (!group.bestRank || row.rank < group.bestRank)) group.bestRank = row.rank
+    groups.set(row.eventId, group)
+  }
+  return [...groups.values()]
+    .map(group => ({ ...group, rows: [...group.rows].sort((a, b) => (a.chapter?.chapterNo || 0) - (b.chapter?.chapterNo || 0)) }))
+    .sort((a, b) => b.eventId - a.eventId)
 })
 
 const worldBloomSummary = computed(() => {
@@ -336,6 +376,11 @@ function getCharacterName(character: GameCharacterData): string {
   return `${character.firstName || ''}${character.givenName}`
 }
 
+function eventBanner(event?: EventInfo): string {
+  if (!event?.assetbundleName) return ''
+  return `${assetsHost.value}/startapp/home/banner/${event.assetbundleName}/${event.assetbundleName}.png`
+}
+
 function formatNumber(value: number): string {
   return new Intl.NumberFormat('zh-CN').format(value)
 }
@@ -347,6 +392,9 @@ function formatPercent(value: number): string {
 function formatDate(value?: number): string {
   return value ? new Date(value).toLocaleDateString('zh-CN') : '未知日期'
 }
+
+watch([eventSearch, rankedOnly], () => { eventPage.value = 1 })
+watch(eventTotalPages, total => { eventPage.value = Math.min(eventPage.value, total) })
 
 onMounted(async () => {
   try {
@@ -379,10 +427,10 @@ onMounted(async () => {
 
 <template>
   <div class="max-w-7xl mx-auto space-y-6">
-    <header class="flex flex-wrap items-start justify-between gap-4">
-      <div><h1 class="text-3xl font-bold flex items-center gap-3"><History class="w-8 h-8 text-primary" />账号记录</h1><p class="text-sm text-base-content/60 mt-2">查看 Suite 中的活动、世界开花章节、排位赛季成绩和全部保存卡组。</p></div>
-      <div class="min-w-56"><AccountSelector v-if="accountStore.accounts.length" v-model="selectedUserId" /></div>
-    </header>
+    <PageHeader title="账号记录" description="活动、World Bloom、挑战 Live、排位赛季与保存卡组的统一履历。">
+      <template #icon><History class="w-8 h-8 text-primary" /></template>
+      <template v-if="accountStore.accounts.length" #actions><div class="sm:w-56"><AccountSelector v-model="selectedUserId" /></div></template>
+    </PageHeader>
 
     <div v-if="isLoading" class="space-y-4"><div class="skeleton h-24 rounded-xl"></div><div class="skeleton h-96 rounded-xl"></div></div>
     <div v-else-if="loadError" class="alert alert-error">账号记录加载失败：{{ loadError }}</div>
@@ -390,7 +438,7 @@ onMounted(async () => {
     <template v-else>
       <div class="tabs tabs-boxed bg-base-100 p-1 w-fit max-w-full h-auto flex-wrap shadow-sm">
         <button class="tab gap-2" :class="{ 'tab-active': activeTab === 'events' }" @click="activeTab = 'events'"><CalendarDays class="w-4 h-4" />活动履历</button>
-        <button class="tab gap-2" :class="{ 'tab-active': activeTab === 'world_bloom' }" @click="activeTab = 'world_bloom'"><Flower2 class="w-4 h-4" />世界开花</button>
+        <button class="tab gap-2" :class="{ 'tab-active': activeTab === 'world_bloom' }" @click="activeTab = 'world_bloom'"><Flower2 class="w-4 h-4" />World Bloom</button>
         <button class="tab gap-2" :class="{ 'tab-active': activeTab === 'challenge' }" @click="activeTab = 'challenge'"><Star class="w-4 h-4" />挑战 Live</button>
         <button class="tab gap-2" :class="{ 'tab-active': activeTab === 'rank' }" @click="activeTab = 'rank'"><Swords class="w-4 h-4" />排位赛</button>
         <button class="tab gap-2" :class="{ 'tab-active': activeTab === 'decks' }" @click="activeTab = 'decks'"><LayoutGrid class="w-4 h-4" />保存卡组</button>
@@ -406,21 +454,47 @@ onMounted(async () => {
             <div class="stat bg-base-100 shadow-sm rounded-xl p-4"><div class="stat-title text-xs">历史最佳排名</div><div class="stat-value text-xl text-secondary">#{{ eventSummary.bestRank ? formatNumber(eventSummary.bestRank.rank) : '-' }}</div><div class="stat-desc">活动 #{{ eventSummary.bestRank?.id || '-' }}</div></div>
           </div>
           <div class="card bg-base-100 shadow-sm"><div class="card-body p-4"><div class="flex flex-wrap gap-3"><label class="input input-bordered input-sm flex items-center gap-2 grow max-w-lg"><Search class="w-4 h-4 opacity-50" /><input v-model="eventSearch" class="grow" placeholder="搜索活动名称或 ID…" /></label><label class="label cursor-pointer gap-2"><input v-model="rankedOnly" type="checkbox" class="checkbox checkbox-sm checkbox-primary" /><span class="label-text">仅显示有排名</span></label></div></div></div>
-          <div class="card bg-base-100 shadow-sm overflow-hidden"><div class="overflow-x-auto"><table class="table table-zebra"><thead><tr><th>活动</th><th>日期</th><th class="text-right">活动点</th><th class="text-right">排名</th></tr></thead><tbody><tr v-for="row in filteredEventRows" :key="row.id"><td><RouterLink v-if="row.master" :to="`/events/${row.id}`" class="link link-hover font-medium">{{ row.master.name }}</RouterLink><span v-else class="font-medium">活动 #{{ row.id }}</span><p class="text-xs text-base-content/45">#{{ row.id }}</p></td><td class="text-sm whitespace-nowrap">{{ formatDate(row.master?.startAt) }}</td><td class="text-right font-medium">{{ formatNumber(row.point) }}</td><td class="text-right"><span v-if="row.rank" class="badge badge-primary badge-outline">#{{ formatNumber(row.rank) }}</span><span v-else class="text-base-content/35">—</span></td></tr></tbody></table></div></div>
+          <div v-if="paginatedEventRows.length" class="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
+            <article v-for="row in paginatedEventRows" :key="row.id" class="card bg-base-100 border border-base-200 shadow-sm overflow-hidden hover:border-primary/30 hover:shadow-md transition-all">
+              <RouterLink v-if="row.master" :to="`/events/${row.id}`" class="block bg-base-200 aspect-[122/52] overflow-hidden"><AssetImage v-if="eventBanner(row.master)" :src="eventBanner(row.master)" :alt="row.master.name" class="w-full h-full object-cover hover:scale-[1.02] transition-transform" /></RouterLink>
+              <div v-else class="aspect-[122/52] bg-base-200 grid place-items-center text-base-content/30"><CalendarDays class="w-10 h-10" /></div>
+              <div class="card-body p-4 gap-3">
+                <div class="flex items-start justify-between gap-3"><div class="min-w-0"><p class="text-xs text-base-content/45">活动 #{{ row.id }} · {{ formatDate(row.master?.startAt) }}</p><RouterLink v-if="row.master" :to="`/events/${row.id}`" class="font-bold link link-hover line-clamp-2">{{ row.master.name }}</RouterLink><p v-else class="font-bold">活动 #{{ row.id }}</p></div><span v-if="row.rank" class="badge badge-primary badge-outline shrink-0">#{{ formatNumber(row.rank) }}</span></div>
+                <div class="grid grid-cols-2 gap-2 text-sm"><div class="rounded-lg bg-base-200/70 px-3 py-2"><p class="text-[11px] text-base-content/45">活动点</p><p class="font-bold text-primary">{{ formatNumber(row.point) }}</p></div><div class="rounded-lg bg-base-200/70 px-3 py-2"><p class="text-[11px] text-base-content/45">最终排名</p><p class="font-bold">{{ row.rank ? `#${formatNumber(row.rank)}` : '—' }}</p></div></div>
+              </div>
+            </article>
+          </div>
+          <div v-else class="card bg-base-100 border border-base-200"><div class="card-body items-center py-12 text-base-content/45">没有匹配的活动记录</div></div>
+          <Pagination v-if="eventTotalPages > 1" :current-page="eventPage" :total-pages="eventTotalPages" base-url="/account-records" @page-change="eventPage = $event" />
         </template>
       </section>
 
       <section v-else-if="activeTab === 'world_bloom'" class="space-y-4">
-        <div v-if="!userWorldBlooms.length" class="alert alert-info">当前 Suite 没有世界开花章节履历数据。</div>
+        <div v-if="!userWorldBlooms.length" class="alert alert-info">当前 Suite 没有 World Bloom 章节履历数据。</div>
         <template v-else>
           <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <div class="stat bg-base-100 shadow-sm rounded-xl p-4"><div class="stat-title text-xs">参与章节 / 活动</div><div class="stat-value text-2xl">{{ worldBloomSummary.count }} / {{ worldBloomSummary.eventCount }}</div></div>
-            <div class="stat bg-base-100 shadow-sm rounded-xl p-4"><div class="stat-title text-xs">累计章节点</div><div class="stat-value text-2xl text-primary">{{ formatNumber(worldBloomSummary.totalPoint) }}</div></div>
+            <div class="stat bg-base-100 shadow-sm rounded-xl p-4"><div class="stat-title text-xs">累计 Chapter Point</div><div class="stat-value text-2xl text-primary">{{ formatNumber(worldBloomSummary.totalPoint) }}</div></div>
             <div class="stat bg-base-100 shadow-sm rounded-xl p-4"><div class="stat-title text-xs">单章最高</div><div class="stat-value text-xl">{{ formatNumber(worldBloomSummary.maxPoint.point) }}</div><div class="stat-desc">{{ worldBloomSummary.maxPoint.character ? getCharacterName(worldBloomSummary.maxPoint.character) : '-' }}</div></div>
-            <div class="stat bg-base-100 shadow-sm rounded-xl p-4"><div class="stat-title text-xs">历史最佳章节排名</div><div class="stat-value text-xl text-secondary">#{{ worldBloomSummary.bestRank ? formatNumber(worldBloomSummary.bestRank.rank) : '-' }}</div><div class="stat-desc">{{ worldBloomSummary.bestRank?.character ? getCharacterName(worldBloomSummary.bestRank.character) : '' }}</div></div>
+            <div class="stat bg-base-100 shadow-sm rounded-xl p-4"><div class="stat-title text-xs">最佳 Chapter Rank</div><div class="stat-value text-xl text-secondary">#{{ worldBloomSummary.bestRank ? formatNumber(worldBloomSummary.bestRank.rank) : '-' }}</div><div class="stat-desc">{{ worldBloomSummary.bestRank?.character ? getCharacterName(worldBloomSummary.bestRank.character) : '' }}</div></div>
           </div>
           <div class="card bg-base-100 shadow-sm"><div class="card-body p-4"><div class="flex flex-wrap gap-3"><label class="input input-bordered input-sm flex items-center gap-2 grow max-w-lg"><Search class="w-4 h-4 opacity-50" /><input v-model="bloomSearch" class="grow" placeholder="搜索活动、角色或 ID…" /></label><label class="label cursor-pointer gap-2"><input v-model="bloomRankedOnly" type="checkbox" class="checkbox checkbox-sm checkbox-primary" /><span class="label-text">仅显示有排名</span></label></div></div></div>
-          <div class="card bg-base-100 shadow-sm overflow-hidden"><div class="overflow-x-auto"><table class="table table-zebra"><thead><tr><th>活动 / 章节</th><th>角色</th><th>日期</th><th class="text-right">章节点</th><th class="text-right">排名</th></tr></thead><tbody><tr v-for="row in filteredWorldBloomRows" :key="`${row.eventId}_${row.characterId}`"><td><RouterLink v-if="row.event" :to="`/events/${row.eventId}`" class="link link-hover font-medium">{{ row.event.name }}</RouterLink><span v-else class="font-medium">活动 #{{ row.eventId }}</span><p class="text-xs text-base-content/45">#{{ row.eventId }}<template v-if="row.chapter?.chapterNo"> · Chapter {{ row.chapter.chapterNo }}</template></p></td><td><RouterLink v-if="row.character" :to="`/characters/${row.characterId}`" class="link link-hover font-medium">{{ getCharacterName(row.character) }}</RouterLink><span v-else>角色 #{{ row.characterId }}</span></td><td class="text-sm whitespace-nowrap">{{ formatDate(row.chapter?.chapterStartAt || row.event?.startAt) }}</td><td class="text-right font-medium">{{ formatNumber(row.point) }}</td><td class="text-right"><span v-if="row.rank" class="badge badge-secondary badge-outline">#{{ formatNumber(row.rank) }}</span><span v-else class="text-base-content/35">—</span></td></tr></tbody></table></div></div>
+          <div v-if="worldBloomGroups.length" class="grid xl:grid-cols-2 gap-4">
+            <article v-for="group in worldBloomGroups" :key="group.eventId" class="card bg-base-100 border border-base-200 shadow-sm overflow-hidden">
+              <RouterLink v-if="group.event" :to="`/events/${group.eventId}`" class="block aspect-[122/42] bg-base-200 overflow-hidden"><AssetImage v-if="eventBanner(group.event)" :src="eventBanner(group.event)" :alt="group.event.name" class="w-full h-full object-cover hover:scale-[1.02] transition-transform" /></RouterLink>
+              <div class="card-body p-4 gap-3">
+                <div class="flex items-start justify-between gap-3"><div class="min-w-0"><p class="text-xs text-base-content/45">World Bloom #{{ group.eventId }} · {{ formatDate(group.event?.startAt) }}</p><RouterLink v-if="group.event" :to="`/events/${group.eventId}`" class="font-bold link link-hover line-clamp-2">{{ group.event.name }}</RouterLink><p v-else class="font-bold">活动 #{{ group.eventId }}</p></div><div class="text-right shrink-0"><p class="font-bold text-primary">{{ formatNumber(group.totalPoint) }}</p><p class="text-[10px] text-base-content/45">Total Chapter Point</p></div></div>
+                <div class="divide-y divide-base-200 rounded-xl border border-base-200 overflow-hidden">
+                  <div v-for="row in group.rows" :key="row.characterId" class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 px-3 py-2.5 bg-base-100">
+                    <span class="badge badge-secondary badge-outline badge-sm whitespace-nowrap">Chapter {{ row.chapter?.chapterNo || '?' }}</span>
+                    <div class="min-w-0"><RouterLink v-if="row.character" :to="`/characters/${row.characterId}`" class="text-sm font-medium link link-hover truncate block">{{ getCharacterName(row.character) }}</RouterLink><span v-else class="text-sm">角色 #{{ row.characterId }}</span><p class="text-[10px] text-base-content/45">{{ formatDate(row.chapter?.chapterStartAt || row.event?.startAt) }}</p></div>
+                    <div class="text-right"><p class="text-sm font-bold">{{ formatNumber(row.point) }}</p><p class="text-[10px]" :class="row.rank ? 'text-secondary' : 'text-base-content/35'">{{ row.rank ? `Rank #${formatNumber(row.rank)}` : 'No rank' }}</p></div>
+                  </div>
+                </div>
+              </div>
+            </article>
+          </div>
+          <div v-else class="card bg-base-100 border border-base-200"><div class="card-body items-center py-12 text-base-content/45">没有匹配的 World Bloom 记录</div></div>
         </template>
       </section>
 
