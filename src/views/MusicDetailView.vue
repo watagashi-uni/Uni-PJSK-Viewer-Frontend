@@ -4,12 +4,13 @@ import { useSeoMeta, useHead } from '@unhead/vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
+import { useAccountStore } from '@/stores/account'
 import { Mp3Encoder } from '@breezystack/lamejs'
 import {
   Play, Pause, BarChart2, Eye, Download, ChevronLeft, ChevronDown,
   Disc3, Sparkles, Mic, Volume2, VolumeX, SkipBack, SkipForward,
   PlayCircle, Zap, X, FileImage, Loader2, ZoomIn, ZoomOut, Maximize,
-  Activity
+  Activity, CheckCircle2, LockKeyhole
 } from 'lucide-vue-next'
 import AssetImage from '@/components/AssetImage.vue'
 import { alignFurigana } from '@/utils/furigana'
@@ -94,6 +95,7 @@ const route = useRoute()
 const router = useRouter()
 const masterStore = useMasterStore()
 const settingsStore = useSettingsStore()
+const accountStore = useAccountStore()
 
 const musicId = computed(() => Number(route.params.id))
 const music = ref<Music | null>(null)
@@ -175,6 +177,17 @@ const pendingAutoPlay = ref(false)  // 待恢复的播放状态
 
 // 当前选中的声乐
 const currentVocal = computed(() => vocals.value[currentVocalIndex.value] || null)
+const vocalOwnershipRows = computed<any[] | null>(() => {
+  if (!accountStore.currentUserId) return null
+  const suite = accountStore.getSuiteCache(accountStore.currentUserId)
+  const rows = suite?.userMusicVocals ?? suite?.user_music_vocals
+  return Array.isArray(rows) ? rows : null
+})
+const ownedVocalIds = computed(() => new Set((vocalOwnershipRows.value || [])
+  .map(row => Number(row?.musicVocalId ?? row?.music_vocal_id))
+  .filter(Number.isFinite)))
+const hasVocalOwnership = computed(() => vocalOwnershipRows.value !== null)
+const ownedVocalCount = computed(() => vocals.value.filter(vocal => ownedVocalIds.value.has(vocal.id)).length)
 
 const audioTrimStartSec = computed(() => {
   if (!music.value) return 0
@@ -1292,7 +1305,14 @@ const isExpired = computed(() => {
 
               <!-- 当前播放版本信息 -->
               <div class="mb-4 p-3 bg-base-200/30 rounded-xl">
-                <p class="font-semibold text-base-content">{{ currentVocal?.caption || '加载中...' }}</p>
+                <div class="flex flex-wrap items-center gap-2">
+                  <p class="font-semibold text-base-content">{{ currentVocal?.caption || '加载中...' }}</p>
+                  <span v-if="currentVocal && hasVocalOwnership" class="badge badge-sm gap-1" :class="ownedVocalIds.has(currentVocal.id) ? 'badge-success' : 'badge-ghost'">
+                    <CheckCircle2 v-if="ownedVocalIds.has(currentVocal.id)" class="w-3 h-3" />
+                    <LockKeyhole v-else class="w-3 h-3" />
+                    {{ ownedVocalIds.has(currentVocal.id) ? '已解锁' : '未解锁' }}
+                  </span>
+                </div>
                 <p v-if="currentVocal && getVocalSingers(currentVocal)" class="text-sm text-base-content/60 flex items-center gap-1 mt-1">
                   <Mic class="w-3 h-3 shrink-0" />
                   <span>{{ getVocalSingers(currentVocal) }}</span>
@@ -1373,7 +1393,7 @@ const isExpired = computed(() => {
 
               <!-- 版本选择列表 -->
               <div v-if="vocals.length > 1" class="mt-5 pt-4 border-t border-base-200/50">
-                <p class="text-xs text-base-content/60 mb-3 font-medium">选择版本 ({{ vocals.length }})</p>
+                <p class="text-xs text-base-content/60 mb-3 font-medium">选择版本 ({{ vocals.length }})<span v-if="hasVocalOwnership"> · 账号已解锁 {{ ownedVocalCount }}/{{ vocals.length }}</span></p>
                 <div class="max-h-48 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
                   <button
                     v-for="(vocal, index) in vocals"
@@ -1408,6 +1428,7 @@ const isExpired = computed(() => {
                         {{ getVocalSingers(vocal) }}
                       </p>
                     </div>
+                    <span v-if="hasVocalOwnership" class="badge badge-xs shrink-0" :class="ownedVocalIds.has(vocal.id) ? 'badge-success' : 'badge-ghost'">{{ ownedVocalIds.has(vocal.id) ? '已解锁' : '未解锁' }}</span>
                   </button>
                 </div>
               </div>
