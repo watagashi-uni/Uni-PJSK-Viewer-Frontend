@@ -69,6 +69,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '故事档案' },
     },
     {
+        path: '/area-items',
+        name: 'AreaItems',
+        component: () => import('@/views/AreaItemsView.vue'),
+        meta: { title: '区域道具规划' },
+    },
+    {
         path: '/card-collection',
         name: 'CardCollection',
         component: () => import('@/views/CardCollectionView.vue'),

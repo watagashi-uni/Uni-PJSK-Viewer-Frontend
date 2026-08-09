@@ -8,7 +8,7 @@ import { useSettingsStore } from '@/stores/settings'
 import { useAccountStore } from '@/stores/account'
 import { useOAuthStore } from '@/stores/oauth'
 import { useNotificationStore } from '@/stores/notification'
-import { Music, Image, BarChart3, Info, Settings, Calendar, Gift, Zap, User, RefreshCw, Github, House, Radio, Shirt, Dices, Smile, Users, Trophy, BookOpen } from 'lucide-vue-next'
+import { Music, Image, BarChart3, Info, Settings, Calendar, Gift, Zap, User, RefreshCw, Github, House, Radio, Shirt, Dices, Smile, Users, Trophy, BookOpen, Wrench } from 'lucide-vue-next'
 import AccountSelector from '@/components/AccountSelector.vue'
 
 const route = useRoute()
@@ -136,6 +136,11 @@ async function handleSuiteRefresh() {
           <li>
             <RouterLink to="/stories" active-class="active">
               <BookOpen class="w-5 h-5" /> 故事档案
+            </RouterLink>
+          </li>
+          <li>
+            <RouterLink to="/area-items" active-class="active">
+              <Wrench class="w-5 h-5" /> 区域道具规划
             </RouterLink>
           </li>
           <li>
