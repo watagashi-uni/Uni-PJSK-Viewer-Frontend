@@ -2072,7 +2072,7 @@ function closeFixtureDetail() {
               <span class="absolute left-2 top-2 badge border-0 bg-black/30 text-white">{{ phenomenaTimeLabels[row.timePeriodType] || row.timePeriodType }}</span>
               <span class="absolute right-2 top-2 text-[10px] font-medium text-white/75">#{{ row.id }}</span>
               <div class="absolute inset-0 flex flex-col items-center justify-center px-3 text-center text-white [text-shadow:0_1px_4px_rgb(0_0_0_/_0.45)]">
-                <CloudSun class="h-8 w-8 opacity-80" />
+                <AssetImage :src="`${mysekaiAssetsHost}/ondemand/mysekai/thumbnail/phenomena/${row.iconAssetbundleName}.png`" :alt="row.name" class="h-12 w-12 object-contain drop-shadow-md" />
                 <p class="mt-1 text-lg font-black tracking-wide">{{ row.englishName }}</p>
               </div>
             </div>
