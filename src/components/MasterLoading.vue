@@ -17,12 +17,7 @@ const masterStore = useMasterStore()
           
           <!-- Loading Text -->
           <p class="mt-4 text-base-content/70 text-lg font-medium">
-            正在加载数据...
-          </p>
-          
-          <!-- Current File -->
-          <p v-if="masterStore.loadingFile" class="text-sm text-base-content/50 mt-1">
-            {{ masterStore.loadingFile }}.json
+            正在准备游戏资料...
           </p>
           
           <!-- Progress Dots Animation -->

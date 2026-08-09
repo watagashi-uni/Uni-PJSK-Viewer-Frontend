@@ -57,39 +57,41 @@ function goToPage(page: number) {
 </script>
 
 <template>
-  <div class="flex flex-wrap items-center justify-center gap-4 mt-8">
+  <div class="mt-8 flex w-full min-w-0 flex-wrap items-center justify-center gap-4">
     <!-- 分页按钮 -->
-    <div class="join bg-base-100 shadow-lg rounded-full p-2">
-      <!-- 上一页 -->
-      <button 
-        class="join-item btn btn-sm btn-ghost"
-        :disabled="currentPage === 1"
-        @click="goToPage(currentPage - 1)"
-      >
-        «
-      </button>
-
-      <!-- 页码 -->
-      <template v-for="page in visiblePages" :key="page">
-        <button 
-          v-if="typeof page === 'number'"
-          class="join-item btn btn-sm"
-          :class="page === currentPage ? 'btn-primary' : 'btn-ghost'"
-          @click="goToPage(page)"
+    <div class="max-w-full overflow-x-auto rounded-full pb-1">
+      <div class="join w-max bg-base-100 p-2 shadow-lg">
+        <!-- 上一页 -->
+        <button
+          class="join-item btn btn-sm btn-ghost"
+          :disabled="currentPage === 1"
+          @click="goToPage(currentPage - 1)"
         >
-          {{ page }}
+          «
         </button>
-        <span v-else class="join-item btn btn-sm btn-ghost btn-disabled">...</span>
-      </template>
 
-      <!-- 下一页 -->
-      <button 
-        class="join-item btn btn-sm btn-ghost"
-        :disabled="currentPage === totalPages"
-        @click="goToPage(currentPage + 1)"
-      >
-        »
-      </button>
+        <!-- 页码 -->
+        <template v-for="page in visiblePages" :key="page">
+          <button
+            v-if="typeof page === 'number'"
+            class="join-item btn btn-sm"
+            :class="page === currentPage ? 'btn-primary' : 'btn-ghost'"
+            @click="goToPage(page)"
+          >
+            {{ page }}
+          </button>
+          <span v-else class="join-item btn btn-sm btn-ghost btn-disabled">...</span>
+        </template>
+
+        <!-- 下一页 -->
+        <button
+          class="join-item btn btn-sm btn-ghost"
+          :disabled="currentPage === totalPages"
+          @click="goToPage(currentPage + 1)"
+        >
+          »
+        </button>
+      </div>
     </div>
 
     <!-- 跳转输入框 -->

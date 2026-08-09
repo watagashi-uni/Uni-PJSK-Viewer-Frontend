@@ -306,7 +306,7 @@ onMounted(async () => {
     characters.value = characterData
   } catch (error) {
     console.error('加载称号图鉴失败:', error)
-    loadError.value = error instanceof Error ? error.message : 'Master 数据加载失败'
+    loadError.value = '游戏资料加载失败，请稍后重试'
   } finally {
     isLoading.value = false
   }
@@ -314,10 +314,10 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="max-w-7xl mx-auto space-y-6">
+  <div class="mx-auto max-w-7xl min-w-0 space-y-6">
     <PageHeader title="称号图鉴" description="浏览普通、活动排名与角色羁绊称号，并结合账号查看持有状态。">
       <template #icon><Trophy class="w-8 h-8 text-warning" /></template>
-      <template v-if="accountStore.accounts.length" #actions><div class="sm:w-56"><AccountSelector v-model="selectedUserId" /></div></template>
+      <template v-if="accountStore.accounts.length" #actions><div class="w-full min-w-0 sm:w-56"><AccountSelector v-model="selectedUserId" /></div></template>
     </PageHeader>
 
     <div role="tablist" class="tabs tabs-box bg-base-100 border border-base-200 w-fit">
@@ -335,29 +335,29 @@ onMounted(async () => {
     <div v-else-if="loadError" class="alert alert-error">称号数据加载失败：{{ loadError }}</div>
 
     <template v-else-if="activeTab === 'normal'">
-      <section class="card bg-base-100 border border-base-200 shadow-sm">
-        <div class="card-body p-4 gap-3">
-          <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-[minmax(240px,1fr)_180px_160px_280px] gap-3">
-            <label class="input input-bordered flex items-center gap-2">
+      <section class="card min-w-0 bg-base-100 border border-base-200 shadow-sm">
+        <div class="card-body min-w-0 p-4 gap-3">
+          <div class="grid min-w-0 grid-cols-1 md:grid-cols-2 xl:grid-cols-[minmax(240px,1fr)_180px_160px_280px] gap-3">
+            <label class="input input-bordered flex min-w-0 max-w-full items-center gap-2">
               <Search class="w-4 h-4 opacity-50" />
               <input v-model="normalSearch" class="grow min-w-0" placeholder="搜索名称、条件或 ID…" />
               <button v-if="normalSearch" class="btn btn-ghost btn-xs btn-circle" aria-label="清空" @click="normalSearch = ''"><X class="w-3 h-3" /></button>
             </label>
-            <select v-model="selectedHonorType" class="select select-bordered w-full">
+            <select v-model="selectedHonorType" class="select select-bordered w-full min-w-0 max-w-full">
               <option value="">全部类型</option>
               <option v-for="option in typeOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
             </select>
-            <select v-model="selectedRarity" class="select select-bordered w-full">
+            <select v-model="selectedRarity" class="select select-bordered w-full min-w-0 max-w-full">
               <option value="">全部稀有度</option>
               <option v-for="option in rarityOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
             </select>
-            <select v-model.number="selectedEventGroup" class="select select-bordered w-full" :disabled="selectedHonorType !== 'event'">
+            <select v-model.number="selectedEventGroup" class="select select-bordered w-full min-w-0 max-w-full" :disabled="selectedHonorType !== 'event'">
               <option :value="0">全部活动</option>
               <option v-for="group in eventGroupOptions" :key="group.id" :value="group.id">#{{ group.id }} {{ group.name }}</option>
             </select>
           </div>
           <div class="flex flex-wrap items-center gap-4">
-            <p class="text-sm text-base-content/55">找到 {{ filteredHonors.length }} 个称号<span v-if="hasNormalOwnership"> · 当前 master 可显示 {{ visibleNormalOwnedCount }} / {{ honors.length }} 个已拥有称号<span v-if="visibleNormalOwnedCount !== normalOwnedMap.size">（账号记录 {{ normalOwnedMap.size }}）</span></span></p>
+            <p class="text-sm text-base-content/55">找到 {{ filteredHonors.length }} 个称号<span v-if="hasNormalOwnership"> · 资料库可匹配 {{ visibleNormalOwnedCount }} / {{ honors.length }} 个已拥有称号<span v-if="visibleNormalOwnedCount !== normalOwnedMap.size">（账号记录 {{ normalOwnedMap.size }}）</span></span></p>
             <label class="label cursor-pointer gap-2 ml-auto"><input v-model="normalOwnedOnly" type="checkbox" class="checkbox checkbox-sm checkbox-primary" :disabled="!hasNormalOwnership" /><span class="label-text">仅看已拥有</span></label>
           </div>
         </div>
@@ -368,11 +368,11 @@ onMounted(async () => {
           v-for="honor in paginatedHonors"
           :key="honor.id"
           type="button"
-          class="group card bg-base-100 border border-base-200 hover:border-primary/50 hover:shadow-md hover:-translate-y-0.5 transition-all text-left"
+          class="group card w-full min-w-0 overflow-hidden bg-base-100 border border-base-200 hover:border-primary/50 hover:shadow-md hover:-translate-y-0.5 transition-all text-left"
           @click="openHonor(honor)"
         >
-          <div class="card-body p-3 gap-2.5">
-            <div class="relative w-full max-w-[280px] mx-auto"><SekaiHonor :honor-id="honor.id" :honor-level="normalOwnedMap.get(honor.id) || maxLevel(honor.levels)" /><span v-if="normalOwnedMap.has(honor.id)" class="absolute -top-1.5 -right-1.5 badge badge-success badge-xs gap-1 shadow-sm"><CheckCircle2 class="w-3 h-3" />Lv.{{ normalOwnedMap.get(honor.id) }}</span></div>
+          <div class="card-body min-w-0 p-3 gap-2.5">
+            <div class="relative mx-auto w-full min-w-0 max-w-[280px]"><SekaiHonor :honor-id="honor.id" :honor-level="normalOwnedMap.get(honor.id) || maxLevel(honor.levels)" /><span v-if="normalOwnedMap.has(honor.id)" class="absolute -top-1.5 -right-1.5 badge badge-success badge-xs gap-1 shadow-sm"><CheckCircle2 class="w-3 h-3" />Lv.{{ normalOwnedMap.get(honor.id) }}</span></div>
             <div class="min-w-0">
               <div class="flex flex-wrap gap-2 mb-1">
                 <span class="badge badge-sm badge-ghost">#{{ honor.id }}</span>
@@ -397,25 +397,25 @@ onMounted(async () => {
     </template>
 
     <template v-else>
-      <section class="card bg-base-100 border border-base-200 shadow-sm">
-        <div class="card-body p-4 gap-3">
-          <div class="grid grid-cols-1 md:grid-cols-[minmax(240px,1fr)_220px_180px] gap-3">
-            <label class="input input-bordered flex items-center gap-2">
+      <section class="card min-w-0 bg-base-100 border border-base-200 shadow-sm">
+        <div class="card-body min-w-0 p-4 gap-3">
+          <div class="grid min-w-0 grid-cols-1 md:grid-cols-[minmax(240px,1fr)_220px_180px] gap-3">
+            <label class="input input-bordered flex min-w-0 max-w-full items-center gap-2">
               <Search class="w-4 h-4 opacity-50" />
               <input v-model="bondsSearch" class="grow min-w-0" placeholder="搜索角色、羁绊文字或 ID…" />
               <button v-if="bondsSearch" class="btn btn-ghost btn-xs btn-circle" aria-label="清空" @click="bondsSearch = ''"><X class="w-3 h-3" /></button>
             </label>
-            <select v-model.number="selectedBondsCharacter" class="select select-bordered w-full">
+            <select v-model.number="selectedBondsCharacter" class="select select-bordered w-full min-w-0 max-w-full">
               <option :value="0">全部角色</option>
               <option v-for="character in characterOptions" :key="character.id" :value="character.id">{{ character.firstName || '' }}{{ character.givenName }}</option>
             </select>
-            <select v-model="selectedBondsRarity" class="select select-bordered w-full">
+            <select v-model="selectedBondsRarity" class="select select-bordered w-full min-w-0 max-w-full">
               <option value="">全部稀有度</option>
               <option v-for="option in rarityOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
             </select>
           </div>
           <div class="flex flex-wrap items-center gap-4">
-            <p class="text-sm text-base-content/55">找到 {{ filteredBondsHonors.length }} 个羁绊称号<span v-if="hasBondsOwnership"> · 当前 master 可显示 {{ visibleBondsOwnedCount }} / {{ bondsHonors.length }} 个已拥有称号<span v-if="visibleBondsOwnedCount !== bondsOwnedMap.size">（账号记录 {{ bondsOwnedMap.size }}）</span></span></p>
+            <p class="text-sm text-base-content/55">找到 {{ filteredBondsHonors.length }} 个羁绊称号<span v-if="hasBondsOwnership"> · 资料库可匹配 {{ visibleBondsOwnedCount }} / {{ bondsHonors.length }} 个已拥有称号<span v-if="visibleBondsOwnedCount !== bondsOwnedMap.size">（账号记录 {{ bondsOwnedMap.size }}）</span></span></p>
             <label class="label cursor-pointer gap-2 ml-auto"><input v-model="bondsOwnedOnly" type="checkbox" class="checkbox checkbox-sm checkbox-secondary" :disabled="!hasBondsOwnership" /><span class="label-text">仅看已拥有</span></label>
           </div>
         </div>
@@ -426,11 +426,11 @@ onMounted(async () => {
           v-for="honor in paginatedBondsHonors"
           :key="honor.id"
           type="button"
-          class="group card bg-base-100 border border-base-200 hover:border-secondary/50 hover:shadow-md hover:-translate-y-0.5 transition-all text-left"
+          class="group card w-full min-w-0 overflow-hidden bg-base-100 border border-base-200 hover:border-secondary/50 hover:shadow-md hover:-translate-y-0.5 transition-all text-left"
           @click="openBondsHonor(honor)"
         >
-          <div class="card-body p-3 gap-2.5">
-            <div class="relative w-full max-w-[280px] mx-auto">
+          <div class="card-body min-w-0 p-3 gap-2.5">
+            <div class="relative mx-auto w-full min-w-0 max-w-[280px]">
               <SekaiHonorBonds
                 :honor-id="honor.id"
                 :honor-level="bondsOwnedMap.get(honor.id) || maxLevel(honor.levels)"
@@ -438,13 +438,13 @@ onMounted(async () => {
               />
               <span v-if="bondsOwnedMap.has(honor.id)" class="absolute -top-1.5 -right-1.5 badge badge-success badge-xs gap-1 shadow-sm"><CheckCircle2 class="w-3 h-3" />Lv.{{ bondsOwnedMap.get(honor.id) }}</span>
             </div>
-            <div>
+            <div class="min-w-0">
               <div class="flex flex-wrap gap-2 mb-1">
                 <span class="badge badge-sm badge-ghost">#{{ honor.id }}</span>
                 <span class="badge badge-sm badge-outline">{{ getRarityLabel(honor.honorRarity) }}</span>
                 <span class="badge badge-sm badge-outline">{{ wordsByBondsGroup.get(honor.bondsGroupId)?.length || 0 }} 种文字</span>
               </div>
-              <h2 class="font-bold">{{ getCharacterNameByUnitId(honor.gameCharacterUnitId1) }} × {{ getCharacterNameByUnitId(honor.gameCharacterUnitId2) }}</h2>
+              <h2 class="truncate font-bold">{{ getCharacterNameByUnitId(honor.gameCharacterUnitId1) }} × {{ getCharacterNameByUnitId(honor.gameCharacterUnitId2) }}</h2>
               <p class="text-xs text-base-content/55 truncate mt-1">{{ lastDescription(honor.levels) }}</p>
             </div>
           </div>
@@ -466,10 +466,10 @@ onMounted(async () => {
         <button class="btn btn-sm btn-circle btn-ghost absolute right-3 top-3" aria-label="关闭" @click="selectedHonor = null"><X class="w-4 h-4" /></button>
         <h2 class="font-bold text-xl pr-10">{{ honorGroupMap.get(selectedHonor.groupId)?.name || selectedHonor.name }}</h2>
         <p class="text-sm text-base-content/55 mt-1">称号 #{{ selectedHonor.id }} · {{ getTypeLabel(honorGroupMap.get(selectedHonor.groupId)?.honorType) }}<span v-if="normalOwnedMap.has(selectedHonor.id)" class="text-success font-medium"> · 已拥有 Lv.{{ normalOwnedMap.get(selectedHonor.id) }}</span></p>
-        <div class="bg-base-200 rounded-xl p-4 my-5"><div class="max-w-[340px] mx-auto"><SekaiHonor :honor-id="selectedHonor.id" :honor-level="selectedHonorLevel" /></div></div>
+        <div class="bg-base-200 rounded-xl p-4 my-5"><div class="mx-auto w-full min-w-0 max-w-[340px]"><SekaiHonor :honor-id="selectedHonor.id" :honor-level="selectedHonorLevel" /></div></div>
         <label class="form-control w-full">
           <span class="label-text mb-2">展示等级</span>
-          <select v-model.number="selectedHonorLevel" class="select select-bordered">
+          <select v-model.number="selectedHonorLevel" class="select select-bordered w-full min-w-0 max-w-full">
             <option v-for="level in selectedHonor.levels" :key="level.level" :value="level.level">Lv.{{ level.level }} — {{ level.description }}</option>
           </select>
         </label>
@@ -483,7 +483,7 @@ onMounted(async () => {
         <h2 class="font-bold text-xl pr-10">{{ getCharacterNameByUnitId(selectedBondsHonor.gameCharacterUnitId1) }} × {{ getCharacterNameByUnitId(selectedBondsHonor.gameCharacterUnitId2) }}</h2>
         <p class="text-sm text-base-content/55 mt-1">羁绊称号 #{{ selectedBondsHonor.id }}<span v-if="bondsOwnedMap.has(selectedBondsHonor.id)" class="text-success font-medium"> · 已拥有 Lv.{{ bondsOwnedMap.get(selectedBondsHonor.id) }}</span></p>
         <div class="bg-base-200 rounded-xl p-4 my-5">
-          <div class="max-w-[340px] mx-auto">
+          <div class="mx-auto w-full min-w-0 max-w-[340px]">
             <SekaiHonorBonds
               :honor-id="selectedBondsHonor.id"
               :honor-level="selectedBondsLevel"
@@ -495,13 +495,13 @@ onMounted(async () => {
         <div class="grid md:grid-cols-2 gap-3">
           <label class="form-control">
             <span class="label-text mb-2">展示等级</span>
-            <select v-model.number="selectedBondsLevel" class="select select-bordered">
+            <select v-model.number="selectedBondsLevel" class="select select-bordered w-full min-w-0 max-w-full">
               <option v-for="level in selectedBondsHonor.levels" :key="level.level" :value="level.level">Lv.{{ level.level }} — {{ level.description }}</option>
             </select>
           </label>
           <label class="form-control">
             <span class="label-text mb-2">称号文字</span>
-            <select v-model.number="selectedBondsWordId" class="select select-bordered">
+            <select v-model.number="selectedBondsWordId" class="select select-bordered w-full min-w-0 max-w-full">
               <option v-for="word in selectedBondsWords" :key="word.id" :value="word.id">{{ word.name }}</option>
             </select>
           </label>

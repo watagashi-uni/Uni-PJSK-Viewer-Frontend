@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { CalendarDays, CheckCircle2, Flower2, History, LayoutGrid, ListChecks, Search, Star, Swords } from 'lucide-vue-next'
+import { CalendarDays, CheckCircle2, Flower2, Gift, History, LayoutGrid, ListChecks, Search, Star, Swords } from 'lucide-vue-next'
 import AccountSelector from '@/components/AccountSelector.vue'
 import AssetImage from '@/components/AssetImage.vue'
 import PageHeader from '@/components/PageHeader.vue'
@@ -66,6 +66,36 @@ interface UserChallengeStage {
   characterId: number
   rank: number
   challengeLiveStageStatus: string
+}
+
+interface ChallengeLiveStageMaster {
+  id: number
+  characterId: number
+  rank: number
+  name: string
+  nextStageChallengePoint: number
+  completeStageResourceBoxId: number
+  completeStageCharacterExp: number
+}
+
+interface ChallengeLiveHighScoreReward {
+  id: number
+  characterId: number
+  highScore: number
+  resourceBoxId: number
+}
+
+interface ResourceBoxDetail {
+  seq: number
+  resourceType: string
+  resourceId?: number
+  resourceQuantity: number
+}
+
+interface ResourceBoxMaster {
+  id: number
+  resourceBoxPurpose: string
+  details: ResourceBoxDetail[]
 }
 
 interface RankMatchSeason {
@@ -180,6 +210,10 @@ const worldBlooms = ref<WorldBloomInfo[]>([])
 const characters = ref<GameCharacterData[]>([])
 const characterMissions = ref<CharacterMissionInfo[]>([])
 const characterMissionParameters = ref<CharacterMissionParameter[]>([])
+const challengeLiveStages = ref<ChallengeLiveStageMaster[]>([])
+const challengeLiveHighScoreRewards = ref<ChallengeLiveHighScoreReward[]>([])
+const resourceBoxes = ref<ResourceBoxMaster[]>([])
+const materials = ref<NamedMaster[]>([])
 const isLoading = ref(true)
 const loadError = ref('')
 const activeTab = ref<RecordsTab>('events')
@@ -372,14 +406,78 @@ const challengeStageMap = computed(() => {
   return result
 })
 
+const challengeStageMasterGroups = computed(() => {
+  const result = new Map<number, ChallengeLiveStageMaster[]>()
+  for (const row of challengeLiveStages.value) {
+    if (!result.has(row.characterId)) result.set(row.characterId, [])
+    result.get(row.characterId)!.push(row)
+  }
+  for (const rows of result.values()) rows.sort((a, b) => a.rank - b.rank)
+  return result
+})
+
+const challengeHighScoreRewardGroups = computed(() => {
+  const result = new Map<number, ChallengeLiveHighScoreReward[]>()
+  for (const row of challengeLiveHighScoreRewards.value) {
+    if (!result.has(row.characterId)) result.set(row.characterId, [])
+    result.get(row.characterId)!.push(row)
+  }
+  for (const rows of result.values()) rows.sort((a, b) => a.highScore - b.highScore)
+  return result
+})
+
+const challengeRewardBoxMap = computed(() => new Map(resourceBoxes.value
+  .filter(row => row.resourceBoxPurpose === 'challenge_live_stage' || row.resourceBoxPurpose === 'challenge_live_high_score')
+  .map(row => [`${row.resourceBoxPurpose}_${row.id}`, row])))
+
+const materialMap = computed(() => new Map(materials.value.map(row => [row.id, row])))
+
+function challengeRewardDetails(purpose: 'challenge_live_stage' | 'challenge_live_high_score', resourceBoxId: number): ResourceBoxDetail[] {
+  return challengeRewardBoxMap.value.get(`${purpose}_${resourceBoxId}`)?.details || []
+}
+
+function challengeRewardName(row: ResourceBoxDetail): string {
+  if (row.resourceType === 'jewel') return '水晶'
+  if (row.resourceType === 'coin') return '金币'
+  if (row.resourceType === 'material' && row.resourceId) return materialMap.value.get(row.resourceId)?.name || `素材 #${row.resourceId}`
+  return `${row.resourceType}${row.resourceId ? ` #${row.resourceId}` : ''}`
+}
+
+function challengeRewardIcon(row: ResourceBoxDetail): string {
+  if (row.resourceType === 'jewel' || row.resourceType === 'coin') return `${assetsHost.value}/startapp/thumbnail/common_material/${row.resourceType}.png`
+  if (row.resourceType === 'material' && row.resourceId) return `${assetsHost.value}/startapp/thumbnail/material/material${row.resourceId}.png`
+  return ''
+}
+
 const challengeRows = computed(() => {
   const query = challengeSearch.value.trim().toLocaleLowerCase()
-  return userChallengeDecks.value.map(deck => ({
-    deck,
-    character: characterMap.value.get(Number(deck.characterId)),
-    highScore: challengeResultMap.value.get(Number(deck.characterId)) || 0,
-    maxStage: challengeStageMap.value.get(Number(deck.characterId)) || 0,
-  })).filter(row => !query || [
+  return userChallengeDecks.value.map(deck => {
+    const characterId = Number(deck.characterId)
+    const highScore = challengeResultMap.value.get(characterId) || 0
+    const maxStage = challengeStageMap.value.get(characterId) || 0
+    const stageRows = challengeStageMasterGroups.value.get(characterId) || []
+    const scoreRewardRows = challengeHighScoreRewardGroups.value.get(characterId) || []
+    const clearedScoreRewards = scoreRewardRows.filter(reward => reward.highScore <= highScore)
+    const nextScoreReward = scoreRewardRows.find(reward => reward.highScore > highScore) || null
+    const previousScore = clearedScoreRewards[clearedScoreRewards.length - 1]?.highScore || 0
+    const scoreProgress = nextScoreReward
+      ? Math.min(100, Math.max(0, (highScore - previousScore) / Math.max(1, nextScoreReward.highScore - previousScore) * 100))
+      : 100
+    const nextStage = stageRows.find(stage => stage.rank > maxStage) || null
+    return {
+      deck,
+      character: characterMap.value.get(characterId),
+      highScore,
+      maxStage,
+      clearedScoreRewardCount: clearedScoreRewards.length,
+      totalScoreRewardCount: scoreRewardRows.length,
+      nextScoreReward,
+      nextScoreRewardDetails: nextScoreReward ? challengeRewardDetails('challenge_live_high_score', nextScoreReward.resourceBoxId) : [],
+      scoreProgress,
+      nextStage,
+      nextStageRewardDetails: nextStage ? challengeRewardDetails('challenge_live_stage', nextStage.completeStageResourceBoxId) : [],
+    }
+  }).filter(row => !query || [
     row.deck.characterId,
     row.character ? getCharacterName(row.character) : '',
   ].some(value => String(value || '').toLocaleLowerCase().includes(query)))
@@ -395,10 +493,13 @@ const challengeSummary = computed(() => {
     characterId: Number(deck.characterId),
     highScore: challengeResultMap.value.get(Number(deck.characterId)) || 0,
     maxStage: challengeStageMap.value.get(Number(deck.characterId)) || 0,
+    clearedScoreRewards: (challengeHighScoreRewardGroups.value.get(Number(deck.characterId)) || [])
+      .filter(reward => reward.highScore <= (challengeResultMap.value.get(Number(deck.characterId)) || 0)).length,
   }))
   return {
     deckCount: rows.length,
-    totalScore: rows.reduce((sum, row) => sum + row.highScore, 0),
+    clearedScoreRewards: rows.reduce((sum, row) => sum + row.clearedScoreRewards, 0),
+    totalScoreRewards: rows.reduce((sum, row) => sum + (challengeHighScoreRewardGroups.value.get(row.characterId)?.length || 0), 0),
     bestScore: rows.reduce((best, row) => row.highScore > best.highScore ? row : best, { characterId: 0, highScore: 0, maxStage: 0 }),
     maxStage: rows.reduce((best, row) => row.maxStage > best.maxStage ? row : best, { characterId: 0, highScore: 0, maxStage: 0 }),
   }
@@ -581,7 +682,7 @@ watch(eventTotalPages, total => { eventPage.value = Math.min(eventPage.value, to
 
 onMounted(async () => {
   try {
-    const [eventData, seasonData, tierData, gradeData, classData, cardData, bloomData, characterData, missionData, missionParameterData] = await Promise.all([
+    const [eventData, seasonData, tierData, gradeData, classData, cardData, bloomData, characterData, missionData, missionParameterData, challengeStageData, challengeScoreRewardData, resourceBoxData, materialData] = await Promise.all([
       masterStore.getMaster<EventInfo>('events'),
       masterStore.getMaster<RankMatchSeason>('rankMatchSeasons'),
       masterStore.getMaster<RankMatchTier>('rankMatchTiers'),
@@ -592,6 +693,10 @@ onMounted(async () => {
       masterStore.getMaster<GameCharacterData>('gameCharacters'),
       masterStore.getMaster<CharacterMissionInfo>('characterMissionV2s'),
       masterStore.getMaster<CharacterMissionParameter>('characterMissionV2ParameterGroups'),
+      masterStore.getMaster<ChallengeLiveStageMaster>('challengeLiveStages'),
+      masterStore.getMaster<ChallengeLiveHighScoreReward>('challengeLiveHighScoreRewards'),
+      masterStore.getMaster<ResourceBoxMaster>('resourceBoxes'),
+      masterStore.getMaster<NamedMaster>('materials'),
     ])
     events.value = eventData
     rankMatchSeasons.value = seasonData
@@ -603,9 +708,13 @@ onMounted(async () => {
     characters.value = characterData
     characterMissions.value = missionData
     characterMissionParameters.value = missionParameterData
+    challengeLiveStages.value = challengeStageData
+    challengeLiveHighScoreRewards.value = challengeScoreRewardData
+    resourceBoxes.value = resourceBoxData
+    materials.value = materialData
   } catch (error) {
     console.error('加载账号记录数据失败:', error)
-    loadError.value = error instanceof Error ? error.message : 'Master 数据加载失败'
+    loadError.value = '游戏资料加载失败，请稍后重试'
   } finally {
     isLoading.value = false
   }
@@ -621,7 +730,7 @@ onMounted(async () => {
 
     <div v-if="isLoading" class="space-y-4"><div class="skeleton h-24 rounded-xl"></div><div class="skeleton h-96 rounded-xl"></div></div>
     <div v-else-if="loadError" class="alert alert-error">账号记录加载失败：{{ loadError }}</div>
-    <div v-else-if="!selectedUserId" class="alert alert-info"><span>请先在个人信息页添加账号并刷新 Suite。</span><RouterLink to="/profile" class="btn btn-sm btn-primary">前往个人信息</RouterLink></div>
+    <div v-else-if="!selectedUserId" class="alert alert-info flex-col items-stretch sm:flex-row sm:items-center"><span class="min-w-0 flex-1">请先在个人信息页添加账号并刷新 Suite。</span><RouterLink to="/profile" class="btn btn-sm btn-primary w-full shrink-0 whitespace-nowrap sm:w-auto">前往个人信息</RouterLink></div>
     <template v-else>
       <div class="tabs tabs-boxed bg-base-100 p-1 w-fit max-w-full h-auto flex-wrap shadow-sm">
         <button class="tab gap-2" :class="{ 'tab-active': activeTab === 'events' }" @click="activeTab = 'events'"><CalendarDays class="w-4 h-4" />活动履历</button>
@@ -735,7 +844,7 @@ onMounted(async () => {
         <template v-else>
           <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <div class="stat bg-base-100 shadow-sm rounded-xl p-4"><div class="stat-title text-xs">角色卡组</div><div class="stat-value text-2xl">{{ challengeSummary.deckCount }}</div></div>
-            <div class="stat bg-base-100 shadow-sm rounded-xl p-4"><div class="stat-title text-xs">角色最高分合计</div><div class="stat-value text-xl text-primary">{{ formatNumber(challengeSummary.totalScore) }}</div></div>
+            <div class="stat bg-base-100 shadow-sm rounded-xl p-4"><div class="stat-title text-xs">已达成高分奖励</div><div class="stat-value text-xl text-primary">{{ formatNumber(challengeSummary.clearedScoreRewards) }}</div><div class="stat-desc">共 {{ formatNumber(challengeSummary.totalScoreRewards) }} 个里程碑</div></div>
             <div class="stat bg-base-100 shadow-sm rounded-xl p-4"><div class="stat-title text-xs">单角色最高分</div><div class="stat-value text-xl">{{ formatNumber(challengeSummary.bestScore.highScore) }}</div><div class="stat-desc">{{ characterMap.get(challengeSummary.bestScore.characterId) ? getCharacterName(characterMap.get(challengeSummary.bestScore.characterId)!) : '-' }}</div></div>
             <div class="stat bg-base-100 shadow-sm rounded-xl p-4"><div class="stat-title text-xs">最高完成 Stage</div><div class="stat-value text-xl text-secondary">{{ challengeSummary.maxStage.maxStage }}</div><div class="stat-desc">{{ characterMap.get(challengeSummary.maxStage.characterId) ? getCharacterName(characterMap.get(challengeSummary.maxStage.characterId)!) : '-' }}</div></div>
           </div>
@@ -751,6 +860,39 @@ onMounted(async () => {
                   <div v-for="(card, index) in challengeDeckCards(row.deck)" :key="card.cardId" class="min-w-0">
                     <RouterLink :to="`/cards/${card.cardId}`" class="block hover:scale-105 transition-transform"><SekaiCard v-if="card.master" :card="card.master" :trained="card.user?.defaultImage === 'special_training'" :master-rank="card.user?.masterRank || 0" /></RouterLink>
                     <p class="text-[10px] text-center mt-1 truncate"><span v-if="index === 0" class="text-primary font-bold">Leader · </span>Lv.{{ card.user?.level || '?' }}</p>
+                  </div>
+                </div>
+                <div class="grid grid-cols-2 gap-2 border-t border-base-200 pt-2.5">
+                  <div class="min-w-0 rounded-xl bg-base-200/55 p-2.5">
+                    <div class="flex items-center justify-between gap-2"><p class="flex items-center gap-1 text-[11px] font-bold"><Gift class="h-3.5 w-3.5 text-primary" />高分奖励</p><span class="text-[9px] text-base-content/40">{{ row.clearedScoreRewardCount }}/{{ row.totalScoreRewardCount }}</span></div>
+                    <template v-if="row.nextScoreReward">
+                      <div class="mt-1.5 flex items-baseline justify-between gap-1"><strong class="truncate text-xs">{{ formatNumber(row.nextScoreReward.highScore) }} 分</strong><span class="shrink-0 text-[9px] text-primary">还差 {{ formatNumber(row.nextScoreReward.highScore - row.highScore) }}</span></div>
+                      <progress class="progress progress-primary mt-1 h-1.5 w-full" :value="row.scoreProgress" max="100"></progress>
+                      <div class="mt-2 space-y-1">
+                        <div v-for="reward in row.nextScoreRewardDetails" :key="`${reward.seq}-${reward.resourceType}-${reward.resourceId || 0}`" class="flex min-w-0 items-center gap-1.5">
+                          <AssetImage v-if="challengeRewardIcon(reward)" :src="challengeRewardIcon(reward)" :alt="challengeRewardName(reward)" class="h-6 w-6 shrink-0 object-contain" />
+                          <Gift v-else class="h-5 w-5 shrink-0 text-primary" />
+                          <span class="min-w-0 truncate text-[10px]">{{ challengeRewardName(reward) }}</span><strong class="ml-auto shrink-0 text-[10px]">×{{ formatNumber(reward.resourceQuantity) }}</strong>
+                        </div>
+                      </div>
+                    </template>
+                    <p v-else class="mt-2 flex items-center gap-1 text-xs font-bold text-success"><CheckCircle2 class="h-3.5 w-3.5" />全部达成</p>
+                  </div>
+                  <div class="min-w-0 rounded-xl bg-base-200/55 p-2.5">
+                    <div class="flex items-center justify-between gap-2"><p class="flex items-center gap-1 text-[11px] font-bold"><Star class="h-3.5 w-3.5 text-secondary" />下一 Stage</p><span class="text-[9px] text-base-content/40">当前 {{ row.maxStage }}</span></div>
+                    <template v-if="row.nextStage">
+                      <p class="mt-1.5 text-xs font-bold">Stage {{ row.nextStage.rank }}</p>
+                      <p class="mt-0.5 text-[9px] text-base-content/50">Challenge Point {{ formatNumber(row.nextStage.nextStageChallengePoint) }}</p>
+                      <div class="mt-2 space-y-1">
+                        <div v-for="reward in row.nextStageRewardDetails" :key="`${reward.seq}-${reward.resourceType}-${reward.resourceId || 0}`" class="flex min-w-0 items-center gap-1.5">
+                          <AssetImage v-if="challengeRewardIcon(reward)" :src="challengeRewardIcon(reward)" :alt="challengeRewardName(reward)" class="h-6 w-6 shrink-0 object-contain" />
+                          <Gift v-else class="h-5 w-5 shrink-0 text-secondary" />
+                          <span class="min-w-0 truncate text-[10px]">{{ challengeRewardName(reward) }}</span><strong class="ml-auto shrink-0 text-[10px]">×{{ formatNumber(reward.resourceQuantity) }}</strong>
+                        </div>
+                        <div v-if="row.nextStage.completeStageCharacterExp" class="flex items-center justify-between gap-2 text-[10px]"><span>Character EXP</span><strong>+{{ row.nextStage.completeStageCharacterExp }}</strong></div>
+                      </div>
+                    </template>
+                    <p v-else class="mt-2 flex items-center gap-1 text-xs font-bold text-success"><CheckCircle2 class="h-3.5 w-3.5" />全部完成</p>
                   </div>
                 </div>
               </div>

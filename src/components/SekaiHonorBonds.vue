@@ -417,6 +417,8 @@ watch(() => [props.honorId, props.honorLevel, props.bondsHonorWordId, props.bond
 <style scoped>
 .sekai-honor-bonds {
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   height: auto;
   display: block;
 }

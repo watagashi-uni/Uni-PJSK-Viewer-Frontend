@@ -245,7 +245,7 @@ onMounted(async () => {
     characters.value = characterData.filter(character => character.id <= 26).sort((a, b) => Number(a.seq || a.id) - Number(b.seq || b.id))
   } catch (error) {
     console.error('加载卡片图鉴进度失败:', error)
-    loadError.value = error instanceof Error ? error.message : 'Master 数据加载失败'
+    loadError.value = '游戏资料加载失败，请稍后重试'
   } finally {
     isLoading.value = false
     if (isSelectedFullCollection.value) celebrateFullCollection()
@@ -267,7 +267,7 @@ onMounted(async () => {
       <div v-else-if="!hasCardData" class="alert alert-info"><span>当前缓存没有卡片数据，请刷新 Suite。</span><button class="btn btn-sm" :disabled="accountStore.suiteRefreshing" @click="refreshUserCards"><RefreshCw class="w-4 h-4" :class="{ 'animate-spin': accountStore.suiteRefreshing }" />刷新</button></div>
 
       <div class="grid grid-cols-2 lg:grid-cols-5 gap-3">
-        <div class="stat bg-base-100 shadow-sm rounded-xl p-4 lg:col-span-1"><div class="stat-title text-xs">卡片收集</div><div class="stat-value text-2xl text-primary">{{ hasCardData ? collectionSummary.owned : '—' }} / {{ collectionSummary.total }}</div><div class="stat-desc"><template v-if="hasCardData">{{ formatPercent(collectionSummary.collectionRate) }}<template v-if="collectionSummary.unmapped"> · Suite {{ collectionSummary.suiteTotal }}，{{ collectionSummary.unmapped }} 张待 master</template></template><template v-else>当前 master 收录</template></div></div>
+        <div class="stat bg-base-100 shadow-sm rounded-xl p-4 lg:col-span-1"><div class="stat-title text-xs">卡片收集</div><div class="stat-value text-2xl text-primary">{{ hasCardData ? collectionSummary.owned : '—' }} / {{ collectionSummary.total }}</div><div class="stat-desc"><template v-if="hasCardData">{{ formatPercent(collectionSummary.collectionRate) }}<template v-if="collectionSummary.unmapped"> · Suite {{ collectionSummary.suiteTotal }}，{{ collectionSummary.unmapped }} 张暂未收录</template></template><template v-else>资料库共收录</template></div></div>
         <div class="stat bg-base-100 shadow-sm rounded-xl p-4"><div class="stat-title text-xs">完成特训</div><div class="stat-value text-2xl">{{ hasCardData ? `${collectionSummary.trained} / ${collectionSummary.trainable}` : '—' }}</div><div class="stat-desc">已拥有的 3★ / 4★</div></div>
         <div class="stat bg-base-100 shadow-sm rounded-xl p-4"><div class="stat-title text-xs">剧情已读</div><div class="stat-value text-2xl text-secondary">{{ hasCardData ? `${collectionSummary.storyRead} / ${collectionSummary.storyTotal}` : '—' }}</div><div class="stat-desc">前篇与后篇</div></div>
         <div class="stat bg-base-100 shadow-sm rounded-xl p-4"><div class="stat-title text-xs">突破 / 技能双满</div><div class="stat-value text-2xl">{{ hasCardData ? collectionSummary.maxed : '—' }}</div><div class="stat-desc">突破 5 · 技能 4</div></div>
