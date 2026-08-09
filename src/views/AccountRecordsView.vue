@@ -193,7 +193,7 @@ const challengeSort = ref<'character' | 'score' | 'stage'>('score')
 const missionSearch = ref('')
 const missionSort = ref<'rank' | 'completion' | 'character'>('rank')
 const selectedMissionCharacterId = ref<number | null>(null)
-const eventPageSize = 18
+const eventPageSize = 24
 
 const assetsHost = computed(() => settingsStore.assetsHost)
 const selectedUserId = computed({
@@ -642,13 +642,13 @@ onMounted(async () => {
             <div class="stat bg-base-100 shadow-sm rounded-xl p-4"><div class="stat-title text-xs">历史最佳排名</div><div class="stat-value text-xl text-secondary">#{{ eventSummary.bestRank ? formatNumber(eventSummary.bestRank.rank) : '-' }}</div><div class="stat-desc">活动 #{{ eventSummary.bestRank?.id || '-' }}</div></div>
           </div>
           <div class="card bg-base-100 shadow-sm"><div class="card-body p-4"><div class="flex flex-wrap gap-3"><label class="input input-bordered input-sm flex items-center gap-2 grow max-w-lg"><Search class="w-4 h-4 opacity-50" /><input v-model="eventSearch" class="grow" placeholder="搜索活动名称或 ID…" /></label><label class="label cursor-pointer gap-2"><input v-model="rankedOnly" type="checkbox" class="checkbox checkbox-sm checkbox-primary" /><span class="label-text">仅显示有排名</span></label></div></div></div>
-          <div v-if="paginatedEventRows.length" class="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
+          <div v-if="paginatedEventRows.length" class="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
             <article v-for="row in paginatedEventRows" :key="row.id" class="card bg-base-100 border border-base-200 shadow-sm overflow-hidden hover:border-primary/30 hover:shadow-md transition-all">
               <RouterLink v-if="row.master" :to="`/events/${row.id}`" class="block bg-base-200 aspect-[122/52] overflow-hidden"><AssetImage v-if="eventBanner(row.master)" :src="eventBanner(row.master)" :alt="row.master.name" class="w-full h-full object-cover hover:scale-[1.02] transition-transform" /></RouterLink>
               <div v-else class="aspect-[122/52] bg-base-200 grid place-items-center text-base-content/30"><CalendarDays class="w-10 h-10" /></div>
-              <div class="card-body p-4 gap-3">
+              <div class="card-body p-3 gap-2.5">
                 <div class="flex items-start justify-between gap-3"><div class="min-w-0"><p class="text-xs text-base-content/45">活动 #{{ row.id }} · {{ formatDate(row.master?.startAt) }}</p><RouterLink v-if="row.master" :to="`/events/${row.id}`" class="font-bold link link-hover line-clamp-2">{{ row.master.name }}</RouterLink><p v-else class="font-bold">活动 #{{ row.id }}</p></div><span v-if="row.rank" class="badge badge-primary badge-outline shrink-0">#{{ formatNumber(row.rank) }}</span></div>
-                <div class="grid grid-cols-2 gap-2 text-sm"><div class="rounded-lg bg-base-200/70 px-3 py-2"><p class="text-[11px] text-base-content/45">活动点</p><p class="font-bold text-primary">{{ formatNumber(row.point) }}</p></div><div class="rounded-lg bg-base-200/70 px-3 py-2"><p class="text-[11px] text-base-content/45">最终排名</p><p class="font-bold">{{ row.rank ? `#${formatNumber(row.rank)}` : '—' }}</p></div></div>
+                <div class="grid grid-cols-2 gap-1.5 text-xs"><div class="rounded-lg bg-base-200/70 px-2.5 py-2"><p class="text-[10px] text-base-content/45">活动点</p><p class="font-bold text-primary">{{ formatNumber(row.point) }}</p></div><div class="rounded-lg bg-base-200/70 px-2.5 py-2"><p class="text-[10px] text-base-content/45">最终排名</p><p class="font-bold">{{ row.rank ? `#${formatNumber(row.rank)}` : '—' }}</p></div></div>
               </div>
             </article>
           </div>
@@ -711,13 +711,13 @@ onMounted(async () => {
             <div class="stat bg-base-100 shadow-sm rounded-xl p-4"><div class="stat-title text-xs">最佳 Chapter Rank</div><div class="stat-value text-xl text-secondary">#{{ worldBloomSummary.bestRank ? formatNumber(worldBloomSummary.bestRank.rank) : '-' }}</div><div class="stat-desc">{{ worldBloomSummary.bestRank?.character ? getCharacterName(worldBloomSummary.bestRank.character) : '' }}</div></div>
           </div>
           <div class="card bg-base-100 shadow-sm"><div class="card-body p-4"><div class="flex flex-wrap gap-3"><label class="input input-bordered input-sm flex items-center gap-2 grow max-w-lg"><Search class="w-4 h-4 opacity-50" /><input v-model="bloomSearch" class="grow" placeholder="搜索活动、角色或 ID…" /></label><label class="label cursor-pointer gap-2"><input v-model="bloomRankedOnly" type="checkbox" class="checkbox checkbox-sm checkbox-primary" /><span class="label-text">仅显示有排名</span></label></div></div></div>
-          <div v-if="worldBloomGroups.length" class="grid xl:grid-cols-2 gap-4">
+          <div v-if="worldBloomGroups.length" class="grid md:grid-cols-2 xl:grid-cols-3 gap-3">
             <article v-for="group in worldBloomGroups" :key="group.eventId" class="card bg-base-100 border border-base-200 shadow-sm overflow-hidden">
-              <RouterLink v-if="group.event" :to="`/events/${group.eventId}`" class="block aspect-[122/42] bg-base-200 overflow-hidden"><AssetImage v-if="eventBanner(group.event)" :src="eventBanner(group.event)" :alt="group.event.name" class="w-full h-full object-cover hover:scale-[1.02] transition-transform" /></RouterLink>
-              <div class="card-body p-4 gap-3">
+              <RouterLink v-if="group.event" :to="`/events/${group.eventId}`" class="block aspect-[122/38] bg-base-200 overflow-hidden"><AssetImage v-if="eventBanner(group.event)" :src="eventBanner(group.event)" :alt="group.event.name" class="w-full h-full object-cover hover:scale-[1.02] transition-transform" /></RouterLink>
+              <div class="card-body p-3 gap-2.5">
                 <div class="flex items-start justify-between gap-3"><div class="min-w-0"><p class="text-xs text-base-content/45">World Bloom #{{ group.eventId }} · {{ formatDate(group.event?.startAt) }}</p><RouterLink v-if="group.event" :to="`/events/${group.eventId}`" class="font-bold link link-hover line-clamp-2">{{ group.event.name }}</RouterLink><p v-else class="font-bold">活动 #{{ group.eventId }}</p></div><div class="text-right shrink-0"><p class="font-bold text-primary">{{ formatNumber(group.totalPoint) }}</p><p class="text-[10px] text-base-content/45">Total Chapter Point</p></div></div>
                 <div class="divide-y divide-base-200 rounded-xl border border-base-200 overflow-hidden">
-                  <div v-for="row in group.rows" :key="row.characterId" class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 px-3 py-2.5 bg-base-100">
+                  <div v-for="row in group.rows" :key="row.characterId" class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 px-2.5 py-2 bg-base-100">
                     <span class="badge badge-secondary badge-outline badge-sm whitespace-nowrap">Chapter {{ row.chapter?.chapterNo || '?' }}</span>
                     <div class="min-w-0"><RouterLink v-if="row.character" :to="`/characters/${row.characterId}`" class="text-sm font-medium link link-hover truncate block">{{ getCharacterName(row.character) }}</RouterLink><span v-else class="text-sm">角色 #{{ row.characterId }}</span><p class="text-[10px] text-base-content/45">{{ formatDate(row.chapter?.chapterStartAt || row.event?.startAt) }}</p></div>
                     <div class="text-right"><p class="text-sm font-bold">{{ formatNumber(row.point) }}</p><p class="text-[10px]" :class="row.rank ? 'text-secondary' : 'text-base-content/35'">{{ row.rank ? `Rank #${formatNumber(row.rank)}` : 'No rank' }}</p></div>
@@ -740,14 +740,14 @@ onMounted(async () => {
             <div class="stat bg-base-100 shadow-sm rounded-xl p-4"><div class="stat-title text-xs">最高完成 Stage</div><div class="stat-value text-xl text-secondary">{{ challengeSummary.maxStage.maxStage }}</div><div class="stat-desc">{{ characterMap.get(challengeSummary.maxStage.characterId) ? getCharacterName(characterMap.get(challengeSummary.maxStage.characterId)!) : '-' }}</div></div>
           </div>
           <div class="card bg-base-100 shadow-sm"><div class="card-body p-4"><div class="flex flex-wrap gap-3"><label class="input input-bordered input-sm flex items-center gap-2 grow max-w-lg"><Search class="w-4 h-4 opacity-50" /><input v-model="challengeSearch" class="grow" placeholder="搜索角色或 ID…" /></label><select v-model="challengeSort" class="select select-bordered select-sm"><option value="score">最高分排序</option><option value="stage">Stage 排序</option><option value="character">角色顺序</option></select></div></div></div>
-          <div class="grid lg:grid-cols-2 gap-4">
+          <div class="grid md:grid-cols-2 xl:grid-cols-3 gap-3">
             <article v-for="row in challengeRows" :key="row.deck.characterId" class="card bg-base-100 shadow-sm border border-base-200">
-              <div class="card-body p-4 gap-3">
+              <div class="card-body p-3 gap-2.5">
                 <div class="flex items-center justify-between gap-3">
                   <div><RouterLink v-if="row.character" :to="`/characters/${row.deck.characterId}`" class="link link-hover font-bold">{{ getCharacterName(row.character) }}</RouterLink><span v-else class="font-bold">角色 #{{ row.deck.characterId }}</span><p class="text-xs text-base-content/45">挑战 Live 专用卡组</p></div>
                   <div class="flex gap-2 text-right"><span class="badge badge-primary badge-outline">{{ formatNumber(row.highScore) }} 分</span><span class="badge badge-secondary badge-outline">Stage {{ row.maxStage }}</span></div>
                 </div>
-                <div class="grid grid-cols-5 gap-2">
+                <div class="grid grid-cols-5 gap-1.5">
                   <div v-for="(card, index) in challengeDeckCards(row.deck)" :key="card.cardId" class="min-w-0">
                     <RouterLink :to="`/cards/${card.cardId}`" class="block hover:scale-105 transition-transform"><SekaiCard v-if="card.master" :card="card.master" :trained="card.user?.defaultImage === 'special_training'" :master-rank="card.user?.masterRank || 0" /></RouterLink>
                     <p class="text-[10px] text-center mt-1 truncate"><span v-if="index === 0" class="text-primary font-bold">Leader · </span>Lv.{{ card.user?.level || '?' }}</p>
@@ -774,7 +774,7 @@ onMounted(async () => {
 
       <section v-else-if="activeTab === 'decks'" class="space-y-4">
         <div v-if="!userDecks.length" class="alert alert-info">当前 Suite 没有保存卡组数据。</div>
-        <div v-else class="grid lg:grid-cols-2 gap-4"><article v-for="deck in userDecks" :key="deck.deckId" class="card bg-base-100 shadow-sm border border-base-200"><div class="card-body p-4"><div class="flex items-center justify-between"><h2 class="font-bold flex items-center gap-2"><LayoutGrid class="w-4 h-4 text-primary" />{{ deck.name || `卡组 ${deck.deckId}` }}</h2><span class="badge badge-outline">Deck {{ deck.deckId }}</span></div><div class="grid grid-cols-5 gap-2"><div v-for="row in deckCards(deck)" :key="row.cardId" class="min-w-0"><RouterLink :to="`/cards/${row.cardId}`" class="block hover:scale-105 transition-transform"><SekaiCard v-if="row.master" :card="row.master" :trained="row.user?.defaultImage === 'special_training'" :master-rank="row.user?.masterRank || 0" /></RouterLink><p class="text-[10px] text-center mt-1 truncate">Lv.{{ row.user?.level || '?' }}<span v-if="row.cardId === deck.leader" class="text-primary"> · L</span></p></div></div></div></article></div>
+        <div v-else class="grid md:grid-cols-2 xl:grid-cols-3 gap-3"><article v-for="deck in userDecks" :key="deck.deckId" class="card bg-base-100 shadow-sm border border-base-200"><div class="card-body p-3"><div class="flex items-center justify-between"><h2 class="font-bold text-sm flex items-center gap-2"><LayoutGrid class="w-4 h-4 text-primary" />{{ deck.name || `卡组 ${deck.deckId}` }}</h2><span class="badge badge-sm badge-outline">Deck {{ deck.deckId }}</span></div><div class="grid grid-cols-5 gap-1.5"><div v-for="row in deckCards(deck)" :key="row.cardId" class="min-w-0"><RouterLink :to="`/cards/${row.cardId}`" class="block hover:scale-105 transition-transform"><SekaiCard v-if="row.master" :card="row.master" :trained="row.user?.defaultImage === 'special_training'" :master-rank="row.user?.masterRank || 0" /></RouterLink><p class="text-[9px] text-center mt-1 truncate">Lv.{{ row.user?.level || '?' }}<span v-if="row.cardId === deck.leader" class="text-primary"> · L</span></p></div></div></div></article></div>
       </section>
     </template>
 
