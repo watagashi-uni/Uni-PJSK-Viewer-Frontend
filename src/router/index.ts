@@ -75,6 +75,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '区域道具规划' },
     },
     {
+        path: '/account-records',
+        name: 'AccountRecords',
+        component: () => import('@/views/AccountRecordsView.vue'),
+        meta: { title: '账号记录' },
+    },
+    {
         path: '/items',
         name: 'Items',
         component: () => import('@/views/ItemsView.vue'),
