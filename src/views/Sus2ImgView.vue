@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, onMounted, watch, onBeforeUnmount } from 'vue'
-import { ArrowLeftRight, ClipboardCopy, Download, FileImage, Play, Search, Settings2, Trash2, TriangleAlert } from 'lucide-vue-next'
+import { ArrowLeftRight, ClipboardCopy, Download, FileImage, Play, Search, Settings2, Sparkles, Trash2, TriangleAlert } from 'lucide-vue-next'
 import {
   renderCustomScoreJsonToPng,
   renderCustomScoreJsonToPngWithRust,
@@ -15,6 +15,8 @@ import {
   analyzeSusConflicts,
   convertSusToCustomScoreJson,
   convertCustomScoreJsonToSus,
+  generateRebaseJsonFromCustomScore,
+  generateRebaseJsonFromSus,
   type Sus2ImgFrontendResult,
   type Sus2ImgSkin,
   type ConflictDiagnostic,
@@ -54,6 +56,9 @@ const isAnalyzing = ref(false)
 const hasAuditRun = ref(false)
 const isPreparingPreview = ref(false)
 const isDownloadingPng = ref(false)
+const isGeneratingRebase = ref(false)
+const rebaseGenerationError = ref<string | null>(null)
+const rebaseGenerationMessage = ref<string | null>(null)
 
 // 可选设置折叠状态（默认折叠，不持久化）
 const showOptionalSettings = ref(false)
@@ -285,6 +290,8 @@ watch(
     resetAuditState()
     resetRenderState()
     resetConversionState()
+    rebaseGenerationError.value = null
+    rebaseGenerationMessage.value = null
   },
 )
 
@@ -292,6 +299,8 @@ function handleFileChange(event: Event) {
   const target = event.target as HTMLInputElement
   if (target.files && target.files[0]) {
     chartFile.value = target.files[0]
+    rebaseGenerationError.value = null
+    rebaseGenerationMessage.value = null
   }
 }
 
@@ -348,6 +357,34 @@ async function getChartText(): Promise<string> {
   }
 
   throw new Error(isJsonInput.value ? '请提供 JSON 谱面内容或上传文件' : '请提供 SUS 文件内容或上传文件')
+}
+
+async function generateRebaseFromCurrentChart() {
+  rebaseGenerationError.value = null
+  rebaseGenerationMessage.value = null
+
+  if (form.value.rebase.trim() && !window.confirm('这会覆盖文本框中现有的 rebase.json 内容，是否继续？')) {
+    return
+  }
+
+  isGeneratingRebase.value = true
+  try {
+    const chartText = await getChartText()
+    form.value.rebase = isJsonInput.value
+      ? generateRebaseJsonFromCustomScore(parseCustomScoreJson(chartText), {
+          title: form.value.title,
+          artist: form.value.artist,
+          author: form.value.author,
+          difficulty: form.value.difficulty,
+          playlevel: form.value.playlevel,
+        })
+      : generateRebaseJsonFromSus(chartText)
+    rebaseGenerationMessage.value = '已根据当前谱面填入，可直接继续修改。'
+  } catch (rebaseReason) {
+    rebaseGenerationError.value = rebaseReason instanceof Error ? rebaseReason.message : '生成 rebase.json 失败'
+  } finally {
+    isGeneratingRebase.value = false
+  }
 }
 
 const resetConversionState = () => {
@@ -802,6 +839,9 @@ function clearForm() {
   resetRenderState()
   resetConversionState()
   overlapAcknowledged.value = false
+  isGeneratingRebase.value = false
+  rebaseGenerationError.value = null
+  rebaseGenerationMessage.value = null
   sessionStorage.removeItem(FORM_STORAGE_KEY)
 }
 
@@ -968,14 +1008,22 @@ function clearForm() {
             </div>
             <div class="collapse-content space-y-6">
               <div class="form-control w-full">
-                <label class="label">
+                <label class="label flex-wrap gap-2">
                   <span class="label-text font-medium">rebase.json 内容（可选）</span>
+                  <button type="button" class="btn btn-xs btn-outline btn-primary gap-1.5" :disabled="isGeneratingRebase" @click="generateRebaseFromCurrentChart">
+                    <span v-if="isGeneratingRebase" class="loading loading-spinner loading-xs"></span>
+                    <Sparkles v-else class="w-3.5 h-3.5" />
+                    {{ isGeneratingRebase ? '生成中…' : form.rebase.trim() ? '根据当前谱面重新生成' : '根据当前谱面生成' }}
+                  </button>
                 </label>
                 <textarea
                   v-model="form.rebase"
                   class="textarea textarea-bordered h-32 font-mono text-sm w-full"
                   placeholder="在此粘贴 rebase.json 内容"
                 ></textarea>
+                <p class="mt-1.5 text-xs text-base-content/50">点击按钮后才会生成并填入文本框，不会自动下载；现有前端与 Rust WASM 均可使用。</p>
+                <p v-if="rebaseGenerationMessage" class="mt-1 text-xs text-success">{{ rebaseGenerationMessage }}</p>
+                <p v-if="rebaseGenerationError" class="mt-1 text-xs text-error">{{ rebaseGenerationError }}</p>
               </div>
 
               <div class="grid md:grid-cols-2 gap-4">
