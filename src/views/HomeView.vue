@@ -7,7 +7,7 @@ import {
   Music, Calendar, Clock, 
   ChevronRight, Sparkles, BarChart3,
   CreditCard, User, Gift, Palette,
-  ExternalLink, Link
+  ExternalLink, Link, CalendarDays, History, House, Layers3
 } from 'lucide-vue-next'
 import AssetImage from '@/components/AssetImage.vue'
 import type { EventData, MusicData } from '@/types/master'
@@ -41,6 +41,40 @@ import type { Gacha } from '@/types/gacha'
 const events = ref<EventData[]>([])
 const musics = ref<MusicData[]>([])
 const gachas = ref<Gacha[]>([])
+interface VirtualLiveSummary {
+  id: number
+  name: string
+  startAt: number
+}
+
+interface LoginBonusSummary {
+  id: number
+  name: string
+  startAt: number
+  endAt: number
+}
+
+type ScheduleCategory = 'event' | 'gacha' | 'music' | 'virtual_live' | 'login_bonus'
+
+interface ScheduleItem {
+  key: string
+  category: ScheduleCategory
+  timestamp: number
+  title: string
+  subtitle: string
+  route: string
+}
+
+const virtualLives = ref<VirtualLiveSummary[]>([])
+const loginBonuses = ref<LoginBonusSummary[]>([])
+
+const scheduleMeta: Record<ScheduleCategory, { label: string; badge: string; dot: string }> = {
+  event: { label: '活动', badge: 'badge-primary', dot: 'bg-primary' },
+  gacha: { label: '卡池', badge: 'badge-secondary', dot: 'bg-secondary' },
+  music: { label: '歌曲', badge: 'badge-info', dot: 'bg-info' },
+  virtual_live: { label: 'Live', badge: 'badge-warning', dot: 'bg-warning' },
+  login_bonus: { label: '登录', badge: 'badge-accent', dot: 'bg-accent' },
+}
 
 // 活动类型映射
 const eventTypeMap: Record<string, { label: string; color: string }> = {
@@ -92,6 +126,60 @@ const ongoingGachas = computed(() => {
   list.sort((a, b) => b.startAt - a.startAt)
   return list
 })
+
+const allScheduleItems = computed<ScheduleItem[]>(() => {
+  const rows: ScheduleItem[] = []
+  for (const event of events.value) {
+    rows.push({ key: `event-start-${event.id}`, category: 'event', timestamp: event.startAt, title: event.name, subtitle: '活动开始', route: `/events/${event.id}` })
+    rows.push({ key: `event-end-${event.id}`, category: 'event', timestamp: event.aggregateAt, title: event.name, subtitle: '活动结算', route: `/events/${event.id}` })
+  }
+  for (const gacha of gachas.value) {
+    rows.push({ key: `gacha-start-${gacha.id}`, category: 'gacha', timestamp: gacha.startAt, title: gacha.name, subtitle: '卡池开放', route: `/gacha/${gacha.id}` })
+    rows.push({ key: `gacha-end-${gacha.id}`, category: 'gacha', timestamp: gacha.endAt, title: gacha.name, subtitle: '卡池结束', route: `/gacha/${gacha.id}` })
+  }
+  for (const music of musics.value) {
+    rows.push({ key: `music-${music.id}`, category: 'music', timestamp: music.publishedAt, title: music.title, subtitle: '歌曲发布', route: `/musics/${music.id}` })
+  }
+  for (const live of virtualLives.value) {
+    rows.push({ key: `live-${live.id}`, category: 'virtual_live', timestamp: live.startAt, title: live.name, subtitle: 'Virtual Live 开始', route: `/vlives/${live.id}` })
+  }
+  for (const campaign of loginBonuses.value) {
+    rows.push({ key: `login-start-${campaign.id}`, category: 'login_bonus', timestamp: campaign.startAt, title: campaign.name, subtitle: '登录活动开始', route: '/calendar' })
+    rows.push({ key: `login-end-${campaign.id}`, category: 'login_bonus', timestamp: campaign.endAt, title: campaign.name, subtitle: '登录活动结束', route: '/calendar' })
+  }
+  return rows.filter(row => Number.isFinite(row.timestamp) && row.timestamp > 0)
+})
+
+const upcomingScheduleItems = computed(() => {
+  const now = Date.now()
+  const horizon = now + 90 * 24 * 60 * 60 * 1000
+  return allScheduleItems.value
+    .filter(row => row.timestamp > now && row.timestamp <= horizon)
+    .sort((a, b) => a.timestamp - b.timestamp)
+    .slice(0, 6)
+})
+
+const recentScheduleItems = computed(() => {
+  const now = Date.now()
+  return allScheduleItems.value
+    .filter(row => row.timestamp <= now)
+    .sort((a, b) => b.timestamp - a.timestamp)
+    .slice(0, 6)
+})
+
+const isShowingUpcomingSchedule = computed(() => settingsStore.showSpoilers && upcomingScheduleItems.value.length > 0)
+const homeScheduleItems = computed(() => isShowingUpcomingSchedule.value ? upcomingScheduleItems.value : recentScheduleItems.value)
+const scheduleTitle = computed(() => isShowingUpcomingSchedule.value ? '近期日程' : '最近动态')
+
+function scheduleTime(timestamp: number): string {
+  const date = new Date(timestamp)
+  const now = new Date()
+  const dateKey = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`
+  const nowKey = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`
+  const time = date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false })
+  if (dateKey === nowKey) return `今天 ${time}`
+  return date.toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })
+}
 
 const gachaScrollContainer = ref<HTMLElement | null>(null)
 function handleGachaScroll(e: WheelEvent) {
@@ -188,22 +276,31 @@ const currentUserProfileData = computed(() => {
   return accountStore.getProfileCache(currentUserProfile.value.userId)
 })
 
+const ownedCardCount = computed<number | null>(() => {
+  const cards = currentUserProfileData.value?.userCards || currentUserSuite.value?.userCards
+  return Array.isArray(cards) ? cards.length : null
+})
+
 onMounted(async () => {
   try {
     masterStore.checkVersionInBackground()
 
     // 优先使用本地 master 缓存；version 在后台校验，变化时会触发当前页重新挂载。
-    const [eventsData, musicsData, gachasData] = await Promise.all([
+    const [eventsData, musicsData, gachasData, , virtualLiveData, loginBonusData] = await Promise.all([
       masterStore.getMaster<EventData>('events'),
       masterStore.getMaster<MusicData>('musics'),
       masterStore.getMaster<Gacha>('gachas'),
-      masterStore.getMaster<any>('cards')
+      masterStore.getMaster<any>('cards'),
+      masterStore.getMaster<VirtualLiveSummary>('virtualLives'),
+      masterStore.getMaster<LoginBonusSummary>('limitedLoginBonuses'),
     ])
     
     // 设置数据 (events 需要倒序)
     events.value = eventsData.sort((a, b) => b.id - a.id)
     musics.value = musicsData
     gachas.value = gachasData
+    virtualLives.value = virtualLiveData
+    loginBonuses.value = loginBonusData
   } catch (e) {
     console.error('加载首页数据失败:', e)
   } finally {
@@ -303,29 +400,40 @@ onMounted(async () => {
       </RouterLink>
     </div>
 
-    <div class="card bg-base-100 border border-base-200 shadow-sm overflow-hidden">
-      <div class="card-body p-4 md:p-5">
-        <div class="flex flex-col md:flex-row items-center gap-4 md:gap-5">
-          <img
-            src="/img/costume3d.webp"
-            alt="衣装 3D 在线预览"
-            class="w-full md:w-56 rounded-lg object-cover shrink-0 border border-base-200"
-          />
-          <div class="min-w-0 w-full">
-            <h2 class="text-lg md:text-xl font-bold text-base-content">
-              衣装图鉴 & 3D 在线预览上线
-            </h2>
-            <p class="text-sm text-base-content/70 mt-1">
-              按角色浏览全部衣装、头饰与发型，查看来源卡片和当期活动；详情页可直接加载还原游戏渲染的 3D 模型，支持旋转缩放、切换配色与全屏查看。
-            </p>
-            <div class="flex flex-wrap gap-2 mt-3">
-              <RouterLink to="/costumes" class="btn btn-sm btn-primary">
-                去衣装页体验
-              </RouterLink>
+    <div class="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(17rem,1fr)]">
+      <section class="card border border-base-200 bg-base-100 shadow-sm">
+        <div class="card-body gap-3 p-4 md:p-5">
+          <div class="flex items-center justify-between gap-3">
+            <div>
+              <h2 class="flex items-center gap-2 text-lg font-bold"><CalendarDays class="h-5 w-5 text-primary" />{{ scheduleTitle }}</h2>
+              <p class="mt-0.5 text-xs text-base-content/45">{{ isShowingUpcomingSchedule ? '已开启未来内容，列出未来 90 天内接下来发生的事项' : settingsStore.showSpoilers ? '未来 90 天暂无日程，暂时显示最近动态' : '未来内容已隐藏，仅列出最近发生的事项' }}</p>
             </div>
+            <RouterLink to="/calendar" class="btn btn-ghost btn-sm shrink-0">完整日历 <ChevronRight class="h-4 w-4" /></RouterLink>
           </div>
+          <div v-if="isLoading" class="grid gap-2 sm:grid-cols-2"><div v-for="index in 4" :key="index" class="skeleton h-16 rounded-lg"></div></div>
+          <div v-else-if="homeScheduleItems.length" class="grid gap-2 sm:grid-cols-2">
+            <RouterLink v-for="item in homeScheduleItems" :key="item.key" :to="item.route" class="group flex min-w-0 items-center gap-3 rounded-xl border border-base-200 px-3 py-2.5 transition-colors hover:border-primary/35 hover:bg-base-200/45">
+              <span class="h-2.5 w-2.5 shrink-0 rounded-full" :class="scheduleMeta[item.category].dot"></span>
+              <div class="min-w-0 flex-1"><div class="flex items-center gap-1.5"><span class="badge badge-xs" :class="scheduleMeta[item.category].badge">{{ scheduleMeta[item.category].label }}</span><span class="truncate text-[10px] text-base-content/40">{{ item.subtitle }}</span></div><p class="mt-1 truncate text-sm font-medium group-hover:text-primary" :title="item.title">{{ item.title }}</p></div>
+              <time class="shrink-0 text-[10px] text-base-content/45">{{ scheduleTime(item.timestamp) }}</time>
+            </RouterLink>
+          </div>
+          <div v-else class="rounded-xl bg-base-200/45 py-8 text-center text-sm text-base-content/45">当前没有可显示的日程</div>
         </div>
-      </div>
+      </section>
+
+      <section class="card border border-base-200 bg-base-100 shadow-sm">
+        <div class="card-body gap-3 p-4 md:p-5">
+          <div><h2 class="text-lg font-bold">账号工作台</h2><p v-if="currentUserProfile" class="mt-0.5 text-xs text-base-content/45">{{ currentUserProfile.name }}<span v-if="ownedCardCount !== null"> · 已持有 {{ ownedCardCount }} 张卡片</span></p><p v-else class="mt-0.5 text-xs text-base-content/45">绑定账号后可快速查看养成与履历</p></div>
+          <div v-if="currentUserProfile" class="grid grid-cols-2 gap-2">
+            <RouterLink to="/card-collection" class="btn h-auto justify-start gap-2 border-base-200 bg-base-200/45 px-3 py-2.5"><Layers3 class="h-4 w-4 text-primary" /><span class="text-xs">养成进度</span></RouterLink>
+            <RouterLink to="/account-records" class="btn h-auto justify-start gap-2 border-base-200 bg-base-200/45 px-3 py-2.5"><History class="h-4 w-4 text-secondary" /><span class="text-xs">账号记录</span></RouterLink>
+            <RouterLink to="/mysekai" class="btn h-auto justify-start gap-2 border-base-200 bg-base-200/45 px-3 py-2.5"><House class="h-4 w-4 text-accent" /><span class="text-xs">MySekai</span></RouterLink>
+            <RouterLink to="/profile" class="btn h-auto justify-start gap-2 border-base-200 bg-base-200/45 px-3 py-2.5"><User class="h-4 w-4" /><span class="text-xs">个人信息</span></RouterLink>
+          </div>
+          <RouterLink v-else to="/profile" class="btn btn-primary btn-sm mt-auto">添加账号</RouterLink>
+        </div>
+      </section>
     </div>
     
     <!-- 主体两列内容 -->
