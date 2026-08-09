@@ -225,6 +225,26 @@ function getUnitColor(unit: string): string {
   return unitProfileMap.value.get(unit)?.colorCode || '#33aaee'
 }
 
+function getReadableTextColor(background: string): string {
+  const normalized = background.trim().replace('#', '')
+  if (!/^[0-9a-f]{6}$/i.test(normalized)) return '#ffffff'
+  const channels = [0, 2, 4].map(offset => {
+    const value = Number.parseInt(normalized.slice(offset, offset + 2), 16) / 255
+    return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4
+  })
+  const luminance = 0.2126 * channels[0]! + 0.7152 * channels[1]! + 0.0722 * channels[2]!
+  return luminance > 0.3 ? '#2b2026' : '#ffffff'
+}
+
+function getUnitBadgeStyle(unit: string) {
+  const backgroundColor = getUnitColor(unit)
+  return {
+    backgroundColor,
+    color: getReadableTextColor(backgroundColor),
+    borderColor: backgroundColor.toLocaleLowerCase() === '#ffffff' ? 'var(--color-base-300)' : backgroundColor,
+  }
+}
+
 function getStandingUrl(character: GameCharacterData): string {
   const resourceId = String(character.resourceId).padStart(3, '0')
   return `${assetsHost.value}/startapp/character/member_cutout_trm/res${resourceId}_no001/normal.png`
@@ -346,7 +366,7 @@ onMounted(async () => {
             class="absolute inset-0 w-full h-full object-contain object-bottom p-3"
           />
           <div class="absolute left-5 top-5">
-            <span class="badge border-0 text-white" :style="{ backgroundColor: getUnitColor(selectedCharacter.unit) }">
+            <span class="badge border" :style="getUnitBadgeStyle(selectedCharacter.unit)">
               {{ getUnitName(selectedCharacter.unit) }}
             </span>
           </div>
@@ -495,7 +515,7 @@ onMounted(async () => {
 
       <section v-for="group in groupedCharacters" :key="group.unit" class="space-y-3">
         <div class="flex items-center gap-3">
-          <span class="w-1.5 h-7 rounded-full" :style="{ backgroundColor: getUnitColor(group.unit) }"></span>
+          <span class="h-7 w-1.5 rounded-full border border-base-300" :style="{ backgroundColor: getUnitColor(group.unit) }"></span>
           <div>
             <h2 class="text-xl font-bold">{{ group.profile?.unitName || getUnitName(group.unit) }}</h2>
             <p class="text-[11px] text-base-content/45">{{ group.items.length }} 名角色</p>
@@ -521,7 +541,7 @@ onMounted(async () => {
               />
               <span
                 v-if="userCharacterMap.get(character.id)"
-                class="absolute top-2 left-2 badge badge-primary badge-sm border-0 shadow-sm"
+                class="absolute left-2 top-2 badge badge-sm border-0 bg-black/65 text-white shadow-sm"
               >
                 Rank {{ getUserCharacterRank(userCharacterMap.get(character.id)!) }}
               </span>

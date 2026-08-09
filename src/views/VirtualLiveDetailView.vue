@@ -449,8 +449,8 @@ const informationText = computed(() => {
 </script>
 
 <template>
-  <div class="mx-auto max-w-6xl space-y-5">
-    <div v-if="isLoading" class="space-y-4"><div class="skeleton h-20 rounded-xl"></div><div class="skeleton h-72 rounded-xl"></div><div class="grid gap-3 md:grid-cols-2"><div class="skeleton h-48 rounded-xl"></div><div class="skeleton h-48 rounded-xl"></div></div></div>
+  <div class="mx-auto max-w-7xl space-y-5">
+    <div v-if="isLoading" class="space-y-4"><div class="skeleton h-20 rounded-xl"></div><div class="skeleton h-64 rounded-xl"></div><div class="grid gap-3 lg:grid-cols-3"><div class="skeleton h-48 lg:col-span-2"></div><div class="skeleton h-48"></div></div></div>
     <div v-else-if="loadError" class="alert alert-error">Virtual Live 加载失败：{{ loadError }}</div>
     <div v-else-if="!vlive" class="rounded-xl border border-base-200 bg-base-100 py-20 text-center"><p class="text-xl text-base-content/60">Virtual Live 不存在</p><RouterLink to="/vlives" class="btn btn-primary mt-4">返回列表</RouterLink></div>
 
@@ -460,71 +460,75 @@ const informationText = computed(() => {
         <template #actions><RouterLink to="/vlives" class="btn btn-sm btn-ghost"><ChevronLeft class="h-4 w-4" />返回列表</RouterLink></template>
       </PageHeader>
 
-      <section class="card overflow-hidden border border-base-200 bg-base-100 shadow-sm">
-        <figure class="flex max-h-72 items-center justify-center bg-base-200/70">
-          <AssetImage :src="getBannerUrl(vlive.assetbundleName)" :alt="vlive.name" class="max-h-72 w-full object-contain" />
+      <section class="grid overflow-hidden rounded-xl border border-base-200 bg-base-100 shadow-sm lg:grid-cols-[minmax(0,1.45fr)_minmax(20rem,.75fr)]">
+        <figure class="flex aspect-[122/52] items-center justify-center bg-base-200/70 lg:aspect-auto">
+          <AssetImage :src="getBannerUrl(vlive.assetbundleName)" :alt="vlive.name" class="h-full max-h-72 w-full object-contain" />
         </figure>
-        <div class="grid gap-2 p-4 text-sm md:grid-cols-2">
-          <div class="flex items-center gap-2 rounded-lg bg-base-200/65 px-3 py-2"><Calendar class="h-4 w-4 text-primary" /><span class="text-base-content/50">开始</span><strong class="ml-auto text-right">{{ formatDate(getScheduleBounds(vlive).start) }}</strong></div>
-          <div class="flex items-center gap-2 rounded-lg bg-base-200/65 px-3 py-2"><Clock class="h-4 w-4 text-primary" /><span class="text-base-content/50">结束</span><strong class="ml-auto text-right">{{ formatDate(getScheduleBounds(vlive).end) }}</strong></div>
+        <div class="flex flex-col justify-center gap-3 border-base-200 p-4 lg:border-l lg:p-5">
+          <div class="flex flex-wrap gap-1.5"><span class="badge" :class="typeMap[vlive.virtualLiveType]?.color || 'badge-ghost'">{{ typeMap[vlive.virtualLiveType]?.label || vlive.virtualLiveType }}</span><span class="badge badge-ghost">{{ vlive.virtualLivePlatform.toUpperCase() }}</span></div>
+          <div class="space-y-2 text-sm">
+            <div class="flex items-center gap-2"><Calendar class="h-4 w-4 shrink-0 text-primary" /><span class="text-base-content/45">开始</span><strong class="ml-auto text-right">{{ formatDate(getScheduleBounds(vlive).start) }}</strong></div>
+            <div class="flex items-center gap-2"><Clock class="h-4 w-4 shrink-0 text-primary" /><span class="text-base-content/45">结束</span><strong class="ml-auto text-right">{{ formatDate(getScheduleBounds(vlive).end) }}</strong></div>
+          </div>
+          <div class="grid grid-cols-3 divide-x divide-base-200 rounded-lg bg-base-200/55 py-2 text-center"><div><strong class="block text-lg">{{ cast.length }}</strong><span class="text-[10px] text-base-content/45">出演</span></div><div><strong class="block text-lg">{{ musicSetlists.length }}</strong><span class="text-[10px] text-base-content/45">歌曲</span></div><div><strong class="block text-lg">{{ vlive.virtualLiveSchedules?.length || 0 }}</strong><span class="text-[10px] text-base-content/45">场次</span></div></div>
         </div>
       </section>
 
-      <section v-if="cast.length" class="card border border-base-200 bg-base-100 shadow-sm">
-        <div class="card-body gap-3 p-4 md:p-5">
-          <div class="flex items-center justify-between"><h2 class="flex items-center gap-2 text-lg font-bold"><Users class="h-5 w-5 text-primary" />出演角色</h2><span class="badge badge-ghost">{{ cast.length }} 人</span></div>
-          <div class="grid grid-cols-4 gap-2 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10">
-            <div v-for="row in cast" :key="row.id" class="min-w-0 text-center">
-              <img v-if="row.icon" :src="row.icon" :alt="row.name" class="mx-auto h-12 w-12 rounded-full bg-base-200 object-cover ring-2 ring-primary/15" />
-              <div v-else class="mx-auto grid h-12 w-12 place-items-center rounded-full bg-primary/10 text-sm font-bold text-primary ring-2 ring-primary/15">{{ row.name.slice(0, 1) }}</div>
-              <p class="mt-1 truncate text-[11px]" :title="row.name">{{ row.name }}</p>
-              <p v-if="row.virtualLivePerformanceType === 'both'" class="text-[9px] text-primary">主场＋待机</p>
+      <div class="grid items-start gap-4 lg:grid-cols-[minmax(0,1.55fr)_minmax(19rem,.75fr)]">
+        <main class="space-y-4">
+          <section v-if="setlists.length" class="rounded-xl border border-base-200 bg-base-100 p-4 shadow-sm md:p-5">
+            <div class="mb-4 flex flex-wrap items-center justify-between gap-2"><h2 class="flex items-center gap-2 text-lg font-bold"><Disc3 class="h-5 w-5 text-primary" />节目单</h2><div class="flex flex-wrap gap-1"><span class="badge badge-ghost">流程 {{ setlists.length }}</span><span class="badge badge-primary">歌曲 {{ musicSetlists.length }}</span><span v-if="setlistTypeCounts.get('mc')" class="badge badge-ghost">MC {{ setlistTypeCounts.get('mc') }}</span><span v-if="setlistTypeCounts.get('mc_timeline')" class="badge badge-ghost">Timeline MC {{ setlistTypeCounts.get('mc_timeline') }}</span><span v-if="setlistTypeCounts.get('virtual_message')" class="badge badge-ghost">Message {{ setlistTypeCounts.get('virtual_message') }}</span></div></div>
+            <div v-if="musicSetlists.length" class="grid gap-2 sm:grid-cols-2">
+              <RouterLink v-for="row in musicSetlists" :key="row.id" :to="`/musics/${row.musicId}`" class="group flex min-w-0 gap-3 rounded-xl border border-base-200 p-2.5 transition hover:border-primary/40 hover:bg-base-200/35">
+                <AssetImage v-if="musicMap.get(row.musicId || 0)" :src="`${assetsHost}/startapp/music/jacket/${musicMap.get(row.musicId || 0)?.assetbundleName}/${musicMap.get(row.musicId || 0)?.assetbundleName}.png`" :alt="musicMap.get(row.musicId || 0)?.title || ''" class="h-16 w-16 shrink-0 rounded-lg object-cover" />
+                <div class="min-w-0 flex-1"><div class="flex items-center gap-1.5 text-[10px] text-base-content/40"><span>#{{ row.seq }}</span><span>Stage {{ row.virtualLiveStageId }}</span></div><h3 class="mt-0.5 truncate font-bold group-hover:text-primary">{{ musicMap.get(row.musicId || 0)?.title || `歌曲 #${row.musicId}` }}</h3><p v-if="row.musicVocalId" class="truncate text-xs text-base-content/55">{{ musicVocalMap.get(row.musicVocalId)?.caption || `Vocal #${row.musicVocalId}` }}</p><p v-if="setlistPerformers(row).length" class="mt-1 line-clamp-2 text-[10px] text-base-content/45">出演：{{ setlistPerformers(row).join('、') }}</p></div>
+              </RouterLink>
             </div>
-          </div>
-        </div>
-      </section>
+            <p v-else class="rounded-lg bg-base-200/50 py-6 text-center text-sm text-base-content/45">该节目流程没有歌曲段落</p>
+          </section>
 
-      <section v-if="setlists.length" class="card border border-base-200 bg-base-100 shadow-sm">
-        <div class="card-body gap-4 p-4 md:p-5">
-          <div class="flex flex-wrap items-center justify-between gap-2"><h2 class="flex items-center gap-2 text-lg font-bold"><Disc3 class="h-5 w-5 text-primary" />节目单</h2><div class="flex flex-wrap gap-1"><span class="badge badge-ghost">流程 {{ setlists.length }}</span><span class="badge badge-primary">歌曲 {{ musicSetlists.length }}</span><span v-if="setlistTypeCounts.get('mc')" class="badge badge-ghost">MC {{ setlistTypeCounts.get('mc') }}</span><span v-if="setlistTypeCounts.get('mc_timeline')" class="badge badge-ghost">Timeline MC {{ setlistTypeCounts.get('mc_timeline') }}</span><span v-if="setlistTypeCounts.get('virtual_message')" class="badge badge-ghost">Message {{ setlistTypeCounts.get('virtual_message') }}</span></div></div>
-          <div v-if="musicSetlists.length" class="grid gap-2 md:grid-cols-2">
-            <RouterLink v-for="row in musicSetlists" :key="row.id" :to="`/musics/${row.musicId}`" class="group flex min-w-0 gap-3 rounded-xl border border-base-200 p-2.5 hover:border-primary/40 hover:bg-base-200/35">
-              <AssetImage v-if="musicMap.get(row.musicId || 0)" :src="`${assetsHost}/startapp/music/jacket/${musicMap.get(row.musicId || 0)?.assetbundleName}/${musicMap.get(row.musicId || 0)?.assetbundleName}.png`" :alt="musicMap.get(row.musicId || 0)?.title || ''" class="h-16 w-16 shrink-0 rounded-lg object-cover" />
-              <div class="min-w-0 flex-1"><div class="flex items-center gap-1.5 text-[10px] text-base-content/40"><span>#{{ row.seq }}</span><span>Stage {{ row.virtualLiveStageId }}</span></div><h3 class="mt-0.5 truncate font-bold group-hover:text-primary">{{ musicMap.get(row.musicId || 0)?.title || `歌曲 #${row.musicId}` }}</h3><p v-if="row.musicVocalId" class="truncate text-xs text-base-content/55">{{ musicVocalMap.get(row.musicVocalId)?.caption || `Vocal #${row.musicVocalId}` }}</p><p v-if="setlistPerformers(row).length" class="mt-1 line-clamp-2 text-[10px] text-base-content/45">出演：{{ setlistPerformers(row).join('、') }}</p></div>
-            </RouterLink>
-          </div>
-          <p v-else class="rounded-lg bg-base-200/50 py-6 text-center text-sm text-base-content/45">该节目流程没有歌曲段落</p>
-        </div>
-      </section>
+          <section v-if="scheduleGroups.length || beginnerScheduleGroups.length" class="rounded-xl border border-base-200 bg-base-100 p-4 shadow-sm md:p-5">
+            <div class="mb-4 flex items-center justify-between"><h2 class="flex items-center gap-2 text-lg font-bold"><Clock class="h-5 w-5 text-primary" />场次安排</h2><span class="badge badge-ghost">{{ (vlive.virtualLiveSchedules?.length || 0) + (vlive.virtualLiveBeginnerSchedules?.length || 0) }} 场</span></div>
+            <div v-if="scheduleGroups.length" class="grid gap-2 sm:grid-cols-2">
+              <div v-for="group in scheduleGroups" :key="group.key" class="rounded-xl bg-base-200/45 p-3"><p class="mb-2 text-sm font-bold">{{ group.label }}</p><div class="flex flex-wrap gap-1.5"><span v-for="schedule in group.schedules" :key="schedule.id" class="badge h-auto gap-1 py-1" :class="schedule.isAfterEvent ? 'badge-secondary' : 'badge-ghost'"><span v-if="schedule.isAfterEvent">After Event</span><span>{{ timeLabel(schedule.startAt) }}–{{ timeLabel(schedule.endAt) }}</span></span></div></div>
+            </div>
+            <details v-if="beginnerScheduleGroups.length" class="collapse collapse-arrow mt-3 border border-base-200 bg-base-200/35"><summary class="collapse-title min-h-0 py-3 font-bold">每周循环场次</summary><div class="collapse-content space-y-3"><div v-for="group in beginnerScheduleGroups" :key="group.key" class="grid gap-2 sm:grid-cols-[5rem_1fr]"><strong class="text-sm">{{ group.label }}</strong><div class="flex flex-wrap gap-1"><span v-for="schedule in group.schedules" :key="schedule.id" class="badge badge-ghost">{{ schedule.startTime.slice(0, 5) }}–{{ schedule.endTime.slice(0, 5) }}</span></div></div></div></details>
+          </section>
 
-      <section v-if="scheduleGroups.length || beginnerScheduleGroups.length" class="card border border-base-200 bg-base-100 shadow-sm">
-        <div class="card-body gap-4 p-4 md:p-5">
-          <div class="flex items-center justify-between"><h2 class="flex items-center gap-2 text-lg font-bold"><Clock class="h-5 w-5 text-primary" />场次安排</h2><span class="badge badge-ghost">{{ (vlive.virtualLiveSchedules?.length || 0) + (vlive.virtualLiveBeginnerSchedules?.length || 0) }} 场</span></div>
-          <div v-if="scheduleGroups.length" class="space-y-3">
-            <div v-for="group in scheduleGroups" :key="group.key" class="rounded-xl border border-base-200 p-3"><p class="mb-2 text-sm font-bold">{{ group.label }}</p><div class="flex flex-wrap gap-1.5"><span v-for="schedule in group.schedules" :key="schedule.id" class="badge h-auto gap-1 py-1" :class="schedule.isAfterEvent ? 'badge-secondary' : 'badge-ghost'"><span v-if="schedule.isAfterEvent">After Event</span><span>{{ timeLabel(schedule.startAt) }}–{{ timeLabel(schedule.endAt) }}</span></span></div></div>
-          </div>
-          <details v-if="beginnerScheduleGroups.length" class="collapse collapse-arrow border border-base-200 bg-base-200/35"><summary class="collapse-title min-h-0 py-3 font-bold">每周循环场次</summary><div class="collapse-content space-y-3"><div v-for="group in beginnerScheduleGroups" :key="group.key" class="grid gap-2 sm:grid-cols-[5rem_1fr]"><strong class="text-sm">{{ group.label }}</strong><div class="flex flex-wrap gap-1"><span v-for="schedule in group.schedules" :key="schedule.id" class="badge badge-ghost">{{ schedule.startTime.slice(0, 5) }}–{{ schedule.endTime.slice(0, 5) }}</span></div></div></div></details>
-        </div>
-      </section>
+          <details v-if="informationText" class="collapse collapse-arrow border border-base-200 bg-base-100 shadow-sm">
+            <summary class="collapse-title flex min-h-0 items-center gap-2 py-4 text-lg font-bold"><FileText class="h-5 w-5 text-primary" />官方说明</summary>
+            <div class="collapse-content"><p class="max-h-[34rem] overflow-y-auto whitespace-pre-wrap rounded-xl bg-base-200/45 p-4 text-sm leading-7">{{ informationText }}</p></div>
+          </details>
+        </main>
 
-      <section v-if="rewardGroups.length" class="card border border-base-200 bg-base-100 shadow-sm">
-        <div class="card-body gap-4 p-4 md:p-5">
-          <div class="flex items-center justify-between"><h2 class="flex items-center gap-2 text-lg font-bold"><Gift class="h-5 w-5 text-primary" />参加奖励</h2><span class="badge badge-ghost">{{ rewardGroups.length }} 组</span></div>
-          <div class="grid gap-3 md:grid-cols-2">
-            <div v-for="group in rewardGroups" :key="group.id" class="rounded-xl border border-base-200 p-3"><div class="mb-3 flex items-center justify-between"><strong class="text-sm">{{ rewardTypeLabels[group.virtualLiveType] || group.virtualLiveType }}</strong><span class="text-[10px] text-base-content/35">Box #{{ group.resourceBoxId }}</span></div><div v-if="group.details.length" class="space-y-2"><div v-for="reward in group.details" :key="`${reward.seq}-${reward.resourceType}-${reward.resourceId || 0}`" class="flex items-center gap-2"><SekaiHonor v-if="reward.resourceType === 'honor' && reward.resourceId" :honor-id="reward.resourceId" :honor-level="reward.resourceLevel || 1" sub class="w-24 shrink-0" /><AssetImage v-else-if="resourceIcon(reward)" :src="resourceIcon(reward)" :alt="resourceName(reward)" class="h-10 w-10 shrink-0 object-contain" /><div v-else class="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-primary/10"><Gift class="h-4 w-4 text-primary" /></div><div class="min-w-0 flex-1"><p class="truncate text-xs" :title="resourceName(reward)">{{ resourceName(reward) }}</p><p class="font-bold">× {{ formatNumber(reward.resourceQuantity) }}</p></div></div></div><p v-else class="text-xs text-base-content/40">奖励箱数据缺失</p></div>
-          </div>
-        </div>
-      </section>
+        <aside class="space-y-4">
+          <section v-if="cast.length" class="rounded-xl border border-base-200 bg-base-100 p-4 shadow-sm">
+            <div class="mb-3 flex items-center justify-between"><h2 class="flex items-center gap-2 font-bold"><Users class="h-5 w-5 text-primary" />出演角色</h2><span class="badge badge-sm badge-ghost">{{ cast.length }} 人</span></div>
+            <div class="grid grid-cols-4 gap-x-2 gap-y-3">
+              <div v-for="row in cast" :key="row.id" class="min-w-0 text-center">
+                <img v-if="row.icon" :src="row.icon" :alt="row.name" class="mx-auto h-11 w-11 rounded-full bg-base-200 object-cover ring-2 ring-primary/15" />
+                <div v-else class="mx-auto grid h-11 w-11 place-items-center rounded-full bg-primary/10 text-sm font-bold text-primary ring-2 ring-primary/15">{{ row.name.slice(0, 1) }}</div>
+                <p class="mt-1 truncate text-[10px]" :title="row.name">{{ row.name }}</p><p v-if="row.virtualLivePerformanceType === 'both'" class="text-[8px] text-primary">主场＋待机</p>
+              </div>
+            </div>
+          </section>
 
-      <section v-if="relatedTickets.length || relatedPamphlets.length" class="grid gap-3 md:grid-cols-2">
-        <div v-if="relatedTickets.length" class="card border border-base-200 bg-base-100 shadow-sm"><div class="card-body gap-3 p-4 md:p-5"><h2 class="flex items-center gap-2 text-lg font-bold"><Ticket class="h-5 w-5 text-primary" />入场票券</h2><div v-for="item in relatedTickets" :key="item.id" class="rounded-xl bg-base-200/55 p-3"><div class="flex items-start justify-between gap-2"><strong class="text-sm">{{ item.name }}</strong><span class="badge badge-sm">{{ item.virtualLiveTicketType }}</span></div><p class="mt-1 text-xs text-base-content/55">{{ item.flavorText }}</p><p class="mt-2 text-[10px] text-primary">{{ ticketScheduleLabel(item) }}</p></div></div></div>
-        <div v-if="relatedPamphlets.length" class="card border border-base-200 bg-base-100 shadow-sm"><div class="card-body gap-3 p-4 md:p-5"><h2 class="flex items-center gap-2 text-lg font-bold"><FileText class="h-5 w-5 text-primary" />场刊</h2><div v-for="item in relatedPamphlets" :key="item.id" class="rounded-xl bg-base-200/55 p-3"><strong class="text-sm">{{ item.name }}</strong><p class="mt-1 text-xs text-base-content/55">{{ item.flavorText }}</p></div></div></div>
-      </section>
+          <section v-if="rewardGroups.length" class="rounded-xl border border-base-200 bg-base-100 p-4 shadow-sm">
+            <div class="mb-3 flex items-center justify-between"><h2 class="flex items-center gap-2 font-bold"><Gift class="h-5 w-5 text-primary" />参加奖励</h2><span class="badge badge-sm badge-ghost">{{ rewardGroups.length }} 组</span></div>
+            <div class="space-y-3">
+              <div v-for="group in rewardGroups" :key="group.id" class="rounded-xl bg-base-200/45 p-3"><div class="mb-2 flex items-center justify-between"><strong class="text-sm">{{ rewardTypeLabels[group.virtualLiveType] || group.virtualLiveType }}</strong><span class="text-[9px] text-base-content/35">Box #{{ group.resourceBoxId }}</span></div><div v-if="group.details.length" class="space-y-2"><div v-for="reward in group.details" :key="`${reward.seq}-${reward.resourceType}-${reward.resourceId || 0}`" class="flex items-center gap-2"><SekaiHonor v-if="reward.resourceType === 'honor' && reward.resourceId" :honor-id="reward.resourceId" :honor-level="reward.resourceLevel || 1" sub class="w-24 shrink-0" /><AssetImage v-else-if="resourceIcon(reward)" :src="resourceIcon(reward)" :alt="resourceName(reward)" class="h-9 w-9 shrink-0 object-contain" /><div v-else class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary/10"><Gift class="h-4 w-4 text-primary" /></div><div class="min-w-0 flex-1"><p class="truncate text-xs" :title="resourceName(reward)">{{ resourceName(reward) }}</p><p class="text-sm font-bold">× {{ formatNumber(reward.resourceQuantity) }}</p></div></div></div><p v-else class="text-xs text-base-content/40">奖励箱数据缺失</p></div>
+            </div>
+          </section>
 
-      <details v-if="informationText" class="collapse collapse-arrow border border-base-200 bg-base-100 shadow-sm">
-        <summary class="collapse-title flex min-h-0 items-center gap-2 py-4 text-lg font-bold"><FileText class="h-5 w-5 text-primary" />官方说明</summary>
-        <div class="collapse-content"><p class="max-h-[34rem] overflow-y-auto whitespace-pre-wrap rounded-xl bg-base-200/45 p-4 text-sm leading-7">{{ informationText }}</p></div>
-      </details>
+          <section v-if="relatedTickets.length" class="rounded-xl border border-base-200 bg-base-100 p-4 shadow-sm">
+            <h2 class="mb-3 flex items-center gap-2 font-bold"><Ticket class="h-5 w-5 text-primary" />入场票券</h2><div class="space-y-2"><div v-for="item in relatedTickets" :key="item.id" class="rounded-xl bg-base-200/45 p-3"><div class="flex items-start justify-between gap-2"><strong class="text-sm">{{ item.name }}</strong><span class="badge badge-sm">{{ item.virtualLiveTicketType }}</span></div><p class="mt-1 text-xs text-base-content/55">{{ item.flavorText }}</p><p class="mt-2 text-[10px] text-primary">{{ ticketScheduleLabel(item) }}</p></div></div>
+          </section>
+
+          <section v-if="relatedPamphlets.length" class="rounded-xl border border-base-200 bg-base-100 p-4 shadow-sm">
+            <h2 class="mb-3 flex items-center gap-2 font-bold"><FileText class="h-5 w-5 text-primary" />场刊</h2><div class="space-y-2"><div v-for="item in relatedPamphlets" :key="item.id" class="rounded-xl bg-base-200/45 p-3"><strong class="text-sm">{{ item.name }}</strong><p class="mt-1 text-xs text-base-content/55">{{ item.flavorText }}</p></div></div>
+          </section>
+        </aside>
+      </div>
     </template>
   </div>
 </template>

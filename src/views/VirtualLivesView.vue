@@ -4,9 +4,10 @@ import { useRoute, useRouter } from 'vue-router'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
 import { useNotificationStore } from '@/stores/notification'
-import { Calendar, Radio, PlayCircle, Clock, Bell, BellRing } from 'lucide-vue-next'
+import { Calendar, Radio, PlayCircle, Clock, Bell, BellRing, Search } from 'lucide-vue-next'
 import AssetImage from '@/components/AssetImage.vue'
 import Pagination from '@/components/Pagination.vue'
+import PageHeader from '@/components/PageHeader.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -59,9 +60,11 @@ onUnmounted(() => {
 })
 
 const typeMap: Record<string, { label: string; color: string }> = {
-  normal: { label: '普通', color: 'badge-primary' },
-  after_event: { label: '活动后', color: 'badge-secondary' },
-  cheer: { label: 'Cheer', color: 'badge-accent' },
+  normal: { label: '普通 Live', color: 'badge-primary' },
+  cheerful_carnival: { label: 'Cheerful Carnival', color: 'badge-secondary' },
+  streaming: { label: 'Connect Live', color: 'badge-accent' },
+  virtual_message: { label: 'Virtual Message', color: 'badge-info' },
+  beginner: { label: 'Welcome Live', color: 'badge-success' },
 }
 
 const filteredVlives = computed(() => {
@@ -178,41 +181,32 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="max-w-6xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
-    <h1 class="text-3xl font-bold mb-6 flex items-center gap-3">
-      <Radio class="w-8 h-8" />
-      虚拟 Live
-    </h1>
+  <div class="mx-auto max-w-7xl space-y-5">
+    <PageHeader title="虚拟 Live" :description="`查看演出排期、节目单与参加奖励 · ${filteredVlives.length} 场`">
+      <template #icon><Radio class="h-8 w-8 text-primary" /></template>
+      <template #actions>
+        <button
+          v-if="notificationStore.isSupported || notificationStore.isIOS"
+          class="btn btn-sm gap-1"
+          :class="isVliveSubscribed ? 'btn-primary' : 'btn-ghost'"
+          @click="toggleVliveSub"
+        >
+          <BellRing v-if="isVliveSubscribed" class="w-4 h-4" />
+          <Bell v-else class="w-4 h-4" />
+          {{ isVliveSubscribed ? '已订阅 Live' : '订阅 Live' }}
+        </button>
+      </template>
+    </PageHeader>
 
-    <div class="flex flex-wrap gap-4 mb-6">
-      <div class="form-control flex-1 min-w-[200px]">
-        <div class="input-group">
-          <input 
-            v-model="searchQuery"
-            type="text" 
-            placeholder="搜索 Live 名称或 ID..." 
-            class="input input-bordered w-full"
-          />
-        </div>
-      </div>
-
-      <div class="flex items-center">
-        <label class="label cursor-pointer gap-2 bg-base-200 px-3 py-1 rounded-lg">
-          <span class="label-text font-medium text-sm">展示已结束</span>
-          <input v-model="showEnded" type="checkbox" class="toggle toggle-sm toggle-primary" />
-        </label>
-      </div>
-
-      <button 
-        v-if="notificationStore.isSupported || notificationStore.isIOS"
-        class="btn btn-sm gap-1"
-        :class="isVliveSubscribed ? 'btn-primary' : 'btn-ghost'"
-        @click="toggleVliveSub"
-      >
-        <BellRing v-if="isVliveSubscribed" class="w-4 h-4" />
-        <Bell v-else class="w-4 h-4" />
-        {{ isVliveSubscribed ? '已订阅 Live' : '订阅 Live' }}
-      </button>
+    <div class="flex flex-col gap-3 rounded-xl border border-base-200 bg-base-100 p-3 shadow-sm sm:flex-row sm:items-center">
+      <label class="input input-sm input-bordered flex min-w-0 flex-1 items-center gap-2">
+        <Search class="h-4 w-4 opacity-45" />
+        <input v-model="searchQuery" type="text" class="grow min-w-0" placeholder="搜索 Live 名称或 ID…" />
+      </label>
+      <label class="flex cursor-pointer items-center justify-between gap-3 rounded-lg bg-base-200/65 px-3 py-2 sm:justify-start">
+        <span class="text-sm font-medium">展示已结束</span>
+        <input v-model="showEnded" type="checkbox" class="toggle toggle-sm toggle-primary" />
+      </label>
     </div>
 
     <!-- 加载状态 -->
@@ -220,12 +214,12 @@ onMounted(async () => {
       <span class="loading loading-spinner loading-lg"></span>
     </div>
 
-    <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div v-else class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
       <RouterLink 
         v-for="vlive in paginatedVlives" 
         :key="vlive.id"
         :to="'/vlives/' + vlive.id"
-        class="card bg-base-100 shadow-lg hover:shadow-xl transition-all overflow-hidden relative group block animate-fade-in-up"
+        class="group block overflow-hidden rounded-xl border border-base-200 bg-base-100 shadow-sm transition hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-md"
       >
         <figure class="relative bg-base-200 aspect-[122/52]">
           <AssetImage 
@@ -235,44 +229,44 @@ onMounted(async () => {
           />
           
           <!-- 状态角标 -->
-          <div class="absolute top-2 left-2 z-20 badge font-bold shadow-md gap-1" :class="getStatusInfo(vlive).color">
+          <div class="absolute left-2 top-2 z-20 badge badge-sm gap-1 border-0 font-bold shadow-sm" :class="getStatusInfo(vlive).color">
             <component :is="getStatusInfo(vlive).icon" v-if="getStatusInfo(vlive).icon" class="w-3 h-3" />
             {{ getStatusInfo(vlive).label }}
           </div>
           
           <!-- 类型角标 -->
           <div class="absolute bottom-2 left-2 z-20">
-            <span class="badge" :class="typeMap[vlive.virtualLiveType]?.color || 'badge-ghost'">
+            <span class="badge badge-sm" :class="typeMap[vlive.virtualLiveType]?.color || 'badge-ghost'">
               {{ typeMap[vlive.virtualLiveType]?.label || vlive.virtualLiveType }}
             </span>
           </div>
 
           <div class="absolute top-2 right-2 z-20">
-            <span class="badge badge-ghost bg-black/50 text-white border-0">
+            <span class="badge badge-sm border-0 bg-black/50 text-white">
               #{{ vlive.id }}
             </span>
           </div>
         </figure>
         
-        <div class="card-body p-4 gap-2">
-          <h2 class="card-title text-[15px] leading-tight line-clamp-2 min-h-[40px]">{{ vlive.name }}</h2>
+        <div class="space-y-2.5 p-3">
+          <h2 class="line-clamp-2 min-h-10 text-[15px] font-bold leading-5 transition-colors group-hover:text-primary">{{ vlive.name }}</h2>
           
-          <div class="text-xs text-base-content/70 whitespace-nowrap bg-base-200 p-2 rounded-md flex items-center gap-2">
+          <div class="flex items-start gap-2 text-xs leading-4 text-base-content/60">
             <Calendar class="w-3.5 h-3.5 flex-shrink-0" />
-            <span>{{ formatDate(getScheduleBounds(vlive).start) }} ~ {{ formatDate(getScheduleBounds(vlive).end) }}</span>
+            <span>{{ formatDate(getScheduleBounds(vlive).start) }} – {{ formatDate(getScheduleBounds(vlive).end) }}</span>
           </div>
 
           <!-- 下一排期信息 -->
-          <div v-if="getNextSchedule(vlive)" class="text-xs text-primary bg-primary/10 p-2 rounded-md flex justify-between items-center whitespace-nowrap overflow-hidden">
+          <div v-if="getNextSchedule(vlive)" class="flex items-center justify-between overflow-hidden rounded-lg bg-primary/8 px-2.5 py-2 text-xs text-primary">
             <div class="flex items-center gap-1.5 flex-1 min-w-0">
               <Clock class="w-3.5 h-3.5 flex-shrink-0" />
               <span class="truncate">下一场: {{ formatDate(getNextSchedule(vlive)!.next.startAt) }}</span>
             </div>
-            <span class="font-bold shrink-0 ml-2 border border-primary/30 px-1.5 rounded-sm">
+            <span class="ml-2 shrink-0 font-bold">
               剩余 {{ getNextSchedule(vlive)?.remainingCount }} 场
             </span>
           </div>
-          <div v-else-if="getStatusInfo(vlive).status === 'ongoing'" class="text-xs text-warning bg-warning/10 p-2 rounded-md flex items-center justify-center">
+          <div v-else-if="getStatusInfo(vlive).status === 'ongoing'" class="flex items-center justify-center rounded-lg bg-warning/10 p-2 text-xs text-warning">
             所有场次已结束 / 随时入场
           </div>
         </div>

@@ -2060,31 +2060,33 @@ function closeFixtureDetail() {
                 <button v-for="option in [{ value: 'all', label: '全部时段' }, { value: 'daytime', label: '白昼' }, { value: 'evening', label: '黄昏' }, { value: 'night', label: '夜晚' }]" :key="option.value" class="join-item btn btn-xs sm:btn-sm" :class="phenomenaTimeFilter === option.value ? 'btn-secondary' : 'btn-ghost'" @click="phenomenaTimeFilter = option.value">{{ option.label }}</button>
               </div>
             </div>
-            <p class="text-xs text-base-content/50">显示 {{ filteredPhenomenas.length }} / {{ phenomenas.length }} 种；视觉背景直接使用 master 中的环境色板生成。</p>
+            <p class="text-xs text-base-content/50">显示 {{ filteredPhenomenas.length }} / {{ phenomenas.length }} 种；图标旁的色块取自 master 环境色板。</p>
           </div>
         </div>
 
-        <div v-if="filteredPhenomenas.length" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          <article v-for="row in filteredPhenomenas" :key="row.id" class="card overflow-hidden border border-base-200 bg-base-100 shadow-sm">
-            <div class="relative aspect-[2/1] overflow-hidden" :style="{ backgroundImage: phenomenaGradient(row) }">
-              <div class="absolute -left-8 -top-10 h-32 w-32 rounded-full bg-white/20 blur-sm"></div>
-              <div class="absolute -bottom-12 right-2 h-28 w-28 rounded-full bg-white/15 blur-md"></div>
-              <span class="absolute left-2 top-2 badge border-0 bg-black/30 text-white">{{ phenomenaTimeLabels[row.timePeriodType] || row.timePeriodType }}</span>
-              <span class="absolute right-2 top-2 text-[10px] font-medium text-white/75">#{{ row.id }}</span>
-              <div class="absolute inset-0 flex flex-col items-center justify-center px-3 text-center text-white [text-shadow:0_1px_4px_rgb(0_0_0_/_0.45)]">
-                <AssetImage :src="`${mysekaiAssetsHost}/ondemand/mysekai/thumbnail/phenomena/${row.iconAssetbundleName}.png`" :alt="row.name" class="h-12 w-12 object-contain drop-shadow-md" />
-                <p class="mt-1 text-lg font-black tracking-wide">{{ row.englishName }}</p>
+        <div v-if="filteredPhenomenas.length" class="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+          <article v-for="row in filteredPhenomenas" :key="row.id" class="rounded-xl border border-base-200 bg-base-100 p-3 shadow-sm">
+            <div class="flex items-start gap-3">
+              <div class="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-xl border border-black/5" :style="{ backgroundImage: phenomenaGradient(row) }">
+                <AssetImage :src="`${mysekaiAssetsHost}/ondemand/mysekai/thumbnail/phenomena/${row.iconAssetbundleName}.png`" :alt="row.name" class="h-10 w-10 object-contain drop-shadow-sm" />
+              </div>
+              <div class="min-w-0 flex-1">
+                <div class="flex items-start justify-between gap-1.5">
+                  <div class="min-w-0"><h3 class="truncate font-bold">{{ row.name }}</h3><p class="truncate text-[11px] text-base-content/45">{{ row.englishName }}</p></div>
+                  <span class="shrink-0 text-[10px] text-base-content/35">#{{ row.id }}</span>
+                </div>
+                <p class="mt-1 line-clamp-2 text-xs leading-4 text-base-content/55">{{ row.description }}</p>
               </div>
             </div>
-            <div class="card-body gap-2 p-3">
-              <div class="flex items-start justify-between gap-2"><div><h3 class="font-bold">{{ row.name }}</h3><p class="text-xs text-base-content/45">{{ row.description }}</p></div><span class="badge badge-sm badge-outline">{{ phenomenaBrightnessLabels[row.brightnessType] || row.brightnessType }}</span></div>
-              <div v-if="phenomenaBackgroundColorMap.get(row.backgroundColorId)" class="flex items-center gap-1.5" title="环境色板">
-                <span v-for="color in [phenomenaBackgroundColorMap.get(row.backgroundColorId)?.baseColor, phenomenaBackgroundColorMap.get(row.backgroundColorId)?.groundColor, phenomenaBackgroundColorMap.get(row.backgroundColorId)?.gradationColor, phenomenaBackgroundColorMap.get(row.backgroundColorId)?.cornerColor, phenomenaBackgroundColorMap.get(row.backgroundColorId)?.groundHighlightColor]" :key="color" class="h-3.5 w-3.5 rounded-full border border-black/10" :style="{ backgroundColor: color }"></span>
-                <span class="ml-1 text-[10px] text-base-content/40">Palette {{ row.backgroundColorId }}</span>
+            <div class="mt-2.5 flex flex-wrap items-center gap-1.5">
+              <span class="badge badge-sm badge-secondary badge-outline">{{ phenomenaTimeLabels[row.timePeriodType] || row.timePeriodType }}</span>
+              <span class="badge badge-sm badge-outline">{{ phenomenaBrightnessLabels[row.brightnessType] || row.brightnessType }}</span>
+              <div v-if="phenomenaBackgroundColorMap.get(row.backgroundColorId)" class="ml-auto flex items-center gap-1" :title="`环境色板 ${row.backgroundColorId}`">
+                <span v-for="color in [phenomenaBackgroundColorMap.get(row.backgroundColorId)?.baseColor, phenomenaBackgroundColorMap.get(row.backgroundColorId)?.groundColor, phenomenaBackgroundColorMap.get(row.backgroundColorId)?.gradationColor, phenomenaBackgroundColorMap.get(row.backgroundColorId)?.cornerColor, phenomenaBackgroundColorMap.get(row.backgroundColorId)?.groundHighlightColor]" :key="color" class="h-2.5 w-2.5 rounded-full border border-black/10" :style="{ backgroundColor: color }"></span>
               </div>
-              <div v-if="phenomenaBgmMap.get(row.id)" class="flex min-w-0 items-center gap-1.5 rounded-lg bg-base-200/60 px-2 py-1.5 text-xs"><Music2 class="h-3.5 w-3.5 shrink-0 text-primary" /><span class="truncate" :title="phenomenaBgmMap.get(row.id)?.cue">{{ phenomenaBgmMap.get(row.id)?.cue }}</span></div>
-              <p v-else class="text-[10px] text-base-content/35">使用场地默认 BGM</p>
             </div>
+            <div v-if="phenomenaBgmMap.get(row.id)" class="mt-2 flex min-w-0 items-center gap-1.5 text-[11px] text-base-content/50"><Music2 class="h-3 w-3 shrink-0 text-primary" /><span class="truncate" :title="phenomenaBgmMap.get(row.id)?.cue">{{ phenomenaBgmMap.get(row.id)?.cue }}</span></div>
+            <p v-else class="mt-2 text-[10px] text-base-content/35">使用场地默认 BGM</p>
           </article>
         </div>
         <div v-else class="card border border-base-200 bg-base-100"><div class="card-body items-center py-14 text-sm text-base-content/50">没有符合筛选条件的天气现象</div></div>
