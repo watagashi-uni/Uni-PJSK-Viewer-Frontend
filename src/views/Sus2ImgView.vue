@@ -1021,7 +1021,6 @@ function clearForm() {
                   class="textarea textarea-bordered h-32 font-mono text-sm w-full"
                   placeholder="在此粘贴 rebase.json 内容"
                 ></textarea>
-                <p class="mt-1.5 text-xs text-base-content/50">点击按钮后才会生成并填入文本框，不会自动下载；现有前端与 Rust WASM 均可使用。</p>
                 <p v-if="rebaseGenerationMessage" class="mt-1 text-xs text-success">{{ rebaseGenerationMessage }}</p>
                 <p v-if="rebaseGenerationError" class="mt-1 text-xs text-error">{{ rebaseGenerationError }}</p>
               </div>
