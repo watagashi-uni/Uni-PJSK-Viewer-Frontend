@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { CalendarDays, Flower2, History, LayoutGrid, Search, Star, Swords } from 'lucide-vue-next'
+import { CalendarDays, CheckCircle2, Flower2, History, LayoutGrid, ListChecks, Search, Star, Swords } from 'lucide-vue-next'
 import AccountSelector from '@/components/AccountSelector.vue'
 import AssetImage from '@/components/AssetImage.vue'
 import PageHeader from '@/components/PageHeader.vue'
@@ -11,7 +11,7 @@ import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
 import type { GameCharacterData } from '@/types/master'
 
-type RecordsTab = 'events' | 'world_bloom' | 'challenge' | 'rank' | 'decks'
+type RecordsTab = 'events' | 'world_bloom' | 'challenge' | 'rank' | 'decks' | 'missions'
 
 interface EventInfo {
   id: number
@@ -129,6 +129,43 @@ interface UserDeckInfo {
   member5: number
 }
 
+interface CharacterMissionInfo {
+  id: number
+  characterMissionType: string
+  characterId: number
+  parameterGroupId: number
+  sentence: string
+  progressSentence: string
+}
+
+interface CharacterMissionParameter {
+  id: number
+  seq: number
+  requirement: number
+  exp?: number
+}
+
+interface UserCharacterMission {
+  characterId: number
+  characterMissionType: string
+  progress: number
+}
+
+interface UserCharacterMissionStatus {
+  missionId: number
+  characterId: number
+  parameterGroupId: number
+  seq: number
+  missionStatus: string
+}
+
+interface UserCharacterRank {
+  characterId: number
+  characterRank: number
+  exp: number
+  totalExp?: number
+}
+
 const masterStore = useMasterStore()
 const accountStore = useAccountStore()
 const settingsStore = useSettingsStore()
@@ -141,6 +178,8 @@ const rankMatchClasses = ref<NamedMaster[]>([])
 const cards = ref<CardInfo[]>([])
 const worldBlooms = ref<WorldBloomInfo[]>([])
 const characters = ref<GameCharacterData[]>([])
+const characterMissions = ref<CharacterMissionInfo[]>([])
+const characterMissionParameters = ref<CharacterMissionParameter[]>([])
 const isLoading = ref(true)
 const loadError = ref('')
 const activeTab = ref<RecordsTab>('events')
@@ -151,6 +190,9 @@ const bloomSearch = ref('')
 const bloomRankedOnly = ref(false)
 const challengeSearch = ref('')
 const challengeSort = ref<'character' | 'score' | 'stage'>('score')
+const missionSearch = ref('')
+const missionSort = ref<'rank' | 'completion' | 'character'>('rank')
+const selectedMissionCharacterId = ref<number | null>(null)
 const eventPageSize = 18
 
 const assetsHost = computed(() => settingsStore.assetsHost)
@@ -184,7 +226,36 @@ const userChallengeStages = computed(() => suiteArray<UserChallengeStage>('userC
 const userRankSeasons = computed(() => suiteArray<UserRankMatchSeason>('userRankMatchSeasons', 'user_rank_match_seasons'))
 const userDecks = computed(() => suiteArray<UserDeckInfo>('userDecks', 'user_decks'))
 const userCards = computed(() => suiteArray<UserCardInfo>('userCards', 'user_cards'))
+const userCharacterMissions = computed(() => suiteArray<UserCharacterMission>('userCharacterMissionV2s', 'user_character_mission_v2s'))
+const userCharacterMissionStatuses = computed(() => suiteArray<UserCharacterMissionStatus>('userCharacterMissionV2Statuses', 'user_character_mission_v2_statuses'))
+const userCharacterRanks = computed(() => suiteArray<UserCharacterRank>('userCharacters', 'user_characters'))
 const userCardMap = computed(() => new Map(userCards.value.map(card => [card.cardId, card])))
+const userCharacterRankMap = computed(() => new Map(userCharacterRanks.value.map(row => [Number(row.characterId), row])))
+
+const missionTypeLabels: Record<string, string> = {
+  play_live: '担任队长完成 Live',
+  play_live_ex: '担任队长完成 Live EX',
+  waiting_room: '成员进入等候室',
+  waiting_room_ex: '成员进入等候室 EX',
+  collect_costume_3d: '收集 3D 服装',
+  collect_stamp: '收集表情贴图',
+  read_area_talk: '阅读区域对话',
+  read_card_episode_first: '阅读前篇卡片剧情',
+  read_card_episode_second: '阅读后篇卡片剧情',
+  collect_another_vocal: '收集 Another Vocal',
+  area_item_level_up_character: '升级角色区域道具',
+  area_item_level_up_unit: '升级组合区域道具',
+  area_item_level_up_reality_world: '升级属性区域道具',
+  collect_member: '收集成员卡片',
+  skill_level_up_rare: '提升高稀有度技能等级',
+  skill_level_up_standard: '提升常规卡片技能等级',
+  master_rank_up_rare: '提升高稀有度 Master Rank',
+  master_rank_up_standard: '提升常规卡片 Master Rank',
+  collect_character_archive_voice: '收集角色语音',
+  collect_mysekai_fixture: '制作角色 MySekai 家具',
+  collect_mysekai_canvas: '制作角色 MySekai 画布',
+  read_mysekai_fixture_unique_character_talk: '阅读 MySekai 家具对话',
+}
 
 const eventRows = computed(() => userEvents.value.map(row => {
   const id = Number(row.eventId ?? row.event_id)
@@ -354,6 +425,109 @@ const rankSummary = computed(() => {
   return { play, wins, winRate: decisions ? wins / decisions * 100 : 0, bestRank }
 })
 
+const missionParameterMap = computed(() => {
+  const result = new Map<number, CharacterMissionParameter[]>()
+  for (const row of characterMissionParameters.value) {
+    const list = result.get(Number(row.id)) || []
+    list.push(row)
+    result.set(Number(row.id), list)
+  }
+  for (const list of result.values()) list.sort((a, b) => Number(a.seq) - Number(b.seq))
+  return result
+})
+
+const userMissionProgressMap = computed(() => new Map(userCharacterMissions.value.map(row => [
+  `${Number(row.characterId)}_${row.characterMissionType}`,
+  Number(row.progress || 0),
+])))
+
+const userMissionStatusMap = computed(() => {
+  const result = new Map<number, UserCharacterMissionStatus[]>()
+  for (const row of userCharacterMissionStatuses.value) {
+    const list = result.get(Number(row.missionId)) || []
+    list.push(row)
+    result.set(Number(row.missionId), list)
+  }
+  return result
+})
+
+const characterMissionRows = computed(() => characters.value.map(character => {
+  const definitions = characterMissions.value.filter(row => Number(row.characterId) === character.id)
+  const missions = definitions.map(definition => {
+    const parameters = missionParameterMap.value.get(Number(definition.parameterGroupId)) || []
+    const statuses = userMissionStatusMap.value.get(Number(definition.id)) || []
+    const achievedSeqs = new Set(statuses.map(row => Number(row.seq)))
+    const isEx = definition.characterMissionType.endsWith('_ex')
+    const nextSeq = statuses.reduce((max, row) => Math.max(max, Number(row.seq)), 0) + 1
+    const exParameter = [...parameters].reverse().find(row => Number(row.seq) <= nextSeq)
+    const next = isEx
+      ? (exParameter ? { ...exParameter, seq: nextSeq } : undefined)
+      : parameters.find(row => !achievedSeqs.has(Number(row.seq)))
+    const progress = userMissionProgressMap.value.get(`${character.id}_${definition.characterMissionType}`) || 0
+    const received = statuses.filter(row => row.missionStatus === 'received').length
+    const claimable = statuses.filter(row => row.missionStatus !== 'received').length
+    return {
+      definition,
+      isEx,
+      progress,
+      received,
+      claimable,
+      total: parameters.length,
+      next,
+      remaining: next ? Math.max(0, Number(next.requirement) - progress) : 0,
+      ratio: next?.requirement ? Math.min(1, progress / Number(next.requirement)) : 1,
+    }
+  })
+  const rank = userCharacterRankMap.value.get(character.id)
+  const received = missions.reduce((sum, row) => sum + row.received, 0)
+  const claimable = missions.reduce((sum, row) => sum + row.claimable, 0)
+  const finiteReceived = missions.filter(row => !row.isEx).reduce((sum, row) => sum + row.received, 0)
+  const finiteTotal = missions.filter(row => !row.isEx).reduce((sum, row) => sum + row.total, 0)
+  const nearest = missions.filter(row => row.next)
+    .sort((a, b) => b.ratio - a.ratio || a.remaining - b.remaining)
+    .slice(0, 3)
+  return {
+    character,
+    rank,
+    missions: missions.sort((a, b) => a.definition.id - b.definition.id),
+    received,
+    claimable,
+    total: finiteTotal,
+    completion: finiteTotal ? finiteReceived / finiteTotal : 0,
+    completedTypes: missions.filter(row => !row.isEx && !row.next).length,
+    nearest,
+  }
+}))
+
+const filteredCharacterMissionRows = computed(() => {
+  const query = missionSearch.value.trim().toLocaleLowerCase()
+  return characterMissionRows.value
+    .filter(row => !query || [
+      row.character.id,
+      getCharacterName(row.character),
+      row.character.firstNameEnglish,
+      row.character.givenNameEnglish,
+    ].some(value => String(value || '').toLocaleLowerCase().includes(query)))
+    .sort((a, b) => {
+      if (missionSort.value === 'completion') return b.completion - a.completion || b.received - a.received
+      if (missionSort.value === 'rank') return Number(b.rank?.characterRank || 0) - Number(a.rank?.characterRank || 0) || a.character.seq - b.character.seq
+      return a.character.seq - b.character.seq
+    })
+})
+
+const selectedCharacterMission = computed(() => characterMissionRows.value.find(row => row.character.id === selectedMissionCharacterId.value))
+
+const characterMissionSummary = computed(() => {
+  const rows = characterMissionRows.value
+  const rankRows = rows.filter(row => row.rank)
+  return {
+    characterCount: rankRows.length,
+    received: rows.reduce((sum, row) => sum + row.received, 0),
+    claimable: rows.reduce((sum, row) => sum + row.claimable, 0),
+    averageRank: rankRows.length ? rankRows.reduce((sum, row) => sum + Number(row.rank?.characterRank || 0), 0) / rankRows.length : 0,
+  }
+})
+
 function deckCards(deck: UserDeckInfo) {
   return [deck.member1, deck.member2, deck.member3, deck.member4, deck.member5]
     .map(cardId => ({ cardId, master: cardMap.value.get(cardId), user: userCardMap.value.get(cardId) }))
@@ -374,6 +548,15 @@ function tierLabel(row: typeof rankRows.value[number]): string {
 
 function getCharacterName(character: GameCharacterData): string {
   return `${character.firstName || ''}${character.givenName}`
+}
+
+function characterIcon(characterId: number): string {
+  if (characterId <= 20) return `/img/chr_ts/chr_ts_90_${characterId}.png`
+  return `/img/chr_ts/chr_ts_90_${characterId}_2.png`
+}
+
+function missionTypeLabel(type: string): string {
+  return missionTypeLabels[type] || type.replace(/_/g, ' ')
 }
 
 function eventBanner(event?: EventInfo): string {
@@ -398,7 +581,7 @@ watch(eventTotalPages, total => { eventPage.value = Math.min(eventPage.value, to
 
 onMounted(async () => {
   try {
-    const [eventData, seasonData, tierData, gradeData, classData, cardData, bloomData, characterData] = await Promise.all([
+    const [eventData, seasonData, tierData, gradeData, classData, cardData, bloomData, characterData, missionData, missionParameterData] = await Promise.all([
       masterStore.getMaster<EventInfo>('events'),
       masterStore.getMaster<RankMatchSeason>('rankMatchSeasons'),
       masterStore.getMaster<RankMatchTier>('rankMatchTiers'),
@@ -407,6 +590,8 @@ onMounted(async () => {
       masterStore.getMaster<CardInfo>('cards'),
       masterStore.getMaster<WorldBloomInfo>('worldBlooms'),
       masterStore.getMaster<GameCharacterData>('gameCharacters'),
+      masterStore.getMaster<CharacterMissionInfo>('characterMissionV2s'),
+      masterStore.getMaster<CharacterMissionParameter>('characterMissionV2ParameterGroups'),
     ])
     events.value = eventData
     rankMatchSeasons.value = seasonData
@@ -416,6 +601,8 @@ onMounted(async () => {
     cards.value = cardData
     worldBlooms.value = bloomData
     characters.value = characterData
+    characterMissions.value = missionData
+    characterMissionParameters.value = missionParameterData
   } catch (error) {
     console.error('加载账号记录数据失败:', error)
     loadError.value = error instanceof Error ? error.message : 'Master 数据加载失败'
@@ -427,7 +614,7 @@ onMounted(async () => {
 
 <template>
   <div class="max-w-7xl mx-auto space-y-6">
-    <PageHeader title="账号记录" description="活动、World Bloom、挑战 Live、排位赛季与保存卡组的统一履历。">
+    <PageHeader title="账号记录" description="活动、角色任务、World Bloom、挑战 Live、排位赛季与卡组的统一履历。">
       <template #icon><History class="w-8 h-8 text-primary" /></template>
       <template v-if="accountStore.accounts.length" #actions><div class="sm:w-56"><AccountSelector v-model="selectedUserId" /></div></template>
     </PageHeader>
@@ -438,6 +625,7 @@ onMounted(async () => {
     <template v-else>
       <div class="tabs tabs-boxed bg-base-100 p-1 w-fit max-w-full h-auto flex-wrap shadow-sm">
         <button class="tab gap-2" :class="{ 'tab-active': activeTab === 'events' }" @click="activeTab = 'events'"><CalendarDays class="w-4 h-4" />活动履历</button>
+        <button class="tab gap-2" :class="{ 'tab-active': activeTab === 'missions' }" @click="activeTab = 'missions'"><ListChecks class="w-4 h-4" />角色任务</button>
         <button class="tab gap-2" :class="{ 'tab-active': activeTab === 'world_bloom' }" @click="activeTab = 'world_bloom'"><Flower2 class="w-4 h-4" />World Bloom</button>
         <button class="tab gap-2" :class="{ 'tab-active': activeTab === 'challenge' }" @click="activeTab = 'challenge'"><Star class="w-4 h-4" />挑战 Live</button>
         <button class="tab gap-2" :class="{ 'tab-active': activeTab === 'rank' }" @click="activeTab = 'rank'"><Swords class="w-4 h-4" />排位赛</button>
@@ -466,6 +654,50 @@ onMounted(async () => {
           </div>
           <div v-else class="card bg-base-100 border border-base-200"><div class="card-body items-center py-12 text-base-content/45">没有匹配的活动记录</div></div>
           <Pagination v-if="eventTotalPages > 1" :current-page="eventPage" :total-pages="eventTotalPages" base-url="/account-records" @page-change="eventPage = $event" />
+        </template>
+      </section>
+
+      <section v-else-if="activeTab === 'missions'" class="space-y-4">
+        <div v-if="!userCharacterMissions.length && !userCharacterMissionStatuses.length" class="alert alert-info">当前 Suite 没有角色任务数据。</div>
+        <template v-else>
+          <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div class="stat bg-base-100 shadow-sm rounded-xl p-4"><div class="stat-title text-xs">有记录角色</div><div class="stat-value text-2xl">{{ characterMissionSummary.characterCount }}</div></div>
+            <div class="stat bg-base-100 shadow-sm rounded-xl p-4"><div class="stat-title text-xs">平均 Character Rank</div><div class="stat-value text-2xl text-primary">{{ characterMissionSummary.averageRank.toFixed(1) }}</div></div>
+            <div class="stat bg-base-100 shadow-sm rounded-xl p-4"><div class="stat-title text-xs">已领取里程碑</div><div class="stat-value text-2xl">{{ formatNumber(characterMissionSummary.received) }}</div></div>
+            <div class="stat bg-base-100 shadow-sm rounded-xl p-4"><div class="stat-title text-xs">待领取里程碑</div><div class="stat-value text-2xl text-secondary">{{ formatNumber(characterMissionSummary.claimable) }}</div></div>
+          </div>
+
+          <div class="card bg-base-100 shadow-sm"><div class="card-body p-4"><div class="flex flex-wrap gap-3"><label class="input input-bordered input-sm flex items-center gap-2 grow max-w-lg"><Search class="w-4 h-4 opacity-50" /><input v-model="missionSearch" class="grow" placeholder="搜索角色名称或 ID…" /></label><select v-model="missionSort" class="select select-bordered select-sm"><option value="rank">Character Rank 排序</option><option value="completion">任务完成度排序</option><option value="character">角色顺序</option></select></div></div></div>
+
+          <div class="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
+            <article v-for="row in filteredCharacterMissionRows" :key="row.character.id" class="card bg-base-100 border border-base-200 shadow-sm hover:border-primary/30 hover:shadow-md transition-all">
+              <div class="card-body p-4 gap-4">
+                <div class="flex items-center gap-3">
+                  <div class="avatar shrink-0"><div class="w-14 rounded-full bg-base-200 ring-2 ring-base-200"><img :src="characterIcon(row.character.id)" :alt="getCharacterName(row.character)" loading="lazy" /></div></div>
+                  <div class="min-w-0 grow"><RouterLink :to="`/characters/${row.character.id}`" class="font-bold link link-hover truncate block">{{ getCharacterName(row.character) }}</RouterLink><p class="text-xs text-base-content/45">{{ row.character.firstNameEnglish }} {{ row.character.givenNameEnglish }}</p></div>
+                  <div class="text-right shrink-0"><p class="text-[10px] text-base-content/45">Character Rank</p><p class="text-2xl font-black text-primary">{{ row.rank?.characterRank || '—' }}</p><p v-if="row.rank" class="text-[10px] text-base-content/45">EXP {{ row.rank.exp }}</p></div>
+                </div>
+
+                <div>
+                  <div class="flex justify-between text-xs mb-1.5"><span>已领取 {{ formatNumber(row.received) }} 个里程碑</span><span>有限任务 {{ formatPercent(row.completion * 100) }}</span></div>
+                  <progress class="progress progress-primary w-full h-2" :value="row.completion" max="1"></progress>
+                  <div class="flex gap-2 mt-2 text-[11px] text-base-content/50"><span>{{ row.completedTypes }} 类有限任务已满级</span><span v-if="row.claimable" class="text-secondary font-medium">{{ row.claimable }} 项待领取</span></div>
+                </div>
+
+                <div class="space-y-2">
+                  <p class="text-[11px] font-bold uppercase tracking-wide text-base-content/45">距离最近的目标</p>
+                  <div v-for="mission in row.nearest" :key="mission.definition.id" class="rounded-lg bg-base-200/65 px-3 py-2">
+                    <div class="flex justify-between gap-3 text-xs"><span class="font-medium truncate">{{ missionTypeLabel(mission.definition.characterMissionType) }}</span><span class="shrink-0 tabular-nums">{{ formatNumber(mission.progress) }} / {{ formatNumber(mission.next!.requirement) }}</span></div>
+                    <progress class="progress progress-secondary w-full h-1.5 mt-1" :value="mission.progress" :max="mission.next!.requirement || 1"></progress>
+                  </div>
+                  <p v-if="!row.nearest.length" class="rounded-lg bg-success/10 text-success text-sm px-3 py-3 flex items-center gap-2"><CheckCircle2 class="w-4 h-4" />所有任务里程碑均已完成</p>
+                </div>
+
+                <button class="btn btn-sm btn-ghost border border-base-200" @click="selectedMissionCharacterId = row.character.id">查看全部 {{ row.missions.length }} 类任务</button>
+              </div>
+            </article>
+          </div>
+          <div v-if="!filteredCharacterMissionRows.length" class="card bg-base-100 border border-base-200"><div class="card-body items-center py-12 text-base-content/45">没有匹配的角色</div></div>
         </template>
       </section>
 
@@ -540,10 +772,39 @@ onMounted(async () => {
         </template>
       </section>
 
-      <section v-else class="space-y-4">
+      <section v-else-if="activeTab === 'decks'" class="space-y-4">
         <div v-if="!userDecks.length" class="alert alert-info">当前 Suite 没有保存卡组数据。</div>
         <div v-else class="grid lg:grid-cols-2 gap-4"><article v-for="deck in userDecks" :key="deck.deckId" class="card bg-base-100 shadow-sm border border-base-200"><div class="card-body p-4"><div class="flex items-center justify-between"><h2 class="font-bold flex items-center gap-2"><LayoutGrid class="w-4 h-4 text-primary" />{{ deck.name || `卡组 ${deck.deckId}` }}</h2><span class="badge badge-outline">Deck {{ deck.deckId }}</span></div><div class="grid grid-cols-5 gap-2"><div v-for="row in deckCards(deck)" :key="row.cardId" class="min-w-0"><RouterLink :to="`/cards/${row.cardId}`" class="block hover:scale-105 transition-transform"><SekaiCard v-if="row.master" :card="row.master" :trained="row.user?.defaultImage === 'special_training'" :master-rank="row.user?.masterRank || 0" /></RouterLink><p class="text-[10px] text-center mt-1 truncate">Lv.{{ row.user?.level || '?' }}<span v-if="row.cardId === deck.leader" class="text-primary"> · L</span></p></div></div></div></article></div>
       </section>
     </template>
+
+    <div v-if="selectedCharacterMission" class="modal modal-open" role="dialog">
+      <button class="modal-backdrop" aria-label="关闭任务详情" @click="selectedMissionCharacterId = null"></button>
+      <div class="modal-box max-w-4xl p-0 overflow-hidden">
+        <div class="sticky top-0 z-10 bg-base-100 border-b border-base-200 p-5 flex items-center gap-3">
+          <div class="avatar shrink-0"><div class="w-12 rounded-full bg-base-200"><img :src="characterIcon(selectedCharacterMission.character.id)" :alt="getCharacterName(selectedCharacterMission.character)" /></div></div>
+          <div class="min-w-0 grow"><h2 class="font-bold text-lg">{{ getCharacterName(selectedCharacterMission.character) }} · 角色任务</h2><p class="text-xs text-base-content/50">Character Rank {{ selectedCharacterMission.rank?.characterRank || '—' }} · 已领取 {{ selectedCharacterMission.received }} 个里程碑</p></div>
+          <button class="btn btn-sm btn-circle btn-ghost" aria-label="关闭" @click="selectedMissionCharacterId = null">✕</button>
+        </div>
+        <div class="p-4 sm:p-5 max-h-[72vh] overflow-y-auto">
+          <div class="grid md:grid-cols-2 gap-3">
+            <div v-for="mission in selectedCharacterMission.missions" :key="mission.definition.id" class="rounded-xl border border-base-200 p-3 space-y-2" :class="{ 'bg-success/5 border-success/20': !mission.next }">
+              <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0"><h3 class="text-sm font-bold">{{ missionTypeLabel(mission.definition.characterMissionType) }}</h3><p class="text-[10px] text-base-content/40">{{ mission.definition.characterMissionType }}</p></div>
+                <span v-if="!mission.next" class="badge badge-success badge-sm gap-1 shrink-0"><CheckCircle2 class="w-3 h-3" />完成</span>
+                <span v-else-if="mission.claimable" class="badge badge-secondary badge-sm shrink-0">待领取 {{ mission.claimable }}</span>
+                <span v-else-if="mission.isEx" class="badge badge-outline badge-sm shrink-0">EX Lv.{{ mission.next.seq }}</span>
+              </div>
+              <template v-if="mission.next">
+                <div class="flex justify-between text-xs"><span>当前 {{ formatNumber(mission.progress) }}</span><span>下一级 {{ formatNumber(mission.next.requirement) }}</span></div>
+                <progress class="progress progress-primary w-full h-2" :value="mission.progress" :max="mission.next.requirement || 1"></progress>
+                <p class="text-xs text-base-content/55">还差 <strong class="text-base-content">{{ formatNumber(mission.remaining) }}</strong> · 已领取 {{ mission.received }}<template v-if="!mission.isEx"> / {{ mission.total }}</template> 级</p>
+              </template>
+              <p v-else class="text-xs text-success">已领取全部 {{ mission.total }} 级里程碑</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
