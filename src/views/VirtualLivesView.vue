@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
 import { useNotificationStore } from '@/stores/notification'
-import { Calendar, EyeOff, Radio, PlayCircle, Clock, Bell, BellRing } from 'lucide-vue-next'
+import { Calendar, Radio, PlayCircle, Clock, Bell, BellRing } from 'lucide-vue-next'
 import AssetImage from '@/components/AssetImage.vue'
 import Pagination from '@/components/Pagination.vue'
 
@@ -175,9 +175,6 @@ onMounted(async () => {
   }
 })
 
-function isLeak(vlive: any): boolean {
-  return vlive.startAt > now.value
-}
 </script>
 
 <template>
@@ -230,16 +227,6 @@ function isLeak(vlive: any): boolean {
         :to="'/vlives/' + vlive.id"
         class="card bg-base-100 shadow-lg hover:shadow-xl transition-all overflow-hidden relative group block animate-fade-in-up"
       >
-        <!-- 遮罩 -->
-        <div 
-          v-if="isLeak(vlive) && settingsStore.maskSpoilers" 
-          class="absolute inset-0 z-50 bg-base-100/95 backdrop-blur-sm flex flex-col items-center justify-center text-center p-4 transition-opacity duration-300 group-hover:opacity-0 pointer-events-none"
-        >
-          <EyeOff class="w-8 h-8 mb-2 text-warning" />
-          <span class="font-bold text-lg mb-1">即将开始</span>
-          <span class="text-xs text-base-content/60">鼠标悬停查看</span>
-        </div>
-
         <figure class="relative bg-base-200 aspect-[122/52]">
           <AssetImage 
             :src="getBannerUrl(vlive.assetbundleName)" 

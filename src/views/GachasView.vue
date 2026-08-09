@@ -152,16 +152,6 @@ onMounted(async () => {
           :to="`/gacha/${gacha.id}`"
           class="card bg-base-100 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all group overflow-hidden relative"
         >
-          <!-- 全卡片遮罩 (仅在开启遮罩模式下显示，Hover时消失) -->
-          <div 
-            v-if="isLeak(gacha) && settingsStore.maskSpoilers" 
-            class="absolute inset-0 z-50 bg-base-100/95 backdrop-blur-sm flex flex-col items-center justify-center text-center p-4 transition-opacity duration-300 group-hover:opacity-0 pointer-events-none"
-          >
-            <EyeOff class="w-8 h-8 mb-2 text-warning" />
-            <span class="font-bold text-lg mb-1">即将开始</span>
-            <span class="text-xs text-base-content/60">鼠标悬停查看</span>
-          </div>
-
           <figure class="relative aspect-[7/2] bg-base-200 overflow-hidden flex items-center justify-center">
             <AssetImage
               v-if="gachaImgSrc(gacha)"

@@ -152,24 +152,8 @@ async function handleClearTranslationCache() {
                 class="toggle toggle-primary"
               />
               <div>
-                <span class="label-text font-medium">显示剧透内容</span>
-                <p class="text-sm text-base-content/60">开启后将显示尚未发布的歌曲和卡片</p>
-              </div>
-            </label>
-          </div>
-
-          <!-- 剧透遮罩开关 -->
-          <div class="form-control">
-            <label class="label cursor-pointer justify-start gap-4">
-              <input 
-                v-model="settingsStore.maskSpoilers" 
-                type="checkbox" 
-                class="toggle toggle-primary"
-                :disabled="!settingsStore.showSpoilers"
-              />
-              <div :class="{ 'opacity-50': !settingsStore.showSpoilers }">
-                <span class="label-text font-medium">启用剧透遮罩</span>
-                <p class="text-sm text-base-content/60">开启后剧透内容默认被遮挡，点击即可查看</p>
+                <span class="label-text font-medium">显示未来内容</span>
+                <p class="text-sm text-base-content/60">开启后直接显示尚未发布的歌曲、卡片、活动与日程</p>
               </div>
             </label>
           </div>

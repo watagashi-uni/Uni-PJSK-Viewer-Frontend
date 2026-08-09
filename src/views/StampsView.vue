@@ -122,10 +122,6 @@ function formatDate(timestamp: number): string {
   return new Date(timestamp).toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' })
 }
 
-function isSpoiler(stamp: StampData): boolean {
-  return stamp.archivePublishedAt > now
-}
-
 async function downloadStamp(stamp: StampData) {
   actionMessage.value = ''
   const url = getStampUrl(stamp)
@@ -229,9 +225,6 @@ onMounted(async () => {
         <figure class="relative aspect-square bg-[radial-gradient(circle_at_center,var(--color-base-100),var(--color-base-200))] p-2">
           <AssetImage :src="getStampUrl(stamp)" :alt="cleanName(stamp.name)" class="w-full h-full object-contain group-hover:scale-105 transition-transform" />
           <div class="absolute top-2 right-2 badge badge-sm bg-base-100/80 border-0">#{{ stamp.id }}</div>
-          <div v-if="isSpoiler(stamp) && settingsStore.maskSpoilers" class="absolute inset-0 bg-base-100/95 backdrop-blur-sm grid place-items-center font-bold text-warning">
-            未公开
-          </div>
         </figure>
         <div class="card-body p-3 gap-1 min-w-0">
           <h2 class="font-bold text-sm truncate" :title="cleanName(stamp.name)">{{ cleanName(stamp.name) }}</h2>
