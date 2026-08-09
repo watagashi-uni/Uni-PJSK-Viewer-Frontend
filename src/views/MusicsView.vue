@@ -61,7 +61,7 @@ import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
 import { useAccountStore } from '@/stores/account'
 import { useNotificationStore } from '@/stores/notification'
-import { Search, ArrowUpDown, Languages, Trophy, List, LayoutGrid, RefreshCw, Layers, Github, Camera, Loader2, Bell, BellRing, FilterX, SlidersHorizontal, ChevronDown, EyeOff, ListFilter } from 'lucide-vue-next'
+import { Search, ArrowUpDown, Languages, Trophy, List, LayoutGrid, RefreshCw, Layers, Github, Camera, Loader2, Bell, BellRing, FilterX, SlidersHorizontal, ChevronDown, ListFilter } from 'lucide-vue-next'
 import { toPng } from 'html-to-image'
 import MusicCard from '@/components/MusicCard.vue'
 import Pagination from '@/components/Pagination.vue'
@@ -1106,18 +1106,6 @@ function isLeak(music: Music): boolean {
   return limited ? limited.startAt > Date.now() : false
 }
 
-// 列表视图的剧透遮罩（点击后本次浏览内不再遮罩）
-const revealedSpoilerIds = ref(new Set<number>())
-
-function isSpoilerMasked(music: Music): boolean {
-  return isLeak(music) && settingsStore.maskSpoilers && !revealedSpoilerIds.value.has(music.id)
-}
-
-function revealSpoiler(musicId: number): void {
-  revealedSpoilerIds.value.add(musicId)
-  revealedSpoilerIds.value = new Set(revealedSpoilerIds.value)
-}
-
 function getTranslation(id: number): string {
   return translations.value[id] || ''
 }
@@ -1824,16 +1812,6 @@ watch(totalPages, (pages) => {
             <tbody>
               <tr v-for="music in displayedMusics" :key="music.id" class="hover text-sm relative group">
                 <td class="p-2">
-                  <!-- 整行剧透遮罩 (仅在开启遮罩模式下显示，Hover时消失) -->
-                  <div
-                    v-if="isSpoilerMasked(music)"
-                    class="absolute inset-0 z-30 bg-base-100/95 backdrop-blur-sm flex items-center justify-center gap-2 transition-opacity duration-300 group-hover:opacity-0 group-hover:pointer-events-none cursor-pointer"
-                    @click.prevent.stop="revealSpoiler(music.id)"
-                  >
-                    <EyeOff class="w-4 h-4 text-warning" />
-                    <span class="font-bold text-sm">剧透内容</span>
-                    <span class="text-xs text-base-content/60">鼠标悬停或点击查看</span>
-                  </div>
                   <AssetImage
                     :src="getMusicThumbnailUrl(music.id)"
                     :alt="music.title"
@@ -1901,16 +1879,6 @@ watch(totalPages, (pages) => {
         <!-- Mobile List View -->
         <div class="block sm:hidden space-y-2">
           <div v-for="music in displayedMusics" :key="music.id" class="bg-base-100 p-2 rounded-lg flex gap-3 shadow-sm cv-auto-row relative overflow-hidden group">
-            <!-- 整行剧透遮罩 (仅在开启遮罩模式下显示，点击后消失) -->
-            <div
-              v-if="isSpoilerMasked(music)"
-              class="absolute inset-0 z-30 bg-base-100/95 backdrop-blur-sm flex items-center justify-center gap-2 transition-opacity duration-300 group-hover:opacity-0 group-hover:pointer-events-none cursor-pointer"
-              @click.prevent.stop="revealSpoiler(music.id)"
-            >
-              <EyeOff class="w-4 h-4 text-warning" />
-              <span class="font-bold text-sm">剧透内容</span>
-              <span class="text-xs text-base-content/60">点击查看</span>
-            </div>
             <AssetImage
               :src="getMusicThumbnailUrl(music.id)"
               :alt="music.title"

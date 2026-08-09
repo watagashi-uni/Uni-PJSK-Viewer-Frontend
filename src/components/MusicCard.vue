@@ -1,12 +1,8 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
-import { EyeOff, ListFilter } from 'lucide-vue-next'
-import { useSettingsStore } from '@/stores/settings'
+import { ListFilter } from 'lucide-vue-next'
 import AssetImage from '@/components/AssetImage.vue'
-
-const settingsStore = useSettingsStore()
-const spoilerRevealed = ref(false)
 
 const props = defineProps<{
   id: number
@@ -84,10 +80,6 @@ const coverUrl = computed(() => {
   return `${props.assetsHost}/startapp/music/jacket/${props.assetbundleName}/${props.assetbundleName}.png`
 })
 
-function revealSpoiler() {
-  spoilerRevealed.value = true
-}
-
 function selectArtist() {
   if (!props.composer) return
   emit('artistClick', props.composer)
@@ -100,19 +92,6 @@ function selectArtist() {
     class="card bg-base-100 shadow-sm overflow-hidden group relative"
     :class="results ? 'hover:border-primary/30 border border-transparent transition-colors' : 'hover:shadow-md transition-all hover:-translate-y-1'"
   >
-    <!-- 全卡片遮罩 (仅在开启遮罩模式下显示，Hover时消失) -->
-    <div
-      v-if="isLeak && settingsStore.maskSpoilers && !spoilerRevealed"
-      class="absolute inset-0 z-50 bg-base-100/95 backdrop-blur-sm flex flex-col items-center justify-center text-center p-4 transition-opacity duration-300 group-hover:opacity-0 group-hover:pointer-events-none"
-      @click.prevent.stop="revealSpoiler"
-    >
-      <EyeOff class="w-8 h-8 mb-2 text-warning" />
-      <span class="font-bold text-lg mb-1">剧透内容</span>
-      <span class="text-xs text-base-content/60 mb-3">鼠标悬停或点击查看</span>
-      <span class="btn btn-warning btn-xs pointer-events-auto" role="button">
-        取消遮罩
-      </span>
-    </div>
     <!-- 封面 -->
     <figure class="relative aspect-square">
       <AssetImage 

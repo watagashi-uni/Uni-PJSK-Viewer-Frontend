@@ -514,15 +514,6 @@ watch(() => route.params.id, loadData)
     </div>
 
     <template v-else-if="gacha">
-      <!-- 剧透 Banner (仅在 Mask 开启且是 Leak 时显示) -->
-      <div v-if="isLeak && settingsStore.maskSpoilers" class="alert alert-warning shadow-sm">
-        <EyeOff class="w-5 h-5" />
-        <div>
-          <h3 class="font-bold">即将开始的卡池</h3>
-          <div class="text-xs">此卡池尚未在游戏中上线。</div>
-        </div>
-      </div>
-
       <!-- 卡池信息卡片 -->
       <div class="card bg-base-100 shadow-lg">
         <div class="card-body">

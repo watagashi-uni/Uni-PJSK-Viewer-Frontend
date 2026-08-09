@@ -10,8 +10,6 @@ export const useSettingsStore = defineStore('settings', () => {
 
     // 状态
     const showSpoilers = ref(false)
-    // 是否使用遮罩覆盖剧透内容（默认开启）
-    const maskSpoilers = ref(true)
     // 主题状态: 'light' | 'dark' | 'auto' | 'moe' | 'jirai'
     const theme = ref<string>('auto')
 
@@ -103,10 +101,7 @@ export const useSettingsStore = defineStore('settings', () => {
             showSpoilers.value = saved === '1'
         }
 
-        const savedMask = localStorage.getItem('settings_maskSpoilers')
-        if (savedMask !== null) {
-            maskSpoilers.value = savedMask === '1'
-        }
+        localStorage.removeItem('settings_maskSpoilers')
 
         const savedTheme = localStorage.getItem('settings_theme')
         if (savedTheme) {
@@ -168,17 +163,9 @@ export const useSettingsStore = defineStore('settings', () => {
         showSpoilers.value = !showSpoilers.value
     }
 
-    function toggleMaskSpoilers(): void {
-        maskSpoilers.value = !maskSpoilers.value
-    }
-
     // 监听变化并保存到 localStorage
     watch(showSpoilers, (value) => {
         localStorage.setItem('settings_showSpoilers', value ? '1' : '0')
-    })
-
-    watch(maskSpoilers, (value) => {
-        localStorage.setItem('settings_maskSpoilers', value ? '1' : '0')
     })
 
     watch(theme, (value) => {
@@ -197,7 +184,6 @@ export const useSettingsStore = defineStore('settings', () => {
         ASSETS_HOST_CN,
         ASSETS_HOST_GLOBAL,
         showSpoilers,
-        maskSpoilers,
         theme,
         defaultVocal,
         preferredAssetsHost,
@@ -206,7 +192,6 @@ export const useSettingsStore = defineStore('settings', () => {
         cnAssetsPolicyLoaded,
         initialize,
         toggleSpoilers,
-        toggleMaskSpoilers,
         setTheme,
         setDefaultVocal,
         setAssetsHost,

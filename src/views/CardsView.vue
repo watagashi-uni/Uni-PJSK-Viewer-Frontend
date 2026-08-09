@@ -10,7 +10,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
-import { EyeOff, RefreshCw, SlidersHorizontal, ChevronDown, FilterX } from 'lucide-vue-next'
+import { RefreshCw, SlidersHorizontal, ChevronDown, FilterX } from 'lucide-vue-next'
 import { useAccountStore } from '@/stores/account'
 import Pagination from '@/components/Pagination.vue'
 import SekaiCard from '@/components/SekaiCard.vue'
@@ -582,16 +582,6 @@ onMounted(() => {
       >
         <!-- 卡片背景框 -->
         <div class="bg-base-100 rounded-xl p-2.5 shadow-md border border-base-200 hover:shadow-lg hover:border-primary/30 transition-all relative overflow-hidden">
-          <!-- 全卡片遮罩 (仅在开启遮罩模式下显示，Hover时消失) -->
-          <div
-            v-if="isLeak(card.releaseAt) && settingsStore.maskSpoilers"
-            class="absolute inset-0 z-50 bg-base-100/95 backdrop-blur-sm flex flex-col items-center justify-center text-center p-4 transition-opacity duration-300 group-hover:opacity-0 pointer-events-none"
-          >
-            <EyeOff class="w-6 h-6 mb-2 text-warning" />
-            <span class="font-bold text-sm mb-1">剧透内容</span>
-            <span class="text-[10px] text-base-content/60">鼠标悬停查看</span>
-          </div>
-
           <!-- 简单角标 (替代之前的内部遮罩) -->
           <div v-if="isLeak(card.releaseAt)" class="absolute top-1 right-1 z-40 badge badge-warning badge-xs gap-0.5">
             剧透
