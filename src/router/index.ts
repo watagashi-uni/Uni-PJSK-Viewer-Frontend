@@ -123,6 +123,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '活动' },
     },
     {
+        path: '/calendar',
+        name: 'GameCalendar',
+        component: () => import('@/views/GameCalendarView.vue'),
+        meta: { title: '游戏日历' },
+    },
+    {
         path: '/vlives',
         name: 'VirtualLives',
         component: () => import('@/views/VirtualLivesView.vue'),
