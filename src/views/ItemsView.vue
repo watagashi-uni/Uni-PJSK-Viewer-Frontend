@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { Boxes, CalendarClock, Search, X } from 'lucide-vue-next'
 import AccountSelector from '@/components/AccountSelector.vue'
 import AssetImage from '@/components/AssetImage.vue'
+import PageHeader from '@/components/PageHeader.vue'
 import Pagination from '@/components/Pagination.vue'
 import { useAccountStore } from '@/stores/account'
 import { useMasterStore } from '@/stores/master'
@@ -273,10 +274,7 @@ onMounted(async () => {
 
 <template>
   <div class="max-w-7xl mx-auto space-y-6">
-    <header>
-      <h1 class="text-3xl font-bold flex items-center gap-3"><Boxes class="w-8 h-8 text-primary" />物品图鉴</h1>
-      <p class="text-sm text-base-content/60 mt-2">集中查看素材、体力道具、练习券、技能券与招募贴纸；选择账号后显示 suite 中的持有数量。</p>
-    </header>
+    <PageHeader title="物品图鉴" description="素材、体力道具、练习券、技能券与招募贴纸；选择账号后显示持有数量。"><template #icon><Boxes class="w-8 h-8 text-primary" /></template></PageHeader>
 
     <section class="card bg-base-100 border border-base-200 shadow-sm">
       <div class="card-body p-4 gap-4">
@@ -290,12 +288,12 @@ onMounted(async () => {
       </div>
     </section>
 
-    <div v-if="isLoading" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4"><div v-for="index in 24" :key="index" class="skeleton h-60 rounded-xl"></div></div>
+    <div v-if="isLoading" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3"><div v-for="index in 24" :key="index" class="skeleton h-52 rounded-xl"></div></div>
     <div v-else-if="loadError" class="alert alert-error">物品数据加载失败：{{ loadError }}</div>
     <template v-else>
-      <div v-if="paginatedItems.length" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-        <button v-for="item in paginatedItems" :key="item.key" class="card bg-base-100 border border-base-200 hover:shadow-lg hover:-translate-y-0.5 transition-all overflow-hidden text-left" @click="selectedItem = item">
-          <figure class="relative aspect-square bg-base-200/70 p-4"><AssetImage :src="item.icon" :alt="item.name" class="w-full h-full object-contain" /><span class="absolute top-2 left-2 badge badge-sm badge-neutral">{{ categoryMeta[item.category].shortLabel }}</span><span v-if="hasInventory(item.category)" class="absolute top-2 right-2 badge badge-sm badge-primary">×{{ formatNumber(getOwned(item)) }}</span></figure>
+      <div v-if="paginatedItems.length" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+        <button v-for="item in paginatedItems" :key="item.key" class="group card bg-base-100 border border-base-200 hover:border-primary/30 hover:shadow-md hover:-translate-y-0.5 transition-all overflow-hidden text-left" @click="selectedItem = item">
+          <figure class="relative h-28 sm:h-32 bg-gradient-to-br from-base-200 to-base-100 p-2.5"><AssetImage :src="item.icon" :alt="item.name" class="w-full h-full object-contain group-hover:scale-105 transition-transform" /><span class="absolute top-2 left-2 badge badge-xs badge-neutral">{{ categoryMeta[item.category].shortLabel }}</span><span v-if="hasInventory(item.category)" class="absolute top-2 right-2 badge badge-xs badge-primary shadow-sm">×{{ formatNumber(getOwned(item)) }}</span></figure>
           <div class="card-body p-3 gap-1"><span class="text-[10px] text-base-content/45">#{{ item.id }} · {{ item.detail }}</span><h2 class="font-bold text-sm line-clamp-2 min-h-10">{{ item.name }}</h2><p class="text-[11px] text-base-content/55 line-clamp-2 min-h-8">{{ item.description || '暂无说明' }}</p></div>
         </button>
       </div>
@@ -307,7 +305,7 @@ onMounted(async () => {
       <div v-if="selectedItem" class="modal-box max-w-xl">
         <button class="btn btn-sm btn-circle btn-ghost absolute right-3 top-3" aria-label="关闭" @click="selectedItem = null"><X class="w-4 h-4" /></button>
         <div class="flex flex-col sm:flex-row gap-6">
-          <div class="w-40 h-40 bg-base-200 rounded-2xl p-4 shrink-0 self-center"><AssetImage :src="selectedItem.icon" :alt="selectedItem.name" class="w-full h-full object-contain" /></div>
+          <div class="w-32 h-32 bg-base-200 rounded-2xl p-3 shrink-0 self-center"><AssetImage :src="selectedItem.icon" :alt="selectedItem.name" class="w-full h-full object-contain" /></div>
           <div class="min-w-0 space-y-3"><div><span class="badge badge-outline">{{ categoryMeta[selectedItem.category].label }}</span><p class="text-xs text-base-content/45 mt-2">#{{ selectedItem.id }}</p><h2 class="font-bold text-2xl">{{ selectedItem.name }}</h2></div><p class="text-sm text-primary font-medium">{{ selectedItem.detail }}</p><p class="text-sm leading-6 text-base-content/70">{{ selectedItem.description || '暂无说明' }}</p><div v-if="hasInventory(selectedItem.category)" class="stat bg-base-200 rounded-xl p-3"><div class="stat-title text-xs">账号持有</div><div class="stat-value text-2xl text-primary">{{ formatNumber(getOwned(selectedItem)) }}</div></div><div v-if="selectedItem.convertStartAt" class="flex items-center gap-2 text-xs text-base-content/55"><CalendarClock class="w-4 h-4" />{{ formatDate(selectedItem.convertStartAt) }} 开始转换</div></div>
         </div>
       </div>

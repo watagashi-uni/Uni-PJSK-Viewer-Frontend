@@ -6,6 +6,7 @@ import Pagination from '@/components/Pagination.vue'
 import SekaiHonor from '@/components/SekaiHonor.vue'
 import SekaiHonorBonds from '@/components/SekaiHonorBonds.vue'
 import AccountSelector from '@/components/AccountSelector.vue'
+import PageHeader from '@/components/PageHeader.vue'
 import { useMasterStore } from '@/stores/master'
 import { useAccountStore } from '@/stores/account'
 import type { GameCharacterData } from '@/types/master'
@@ -314,10 +315,10 @@ onMounted(async () => {
 
 <template>
   <div class="max-w-7xl mx-auto space-y-6">
-    <header class="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-warning/15 bg-gradient-to-br from-warning/10 via-base-100 to-base-100 p-5 md:p-6">
-      <div class="flex items-center gap-4"><span class="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-warning/15 text-warning"><Trophy class="w-6 h-6" /></span><div><h1 class="text-2xl md:text-3xl font-bold">称号图鉴</h1><p class="text-sm text-base-content/60 mt-1">浏览普通、活动排名与角色羁绊称号，并结合账号查看持有状态。</p></div></div>
-      <div class="min-w-56"><AccountSelector v-if="accountStore.accounts.length" v-model="selectedUserId" /></div>
-    </header>
+    <PageHeader title="称号图鉴" description="浏览普通、活动排名与角色羁绊称号，并结合账号查看持有状态。">
+      <template #icon><Trophy class="w-8 h-8 text-warning" /></template>
+      <template v-if="accountStore.accounts.length" #actions><div class="sm:w-56"><AccountSelector v-model="selectedUserId" /></div></template>
+    </PageHeader>
 
     <div role="tablist" class="tabs tabs-box bg-base-100 border border-base-200 w-fit">
       <button role="tab" class="tab gap-2" :class="{ 'tab-active': activeTab === 'normal' }" @click="setTab('normal')">

@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { Coins, Search, Wrench, X } from 'lucide-vue-next'
 import AccountSelector from '@/components/AccountSelector.vue'
 import AssetImage from '@/components/AssetImage.vue'
+import PageHeader from '@/components/PageHeader.vue'
 import { useAccountStore } from '@/stores/account'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
@@ -280,12 +281,7 @@ onMounted(async () => {
 
 <template>
   <div class="max-w-7xl mx-auto space-y-6">
-    <header class="rounded-2xl border border-primary/15 bg-gradient-to-br from-primary/10 via-base-100 to-base-100 p-5 md:p-6">
-      <div class="flex items-center gap-4">
-        <span class="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-primary/15 text-primary"><Wrench class="w-6 h-6" /></span>
-        <div><h1 class="text-2xl md:text-3xl font-bold">区域道具规划</h1><p class="text-sm text-base-content/60 mt-1">快速查看道具加成，并按账号等级精确计算升级素材与金币。</p></div>
-      </div>
-    </header>
+    <PageHeader title="区域道具规划" description="快速查看道具加成，并按账号等级精确计算升级素材与金币。"><template #icon><Wrench class="w-8 h-8 text-primary" /></template></PageHeader>
 
     <section class="card bg-base-100 border border-base-200 shadow-sm">
       <div class="card-body p-4 gap-4">
