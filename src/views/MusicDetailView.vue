@@ -1365,7 +1365,7 @@ const isExpired = computed(() => {
             <div v-if="musicOriginalLink" class="flex justify-between items-center gap-3 text-sm border-b border-base-200 pb-2">
               <span class="text-base-content/60 shrink-0">原曲链接</span>
               <a :href="musicOriginalLink" target="_blank" rel="noopener noreferrer" class="link link-primary inline-flex items-center gap-1 font-medium">
-                打开官方收录链接 <ExternalLink class="w-3.5 h-3.5" />
+                在新窗口打开官方收录链接 <ExternalLink class="w-3.5 h-3.5" />
               </a>
             </div>
             <div class="flex justify-between items-center text-sm border-b border-base-200 pb-2">
