@@ -719,7 +719,7 @@ onMounted(loadData)
                   <span class="ml-2 w-8 text-sm">{{ cardLevel }}</span>
                 </div>
                 <div class="flex items-center">
-                  <span class="w-24 text-sm font-medium">Master Rank</span>
+                  <span class="w-24 text-sm font-medium">突破</span>
                   <input v-model.number="masterRank" type="range" :min="0" :max="5" class="range range-xs range-secondary flex-1" />
                   <span class="ml-2 w-8 text-sm">{{ masterRank }}</span>
                 </div>

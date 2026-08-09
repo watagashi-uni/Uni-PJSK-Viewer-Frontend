@@ -327,6 +327,44 @@ html {
   transform: scale(1.02);
 }
 
+/* Keep semantic/selected button states readable after the base Jirai button override. */
+[data-theme="jirai"] .btn-secondary {
+  background-color: #8c7694;
+  color: #ffffff;
+  border-color: #d7b6d6;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+}
+
+[data-theme="jirai"] .btn-secondary:hover,
+[data-theme="jirai"] .btn-secondary:focus-visible {
+  background-color: #a58bad;
+  color: #ffffff;
+  border-color: #ffb0ca;
+}
+
+[data-theme="jirai"] .btn.btn-active {
+  background-color: #d65a85;
+  color: #ffffff;
+  border-color: #ffb0ca;
+}
+
+/* Native selects need explicit option colors in Chromium/WebKit dark theme menus. */
+[data-theme="jirai"] :is(.select, select) {
+  background-color: #261f28;
+  color: #f4e6e6;
+  border-color: #8c7694;
+}
+
+[data-theme="jirai"] :is(.select, select) option {
+  background-color: #261f28;
+  color: #f4e6e6;
+}
+
+[data-theme="jirai"] :is(.select, select) option:checked {
+  background-color: #d65a85;
+  color: #ffffff;
+}
+
 /* Sidebar wobble fix */
 [data-theme="jirai"] .drawer-side .btn:hover {
   transform: none;
