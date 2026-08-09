@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { BookOpen, Calendar, ChevronRight, Library, Play, Search, Sparkles, X } from 'lucide-vue-next'
+import { BookOpen, ChevronRight, Library, Play, Search, Sparkles, X } from 'lucide-vue-next'
 import AssetImage from '@/components/AssetImage.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import Pagination from '@/components/Pagination.vue'
@@ -57,17 +57,7 @@ interface UnitEpisodeGroup {
   assetbundleName: string
 }
 
-interface SpecialStory {
-  id: number
-  seq: number
-  title: string
-  assetbundleName: string
-  startAt: number
-  endAt: number
-  episodes: StoryEpisode[]
-}
-
-type StoryTab = 'event' | 'unit' | 'special'
+type StoryTab = 'event' | 'unit'
 type StoryKind = StoryTab
 
 interface SelectedStory {
@@ -91,7 +81,6 @@ const eventStories = ref<EventStory[]>([])
 const eventStoryUnits = ref<EventStoryUnit[]>([])
 const unitStories = ref<UnitStory[]>([])
 const unitEpisodeGroups = ref<UnitEpisodeGroup[]>([])
-const specialStories = ref<SpecialStory[]>([])
 const isLoading = ref(true)
 const loadError = ref('')
 
@@ -99,7 +88,6 @@ const searchQuery = ref('')
 const episodeSearch = ref('')
 const selectedUnit = ref('')
 const eventPage = ref(1)
-const specialPage = ref(1)
 const selectedStory = ref<SelectedStory | null>(null)
 const selectedEpisode = ref<StoryEpisode | null>(null)
 const pageSize = 12
@@ -117,7 +105,6 @@ const unitOptions = [
 const assetsHost = computed(() => settingsStore.assetsHost)
 const activeTab = computed<StoryTab>(() => {
   if (route.query.tab === 'unit') return 'unit'
-  if (route.query.tab === 'special') return 'special'
   return 'event'
 })
 const eventMap = computed(() => new Map(events.value.map(event => [event.id, event])))
@@ -126,10 +113,8 @@ const unitEpisodeGroupMap = computed(() => new Map(unitEpisodeGroups.value.map(g
 const storyStats = computed(() => ({
   events: eventStories.value.length,
   unitChapters: unitStories.value.reduce((sum, story) => sum + story.chapters.length, 0),
-  special: specialStories.value.length,
   episodes: eventStories.value.reduce((sum, story) => sum + story.eventStoryEpisodes.length, 0)
-    + unitStories.value.reduce((sum, story) => sum + story.chapters.reduce((chapterSum, chapter) => chapterSum + chapter.episodes.length, 0), 0)
-    + specialStories.value.reduce((sum, story) => sum + story.episodes.length, 0),
+    + unitStories.value.reduce((sum, story) => sum + story.chapters.reduce((chapterSum, chapter) => chapterSum + chapter.episodes.length, 0), 0),
 }))
 
 const mainUnitByEventStory = computed(() => {
@@ -168,21 +153,6 @@ const flattenedUnitChapters = computed(() => unitStories.value
   })
   .sort((a, b) => unitOrder(a.unit) - unitOrder(b.unit) || a.chapterNo - b.chapterNo))
 
-const filteredSpecialStories = computed(() => {
-  const query = searchQuery.value.trim().toLocaleLowerCase()
-  return specialStories.value
-    .filter(story => settingsStore.showSpoilers || story.startAt <= now)
-    .filter(story => {
-      if (!query) return true
-      return [story.id, story.title, ...story.episodes.map(episode => episode.title)]
-        .some(value => String(value || '').toLocaleLowerCase().includes(query))
-    })
-    .sort((a, b) => b.startAt - a.startAt || b.id - a.id)
-})
-
-const specialTotalPages = computed(() => Math.max(1, Math.ceil(filteredSpecialStories.value.length / pageSize)))
-const paginatedSpecialStories = computed(() => filteredSpecialStories.value.slice((specialPage.value - 1) * pageSize, specialPage.value * pageSize))
-
 const scenarioUrls = computed(() => {
   if (!selectedStory.value || !selectedEpisode.value) return []
   const host = String(assetsHost.value).replace(/\/+$/, '')
@@ -194,10 +164,7 @@ const scenarioUrls = computed(() => {
   if (story.kind === 'unit') {
     return [`${host}/startapp/scenario/unitstory/${story.assetbundleName}/${episode.scenarioId}.json`]
   }
-  return [
-    `${host}/startapp/scenario/special/${episode.assetbundleName}/${episode.scenarioId}.json`,
-    `${host}/startapp/scenario/special/${story.assetbundleName}/${episode.scenarioId}.json`,
-  ]
+  return []
 })
 
 const selectedEpisodeImageUrl = computed(() => {
@@ -228,10 +195,8 @@ const selectedEpisodeIndex = computed(() => {
 
 watch([searchQuery, selectedUnit], () => {
   eventPage.value = 1
-  specialPage.value = 1
 })
 watch(eventTotalPages, total => { eventPage.value = Math.min(eventPage.value, total) })
-watch(specialTotalPages, total => { specialPage.value = Math.min(specialPage.value, total) })
 
 function unitOrder(unit: string): number {
   const index = unitOptions.findIndex(option => option.value === unit)
@@ -299,13 +264,6 @@ function openUnitChapter(chapter: UnitStoryChapter) {
   }
 }
 
-function openSpecialStory(story: SpecialStory) {
-  selectedStory.value = {
-    kind: 'special', id: story.id, title: story.title,
-    assetbundleName: story.assetbundleName, episodes: story.episodes, startAt: story.startAt,
-  }
-}
-
 function closeStory() {
   selectedEpisode.value = null
   selectedStory.value = null
@@ -314,23 +272,21 @@ function closeStory() {
 
 onMounted(async () => {
   try {
-    const [eventData, eventStoryData, eventUnitData, unitStoryData, groupData, specialData] = await Promise.all([
+    const [eventData, eventStoryData, eventUnitData, unitStoryData, groupData] = await Promise.all([
       masterStore.getMaster<EventData>('events'),
       masterStore.getMaster<EventStory>('eventStories'),
       masterStore.getMaster<EventStoryUnit>('eventStoryUnits'),
       masterStore.getMaster<UnitStory>('unitStories'),
       masterStore.getMaster<UnitEpisodeGroup>('unitStoryEpisodeGroups'),
-      masterStore.getMaster<SpecialStory>('specialStories'),
     ])
     events.value = eventData
     eventStories.value = eventStoryData
     eventStoryUnits.value = eventUnitData
     unitStories.value = unitStoryData
     unitEpisodeGroups.value = groupData
-    specialStories.value = specialData
   } catch (error) {
     console.error('加载故事数据失败:', error)
-    loadError.value = error instanceof Error ? error.message : 'Master 数据加载失败'
+    loadError.value = '游戏资料加载失败，请稍后重试'
   } finally {
     isLoading.value = false
   }
@@ -339,19 +295,17 @@ onMounted(async () => {
 
 <template>
   <div class="max-w-7xl mx-auto space-y-6">
-    <PageHeader title="故事档案" description="活动、组合主线与特殊故事的统一目录，支持剧本阅读和台词搜索。"><template #icon><BookOpen class="w-8 h-8 text-primary" /></template></PageHeader>
+    <PageHeader title="故事档案" description="活动故事与组合主线的统一目录，支持剧本阅读和台词搜索。"><template #icon><BookOpen class="w-8 h-8 text-primary" /></template></PageHeader>
 
-    <section class="grid grid-cols-2 md:grid-cols-4 gap-2">
+    <section class="grid grid-cols-3 gap-2">
       <div class="rounded-xl bg-base-100 border border-base-200 px-3 py-2"><p class="text-[11px] text-base-content/45">活动故事</p><p class="font-bold text-lg">{{ storyStats.events }}</p></div>
       <div class="rounded-xl bg-base-100 border border-base-200 px-3 py-2"><p class="text-[11px] text-base-content/45">主线章节</p><p class="font-bold text-lg">{{ storyStats.unitChapters }}</p></div>
-      <div class="rounded-xl bg-base-100 border border-base-200 px-3 py-2"><p class="text-[11px] text-base-content/45">特殊故事</p><p class="font-bold text-lg">{{ storyStats.special }}</p></div>
       <div class="rounded-xl bg-base-100 border border-base-200 px-3 py-2"><p class="text-[11px] text-base-content/45">收录话数</p><p class="font-bold text-lg text-primary">{{ storyStats.episodes }}</p></div>
     </section>
 
     <div role="tablist" class="tabs tabs-box bg-base-100 border border-base-200 w-full sm:w-fit p-1">
       <button role="tab" class="tab flex-1 sm:flex-none gap-1.5" :class="{ 'tab-active': activeTab === 'event' }" @click="setTab('event')"><Sparkles class="w-4 h-4" />活动 <span class="hidden sm:inline">{{ storyStats.events }}</span></button>
       <button role="tab" class="tab flex-1 sm:flex-none gap-1.5" :class="{ 'tab-active': activeTab === 'unit' }" @click="setTab('unit')"><Library class="w-4 h-4" />主线 <span class="hidden sm:inline">{{ storyStats.unitChapters }}</span></button>
-      <button role="tab" class="tab flex-1 sm:flex-none gap-1.5" :class="{ 'tab-active': activeTab === 'special' }" @click="setTab('special')"><BookOpen class="w-4 h-4" />特殊 <span class="hidden sm:inline">{{ storyStats.special }}</span></button>
     </div>
 
     <section class="card bg-base-100 border border-base-200 shadow-sm">
@@ -360,7 +314,7 @@ onMounted(async () => {
           <Search class="w-4 h-4 opacity-50" /><input v-model="searchQuery" class="grow min-w-0" placeholder="搜索故事或章节标题…" />
           <button v-if="searchQuery" class="btn btn-xs btn-circle btn-ghost" aria-label="清空" @click="searchQuery = ''"><X class="w-3 h-3" /></button>
         </label>
-        <select v-if="activeTab !== 'special'" v-model="selectedUnit" class="select select-bordered w-full">
+        <select v-model="selectedUnit" class="select select-bordered w-full">
           <option value="">全部组合</option>
           <option v-for="unit in unitOptions" :key="unit.value" :value="unit.value">{{ unit.label }}</option>
         </select>
@@ -401,21 +355,6 @@ onMounted(async () => {
       </div>
     </template>
 
-    <template v-else>
-      <p class="text-sm font-medium">{{ filteredSpecialStories.length }} 个特殊故事</p>
-      <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <button v-for="story in paginatedSpecialStories" :key="story.id" class="group card bg-base-100 border border-base-200 hover:border-secondary/30 hover:shadow-lg hover:-translate-y-0.5 transition-all text-left overflow-hidden" @click="openSpecialStory(story)">
-          <div class="h-1.5 bg-secondary/70"></div><div class="card-body p-5 gap-3">
-            <div class="flex justify-between gap-3"><span class="badge badge-secondary badge-outline badge-sm">特殊故事</span><span class="text-xs text-base-content/45">#{{ story.id }}</span></div>
-            <h2 class="font-bold line-clamp-2 leading-5 min-h-10">{{ story.title }}</h2>
-            <p class="text-xs text-base-content/55 flex items-center gap-2"><Calendar class="w-4 h-4" />{{ formatDate(story.startAt) }}</p>
-            <div class="flex items-center gap-2 text-[11px] text-base-content/40"><span class="flex-1">共 {{ story.episodes.length }} 话</span><ChevronRight class="w-4 h-4 opacity-40 group-hover:translate-x-0.5 transition-transform" /></div>
-          </div>
-        </button>
-      </div>
-      <Pagination v-if="specialTotalPages > 1" :current-page="specialPage" :total-pages="specialTotalPages" base-url="/stories?tab=special" @page-change="specialPage = $event" />
-    </template>
-
     <dialog class="modal" :class="{ 'modal-open': selectedStory }">
       <div v-if="selectedStory" class="modal-box p-0" :class="selectedEpisode ? 'max-w-5xl' : 'max-w-3xl'">
         <StoryReader
@@ -437,7 +376,7 @@ onMounted(async () => {
           <header class="p-5 border-b border-base-200 flex items-start gap-3" :class="selectedStoryBannerUrl ? '-mt-8 relative z-10 pt-0' : ''">
             <div class="min-w-0 flex-1">
               <div class="flex flex-wrap items-center gap-2 mb-2">
-                <span class="badge badge-primary">{{ selectedStory.kind === 'event' ? '活动故事' : selectedStory.kind === 'unit' ? '组合主线' : '特殊故事' }}</span>
+                <span class="badge badge-primary">{{ selectedStory.kind === 'event' ? '活动故事' : '组合主线' }}</span>
                 <span v-if="selectedStory.unit" class="badge badge-ghost">{{ getUnitLabel(selectedStory.unit) }}</span>
               </div>
               <h2 class="font-bold text-xl">{{ selectedStory.title }}</h2>

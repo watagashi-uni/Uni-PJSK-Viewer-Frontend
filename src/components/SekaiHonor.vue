@@ -363,6 +363,8 @@ watch(() => [props.honorId, props.honorLevel, props.sub, props.userHonorMissions
 <style scoped>
 .sekai-honor {
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   height: auto;
   display: block;
 }

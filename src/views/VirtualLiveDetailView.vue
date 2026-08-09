@@ -272,7 +272,7 @@ async function loadData() {
     pamphlets.value = pamphletData
   } catch (error) {
     console.error('加载 Virtual Live 数据失败：', error)
-    loadError.value = error instanceof Error ? error.message : 'Master 数据加载失败'
+    loadError.value = '游戏资料加载失败，请稍后重试'
   } finally {
     isLoading.value = false
   }

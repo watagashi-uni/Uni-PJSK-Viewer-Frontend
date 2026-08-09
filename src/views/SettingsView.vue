@@ -377,7 +377,7 @@ async function handleClearTranslationCache() {
           </h2>
           
           <p class="text-sm text-base-content/60 mb-4">
-            Master 数据会缓存到本地 IndexedDB，加快后续访问速度。如遇到数据显示异常，可尝试清空缓存。
+            游戏资料会缓存在当前设备上，加快后续访问速度。如遇到数据显示异常，可尝试清空缓存。
           </p>
           
           <button 
@@ -387,7 +387,7 @@ async function handleClearTranslationCache() {
           >
             <RefreshCw v-if="isClearing" class="w-4 h-4 animate-spin" />
             <Trash2 v-else class="w-4 h-4" />
-            {{ isClearing ? '清空中...' : '清空master缓存' }}
+            {{ isClearing ? '清空中...' : '清空资料缓存' }}
           </button>
         </div>
       </div>

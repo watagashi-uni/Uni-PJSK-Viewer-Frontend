@@ -7,7 +7,7 @@ import {
   Music, Calendar, Clock, 
   ChevronRight, Sparkles, BarChart3,
   CreditCard, User, Gift, Palette,
-  ExternalLink, Link, CalendarDays, History, House, Layers3, BookOpen, Image as ImageIcon, Users
+  ExternalLink, Link, CalendarDays, History, House, Layers3, BookOpen, Radio, Users
 } from 'lucide-vue-next'
 import AssetImage from '@/components/AssetImage.vue'
 import type { EventData, MusicData } from '@/types/master'
@@ -447,7 +447,7 @@ onMounted(async () => {
             <RouterLink to="/deck-recommend" class="btn h-auto justify-start gap-2 border-base-200 bg-base-200/45 px-3 py-2.5"><Sparkles class="h-4 w-4 text-warning" /><span class="text-xs">卡组推荐</span></RouterLink>
             <RouterLink to="/stories" class="btn h-auto justify-start gap-2 border-base-200 bg-base-200/45 px-3 py-2.5"><BookOpen class="h-4 w-4 text-secondary" /><span class="text-xs">故事档案</span></RouterLink>
             <RouterLink to="/sus2img" class="btn h-auto justify-start gap-2 border-base-200 bg-base-200/45 px-3 py-2.5"><Music class="h-4 w-4 text-info" /><span class="text-xs">谱面图片</span></RouterLink>
-            <RouterLink to="/thumbnail" class="btn h-auto justify-start gap-2 border-base-200 bg-base-200/45 px-3 py-2.5"><ImageIcon class="h-4 w-4 text-accent" /><span class="text-xs">缩略图工具</span></RouterLink>
+            <RouterLink to="/vlives" class="btn h-auto justify-start gap-2 border-base-200 bg-base-200/45 px-3 py-2.5"><Radio class="h-4 w-4 text-accent" /><span class="text-xs">Virtual Live</span></RouterLink>
             <RouterLink to="/profile" class="btn h-auto justify-start gap-2 border-primary/35 bg-primary/8 px-3 py-2.5"><User class="h-4 w-4 text-primary" /><span class="text-xs">添加账号</span></RouterLink>
           </div>
         </div>

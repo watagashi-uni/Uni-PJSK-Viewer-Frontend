@@ -1343,7 +1343,7 @@ async function loadMasterData() {
     })).filter((row: PhenomenaBgmRow) => row.id > 0 && row.mysekaiPhenomenaId > 0)
   } catch (e) {
     console.error('加载 MySekai master 数据失败', e)
-    errorMsg.value = '加载 master 数据失败，请稍后重试'
+    errorMsg.value = '游戏资料加载失败，请稍后重试'
   } finally {
     isMasterLoading.value = false
   }
@@ -1708,7 +1708,7 @@ function closeFixtureDetail() {
                   未读 {{ selectedTalkUnread }}
                 </span>
                 <span v-if="selectedTalkCharacterId > 0 && !hasSuiteTalkData" class="text-xs text-base-content/60">
-                  未检测到对话抓包，仅按 master 显示可触发家具
+                  账号中没有对话记录，仅按游戏资料显示可触发家具
                 </span>
               </div>
 
@@ -1873,7 +1873,7 @@ function closeFixtureDetail() {
                 <select v-model="selectedCanvasTraining" class="select select-sm select-bordered"><option value="all">全部卡面</option><option value="normal">特训前</option><option value="trained">特训后</option></select>
                 <select v-model="canvasSort" class="select select-sm select-bordered"><option value="obtained">最近获得</option><option value="card">卡片 ID</option><option value="rarity">稀有度</option></select>
               </div>
-              <p class="text-xs text-base-content/50">显示 {{ filteredCanvasItems.length }} / {{ canvasItems.length }} 幅；每幅画布只为对应卡片提供三项固定加成，数值依据卡片稀有度 master。</p>
+              <p class="text-xs text-base-content/50">显示 {{ filteredCanvasItems.length }} / {{ canvasItems.length }} 幅；每幅画布只为对应卡片提供三项固定加成，数值依据卡片稀有度配置。</p>
             </div>
           </div>
 
@@ -2046,9 +2046,9 @@ function closeFixtureDetail() {
 
       <div v-else class="space-y-4">
         <div class="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
-          <div class="stat rounded-xl bg-base-100 p-3 shadow-sm"><div class="stat-title text-xs">天气现象</div><div class="stat-value text-2xl text-primary">{{ phenomenaSummary.total }}</div><div class="stat-desc">当前 master</div></div>
+          <div class="stat rounded-xl bg-base-100 p-3 shadow-sm"><div class="stat-title text-xs">天气现象</div><div class="stat-value text-2xl text-primary">{{ phenomenaSummary.total }}</div><div class="stat-desc">当前资料</div></div>
           <div class="stat rounded-xl bg-base-100 p-3 shadow-sm"><div class="stat-title text-xs">特殊现象</div><div class="stat-value text-2xl text-secondary">{{ phenomenaSummary.special }}</div><div class="stat-desc">独立演出环境</div></div>
-          <div class="stat rounded-xl bg-base-100 p-3 shadow-sm"><div class="stat-title text-xs">专属 BGM</div><div class="stat-value text-2xl">{{ phenomenaSummary.bgm }}</div><div class="stat-desc">master 音轨映射</div></div>
+          <div class="stat rounded-xl bg-base-100 p-3 shadow-sm"><div class="stat-title text-xs">专属 BGM</div><div class="stat-value text-2xl">{{ phenomenaSummary.bgm }}</div><div class="stat-desc">天气专属音轨</div></div>
           <div class="stat rounded-xl bg-base-100 p-3 shadow-sm"><div class="stat-title text-xs">背景色板</div><div class="stat-value text-2xl">{{ phenomenaSummary.palettes }}</div><div class="stat-desc">用于场景环境色</div></div>
         </div>
 
@@ -2060,7 +2060,7 @@ function closeFixtureDetail() {
                 <button v-for="option in [{ value: 'all', label: '全部时段' }, { value: 'daytime', label: '白昼' }, { value: 'evening', label: '黄昏' }, { value: 'night', label: '夜晚' }]" :key="option.value" class="join-item btn btn-xs sm:btn-sm" :class="phenomenaTimeFilter === option.value ? 'btn-secondary' : 'btn-ghost'" @click="phenomenaTimeFilter = option.value">{{ option.label }}</button>
               </div>
             </div>
-            <p class="text-xs text-base-content/50">显示 {{ filteredPhenomenas.length }} / {{ phenomenas.length }} 种；图标旁的色块取自 master 环境色板。</p>
+            <p class="text-xs text-base-content/50">显示 {{ filteredPhenomenas.length }} / {{ phenomenas.length }} 种；图标旁的色块取自游戏内环境色板。</p>
           </div>
         </div>
 

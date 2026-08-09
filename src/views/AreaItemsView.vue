@@ -272,7 +272,7 @@ onMounted(async () => {
     characters.value = characterData
   } catch (error) {
     console.error('加载区域道具数据失败:', error)
-    loadError.value = error instanceof Error ? error.message : 'Master 数据加载失败'
+    loadError.value = '游戏资料加载失败，请稍后重试'
   } finally {
     isLoading.value = false
   }
@@ -305,18 +305,20 @@ onMounted(async () => {
     </div>
 
     <dialog class="modal" :class="{ 'modal-open': selectedItem }">
-      <div v-if="selectedItem" class="modal-box max-w-3xl p-0 overflow-hidden">
+      <div v-if="selectedItem" class="modal-box flex max-h-[calc(100dvh-1rem)] max-w-3xl flex-col overflow-hidden p-0 sm:max-h-[calc(100dvh-2rem)]">
         <button class="btn btn-sm btn-circle btn-ghost absolute right-3 top-3 z-10" aria-label="关闭" @click="selectedItem = null"><X class="w-4 h-4" /></button>
-        <div class="grid md:grid-cols-[190px_1fr]">
-          <div class="bg-gradient-to-br from-base-200 to-base-100 p-5 flex flex-col items-center justify-center"><AssetImage :src="itemImage(selectedItem)" :alt="selectedItem.name" class="w-36 h-36 object-contain" /><span class="badge badge-outline badge-sm mt-3">{{ areaMap.get(selectedItem.areaId)?.name }}</span></div>
-          <div class="p-6 space-y-5">
-            <div><p class="text-xs text-base-content/45">区域道具 #{{ selectedItem.id }}</p><h2 class="font-bold text-2xl">{{ selectedItem.name }}</h2><p class="text-sm text-base-content/60 mt-1">加成对象：{{ getTargetLabel(selectedItem) }}</p></div>
-            <div class="grid grid-cols-2 gap-3">
-              <label class="form-control"><span class="label-text mb-2">当前等级</span><select v-model.number="currentLevel" class="select select-bordered"><option :value="0">未购买</option><option v-for="level in selectedLevels" :key="level.level" :value="level.level">Lv.{{ level.level }}</option></select></label>
-              <label class="form-control"><span class="label-text mb-2">目标等级</span><select v-model.number="targetLevel" class="select select-bordered"><option v-for="level in selectedLevels.filter(level => level.level >= currentLevel)" :key="level.level" :value="level.level">Lv.{{ level.level }}</option></select></label>
+        <div class="min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]">
+          <div class="grid md:grid-cols-[190px_1fr]">
+            <div class="bg-gradient-to-br from-base-200 to-base-100 p-5 flex flex-col items-center justify-center"><AssetImage :src="itemImage(selectedItem)" :alt="selectedItem.name" class="w-36 h-36 object-contain" /><span class="badge badge-outline badge-sm mt-3">{{ areaMap.get(selectedItem.areaId)?.name }}</span></div>
+            <div class="p-6 space-y-5">
+              <div><p class="text-xs text-base-content/45">区域道具 #{{ selectedItem.id }}</p><h2 class="font-bold text-2xl">{{ selectedItem.name }}</h2><p class="text-sm text-base-content/60 mt-1">加成对象：{{ getTargetLabel(selectedItem) }}</p></div>
+              <div class="grid grid-cols-2 gap-3">
+                <label class="form-control"><span class="label-text mb-2">当前等级</span><select v-model.number="currentLevel" class="select select-bordered"><option :value="0">未购买</option><option v-for="level in selectedLevels" :key="level.level" :value="level.level">Lv.{{ level.level }}</option></select></label>
+                <label class="form-control"><span class="label-text mb-2">目标等级</span><select v-model.number="targetLevel" class="select select-bordered"><option v-for="level in selectedLevels.filter(level => level.level >= currentLevel)" :key="level.level" :value="level.level">Lv.{{ level.level }}</option></select></label>
+              </div>
+              <div class="bg-base-200 rounded-xl p-4 text-sm"><p class="text-base-content/50 text-xs mb-1">加成变化</p><p v-if="targetBonus" class="leading-6">{{ currentBonus ? `${currentBonus.power1BonusRate}%` : '0%' }} → <strong class="text-primary">{{ targetBonus.power1BonusRate }}%</strong></p><p class="text-xs text-base-content/60 mt-1">{{ cleanSentence(targetBonus?.sentence) }}</p></div>
+              <div><h3 class="font-bold mb-3">升级成本</h3><div v-if="upgradeCosts.length" class="grid sm:grid-cols-2 gap-2"><div v-for="cost in upgradeCosts" :key="`${cost.resourceType}_${cost.resourceId}`" class="flex items-center gap-3 bg-base-200/70 rounded-lg p-3"><AssetImage v-if="cost.resourceType === 'material'" :src="materialImage(cost.resourceId)" :alt="materialMap.get(cost.resourceId)?.name" class="w-10 h-10 object-contain shrink-0" /><div v-else class="w-10 h-10 rounded-full bg-warning/20 grid place-items-center shrink-0"><Coins class="w-6 h-6 text-warning" /></div><div class="min-w-0"><p class="text-xs text-base-content/55 truncate">{{ cost.resourceType === 'material' ? (materialMap.get(cost.resourceId)?.name || `素材 #${cost.resourceId}`) : '金币' }}</p><p class="font-bold">× {{ formatNumber(cost.quantity) }}</p></div></div></div><p v-else class="text-sm text-base-content/50">目标等级与当前等级相同，无需额外素材。</p></div>
             </div>
-            <div class="bg-base-200 rounded-xl p-4 text-sm"><p class="text-base-content/50 text-xs mb-1">加成变化</p><p v-if="targetBonus" class="leading-6">{{ currentBonus ? `${currentBonus.power1BonusRate}%` : '0%' }} → <strong class="text-primary">{{ targetBonus.power1BonusRate }}%</strong></p><p class="text-xs text-base-content/60 mt-1">{{ cleanSentence(targetBonus?.sentence) }}</p></div>
-            <div><h3 class="font-bold mb-3">升级成本</h3><div v-if="upgradeCosts.length" class="grid sm:grid-cols-2 gap-2"><div v-for="cost in upgradeCosts" :key="`${cost.resourceType}_${cost.resourceId}`" class="flex items-center gap-3 bg-base-200/70 rounded-lg p-3"><AssetImage v-if="cost.resourceType === 'material'" :src="materialImage(cost.resourceId)" :alt="materialMap.get(cost.resourceId)?.name" class="w-10 h-10 object-contain shrink-0" /><div v-else class="w-10 h-10 rounded-full bg-warning/20 grid place-items-center shrink-0"><Coins class="w-6 h-6 text-warning" /></div><div class="min-w-0"><p class="text-xs text-base-content/55 truncate">{{ cost.resourceType === 'material' ? (materialMap.get(cost.resourceId)?.name || `素材 #${cost.resourceId}`) : '金币' }}</p><p class="font-bold">× {{ formatNumber(cost.quantity) }}</p></div></div></div><p v-else class="text-sm text-base-content/50">目标等级与当前等级相同，无需额外素材。</p></div>
           </div>
         </div>
       </div>

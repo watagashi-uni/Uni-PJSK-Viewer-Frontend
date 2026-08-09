@@ -496,7 +496,8 @@ async function loadMasterData() {
     characters.value = characterData
     outsideCharacters.value = outsideCharacterData
   } catch (reason) {
-    error.value = reason instanceof Error ? reason.message : '加载 masterdata 失败'
+    console.error('加载自制谱游戏资料失败', reason)
+    error.value = '游戏资料加载失败，请稍后重试'
   } finally {
     isMasterLoading.value = false
   }

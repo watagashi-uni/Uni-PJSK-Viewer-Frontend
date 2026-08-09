@@ -223,7 +223,7 @@ const probabilityAnalysis = computed(() => {
   })
   const totalWeight = rarityDetails.reduce((sum, detail) => sum + Number(detail.weight || 0), 0)
   if (!targetDetail || totalWeight <= 0 || matchingRates[0]!.rate <= 0) {
-    return { error: '当前 master 缺少这张卡的完整概率权重。' }
+    return { error: '当前资料缺少这张卡的完整概率权重。' }
   }
 
   const singleRate = matchingRates[0]!.rate / 100 * Number(targetDetail.weight || 0) / totalWeight
@@ -704,7 +704,7 @@ watch(() => route.params.id, loadData)
                 <div class="grid grid-cols-4 gap-2 text-center">
                   <div v-for="threshold in [{ label: '50%', pulls: probabilityAnalysis.pulls50 }, { label: '90%', pulls: probabilityAnalysis.pulls90 }, { label: '95%', pulls: probabilityAnalysis.pulls95 }, { label: '99%', pulls: probabilityAnalysis.pulls99 }]" :key="threshold.label" class="rounded-lg border border-base-200 px-2 py-2"><p class="text-[10px] text-base-content/45">达到 {{ threshold.label }}</p><p class="font-bold">{{ threshold.pulls }} 抽</p></div>
                 </div>
-                <p class="text-[11px] leading-relaxed text-base-content/45">“含交换保障”仅在该卡池 master 存在 Pickup 交换门槛且计划抽数达到门槛时计为 100%；未扣除可使用的招募券。付费必中、自选和分阶段概率卡池会停止计算并显示提示。</p>
+                <p class="text-[11px] leading-relaxed text-base-content/45">“含交换保障”仅在该卡池资料中存在 Pickup 交换门槛且计划抽数达到门槛时计为 100%；未扣除可使用的招募券。付费必中、自选和分阶段概率卡池会停止计算并显示提示。</p>
               </div>
             </div>
           </template>

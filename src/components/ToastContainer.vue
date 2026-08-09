@@ -114,7 +114,7 @@ function dismissUpdate() {
         </div>
       </Transition>
       
-      <!-- Master 数据加载 Toast -->
+      <!-- 游戏资料加载 Toast -->
       <Transition name="slide-up">
         <div 
           v-if="masterStore.isLoading"
@@ -122,10 +122,7 @@ function dismissUpdate() {
         >
           <span class="loading loading-spinner loading-sm text-primary"></span>
           <div>
-            <h3 class="font-bold text-sm">正在加载数据</h3>
-            <p v-if="masterStore.loadingFile" class="text-xs text-base-content/60">
-              {{ masterStore.loadingFile }}.json
-            </p>
+            <h3 class="font-bold text-sm">正在加载游戏资料</h3>
           </div>
         </div>
       </Transition>
