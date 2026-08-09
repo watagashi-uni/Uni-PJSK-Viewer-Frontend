@@ -27,7 +27,7 @@ const props = withDefaults(defineProps<{
   hasNext: false,
 })
 
-const emit = defineEmits<{ close: []; loaded: []; previous: []; next: [] }>()
+const emit = defineEmits<{ close: []; previous: []; next: [] }>()
 
 const talks = ref<ScenarioTalk[]>([])
 const isLoading = ref(true)
@@ -77,7 +77,6 @@ async function loadScenario() {
       talks.value = data.TalkData.filter(talk => talk.Body || talk.WindowDisplayName)
       loadedUrl.value = url
       isLoading.value = false
-      emit('loaded')
       return
     } catch (error) {
       failures.push(`${error instanceof Error ? error.message : '请求失败'} ${url}`)
