@@ -797,7 +797,7 @@ function buildChartPreviewPayload(score: DisplayScore, scoreJson: unknown) {
   const music = musicById.value.get(score.musicId)
   const vocal = selectDefaultVocalForMusic(score.musicId)
   const offsetSec = Number(music?.filterSec || music?.fillerSec || 0)
-  const vocalText = [vocal ? getVocalSingers(vocal, ', ') : '', `譜：${score.creatorName}`].filter(Boolean).join('  ')
+  const vocalText = vocal ? getVocalSingers(vocal, ', ') : ''
   const requestId = typeof crypto !== 'undefined' && 'randomUUID' in crypto
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random().toString(36).slice(2)}`
@@ -806,7 +806,7 @@ function buildChartPreviewPayload(score: DisplayScore, scoreJson: unknown) {
     type: 'sekai-mmw-preview:load',
     requestId,
     customScoreJson: scoreJson,
-    title: score.title,
+    title: music?.title || score.musicTitle,
     difficulty: score.musicDifficultyType.toUpperCase(),
     bgm: vocal ? `${assetsHost.value}/ondemand/music/long/${vocal.assetbundleName}/${vocal.assetbundleName}.mp3` : null,
     cover: score.jacketAssetbundleName ? getJacketUrl(score) : null,
@@ -815,6 +815,9 @@ function buildChartPreviewPayload(score: DisplayScore, scoreJson: unknown) {
     composer: music?.composer || null,
     arranger: music?.arranger || null,
     vocal: vocalText || null,
+    customScoreInfo: true,
+    scoreTitle: score.title,
+    scoreCreator: score.creatorName,
   }
 }
 
