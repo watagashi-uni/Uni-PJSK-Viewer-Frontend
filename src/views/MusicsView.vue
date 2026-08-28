@@ -82,6 +82,13 @@ interface Music {
   musicCollaborationId?: number
 }
 
+type MusicMaster = Omit<Music, 'categories'> & { categories?: string[] }
+
+interface MusicCategory {
+  musicId: number
+  musicCategoryName: string
+}
+
 interface MusicDifficulty {
   id: number
   musicId: number
@@ -1028,6 +1035,7 @@ async function loadData() {
   try {
     const [
       musicData,
+      musicCategoryData,
       diffData,
       limitedData,
       musicTagData,
@@ -1039,7 +1047,8 @@ async function loadData() {
       releaseConditionData,
       achievementData,
     ] = await Promise.all([
-      masterStore.getMaster<Music>('musics'),
+      masterStore.getMaster<MusicMaster>('musics'),
+      masterStore.getMaster<MusicCategory>('musicCategories'),
       masterStore.getMaster<MusicDifficulty>('musicDifficulties'),
       masterStore.getMaster<LimitedTimeMusic>('limitedTimeMusics'),
       masterStore.getMaster<MusicTag>('musicTags'),
@@ -1051,7 +1060,16 @@ async function loadData() {
       masterStore.getMaster<ReleaseCondition>('releaseConditions'),
       masterStore.getMaster<MusicAchievement>('musicAchievements'),
     ])
-    musics.value = musicData
+    const categoryMap = new Map<number, string[]>()
+    for (const category of musicCategoryData) {
+      const categories = categoryMap.get(category.musicId) || []
+      categories.push(category.musicCategoryName)
+      categoryMap.set(category.musicId, categories)
+    }
+    musics.value = musicData.map(music => ({
+      ...music,
+      categories: categoryMap.get(music.id) || music.categories || [],
+    }))
     musicDifficulties.value = diffData
     limitedMusics.value = limitedData
     musicTags.value = musicTagData
