@@ -28,10 +28,14 @@ interface Music {
   publishedAt: number
   fillerSec?: number
   filterSec?: number
-  categories: string[]
   assetbundleName: string
   releaseConditionId: number
   musicCollaborationId?: number
+}
+
+interface MusicCategory {
+  musicId: number
+  musicCategoryName: string
 }
 
 interface MusicDifficulty {
@@ -135,6 +139,7 @@ const accountStore = useAccountStore()
 
 const musicId = computed(() => Number(route.params.id))
 const music = ref<Music | null>(null)
+const musicCategories = ref<string[]>([])
 const difficulties = ref<MusicDifficulty[]>([])
 const vocals = ref<MusicVocal[]>([])
 const translation = computed(() => masterStore.translations[musicId.value] || '')
@@ -965,9 +970,10 @@ async function loadData() {
     masterStore.getTranslations().catch(e => console.error('加载翻译失败:', e))
 
     const [
-      musicsData, 
-      difficultiesData, 
-      vocalsData, 
+      musicsData,
+      musicCategoryData,
+      difficultiesData,
+      vocalsData,
       eventsData,
       eventMusicsData,
       charactersData,
@@ -981,6 +987,7 @@ async function loadData() {
       musicAssetVariantData,
     ] = await Promise.all([
       masterStore.getMaster<Music>('musics'),
+      masterStore.getMaster<MusicCategory>('musicCategories'),
       masterStore.getMaster<MusicDifficulty>('musicDifficulties'),
       masterStore.getMaster<MusicVocal>('musicVocals'),
       masterStore.getMaster<EventData>('events'),
@@ -1009,6 +1016,9 @@ async function loadData() {
 
     // 获取歌曲数据
     music.value = musicsData.find(m => m.id === musicId.value) || null
+    musicCategories.value = musicCategoryData
+      .filter(category => category.musicId === musicId.value)
+      .map(category => category.musicCategoryName)
 
     if (!music.value) {
       isLoading.value = false
@@ -1072,7 +1082,7 @@ const categoryIconMap: Record<string, string> = {
 const matchedIcons = computed(() => {
   if (!music.value) return []
   return Object.entries(categoryIconMap)
-    .filter(([cat]) => music.value!.categories.includes(cat))
+    .filter(([cat]) => musicCategories.value.includes(cat))
     .map(([, icon]) => icon)
 })
 
