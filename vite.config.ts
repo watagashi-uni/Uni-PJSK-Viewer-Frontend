@@ -139,20 +139,9 @@ export default defineConfig({
             handler: 'NetworkOnly',
           },
           {
-            // 版本号优先走网络，离线时回退缓存，避免破坏 PWA 的离线可用性；
-            // 在线时 NetworkFirst 总是走网络，长 maxAge 只影响离线兜底的可用窗口
-            urlPattern: /^https:\/\/viewer-api\.unipjsk\.com\/api\/version(?:\?.*)?$/i,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'version-cache',
-              expiration: {
-                maxEntries: 1,
-                maxAgeSeconds: 60 * 60 * 24 * 30, // 30 天
-              },
-              cacheableResponse: {
-                statuses: [0, 200],
-              },
-            },
+            // COS version must always use the network; IndexedDB provides offline fallback.
+            urlPattern: /^https:\/\/jp-master\.unipjsk\.com\/api\//i,
+            handler: 'NetworkOnly',
           },
           {
             // 翻译 API - 使用 NetworkFirst，确保刷新时拿到最新数据

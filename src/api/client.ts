@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { ensureApiEndpointReady, getActiveApiBaseUrl, getFixedApiBaseUrl } from './endpoint'
+import { ensureApiEndpointReady, getActiveApiBaseUrl } from './endpoint'
 
 // API 基础配置
 const defaultConfig = {
@@ -11,11 +11,6 @@ const defaultConfig = {
 
 const apiClient = axios.create({
     baseURL: getActiveApiBaseUrl(),
-    ...defaultConfig,
-})
-
-export const versionApiClient = axios.create({
-    baseURL: getFixedApiBaseUrl(),
     ...defaultConfig,
 })
 
