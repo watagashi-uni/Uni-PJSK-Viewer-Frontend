@@ -1,4 +1,4 @@
-import { versionApiClient } from './client'
+import { masterApiClient } from './masterClient'
 import { applyApiEndpointFromVersion, type ApiEndpointPayload } from './endpoint'
 
 export interface VersionInfo extends ApiEndpointPayload {
@@ -23,7 +23,7 @@ export function getVersion(): Promise<VersionInfo> {
 
     const promise = (async () => {
         try {
-            const response = await versionApiClient.get<VersionInfo>('/api/version')
+            const response = await masterApiClient.get<VersionInfo>('/api/version', { params: { t: Date.now() } })
             applyApiEndpointFromVersion(response.data)
             return response.data
         } finally {

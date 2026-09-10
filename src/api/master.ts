@@ -1,4 +1,5 @@
 import apiClient from './client'
+import { masterApiClient } from './masterClient'
 
 // 允许获取的 master 数据类型 (不再限制，允许任意字符串)
 export type MasterDataName = string
@@ -9,7 +10,7 @@ export type MasterDataName = string
  * @param version - 版本号，用于 CDN 缓存
  */
 export async function getMasterData<T = any>(name: MasterDataName, version: string): Promise<T[]> {
-    const response = await apiClient.get<T[]>(`/api/master/${version}/${name}`)
+    const response = await masterApiClient.get<T[]>(`/api/master/${encodeURIComponent(version)}/${encodeURIComponent(name)}`)
     return response.data
 }
 

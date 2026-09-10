@@ -1,3 +1,5 @@
+import { masterApiBaseUrl } from './masterClient'
+
 export const API_ENDPOINT_KEY = 'apiEndpoint'
 
 export type ApiEndpointPayload = {
@@ -90,7 +92,7 @@ export async function ensureApiEndpointReady(): Promise<void> {
 
     endpointPromise = (async () => {
         try {
-            const response = await fetch(buildUrl(fixedApiBaseUrl, '/api/version'))
+            const response = await fetch(buildUrl(masterApiBaseUrl, '/api/version'), { cache: 'no-store' })
             if (!response.ok) {
                 return
             }
