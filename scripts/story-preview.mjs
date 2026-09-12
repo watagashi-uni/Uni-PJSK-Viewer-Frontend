@@ -6,6 +6,8 @@ import { createReadStream } from 'node:fs'
 import { stat, realpath } from 'node:fs/promises'
 import { resolve, extname, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { createBrotliDecompress, createGzip } from 'node:zlib'
+import { pipeline } from 'node:stream'
 
 const root = await realpath(resolve(process.env.STORY_PREVIEW_DIR || fileURLToPath(new URL('../dist-story-preview', import.meta.url))))
 const host = process.env.STORY_PREVIEW_HOST || '127.0.0.1'
@@ -29,9 +31,16 @@ const server = http.createServer(async (request, response) => {
       const upstream = https.request(new URL(path + url.search, proxy[0]), { method: request.method, headers: { 'Accept-Encoding': 'br, gzip', 'User-Agent': 'Sekai-story-preview/1' }, timeout: 30000 }, incoming => {
         const headers = { ...incoming.headers, 'cache-control': 'no-store' }
         delete headers['set-cookie']; delete headers['access-control-allow-origin']
+        // COS stores master JSON as Brotli. Plain HTTP tailnet clients may not
+        // decode br, unlike trustworthy localhost. Serve those bytes as gzip.
+        const transcode = incoming.headers['content-encoding'] === 'br'
+        if (transcode) {
+          headers['content-encoding'] = 'gzip'
+          delete headers['content-length']; delete headers.etag; delete headers['content-md5']
+        }
         response.writeHead(incoming.statusCode || 502, headers)
-        incoming.on('error', () => response.destroy())
-        incoming.pipe(response)
+        if (transcode && request.method !== 'HEAD') pipeline(incoming, createBrotliDecompress(), createGzip(), response, error => { if (error) response.destroy() })
+        else pipeline(incoming, response, error => { if (error) response.destroy() })
       })
       upstream.on('timeout', () => upstream.destroy(new Error('Upstream timeout')))
       upstream.on('error', () => fail(502, 'Upstream unavailable'))
