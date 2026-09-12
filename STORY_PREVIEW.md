@@ -25,6 +25,8 @@ node --test tests/storyPlayback.test.mjs
 测试构建使用同源 master/API 代理，版本接口的 apiEndpoint 不会把测试页面带回跨域地址。
 没有改线上 CORS；代理仅允许公共资料的 GET/HEAD，不转发用户凭据、Cookie 或写操作。
 普通生产构建继续使用原动态 API 地址。
+COS 的 master 响应固定为 Brotli；预览代理将其转换为 gzip，兼容非 localhost 的
+HTTP 浏览器。已通过实际 Tailscale HTTP 页面验证，避免仅在本地成功而手机加载失败。
 
 ```sh
 VITE_MASTER_API_BASE_URL=/preview-master \
@@ -46,3 +48,14 @@ node scripts/story-preview.mjs
 `scripts/systemd/sekai-story-preview.service`。不替换正式站点，不重启 asset updater。
 停止预览：`systemctl disable --now sekai-story-preview.service`。
 HTTP 测试地址下部分手机浏览器不开放剪贴板，仍可使用全文模式选择文本。
+
+## 2026-09-12 验收
+
+- TypeScript 检查与 Vite 构建通过，改动文件 ESLint 通过，5 个剧情解析/路径测试通过。
+- 浏览器实际读取活动 `event_01_01`、主线 `vsleo_01_01`、卡面 `001001_ichika01`、
+  特别篇 `op_01`；活动与卡面实际语音自动推进，全文搜索可跳转回场景，刷新恢复句子进度。
+- 检查背景/人物图片、漫画原图、BGM 控件、390×844 移动视口；缺图/无配音仍可阅读。
+- 从本地通过 Tailscale 访问日本服务，页面与 master 均 200；版本为 `6.8.0.30`，
+  6 个剧情相关 master 表经 gzip 代理正常解析，浏览器成功加载 214 个活动故事。
+- 预览只监听 `100.77.199.74:4175`；POST 返回 405，未列入白名单的 API 和隐藏文件返回 404。
+  原 R2 follower 和 3D follower 继续 active；未替换正式 Viewer 或日服原生 updater。
