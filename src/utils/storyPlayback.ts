@@ -30,7 +30,7 @@ export interface StoryMediaIndex {
 }
 
 // Story media lives on the global origin; the mainland mirror has a smaller scope.
-export const storyAssetHost = (import.meta.env.VITE_STORY_ASSET_BASE_URL || 'https://assets.unipjsk.com').replace(/\/+$/, '')
+export const storyAssetHost = 'https://assets.unipjsk.com'
 export const storyAssetUrl = (path: string) => `${storyAssetHost}/${path.split('/').map(encodeURIComponent).join('/')}`
 
 export function buildStoryFrames(data: StoryScenario): StoryFrame[] {
