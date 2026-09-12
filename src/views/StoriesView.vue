@@ -6,7 +6,6 @@ import AssetImage from '@/components/AssetImage.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import Pagination from '@/components/Pagination.vue'
 import StoryReader from '@/components/StoryReader.vue'
-import StoryGallery from '@/components/StoryGallery.vue'
 import { loadStoryMedia, storyAssetHost } from '@/utils/storyPlayback'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
@@ -59,8 +58,8 @@ interface UnitEpisodeGroup {
   assetbundleName: string
 }
 
-type StoryTab = 'event' | 'unit' | 'card' | 'special' | 'gallery'
-type StoryKind = Exclude<StoryTab, 'gallery'>
+type StoryTab = 'event' | 'unit' | 'card' | 'special'
+type StoryKind = StoryTab
 interface SpecialStory { id: number; title: string; startAt: number; assetbundleName: string; episodes: StoryEpisode[] }
 interface StoryCard { id: number; prefix: string; characterId: number; releaseAt: number; assetbundleName: string }
 interface CardEpisode extends Omit<StoryEpisode, 'episodeNo'> { cardId: number; cardEpisodePartType: string }
@@ -70,7 +69,7 @@ const cardEpisodes = ref<CardEpisode[]>([])
 const extraLoading = ref(false)
 const extraError = ref('')
 const extraPage = ref(1)
-const extraLabels = { card: '卡面故事', special: '特别篇', gallery: '场景画廊' } as const
+const extraLabels = { card: '卡面故事', special: '特别篇' } as const
 
 interface SelectedStory {
   kind: StoryKind
@@ -121,7 +120,7 @@ const unitOptions = [
 
 const assetsHost = computed(() => storyAssetHost)
 const activeTab = computed<StoryTab>(() => {
-  if (['unit', 'card', 'special', 'gallery'].includes(String(route.query.tab))) return route.query.tab as StoryTab
+  if (['unit', 'card', 'special'].includes(String(route.query.tab))) return route.query.tab as StoryTab
   return 'event'
 })
 const eventMap = computed(() => new Map(events.value.map(event => [event.id, event])))
@@ -374,8 +373,7 @@ onMounted(async () => {
       <button v-for="(label, tab) in extraLabels" :key="tab" role="tab" class="tab flex-1 sm:flex-none text-xs sm:text-sm" :class="{ 'tab-active': activeTab === tab }" @click="setTab(tab)">{{ label }}</button>
     </div>
 
-    <StoryGallery v-if="activeTab === 'gallery'" />
-    <section v-else class="card bg-base-100 border border-base-200 shadow-sm">
+    <section class="card bg-base-100 border border-base-200 shadow-sm">
       <div class="card-body p-3 md:p-4 grid md:grid-cols-[minmax(0,1fr)_240px] gap-3">
         <label class="input input-bordered flex items-center gap-2">
           <Search class="w-4 h-4 opacity-50" /><input v-model="searchQuery" class="grow min-w-0" placeholder="搜索故事或章节标题…" />

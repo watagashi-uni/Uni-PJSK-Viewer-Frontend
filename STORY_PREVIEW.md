@@ -9,10 +9,9 @@
 这不是游戏演出的逐帧复刻：插图不跟随服装、表情或动作，转场特效和剧情音效暂未还原；
 游戏原文不会自动翻译，阅读状态不写回游戏账号。
 
-新增画廊展示 1,335 个背景、68 张正式单格漫画和 708 首剧情 BGM。
 这里只提交路径索引；图片与音频按需从日本 R2 读取，she 的同步范围不变。
 索引基于 2026-09-12 R2 审计；新剧本和常规新背景/BGM 路径能直接读取，
-画廊列表、特别篇可用章节和特殊路径新增项需要重建索引。
+特别篇可用章节和特殊路径新增项需要重建索引。
 特别篇只展示已发布可读脚本的章节，不把仅有影片或尚未同步的条目当作可播放剧情：
 
 ```sh
@@ -42,7 +41,6 @@ node scripts/story-preview.mjs
 - 目录：`http://100.77.199.74:4175/stories`
 - 活动演示：`http://100.77.199.74:4175/stories?story=1&episode=1000001`
 - 卡面演示：`http://100.77.199.74:4175/stories?tab=card&story=1&episode=1`
-- 画廊：`http://100.77.199.74:4175/stories?tab=gallery`
 
 独立部署目录 `/data/watagashi/sekai-story-preview/current`，使用
 `scripts/systemd/sekai-story-preview.service`。不替换正式站点，不重启 asset updater。
