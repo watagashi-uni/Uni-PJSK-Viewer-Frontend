@@ -1,0 +1,21 @@
+[Unit]
+Description=Private Tailscale preview of Sekai story viewer
+After=network-online.target tailscaled.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+DynamicUser=yes
+WorkingDirectory=/data/watagashi/sekai-story-preview/current
+Environment=STORY_PREVIEW_HOST=100.77.199.74
+Environment=STORY_PREVIEW_PORT=4175
+ExecStart=/usr/bin/node scripts/story-preview.mjs
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict
+
+[Install]
+WantedBy=multi-user.target

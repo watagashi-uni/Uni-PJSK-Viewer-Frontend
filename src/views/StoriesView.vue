@@ -6,6 +6,8 @@ import AssetImage from '@/components/AssetImage.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import Pagination from '@/components/Pagination.vue'
 import StoryReader from '@/components/StoryReader.vue'
+import StoryGallery from '@/components/StoryGallery.vue'
+import { loadStoryMedia, storyAssetHost } from '@/utils/storyPlayback'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
 import type { EventData } from '@/types/master'
@@ -57,8 +59,18 @@ interface UnitEpisodeGroup {
   assetbundleName: string
 }
 
-type StoryTab = 'event' | 'unit'
-type StoryKind = StoryTab
+type StoryTab = 'event' | 'unit' | 'card' | 'special' | 'gallery'
+type StoryKind = Exclude<StoryTab, 'gallery'>
+interface SpecialStory { id: number; title: string; startAt: number; assetbundleName: string; episodes: StoryEpisode[] }
+interface StoryCard { id: number; prefix: string; characterId: number; releaseAt: number; assetbundleName: string }
+interface CardEpisode extends Omit<StoryEpisode, 'episodeNo'> { cardId: number; cardEpisodePartType: string }
+const specialStories = ref<SpecialStory[]>([])
+const storyCards = ref<StoryCard[]>([])
+const cardEpisodes = ref<CardEpisode[]>([])
+const extraLoading = ref(false)
+const extraError = ref('')
+const extraPage = ref(1)
+const extraLabels = { card: '卡面故事', special: '特别篇', gallery: '场景画廊' } as const
 
 interface SelectedStory {
   kind: StoryKind
@@ -90,6 +102,11 @@ const selectedUnit = ref('')
 const eventPage = ref(1)
 const selectedStory = ref<SelectedStory | null>(null)
 const selectedEpisode = ref<StoryEpisode | null>(null)
+const storyDialog = ref<HTMLDialogElement | null>(null)
+watch(selectedStory, story => {
+  if (story && !storyDialog.value?.open) storyDialog.value?.showModal()
+  if (!story && storyDialog.value?.open) storyDialog.value.close()
+}, { flush: 'post' })
 const pageSize = 12
 const now = Date.now()
 
@@ -102,9 +119,9 @@ const unitOptions = [
   { value: 'piapro', label: 'VIRTUAL SINGER', logo: '/img/logo/logo_piapro.png' },
 ]
 
-const assetsHost = computed(() => settingsStore.assetsHost)
+const assetsHost = computed(() => storyAssetHost)
 const activeTab = computed<StoryTab>(() => {
-  if (route.query.tab === 'unit') return 'unit'
+  if (['unit', 'card', 'special', 'gallery'].includes(String(route.query.tab))) return route.query.tab as StoryTab
   return 'event'
 })
 const eventMap = computed(() => new Map(events.value.map(event => [event.id, event])))
@@ -164,6 +181,8 @@ const scenarioUrls = computed(() => {
   if (story.kind === 'unit') {
     return [`${host}/startapp/scenario/unitstory/${story.assetbundleName}/${episode.scenarioId}.json`]
   }
+  if (story.kind === 'card') return [`${host}/startapp/character/member/${story.assetbundleName}/${episode.scenarioId}.json`]
+  if (story.kind === 'special') return [`${host}/startapp/scenario/special/${story.assetbundleName}/${episode.scenarioId}.json`]
   return []
 })
 
@@ -190,7 +209,41 @@ const selectedEpisodeIndex = computed(() => {
 
 watch([searchQuery, selectedUnit], () => {
   eventPage.value = 1
+  extraPage.value = 1
 })
+const extraStories = computed<SelectedStory[]>(() => {
+  const items: SelectedStory[] = activeTab.value === 'card'
+    ? storyCards.value.filter(card => settingsStore.showSpoilers || card.releaseAt <= now).map(card => ({
+      kind: 'card', id: card.id, title: card.prefix, assetbundleName: card.assetbundleName,
+      episodes: cardEpisodes.value.filter(episode => episode.cardId === card.id).map((episode, i) => ({ ...episode, episodeNo: i + 1 })),
+    }))
+    : specialStories.value.filter(story => settingsStore.showSpoilers || story.startAt <= now).map(story => ({ ...story, kind: 'special' as const }))
+  const query = searchQuery.value.trim().toLocaleLowerCase()
+  return items.filter(story => story.episodes.length && (!query || `${story.id} ${story.title} ${story.episodes.map(e => e.title).join(' ')}`.toLocaleLowerCase().includes(query))).reverse()
+})
+let extraRequest: Promise<void> | null = null
+async function loadExtra() {
+  if (!['card', 'special'].includes(activeTab.value)) return
+  if (extraRequest) { await extraRequest; return loadExtra() }
+  if (activeTab.value === 'card' && storyCards.value.length || activeTab.value === 'special' && specialStories.value.length) return
+  const tab = activeTab.value
+  extraLoading.value = true; extraError.value = ''
+  extraRequest = (async () => {
+    try {
+      if (tab === 'card') {
+        const [cards, episodes] = await Promise.all([masterStore.getMaster<StoryCard>('cards'), masterStore.getMaster<CardEpisode>('cardEpisodes')])
+        storyCards.value = cards; cardEpisodes.value = episodes
+      } else {
+        const [stories, media] = await Promise.all([masterStore.getMaster<SpecialStory>('specialStories'), loadStoryMedia()])
+        const available = new Set(media.specialScenarios || [])
+        specialStories.value = stories.map(story => ({ ...story, episodes: story.episodes.filter(episode => available.has(`startapp/scenario/special/${story.assetbundleName}/${episode.scenarioId}.json`)) })).filter(story => story.episodes.length)
+      }
+    } catch { extraError.value = '目录加载失败，请重试' }
+    finally { extraLoading.value = false; extraRequest = null }
+  })()
+  await extraRequest
+}
+watch(activeTab, () => { extraPage.value = 1; closeStory(); void loadExtra() })
 watch(eventTotalPages, total => { eventPage.value = Math.min(eventPage.value, total) })
 
 function unitOrder(unit: string): number {
@@ -235,6 +288,7 @@ function unitChapterOutline(chapter: UnitStoryChapter): string {
 
 function openEpisode(episode: StoryEpisode) {
   selectedEpisode.value = episode
+  void router.replace({ query: { ...route.query, story: String(selectedStory.value?.id || ''), episode: String(episode.id) } })
 }
 
 function navigateEpisode(offset: number) {
@@ -284,6 +338,17 @@ onMounted(async () => {
     eventStoryUnits.value = eventUnitData
     unitStories.value = unitStoryData
     unitEpisodeGroups.value = groupData
+    await loadExtra()
+    const storyId = String(route.query.story || '')
+    if (activeTab.value === 'event') {
+      const story = eventStories.value.find(item => String(item.id) === storyId && (settingsStore.showSpoilers || (eventMap.value.get(item.eventId)?.startAt || 0) <= now))
+      if (story) openEventStory(story)
+    } else if (activeTab.value === 'unit') {
+      const chapter = flattenedUnitChapters.value.find(item => String(item.id) === storyId)
+      if (chapter) openUnitChapter(chapter)
+    } else selectedStory.value = extraStories.value.find(item => String(item.id) === storyId) || null
+    const episode = selectedStory.value?.episodes.find(item => String(item.id) === String(route.query.episode))
+    if (episode) selectedEpisode.value = episode
   } catch (error) {
     console.error('加载故事数据失败:', error)
     loadError.value = '游戏资料加载失败，请稍后重试'
@@ -295,7 +360,7 @@ onMounted(async () => {
 
 <template>
   <div class="max-w-7xl mx-auto space-y-6">
-    <PageHeader title="剧情档案" description="活动故事与组合主线的统一目录，支持剧本阅读和台词搜索。"><template #icon><BookOpen class="w-8 h-8 text-primary" /></template></PageHeader>
+    <PageHeader title="剧情档案" description="在熟悉的场景里，听他们把故事说完。支持原文阅读、角色语音和场景播放。"><template #icon><BookOpen class="w-8 h-8 text-primary" /></template></PageHeader>
 
     <section class="grid grid-cols-3 gap-2">
       <div class="rounded-xl bg-base-100 border border-base-200 px-3 py-2"><p class="text-[11px] text-base-content/45">活动故事</p><p class="font-bold text-lg">{{ storyStats.events }}</p></div>
@@ -306,19 +371,21 @@ onMounted(async () => {
     <div role="tablist" class="tabs tabs-box bg-base-100 border border-base-200 w-full sm:w-fit p-1">
       <button role="tab" class="tab flex-1 sm:flex-none gap-1.5" :class="{ 'tab-active': activeTab === 'event' }" @click="setTab('event')"><Sparkles class="w-4 h-4" />活动 <span class="hidden sm:inline">{{ storyStats.events }}</span></button>
       <button role="tab" class="tab flex-1 sm:flex-none gap-1.5" :class="{ 'tab-active': activeTab === 'unit' }" @click="setTab('unit')"><Library class="w-4 h-4" />主线 <span class="hidden sm:inline">{{ storyStats.unitChapters }}</span></button>
+      <button v-for="(label, tab) in extraLabels" :key="tab" role="tab" class="tab flex-1 sm:flex-none text-xs sm:text-sm" :class="{ 'tab-active': activeTab === tab }" @click="setTab(tab)">{{ label }}</button>
     </div>
 
-    <section class="card bg-base-100 border border-base-200 shadow-sm">
+    <StoryGallery v-if="activeTab === 'gallery'" />
+    <section v-else class="card bg-base-100 border border-base-200 shadow-sm">
       <div class="card-body p-3 md:p-4 grid md:grid-cols-[minmax(0,1fr)_240px] gap-3">
         <label class="input input-bordered flex items-center gap-2">
           <Search class="w-4 h-4 opacity-50" /><input v-model="searchQuery" class="grow min-w-0" placeholder="搜索故事或章节标题…" />
           <button v-if="searchQuery" class="btn btn-xs btn-circle btn-ghost" aria-label="清空" @click="searchQuery = ''"><X class="w-3 h-3" /></button>
         </label>
-        <select v-model="selectedUnit" class="select select-bordered w-full">
+        <select v-if="activeTab === 'event' || activeTab === 'unit'" v-model="selectedUnit" class="select select-bordered w-full">
           <option value="">全部组合</option>
           <option v-for="unit in unitOptions" :key="unit.value" :value="unit.value">{{ unit.label }}</option>
         </select>
-        <p class="md:col-span-2 text-xs text-base-content/45">本站仅提供故事浏览与检索，不记录阅读进度。</p>
+        <p class="md:col-span-2 text-xs text-base-content/45">阅读进度保存在当前浏览器，不影响游戏账号。部分剧本没有配音，仍可阅读原文。</p>
       </div>
     </section>
 
@@ -355,11 +422,27 @@ onMounted(async () => {
       </div>
     </template>
 
-    <dialog class="modal" :class="{ 'modal-open': selectedStory }">
-      <div v-if="selectedStory" class="modal-box p-0" :class="selectedEpisode ? 'max-w-5xl' : 'max-w-3xl'">
+    <template v-else-if="activeTab === 'card' || activeTab === 'special'">
+      <div v-if="extraLoading" class="py-20 text-center"><span class="loading loading-spinner"></span><p class="mt-3 text-sm opacity-50">正在加载目录…</p></div>
+      <div v-else-if="extraError" class="alert alert-error">{{ extraError }}<button class="btn btn-sm" @click="loadExtra">重试</button></div>
+      <template v-else>
+        <p class="text-sm opacity-60">{{ extraStories.length }} 篇故事 · {{ activeTab === 'card' ? '卡面前篇与后篇' : '仅展示已有可读剧本的特别篇' }}</p>
+        <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <button v-for="story in extraStories.slice((extraPage - 1) * 12, extraPage * 12)" :key="story.id" class="card bg-base-100 border border-base-200 hover:border-primary text-left overflow-hidden" @click="selectedStory = story">
+            <AssetImage v-if="story.kind === 'card'" :src="`${assetsHost}/startapp/character/member/${story.assetbundleName}/card_normal.jpg`" :alt="story.title" class="w-full aspect-video object-cover" />
+            <div class="p-5 space-y-2"><span class="text-xs text-primary">{{ extraLabels[activeTab] }} / {{ story.id }}</span><h2 class="font-bold">{{ story.title }}</h2><p class="text-xs opacity-50">{{ story.episodes.length }} 话 · 点击选集</p></div>
+          </button>
+        </div>
+        <div v-if="!extraStories.length" class="py-12 text-center opacity-50">没有匹配的故事</div>
+        <div v-if="extraStories.length > 12" class="flex justify-center items-center gap-4"><button class="btn btn-sm" :disabled="extraPage === 1" @click="extraPage--">上一页</button><span class="text-xs">{{ extraPage }} / {{ Math.ceil(extraStories.length / 12) }}</span><button class="btn btn-sm" :disabled="extraPage * 12 >= extraStories.length" @click="extraPage++">下一页</button></div>
+      </template>
+    </template>
+
+    <dialog ref="storyDialog" class="modal" :class="{ 'modal-open': selectedStory }" @cancel.prevent="closeStory">
+      <div v-if="selectedStory" class="modal-box p-0" :class="selectedEpisode ? 'max-w-5xl max-h-[94dvh] w-[96vw]' : 'max-w-3xl'">
         <StoryReader
           v-if="selectedEpisode"
-          :key="selectedEpisode.id"
+          :key="selectedEpisode.scenarioId"
           :title="selectedEpisode.title"
           :episode-label="selectedEpisode.episodeNoLabel || `第 ${selectedEpisode.episodeNo} 话`"
           :scenario-id="selectedEpisode.scenarioId"
@@ -375,7 +458,7 @@ onMounted(async () => {
           <header class="p-5 border-b border-base-200 flex items-start gap-3" :class="selectedStoryBannerUrl ? '-mt-8 relative z-10 pt-0' : ''">
             <div class="min-w-0 flex-1">
               <div class="flex flex-wrap items-center gap-2 mb-2">
-                <span class="badge badge-primary">{{ selectedStory.kind === 'event' ? '活动故事' : '组合主线' }}</span>
+                <span class="badge badge-primary">{{ selectedStory.kind === 'event' ? '活动故事' : selectedStory.kind === 'unit' ? '组合主线' : extraLabels[selectedStory.kind] }}</span>
                 <span v-if="selectedStory.unit" class="badge badge-ghost">{{ getUnitLabel(selectedStory.unit) }}</span>
               </div>
               <h2 class="font-bold text-xl">{{ selectedStory.title }}</h2>
