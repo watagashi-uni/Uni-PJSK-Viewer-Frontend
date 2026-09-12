@@ -9,6 +9,9 @@ export type ApiEndpointPayload = {
 const ENDPOINT_SNAPSHOT_KEY = 'apiEndpointSnapshot'
 
 const fixedApiBaseUrl = normalizeApiBaseUrl(import.meta.env.VITE_API_BASE_URL || '') ?? ''
+// Isolated previews must keep using their same-origin proxy even when version
+// advertises the production endpoint. Production retains dynamic discovery.
+const fixedEndpoint = import.meta.env.VITE_API_ENDPOINT_FIXED === '1'
 
 let activeApiBaseUrl = fixedApiBaseUrl
 let endpointResolved = false
@@ -22,6 +25,7 @@ restoreEndpointSnapshot()
  * Worker 环境无 localStorage，跳过恢复，保持原有的首次阻塞解析。
  */
 function restoreEndpointSnapshot(): void {
+    if (fixedEndpoint) return
     if (typeof localStorage === 'undefined') {
         return
     }
@@ -75,6 +79,7 @@ export function getActiveApiBaseUrl(): string {
 }
 
 export function applyApiEndpointFromVersion(versionInfo: ApiEndpointPayload): void {
+    if (fixedEndpoint) { activeApiBaseUrl = fixedApiBaseUrl; endpointResolved = true; return }
     const endpoint = normalizeApiBaseUrl(versionInfo[API_ENDPOINT_KEY])
     activeApiBaseUrl = endpoint ?? fixedApiBaseUrl
     endpointResolved = true
