@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useSeoMeta, useHead } from '@unhead/vue'
 import { useRoute } from 'vue-router'
+import { useBackToList } from '@/composables/useBackToList'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
 import { useAccountStore } from '@/stores/account'
@@ -16,6 +17,8 @@ import AccountSelector from '@/components/AccountSelector.vue'
 import type { EventData } from '@/types/master'
 
 const route = useRoute()
+// 上一页是列表时后退以保留筛选与页码，否则打开列表
+const goBack = useBackToList('/events')
 const masterStore = useMasterStore()
 const settingsStore = useSettingsStore()
 const accountStore = useAccountStore()
@@ -270,11 +273,15 @@ const unitColorMap: Record<string, string> = {
   piapro: '#00bfbf',
 }
 
+// 当前时间 (每分钟刷新一次, 驱动倒计时与进度条更新)
+const currentTime = ref(Date.now())
+let nowTimer: ReturnType<typeof setInterval> | undefined
+
 // 活动状态
 const eventStatus = computed(() => {
   if (!event.value) return { status: 'unknown', label: '', progress: 0 }
   
-  const now = Date.now()
+  const now = currentTime.value
   const start = event.value.startAt
   const end = event.value.aggregateAt
   
@@ -670,7 +677,16 @@ useHead({
   ]
 })
 
-onMounted(loadData)
+onMounted(() => {
+  nowTimer = setInterval(() => {
+    currentTime.value = Date.now()
+  }, 60_000)
+  void loadData()
+})
+
+onUnmounted(() => {
+  if (nowTimer) clearInterval(nowTimer)
+})
 
 watch(() => route.params.id, loadData)
 </script>
@@ -693,12 +709,12 @@ watch(() => route.params.id, loadData)
       <!-- 头部 -->
       <div class="card bg-base-100 shadow-lg">
         <div class="card-body">
-          <div class="flex items-center justify-between mb-4">
-            <div class="flex items-center gap-4">
-              <RouterLink to="/events" class="btn btn-ghost btn-sm">
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+            <div class="flex flex-wrap items-center gap-2 sm:gap-4">
+              <button type="button" class="btn btn-ghost btn-sm" @click="goBack">
                 <ChevronLeft class="w-4 h-4" />
-                返回
-              </RouterLink>
+                返回列表
+              </button>
               <span class="badge badge-lg">#{{ event.id }}</span>
               <span 
                 class="badge badge-lg"
@@ -723,8 +739,7 @@ watch(() => route.params.id, loadData)
           
           <!-- 活动状态进度条 -->
           <div class="mb-4">
-            <div class="flex justify-between text-sm mb-1">
-              <span>{{ formatDateTime(event.startAt) }}</span>
+            <div class="flex justify-center text-sm mb-1">
               <span 
                 class="font-medium"
                 :class="{
@@ -735,7 +750,6 @@ watch(() => route.params.id, loadData)
               >
                 {{ eventStatus.label }}
               </span>
-              <span>{{ formatDateTime(event.aggregateAt) }}</span>
             </div>
             <progress 
               class="progress w-full"
@@ -841,6 +855,8 @@ watch(() => route.params.id, loadData)
             <button 
               class="btn btn-circle btn-sm absolute! left-2 top-1/2 -translate-y-1/2"
               style="position: absolute;"
+              type="button"
+              aria-label="上一张"
               @click="prevImage"
             >
               <ChevronLeft class="w-4 h-4" />
@@ -848,6 +864,8 @@ watch(() => route.params.id, loadData)
             <button 
               class="btn btn-circle btn-sm absolute! right-2 top-1/2 -translate-y-1/2"
               style="position: absolute;"
+              type="button"
+              aria-label="下一张"
               @click="nextImage"
             >
               <ChevronRight class="w-4 h-4" />
@@ -909,7 +927,7 @@ watch(() => route.params.id, loadData)
             >
               <!-- 角色头像 -->
               <div 
-                class="w-10 h-10 rounded-full overflow-hidden ring-2 flex-shrink-0"
+                class="w-10 h-10 rounded-full overflow-hidden border-2 flex-shrink-0"
                 :style="{ borderColor: unitColorMap[charData?.unit || ''] || '#ccc' }"
               >
                 <img 

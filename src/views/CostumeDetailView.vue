@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useSeoMeta } from '@unhead/vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useBackToList } from '@/composables/useBackToList'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
 import { ChevronLeft, Shirt, Info, CreditCard, Calendar } from 'lucide-vue-next'
@@ -233,14 +234,8 @@ useSeoMeta({
   twitterCard: 'summary',
 })
 
-function goBack() {
-  const backState = window.history.state?.back
-  if (typeof backState === 'string' && backState.startsWith('/costumes')) {
-    router.back()
-  } else {
-    router.push('/costumes')
-  }
-}
+// 上一页是列表时后退以保留筛选与页码，否则打开列表
+const goBack = useBackToList('/costumes')
 
 onMounted(loadData)
 </script>

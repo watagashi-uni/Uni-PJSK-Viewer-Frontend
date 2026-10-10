@@ -28,7 +28,8 @@ interface WorldBloomData {
 
 // 状态
 const activeTab = ref<'top100' | 'borders'>('top100')
-const isLoading = ref(false)
+const isLoading = ref(true)
+const initError = ref('')
 const eventId = ref<number | null>(null)
 const eventName = ref('')
 const currentEvent = ref<EventData | null>(null)
@@ -75,6 +76,7 @@ onUnmounted(() => {
 
 async function initData() {
   isLoading.value = true
+  initError.value = ''
   try {
     if (!masterStore.isReady) {
       await masterStore.initialize()
@@ -130,9 +132,12 @@ async function initData() {
       } else {
         await fetchBorders()
       }
+    } else {
+      initError.value = '暂无可显示的活动'
     }
   } catch (e) {
     console.error('Failed to init ranking data:', e)
+    initError.value = '加载活动数据失败'
   } finally {
     isLoading.value = false
   }
@@ -264,12 +269,15 @@ function getHonor(honors: any[], seq: number) {
     <div class="bg-base-100 p-6 rounded-xl shadow-sm relative">
       <div class="flex flex-col items-center justify-center text-center gap-1">
         <h1 class="text-2xl font-bold flex items-center justify-center gap-2">
-          <span class="text-primary">#{{ eventId }}</span> {{ eventName || '加载中...' }}
+          <template v-if="eventId">
+            <span class="text-primary">#{{ eventId }}</span> {{ eventName }}
+          </template>
+          <template v-else>{{ isLoading ? '加载中...' : '实时榜况' }}</template>
         </h1>
         <p class="text-base-content/60 text-sm flex items-center justify-center gap-2">
           <span>实时榜况</span>
           <span v-if="lastUpdate">
-            更新于: {{ new Date(lastUpdate).toLocaleTimeString() }}
+            更新于 {{ new Date(lastUpdate).toLocaleTimeString('zh-CN', { hour12: false }) }}
           </span>
         </p>
       </div>
@@ -278,7 +286,7 @@ function getHonor(honors: any[], seq: number) {
         <button 
           class="btn btn-primary btn-sm gap-2" 
           :disabled="isLoading" 
-          @click="refreshData"
+          @click="eventId ? refreshData() : initData()"
         >
           <RefreshCw class="w-4 h-4" :class="{ 'animate-spin': isLoading }" />
           刷新
@@ -287,23 +295,27 @@ function getHonor(honors: any[], seq: number) {
     </div>
 
     <!-- Tabs -->
-    <div role="tablist" class="tabs tabs-boxed bg-base-100 p-2">
-      <a 
+    <div role="tablist" class="tabs tabs-box bg-base-100 p-2">
+      <button 
+        type="button"
         role="tab" 
         class="tab transition-all" 
         :class="{ 'tab-active bg-primary text-primary-content': activeTab === 'top100' }"
+        :aria-selected="activeTab === 'top100'"
         @click="activeTab = 'top100'"
       >
         Top 100 (实时)
-      </a>
-      <a 
+      </button>
+      <button 
+        type="button"
         role="tab" 
         class="tab transition-all" 
         :class="{ 'tab-active bg-primary text-primary-content': activeTab === 'borders' }"
+        :aria-selected="activeTab === 'borders'"
         @click="activeTab = 'borders'"
       >
         榜线 (5分钟延迟)
-      </a>
+      </button>
     </div>
 
     <!-- World Link character rankings -->
@@ -341,7 +353,7 @@ function getHonor(honors: any[], seq: number) {
             />
             <span
               class="absolute -bottom-1 -right-1 badge badge-xs border-none px-1"
-              :class="isChapterOngoing(chapter) ? 'badge-success text-success-content' : selectedWorldBloomCharacterId === chapter.gameCharacterId ? 'badge-primary-content text-primary' : 'badge-neutral'"
+              :class="isChapterOngoing(chapter) ? 'badge-success text-success-content' : selectedWorldBloomCharacterId === chapter.gameCharacterId ? 'bg-primary-content text-primary' : 'badge-neutral'"
             >
               {{ chapter.chapterNo }}
             </span>
@@ -356,13 +368,24 @@ function getHonor(honors: any[], seq: number) {
 
     <!-- Unified Table View -->
     <div class="bg-base-100 rounded-xl shadow-sm overflow-hidden min-h-[300px]">
+      <!-- Init Error State -->
+      <div v-if="initError && !isLoading" class="p-8 text-center text-base-content/60">
+        <p :class="{ 'text-error': initError !== '暂无可显示的活动' }">{{ initError }}</p>
+        <button type="button" class="btn btn-sm btn-ghost mt-3" @click="initData">重试</button>
+      </div>
+
       <!-- Error State -->
-      <div v-if="currentError" class="p-8 text-center text-error">
+      <div v-else-if="currentError" class="p-8 text-center text-error">
         {{ currentError }}
+      </div>
+
+      <!-- Loading State -->
+      <div v-else-if="isLoading && rankingRows.length === 0" class="flex justify-center p-12">
+        <span class="loading loading-spinner loading-lg text-primary"></span>
       </div>
       
       <!-- Empty State -->
-      <div v-else-if="rankingRows.length === 0 && !isLoading" class="p-8 text-center text-base-content/60">
+      <div v-else-if="rankingRows.length === 0" class="p-8 text-center text-base-content/60">
         暂无数据
       </div>
       

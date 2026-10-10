@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { pushListPage, readQueryPage, readQueryString, replaceListQuery } from '@/utils/routeQuery'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
 import { Calendar, Gift, Search, EyeOff } from 'lucide-vue-next'
@@ -12,9 +14,13 @@ const masterStore = useMasterStore()
 const settingsStore = useSettingsStore()
 const allGachas = ref<Gacha[]>([])
 const isLoading = ref(true)
-const searchQuery = ref('')
-const sortOrder = ref<'desc' | 'asc'>('desc')
-const currentPage = ref(1)
+const loadError = ref(false)
+const route = useRoute()
+const router = useRouter()
+// 搜索、排序与页码写在 URL 里，从卡池详情返回时保持不变
+const searchQuery = ref(readQueryString(route.query, 'q'))
+const sortOrder = ref<'desc' | 'asc'>(readQueryString(route.query, 'sort') === 'asc' ? 'asc' : 'desc')
+const currentPage = computed(() => readQueryPage(route.query))
 const itemsPerPage = 12
 
 const assetsHost = computed(() => settingsStore.assetsHost)
@@ -45,9 +51,17 @@ const paginatedGachas = computed(() => {
   return filteredGachas.value.slice(start, start + itemsPerPage)
 })
 
-// 搜索变化时重置页码
+// 搜索/排序变化时同步到 URL 并回到第一页
 watch([searchQuery, sortOrder], () => {
-  currentPage.value = 1
+  void replaceListQuery(router, route, {
+    q: searchQuery.value.trim(),
+    sort: sortOrder.value === 'asc' ? 'asc' : null,
+  })
+})
+
+// 筛选后页数变少时，把越界页码拉回最后一页
+watch(totalPages, (total) => {
+  if (total > 0 && currentPage.value > total) void pushListPage(router, route, total)
 })
 
 // 卡池小图优先用首页 banner，加载失败回退 logo（logo 按 assetbundleName 必然存在），再失败显示占位。
@@ -87,22 +101,27 @@ function getGachaStatus(gacha: Gacha): 'upcoming' | 'active' | 'ended' {
 }
 
 function handlePageChange(page: number) {
-  currentPage.value = page
+  void pushListPage(router, route, page)
 }
 
 function isLeak(gacha: Gacha): boolean {
   return gacha.startAt > Date.now()
 }
 
-onMounted(async () => {
+async function loadData() {
+  isLoading.value = true
+  loadError.value = false
   try {
     allGachas.value = await masterStore.getMaster<Gacha>('gachas')
   } catch (error) {
     console.error('加载卡池数据失败:', error)
+    loadError.value = true
   } finally {
     isLoading.value = false
   }
-})
+}
+
+onMounted(loadData)
 </script>
 
 <template>
@@ -141,6 +160,12 @@ onMounted(async () => {
     <!-- 加载状态 -->
     <div v-if="isLoading" class="flex justify-center py-20">
       <span class="loading loading-spinner loading-lg text-primary"></span>
+    </div>
+
+    <!-- 加载失败 -->
+    <div v-else-if="loadError" role="alert" class="alert alert-error">
+      <span>卡池数据加载失败，请检查网络后重试。</span>
+      <button type="button" class="btn btn-sm" @click="loadData">重试</button>
     </div>
 
     <template v-else>

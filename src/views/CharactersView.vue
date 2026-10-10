@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, CreditCard, Search, Smile, Sparkles, UserRound, Users } from 'lucide-vue-next'
 import AccountSelector from '@/components/AccountSelector.vue'
 import AssetImage from '@/components/AssetImage.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import { useBackToList } from '@/composables/useBackToList'
+import { readQueryString, replaceListQuery } from '@/utils/routeQuery'
 import { useAccountStore } from '@/stores/account'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
@@ -58,12 +60,17 @@ const accountStore = useAccountStore()
 const characters = ref<GameCharacterData[]>([])
 const profiles = ref<CharacterProfileData[]>([])
 const unitProfiles = ref<UnitProfileData[]>([])
-const cards = ref<CardData[]>([])
+// master 数据中的 cards 带 releaseAt, 用于剧透过滤
+const cards = ref<(CardData & { releaseAt?: number })[]>([])
 const stamps = ref<StampData[]>([])
 const characterRanks = ref<CharacterRank[]>([])
 const levels = ref<CharacterLevel[]>([])
-const searchQuery = ref('')
-const sortMode = ref<'default' | 'rank' | 'leader' | 'member'>('default')
+// 列表的搜索与排序写在 URL 里，从角色详情返回时保持不变
+const SORT_MODES = ['default', 'rank', 'leader', 'member'] as const
+type SortMode = typeof SORT_MODES[number]
+const initialSort = readQueryString(route.query, 'sort') as SortMode
+const searchQuery = ref(readQueryString(route.query, 'q'))
+const sortMode = ref<SortMode>(SORT_MODES.includes(initialSort) ? initialSort : 'default')
 const isLoading = ref(true)
 const loadError = ref('')
 
@@ -163,9 +170,15 @@ const selectedCharacterLiveUsage = computed(() => {
   return liveUsageMap.value.get(selectedCharacter.value.id) || null
 })
 
+// 与卡牌列表一致: 关闭剧透时不计入未发布的卡牌
 const cardCounts = computed(() => {
   const result = new Map<number, number>()
-  for (const card of cards.value) result.set(card.characterId, (result.get(card.characterId) || 0) + 1)
+  const now = Date.now()
+  const showSpoilers = settingsStore.showSpoilers
+  for (const card of cards.value) {
+    if (!showSpoilers && (card.releaseAt ?? 0) > now) continue
+    result.set(card.characterId, (result.get(card.characterId) || 0) + 1)
+  }
   return result
 })
 
@@ -293,9 +306,15 @@ function openCharacter(character: GameCharacterData) {
   void router.push(`/characters/${character.id}`)
 }
 
-function closeDetail() {
-  void router.push('/characters')
-}
+const closeDetail = useBackToList('/characters')
+
+watch([searchQuery, sortMode], () => {
+  if (route.params.id) return
+  void replaceListQuery(router, route, {
+    q: searchQuery.value.trim(),
+    sort: sortMode.value === 'default' ? null : sortMode.value,
+  })
+})
 
 onMounted(async () => {
   try {
@@ -303,7 +322,7 @@ onMounted(async () => {
       masterStore.getMaster<GameCharacterData>('gameCharacters'),
       masterStore.getMaster<CharacterProfileData>('characterProfiles'),
       masterStore.getMaster<UnitProfileData>('unitProfiles'),
-      masterStore.getMaster<CardData>('cards'),
+      masterStore.getMaster<CardData & { releaseAt?: number }>('cards'),
       masterStore.getMaster<StampData>('stamps'),
       masterStore.getMaster<CharacterRank>('characterRanks'),
       masterStore.getMaster<CharacterLevel>('levels'),
@@ -549,7 +568,6 @@ onMounted(async () => {
             </figure>
             <div class="card-body p-2.5 gap-0">
               <h3 class="font-bold truncate">{{ getCharacterName(character) }}</h3>
-              <p class="text-[10px] tracking-wider text-base-content/45 truncate uppercase">{{ getEnglishName(character) }}</p>
               <p class="text-[11px] text-base-content/55 mt-2">{{ cardCounts.get(character.id) || 0 }} 卡牌 · {{ stampCounts.get(character.id) || 0 }} 贴图</p>
               <p v-if="liveUsageMap.get(character.id)" class="text-[10px] text-base-content/45 mt-1 truncate">
                 队长 {{ formatCount(liveUsageMap.get(character.id)!.leader) }} · 成员 {{ formatCount(liveUsageMap.get(character.id)!.member) }}

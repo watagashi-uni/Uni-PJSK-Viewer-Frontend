@@ -1250,10 +1250,16 @@ function diffTextStyle(difficulty: string) {
   return { color: diffColors[difficulty] }
 }
 
+const searchInputRef = ref<HTMLInputElement | null>(null)
+
 onMounted(() => {
   loadData()
   // 从缓存加载成绩，不调用 API
   loadFromCache()
+  // 顶栏搜索按钮进入 /musics/search 时直接聚焦搜索框
+  if (route.name === 'MusicSearch') {
+    void nextTick(() => searchInputRef.value?.focus())
+  }
 })
 
 onUnmounted(() => {
@@ -1342,9 +1348,11 @@ watch(totalPages, (pages) => {
     <div class="flex flex-col sm:flex-row gap-3 mb-3 items-center">
       <div class="relative w-full sm:w-72">
         <input 
+          ref="searchInputRef"
           v-model="searchText"
-          type="text"
-          placeholder="搜索歌曲..."
+          type="search"
+          placeholder="歌名 / 译名 / 作曲 / 读音"
+          aria-label="搜索歌曲"
           class="input input-bordered w-full pl-10 input-sm"
           @input="clearArtistFilter"
         />
@@ -1363,7 +1371,7 @@ watch(totalPages, (pages) => {
         <span class="text-base leading-none">×</span>
       </button>
 
-      <div class="flex items-center gap-2 flex-nowrap overflow-x-auto no-scrollbar">
+      <div class="flex w-full min-w-0 flex-wrap items-center gap-2 sm:w-auto">
         <div class="join shrink-0">
           <button 
             class="join-item btn btn-sm"
@@ -1754,33 +1762,35 @@ watch(totalPages, (pages) => {
 
         <div v-for="group in levelGroupedMusics" :key="group.level" class="mb-3">
           <!-- 组标题（可点击展开/折叠） -->
-          <div 
-            class="flex items-center gap-3 px-1 py-1.5 cursor-pointer select-none rounded-lg hover:bg-base-200/50 transition-colors"
+          <button
+            type="button"
+            class="flex w-full flex-wrap items-center gap-3 px-1 py-1.5 cursor-pointer select-none rounded-lg text-left hover:bg-base-200/50 transition-colors"
+            :aria-expanded="expandedLevels.has(group.level)"
             @click="toggleLevel(group.level)"
           >
-            <div
+            <span
               class="px-3 py-0.5 rounded-full text-white font-black text-xl shadow-sm tracking-tighter"
               :style="diffBackgroundStyle(selectedDiffType)"
             >
               {{ group.level.toFixed(0) }}
-            </div>
+            </span>
             <span class="text-xs text-base-content/50">{{ group.musics?.length || 0 }}首</span>
-            <div v-if="showUserResults && hasSuiteData" class="flex gap-3 text-xs font-bold px-3 py-1 rounded-full shadow-sm bg-base-100 border border-base-200/50">
-              <span class="flex items-center gap-1 text-base-content/80">
+            <span v-if="showUserResults && hasSuiteData" class="flex gap-3 text-xs font-bold px-3 py-1 rounded-full shadow-sm bg-base-100 border border-base-200/50 text-base-content/80">
+              <span class="flex items-center gap-1">
                 ALL <span class="text-base-content">{{ group.stats?.total || 0 }}</span>
               </span>
-              <span class="flex items-center gap-1 text-[#88DDFF]" title="Clear">
-                <img src="/img/icon_clear.png" class="h-3.5" /> {{ group.stats?.clear || 0 }}
+              <span class="flex items-center gap-1" title="Clear">
+                <img src="/img/icon_clear.png" alt="Clear" class="h-3.5" /> {{ group.stats?.clear || 0 }}
               </span>
-              <span class="flex items-center gap-1 text-[#FF8EE6]" title="AP">
-                <img src="/img/icon_allPerfect.png" class="h-3.5" /> {{ group.stats?.ap || 0 }}
+              <span class="flex items-center gap-1" title="AP">
+                <img src="/img/icon_allPerfect.png" alt="AP" class="h-3.5" /> {{ group.stats?.ap || 0 }}
               </span>
-              <span class="flex items-center gap-1 text-[#FF66AA]" title="FC">
-                <img src="/img/icon_fullCombo.png" class="h-3.5" /> {{ group.stats?.fc || 0 }}
+              <span class="flex items-center gap-1" title="FC">
+                <img src="/img/icon_fullCombo.png" alt="FC" class="h-3.5" /> {{ group.stats?.fc || 0 }}
               </span>
-            </div>
-            <span class="ml-auto text-xs text-base-content/30">{{ expandedLevels.has(group.level) ? '▲' : '▼' }}</span>
-          </div>
+            </span>
+            <span class="ml-auto text-xs text-base-content/30" aria-hidden="true">{{ expandedLevels.has(group.level) ? '▲' : '▼' }}</span>
+          </button>
           <!-- 封面墙（仅展开时渲染） -->
           <div v-if="expandedLevels.has(group.level)" class="flex flex-wrap gap-1.5 sm:gap-2 bg-base-100 p-2 sm:p-3 rounded-xl shadow-sm border border-base-200/50 mt-1.5">
             <RouterLink v-for="music in group.musics" :key="music.id" :to="`/musics/${music.id}`" class="relative group block shrink-0">

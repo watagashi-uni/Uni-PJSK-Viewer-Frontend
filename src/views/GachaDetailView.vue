@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import { useBackToList } from '@/composables/useBackToList'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
 import { 
@@ -16,6 +17,9 @@ import type {
 } from '@/types/gacha'
 
 const route = useRoute()
+// 上一页是列表时后退以保留筛选与页码，否则打开列表
+const goBack = useBackToList('/gachas')
+const infoModal = ref<HTMLDialogElement | null>(null)
 const masterStore = useMasterStore()
 const settingsStore = useSettingsStore()
 
@@ -491,10 +495,10 @@ watch(() => route.params.id, loadData)
 <template>
   <div class="space-y-6">
     <!-- 返回按钮 -->
-    <router-link to="/gachas" class="btn btn-ghost btn-sm gap-1">
+    <button type="button" class="btn btn-ghost btn-sm gap-1" @click="goBack">
       <ChevronLeft class="w-4 h-4" />
       返回卡池列表
-    </router-link>
+    </button>
 
     <!-- 加载状态 -->
     <div v-if="isLoading" class="flex justify-center py-20">
@@ -526,7 +530,7 @@ watch(() => route.params.id, loadData)
             <button 
               v-if="gacha.gachaInformation?.summary || gacha.gachaInformation?.description"
               class="btn btn-outline btn-sm font-normal"
-              onclick="info_modal.showModal()"
+              @click="infoModal?.showModal()"
             >
               卡池介绍（日文）
             </button>
@@ -809,7 +813,7 @@ watch(() => route.params.id, loadData)
     </div>
 
     <!-- 详情 Modal -->
-    <dialog id="info_modal" class="modal modal-bottom sm:modal-middle">
+    <dialog ref="infoModal" class="modal modal-bottom sm:modal-middle">
       <div v-if="gacha?.gachaInformation" class="modal-box">
         <h3 class="font-bold text-lg mb-4">卡池详情</h3>
         <div class="space-y-4 text-sm whitespace-pre-wrap leading-relaxed">
@@ -828,7 +832,7 @@ watch(() => route.params.id, loadData)
         </div>
       </div>
       <form method="dialog" class="modal-backdrop">
-        <button>close</button>
+        <button>关闭</button>
       </form>
     </dialog>
   </div>

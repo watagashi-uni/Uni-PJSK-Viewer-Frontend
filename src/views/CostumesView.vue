@@ -1,7 +1,7 @@
 <script lang="ts">
 import type { CostumeGroup } from '@/types/costume'
 
-// RouterView 以 fullPath 为 key，query 变化会重建整个视图；
+// RouterView 以 path 为 key，query 变化不会重建视图，但离开再返回列表时会重建；
 // costume3ds 有 11 万+ 条目，用模块作用域缓存聚合结果避免每次重建都重新聚合
 let costumeGroupsCache: { source: unknown; groups: CostumeGroup[] } | null = null
 </script>
@@ -162,7 +162,8 @@ function itemSummary(item: CostumeListItem): string {
 }
 
 // 更新 URL 筛选参数（patch 中值为 undefined 表示删除该参数）
-function pushQuery(patch: Record<string, string | undefined>, page: string = '1') {
+// 筛选变化用 replace，避免每次点选都产生历史记录；翻页用 push
+function pushQuery(patch: Record<string, string | undefined>, page: string = '1', mode: 'push' | 'replace' = 'replace') {
   const query: Record<string, string> = {}
   for (const key of ['charaId', 'part', 'source', 'q', 'sort']) {
     const value = route.query[key]
@@ -173,7 +174,8 @@ function pushQuery(patch: Record<string, string | undefined>, page: string = '1'
     else query[key] = value
   }
   query.page = page
-  router.push({ query })
+  if (mode === 'push') router.push({ query })
+  else router.replace({ query })
 }
 
 function selectCharacter(id: number) {
@@ -199,7 +201,7 @@ function toggleSort() {
 }
 
 function handlePageChange(page: number) {
-  pushQuery({}, page.toString())
+  pushQuery({}, page.toString(), 'push')
 }
 
 async function loadData() {
@@ -296,11 +298,11 @@ onMounted(() => {
               </button>
             </div>
 
-            <div class="join">
+            <div class="flex flex-wrap gap-1">
               <button
                 v-for="tab in sourceTabs"
                 :key="tab.value"
-                class="join-item btn btn-sm"
+                class="btn btn-sm"
                 :class="selectedSource === tab.value ? 'btn-primary' : 'btn-outline'"
                 @click="selectSource(tab.value)"
               >

@@ -63,7 +63,9 @@ function goToPage(page: number) {
       <div class="join w-max bg-base-100 p-2 shadow-lg">
         <!-- 上一页 -->
         <button
+          type="button"
           class="join-item btn btn-sm btn-ghost"
+          aria-label="上一页"
           :disabled="currentPage === 1"
           @click="goToPage(currentPage - 1)"
         >
@@ -71,9 +73,10 @@ function goToPage(page: number) {
         </button>
 
         <!-- 页码 -->
-        <template v-for="page in visiblePages" :key="page">
+        <template v-for="(page, index) in visiblePages" :key="typeof page === 'number' ? `page-${page}` : `ellipsis-${index}`">
           <button
             v-if="typeof page === 'number'"
+            type="button"
             class="join-item btn btn-sm"
             :class="page === currentPage ? 'btn-primary' : 'btn-ghost'"
             @click="goToPage(page)"
@@ -85,7 +88,9 @@ function goToPage(page: number) {
 
         <!-- 下一页 -->
         <button
+          type="button"
           class="join-item btn btn-sm btn-ghost"
+          aria-label="下一页"
           :disabled="currentPage === totalPages"
           @click="goToPage(currentPage + 1)"
         >
@@ -105,10 +110,11 @@ function goToPage(page: number) {
         name="page"
         :min="1"
         :max="totalPages"
-        placeholder="Go"
+        placeholder="页码"
+        aria-label="跳转页码"
         class="input input-sm input-bordered w-16 text-center"
       />
-      <button type="submit" class="btn btn-sm btn-ghost">
+      <button type="submit" class="btn btn-sm btn-ghost" aria-label="跳转">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
         </svg>
