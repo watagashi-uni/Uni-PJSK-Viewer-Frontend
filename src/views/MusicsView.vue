@@ -76,6 +76,7 @@ import AssetImage from '@/components/AssetImage.vue'
 import { toRomaji } from '@/utils/kanaToRomaji'
 import AccountSelector from '@/components/AccountSelector.vue'
 import { request } from '@/utils/request'
+import { APPEND_GRADIENT, DIFFICULTY_COLORS, difficultyBackground } from '@/utils/difficulty'
 
 interface Music {
   id: number
@@ -1216,12 +1217,6 @@ function toggleReleaseCondition(value: number) {
   selectedReleaseConditionIds.value = toggleSetValue(selectedReleaseConditionIds.value, value)
 }
 
-const diffColors: Record<string, string> = {
-  easy: '#6EE1D6', normal: '#34DDFF', hard: '#FBCC26',
-  expert: '#EA5B75', master: '#C656EA', append: '#ab9fef',
-}
-
-const appendDifficultyGradient = 'linear-gradient(135deg, #ab9fef, #e192d7)'
 
 const diffLabels: Record<string, string> = {
   easy: 'EAS', normal: 'NOR', hard: 'HRD',
@@ -1232,7 +1227,7 @@ const allDifficulties = ['easy', 'normal', 'hard', 'expert', 'master', 'append']
 
 function diffBackgroundStyle(difficulty: string) {
   return {
-    background: difficulty === 'append' ? appendDifficultyGradient : (diffColors[difficulty] || '#9ca3af'),
+    background: difficultyBackground(difficulty),
     color: ['easy', 'normal', 'hard'].includes(difficulty) ? 'black' : 'white',
   }
 }
@@ -1240,14 +1235,14 @@ function diffBackgroundStyle(difficulty: string) {
 function diffTextStyle(difficulty: string) {
   if (difficulty === 'append') {
     return {
-      background: appendDifficultyGradient,
+      background: APPEND_GRADIENT,
       backgroundClip: 'text',
       WebkitBackgroundClip: 'text',
       color: 'transparent',
       textShadow: '0 0 8px rgba(171,159,239,0.35)',
     }
   }
-  return { color: diffColors[difficulty] }
+  return { color: DIFFICULTY_COLORS[difficulty] }
 }
 
 const searchInputRef = ref<HTMLInputElement | null>(null)

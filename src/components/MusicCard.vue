@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import { ListFilter } from 'lucide-vue-next'
 import AssetImage from '@/components/AssetImage.vue'
+import { DIFFICULTY_LABELS, DIFFICULTY_ORDER, difficultyStyle } from '@/utils/difficulty'
 
 const props = defineProps<{
   id: number
@@ -42,25 +43,6 @@ const matchedIcons = computed(() => {
     .map(([, icon]) => icon)
 })
 
-const difficultyOrder = ['easy', 'normal', 'hard', 'expert', 'master', 'append']
-
-const difficultyColors: Record<string, string> = {
-  easy: 'bg-[#6EE1D6] text-black',
-  normal: 'bg-[#34DDFF] text-black',
-  hard: 'bg-[#FBCC26] text-black',
-  expert: 'bg-[#EA5B75] text-white',
-  master: 'bg-[#C656EA] text-white',
-  append: 'bg-[#EE78DC] text-white'
-}
-
-const difficultyLabels: Record<string, string> = {
-  easy: 'EASY',
-  normal: 'NORMAL',
-  hard: 'HARD',
-  expert: 'EXPERT',
-  master: 'MASTER',
-  append: 'APPEND'
-}
 
 // 成绩显示
 function getResultLabel(diff: string): string {
@@ -72,7 +54,7 @@ function getResultLabel(diff: string): string {
 
 // 获取有效的难度列表
 const availableDifficulties = computed(() => {
-  return difficultyOrder.filter(diff => props.difficulties[diff] !== undefined)
+  return DIFFICULTY_ORDER.filter(diff => props.difficulties[diff] !== undefined)
 })
 
 // 缩略图 URL
@@ -170,8 +152,8 @@ function selectArtist() {
           v-for="diff in availableDifficulties" 
           :key="diff"
           class="flex-1 flex flex-col items-center justify-center rounded py-0.5 min-w-[1.2rem]"
-          :class="difficultyColors[diff]"
-          :title="`${difficultyLabels[diff]}: ${difficulties[diff]}`"
+          :style="difficultyStyle(diff)"
+          :title="`${DIFFICULTY_LABELS[diff]}: ${difficulties[diff]}`"
         >
           <span class="text-xs font-black leading-none">{{ difficulties[diff] }}</span>
         </div>
