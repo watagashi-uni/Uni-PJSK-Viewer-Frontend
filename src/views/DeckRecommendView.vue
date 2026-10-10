@@ -479,24 +479,22 @@ const rarityList = [
       <div class="card bg-base-100 shadow-lg">
         <div class="card-body space-y-4">
           <!-- 用户ID -->
-          <div class="form-control">
-            <label class="label"><span class="label-text font-medium">用户账号</span></label>
+          <div>
+            <label class="label"><span class="font-medium text-base-content">用户账号</span></label>
             <div class="max-w-md w-full border border-base-300 rounded-lg p-1 bg-base-100 shadow-sm">
               <AccountSelector 
                 v-model="userId"
                 show-id
               />
             </div>
-            <label v-if="accountStore.accounts.length === 0" class="label mt-1">
-              <span class="label-text-alt text-base-content/60">
-                请先在 <RouterLink to="/profile" class="link text-primary">用户档案</RouterLink> 中添加账号
-              </span>
-            </label>
+            <p v-if="accountStore.accounts.length === 0" class="mt-1 text-xs text-base-content/60">
+              请先在 <RouterLink to="/profile" class="link text-primary">个人信息</RouterLink> 中添加账号
+            </p>
           </div>
 
           <!-- 模式 -->
-          <div class="form-control">
-            <label class="label"><span class="label-text font-medium">组卡引擎</span></label>
+          <div>
+            <label class="label"><span class="font-medium text-base-content">组卡引擎</span></label>
             <div class="flex gap-2 flex-wrap">
               <button
                 class="btn btn-sm"
@@ -513,15 +511,13 @@ const rarityList = [
                 33
               </button>
             </div>
-            <label class="label">
-              <span class="label-text-alt text-base-content/60">
-                {{ calculatorEngine === 'moesekai' ? '新版算法，支持 BFES 花前花后技能等增强逻辑' : '旧版 3-3.dev / sekai-calculator 逻辑' }}
-              </span>
-            </label>
+            <p class="mt-1 text-xs text-base-content/60">
+              {{ calculatorEngine === 'moesekai' ? '新版算法，支持 BFES 花前花后技能等增强逻辑' : '旧版 3-3.dev / sekai-calculator 逻辑' }}
+            </p>
           </div>
 
-          <div class="form-control">
-            <label class="label"><span class="label-text font-medium">模式</span></label>
+          <div>
+            <label class="label"><span class="font-medium text-base-content">模式</span></label>
             <div class="flex gap-2">
               <button class="btn btn-sm" :class="mode === '2' ? 'btn-primary' : 'btn-ghost'" @click="mode = '2'">
                 <Users class="w-4 h-4" /> 活动
@@ -533,8 +529,8 @@ const rarityList = [
           </div>
 
           <!-- 活动选择 -->
-          <div v-if="mode === '2'" class="form-control">
-            <label class="label"><span class="label-text font-medium">活动</span></label>
+          <div v-if="mode === '2'">
+            <label class="label"><span class="font-medium text-base-content">活动</span></label>
             <div class="relative event-dropdown max-w-md">
               <div 
                 class="border border-base-300 rounded-lg p-2 flex items-center gap-3 cursor-pointer hover:bg-base-200 transition-colors bg-base-100 shadow-sm"
@@ -591,24 +587,24 @@ const rarityList = [
           </div>
 
           <!-- 角色选择(挑战) -->
-          <div v-if="mode === '1'" class="form-control">
-            <label class="label"><span class="label-text font-medium">角色</span></label>
+          <div v-if="mode === '1'">
+            <label class="label"><span class="font-medium text-base-content">角色</span></label>
             <select v-model.number="selectedCharacterId" class="select select-bordered w-full max-w-md">
               <option v-for="c in characters" :key="c.id" :value="c.id">{{ getCharacterName(c) }}</option>
             </select>
           </div>
 
           <!-- 支援角色(WL) -->
-          <div v-if="showSupportCharacter" class="form-control">
-            <label class="label"><span class="label-text font-medium">支援角色（队长）</span></label>
+          <div v-if="showSupportCharacter">
+            <label class="label"><span class="font-medium text-base-content">支援角色（队长）</span></label>
             <select v-model.number="selectedSupportCharacterId" class="select select-bordered w-full max-w-md">
               <option v-for="c in supportCharacters" :key="c.id" :value="c.id">{{ getCharacterName(c) }}</option>
             </select>
           </div>
 
           <!-- Live类型 -->
-          <div v-if="mode === '2'" class="form-control">
-            <label class="label"><span class="label-text font-medium">Live类型</span></label>
+          <div v-if="mode === '2'">
+            <label class="label"><span class="font-medium text-base-content">Live类型</span></label>
             <div class="flex gap-2">
               <button class="btn btn-sm" :class="selectedLiveType === 'multi' ? 'btn-primary' : 'btn-ghost'" @click="selectedLiveType = 'multi'">多人Live</button>
               <button class="btn btn-sm" :class="selectedLiveType === 'solo' ? 'btn-primary' : 'btn-ghost'" @click="selectedLiveType = 'solo'">单人Live</button>
@@ -617,8 +613,8 @@ const rarityList = [
           </div>
 
           <!-- 歌曲 -->
-          <div class="form-control">
-            <label class="label"><span class="label-text font-medium">歌曲</span></label>
+          <div>
+            <label class="label"><span class="font-medium text-base-content">歌曲</span></label>
             <div class="flex gap-2 flex-wrap items-start">
               <div class="relative music-dropdown flex-1 min-w-[200px] max-w-sm">
                 <input v-model="musicSearchText" type="text" :placeholder="selectedMusic ? `${selectedMusic.id} - ${selectedMusic.title}` : '搜索歌曲...'" class="input input-bordered w-full" @focus="showMusicDropdown = true" />
@@ -698,7 +694,7 @@ const rarityList = [
         <div>
           <h3 class="font-bold">计算完成</h3>
           <p v-if="mode === '1' && selectedCharacter && challengeHighScore > 0" class="text-sm">
-            <strong>{{ getCharacterName(selectedCharacter) }}</strong> 当前最高分：<strong>{{ challengeHighScore }}</strong>
+            <strong>{{ getCharacterName(selectedCharacter) }}</strong> 当前最高分：<strong>{{ challengeHighScore.toLocaleString() }}</strong>
           </p>
           <p class="text-sm">拉数据耗时：<strong>{{ fetchDuration.toFixed(0) }} 毫秒</strong></p>
           <p class="text-sm">计算耗时：<strong>{{ calcDuration.toFixed(0) }} 毫秒</strong></p>
@@ -721,7 +717,7 @@ const rarityList = [
             <tbody>
               <tr v-for="(deck, i) in recommend" :key="i" class="hover">
                 <td class="text-center font-bold text-lg">{{ i + 1 }}</td>
-                <td class="text-center text-lg">{{ deck.score }}</td>
+                <td class="text-center text-lg">{{ deck.score.toLocaleString() }}</td>
                 <td>
                   <div class="flex gap-1 justify-center">
                     <div v-for="dc in deck.cards" :key="dc.cardId" class="w-16 sm:w-20">
@@ -744,7 +740,7 @@ const rarityList = [
                   {{ deck.eventBonus }}{{ deck.supportDeckBonus ? `+${deck.supportDeckBonus.toFixed(2)}` : '' }}
                 </td>
                 <td class="text-center text-lg" :title="`面板${deck.power.base}+区域${deck.power.areaItemBonus}+角色${deck.power.characterBonus}+称号${deck.power.honorBonus}+家具${deck.power.fixtureBonus}+大门${deck.power.gateBonus}`">
-                  {{ deck.power.total }}
+                  {{ deck.power.total.toLocaleString() }}
                 </td>
               </tr>
             </tbody>
@@ -758,9 +754,9 @@ const rarityList = [
 
       <div class="text-center text-xs opacity-70 pb-2">
         本页面支持
-        <a href="https://3-3.dev/sekai/deck-recommend" target="_blank" class="link font-medium">3-3.dev</a>
+        <a href="https://3-3.dev/sekai/deck-recommend" target="_blank" rel="noopener noreferrer" class="link font-medium">3-3.dev</a>
         与
-        <a href="https://github.com/moe-sekai/Moesekai/tree/main/refer/re_sekai-calculator" target="_blank" class="link font-medium">Moesekai re_sekai-calculator</a>
+        <a href="https://github.com/moe-sekai/Moesekai/tree/main/refer/re_sekai-calculator" target="_blank" rel="noopener noreferrer" class="link font-medium">Moesekai re_sekai-calculator</a>
       </div>
     </template>
   </div>

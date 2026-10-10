@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { CalendarDays, CheckCircle2, Flower2, Gift, History, LayoutGrid, ListChecks, Search, Star, Swords } from 'lucide-vue-next'
+import { useModalDialog } from '@/composables/useModalDialog'
+import { CalendarDays, CheckCircle2, Flower2, Gift, History, LayoutGrid, ListChecks, RefreshCw, Search, Star, Swords } from 'lucide-vue-next'
 import AccountSelector from '@/components/AccountSelector.vue'
 import AssetImage from '@/components/AssetImage.vue'
 import PageHeader from '@/components/PageHeader.vue'
@@ -216,6 +217,7 @@ const resourceBoxes = ref<ResourceBoxMaster[]>([])
 const materials = ref<NamedMaster[]>([])
 const isLoading = ref(true)
 const loadError = ref('')
+const syncError = ref('')
 const activeTab = ref<RecordsTab>('events')
 const eventSearch = ref('')
 const rankedOnly = ref(false)
@@ -617,6 +619,7 @@ const filteredCharacterMissionRows = computed(() => {
 })
 
 const selectedCharacterMission = computed(() => characterMissionRows.value.find(row => row.character.id === selectedMissionCharacterId.value))
+const { onDialogClose: onMissionDialogClose } = useModalDialog('missionDialog', () => !!selectedCharacterMission.value, () => { selectedMissionCharacterId.value = null })
 
 const characterMissionSummary = computed(() => {
   const rows = characterMissionRows.value
@@ -677,7 +680,18 @@ function formatDate(value?: number): string {
   return value ? new Date(value).toLocaleDateString('zh-CN') : '未知日期'
 }
 
+async function syncUserData() {
+  if (!selectedUserId.value) return
+  syncError.value = ''
+  try {
+    await accountStore.refreshSuite(selectedUserId.value)
+  } catch (error) {
+    syncError.value = error instanceof Error ? error.message : String(error)
+  }
+}
+
 watch([eventSearch, rankedOnly], () => { eventPage.value = 1 })
+watch(selectedUserId, () => { syncError.value = '' })
 watch(eventTotalPages, total => { eventPage.value = Math.min(eventPage.value, total) })
 
 onMounted(async () => {
@@ -730,9 +744,10 @@ onMounted(async () => {
 
     <div v-if="isLoading" class="space-y-4"><div class="skeleton h-24 rounded-xl"></div><div class="skeleton h-96 rounded-xl"></div></div>
     <div v-else-if="loadError" class="alert alert-error">账号记录加载失败：{{ loadError }}</div>
-    <div v-else-if="!selectedUserId" class="alert alert-info flex-col items-stretch sm:flex-row sm:items-center"><span class="min-w-0 flex-1">请先在个人信息页添加账号并刷新 Suite。</span><RouterLink to="/profile" class="btn btn-sm btn-primary w-full shrink-0 whitespace-nowrap sm:w-auto">前往个人信息</RouterLink></div>
+    <div v-else-if="!selectedUserId" class="alert alert-info flex-col items-stretch sm:flex-row sm:items-center"><span class="min-w-0 flex-1">请先在个人信息页添加账号并同步数据。</span><RouterLink to="/profile" class="btn btn-sm btn-primary w-full shrink-0 whitespace-nowrap sm:w-auto">前往个人信息</RouterLink></div>
     <template v-else>
-      <div class="tabs tabs-boxed bg-base-100 p-1 w-fit max-w-full h-auto flex-wrap shadow-sm">
+      <div v-if="syncError" class="alert alert-error">同步数据失败：{{ syncError }}</div>
+      <div class="tabs tabs-box bg-base-100 p-1 w-fit max-w-full h-auto flex-wrap shadow-sm">
         <button class="tab gap-2" :class="{ 'tab-active': activeTab === 'events' }" @click="activeTab = 'events'"><CalendarDays class="w-4 h-4" />活动履历</button>
         <button class="tab gap-2" :class="{ 'tab-active': activeTab === 'missions' }" @click="activeTab = 'missions'"><ListChecks class="w-4 h-4" />角色任务</button>
         <button class="tab gap-2" :class="{ 'tab-active': activeTab === 'world_bloom' }" @click="activeTab = 'world_bloom'"><Flower2 class="w-4 h-4" />World Bloom</button>
@@ -742,7 +757,7 @@ onMounted(async () => {
       </div>
 
       <section v-if="activeTab === 'events'" class="space-y-4">
-        <div v-if="!userEvents.length" class="alert alert-info">当前 Suite 没有活动履历数据。</div>
+        <div v-if="!userEvents.length" class="alert alert-info"><span>当前上传数据中没有活动履历数据。</span><button class="btn btn-sm shrink-0" :disabled="accountStore.suiteRefreshing" @click="syncUserData"><RefreshCw class="w-4 h-4" :class="{ 'animate-spin': accountStore.suiteRefreshing }" />同步数据</button></div>
         <template v-else>
           <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <div class="stat bg-base-100 shadow-sm rounded-xl p-4"><div class="stat-title text-xs">参与活动</div><div class="stat-value text-2xl">{{ eventSummary.count }}</div></div>
@@ -767,7 +782,7 @@ onMounted(async () => {
       </section>
 
       <section v-else-if="activeTab === 'missions'" class="space-y-4">
-        <div v-if="!userCharacterMissions.length && !userCharacterMissionStatuses.length" class="alert alert-info">当前 Suite 没有角色任务数据。</div>
+        <div v-if="!userCharacterMissions.length && !userCharacterMissionStatuses.length" class="alert alert-info"><span>当前上传数据中没有角色任务数据。</span><button class="btn btn-sm shrink-0" :disabled="accountStore.suiteRefreshing" @click="syncUserData"><RefreshCw class="w-4 h-4" :class="{ 'animate-spin': accountStore.suiteRefreshing }" />同步数据</button></div>
         <template v-else>
           <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <div class="stat bg-base-100 shadow-sm rounded-xl p-4"><div class="stat-title text-xs">有记录角色</div><div class="stat-value text-2xl">{{ characterMissionSummary.characterCount }}</div></div>
@@ -811,7 +826,7 @@ onMounted(async () => {
       </section>
 
       <section v-else-if="activeTab === 'world_bloom'" class="space-y-4">
-        <div v-if="!userWorldBlooms.length" class="alert alert-info">当前 Suite 没有 World Bloom 章节履历数据。</div>
+        <div v-if="!userWorldBlooms.length" class="alert alert-info"><span>当前上传数据中没有 World Bloom 章节履历数据。</span><button class="btn btn-sm shrink-0" :disabled="accountStore.suiteRefreshing" @click="syncUserData"><RefreshCw class="w-4 h-4" :class="{ 'animate-spin': accountStore.suiteRefreshing }" />同步数据</button></div>
         <template v-else>
           <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <div class="stat bg-base-100 shadow-sm rounded-xl p-4"><div class="stat-title text-xs">参与章节 / 活动</div><div class="stat-value text-2xl">{{ worldBloomSummary.count }} / {{ worldBloomSummary.eventCount }}</div></div>
@@ -840,7 +855,7 @@ onMounted(async () => {
       </section>
 
       <section v-else-if="activeTab === 'challenge'" class="space-y-4">
-        <div v-if="!userChallengeDecks.length" class="alert alert-info">当前 Suite 没有挑战 Live 卡组数据。</div>
+        <div v-if="!userChallengeDecks.length" class="alert alert-info"><span>当前上传数据中没有挑战 Live 卡组数据。</span><button class="btn btn-sm shrink-0" :disabled="accountStore.suiteRefreshing" @click="syncUserData"><RefreshCw class="w-4 h-4" :class="{ 'animate-spin': accountStore.suiteRefreshing }" />同步数据</button></div>
         <template v-else>
           <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <div class="stat bg-base-100 shadow-sm rounded-xl p-4"><div class="stat-title text-xs">角色卡组</div><div class="stat-value text-2xl">{{ challengeSummary.deckCount }}</div></div>
@@ -902,7 +917,7 @@ onMounted(async () => {
       </section>
 
       <section v-else-if="activeTab === 'rank'" class="space-y-4">
-        <div v-if="!userRankSeasons.length" class="alert alert-info">当前 Suite 没有排位赛季数据。</div>
+        <div v-if="!userRankSeasons.length" class="alert alert-info"><span>当前上传数据中没有排位赛季数据。</span><button class="btn btn-sm shrink-0" :disabled="accountStore.suiteRefreshing" @click="syncUserData"><RefreshCw class="w-4 h-4" :class="{ 'animate-spin': accountStore.suiteRefreshing }" />同步数据</button></div>
         <template v-else>
           <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <div class="stat bg-base-100 shadow-sm rounded-xl p-4"><div class="stat-title text-xs">参与赛季</div><div class="stat-value text-2xl">{{ userRankSeasons.length }}</div></div>
@@ -915,38 +930,40 @@ onMounted(async () => {
       </section>
 
       <section v-else-if="activeTab === 'decks'" class="space-y-4">
-        <div v-if="!userDecks.length" class="alert alert-info">当前 Suite 没有保存卡组数据。</div>
-        <div v-else class="grid md:grid-cols-2 xl:grid-cols-3 gap-3"><article v-for="deck in userDecks" :key="deck.deckId" class="card bg-base-100 shadow-sm border border-base-200"><div class="card-body p-3"><div class="flex items-center justify-between"><h2 class="font-bold text-sm flex items-center gap-2"><LayoutGrid class="w-4 h-4 text-primary" />{{ deck.name || `卡组 ${deck.deckId}` }}</h2><span class="badge badge-sm badge-outline">Deck {{ deck.deckId }}</span></div><div class="grid grid-cols-5 gap-1.5"><div v-for="row in deckCards(deck)" :key="row.cardId" class="min-w-0"><RouterLink :to="`/cards/${row.cardId}`" class="block hover:scale-105 transition-transform"><SekaiCard v-if="row.master" :card="row.master" :trained="row.user?.defaultImage === 'special_training'" :master-rank="row.user?.masterRank || 0" /></RouterLink><p class="text-[9px] text-center mt-1 truncate">Lv.{{ row.user?.level || '?' }}<span v-if="row.cardId === deck.leader" class="text-primary"> · L</span></p></div></div></div></article></div>
+        <div v-if="!userDecks.length" class="alert alert-info"><span>当前上传数据中没有保存卡组数据。</span><button class="btn btn-sm shrink-0" :disabled="accountStore.suiteRefreshing" @click="syncUserData"><RefreshCw class="w-4 h-4" :class="{ 'animate-spin': accountStore.suiteRefreshing }" />同步数据</button></div>
+        <div v-else class="grid md:grid-cols-2 xl:grid-cols-3 gap-3"><article v-for="deck in userDecks" :key="deck.deckId" class="card bg-base-100 shadow-sm border border-base-200"><div class="card-body p-3"><div class="flex items-center justify-between"><h2 class="font-bold text-sm flex items-center gap-2"><LayoutGrid class="w-4 h-4 text-primary" />{{ deck.name || `卡组 ${deck.deckId}` }}</h2><span class="badge badge-sm badge-outline">卡组 {{ deck.deckId }}</span></div><div class="grid grid-cols-5 gap-1.5"><div v-for="row in deckCards(deck)" :key="row.cardId" class="min-w-0"><RouterLink :to="`/cards/${row.cardId}`" class="block hover:scale-105 transition-transform"><SekaiCard v-if="row.master" :card="row.master" :trained="row.user?.defaultImage === 'special_training'" :master-rank="row.user?.masterRank || 0" /></RouterLink><p class="text-xs text-center mt-1 truncate">Lv.{{ row.user?.level || '?' }}<span v-if="row.cardId === deck.leader" class="text-primary"> · 队长</span></p></div></div></div></article></div>
       </section>
     </template>
 
-    <div v-if="selectedCharacterMission" class="modal modal-open" role="dialog">
-      <button class="modal-backdrop" aria-label="关闭任务详情" @click="selectedMissionCharacterId = null"></button>
-      <div class="modal-box max-w-4xl p-0 overflow-hidden">
-        <div class="sticky top-0 z-10 bg-base-100 border-b border-base-200 p-5 flex items-center gap-3">
-          <div class="avatar shrink-0"><div class="w-12 rounded-full bg-base-200"><img :src="characterIcon(selectedCharacterMission.character.id)" :alt="getCharacterName(selectedCharacterMission.character)" /></div></div>
-          <div class="min-w-0 grow"><h2 class="font-bold text-lg">{{ getCharacterName(selectedCharacterMission.character) }} · 角色任务</h2><p class="text-xs text-base-content/50">Character Rank {{ selectedCharacterMission.rank?.characterRank || '—' }} · 已领取 {{ selectedCharacterMission.received }} 个里程碑</p></div>
-          <button class="btn btn-sm btn-circle btn-ghost" aria-label="关闭" @click="selectedMissionCharacterId = null">✕</button>
-        </div>
-        <div class="p-4 sm:p-5 max-h-[72vh] overflow-y-auto">
-          <div class="grid md:grid-cols-2 gap-3">
-            <div v-for="mission in selectedCharacterMission.missions" :key="mission.definition.id" class="rounded-xl border border-base-200 p-3 space-y-2" :class="{ 'bg-success/5 border-success/20': !mission.next }">
-              <div class="flex items-start justify-between gap-3">
-                <div class="min-w-0"><h3 class="text-sm font-bold">{{ missionTypeLabel(mission.definition.characterMissionType) }}</h3><p class="text-[10px] text-base-content/40">{{ mission.definition.characterMissionType }}</p></div>
-                <span v-if="!mission.next" class="badge badge-success badge-sm gap-1 shrink-0"><CheckCircle2 class="w-3 h-3" />完成</span>
-                <span v-else-if="mission.claimable" class="badge badge-secondary badge-sm shrink-0">待领取 {{ mission.claimable }}</span>
-                <span v-else-if="mission.isEx" class="badge badge-outline badge-sm shrink-0">EX Lv.{{ mission.next.seq }}</span>
+    <dialog ref="missionDialog" class="modal" @close="onMissionDialogClose">
+      <template v-if="selectedCharacterMission">
+        <button class="modal-backdrop" aria-label="关闭任务详情" @click="selectedMissionCharacterId = null"></button>
+        <div class="modal-box max-w-4xl p-0 overflow-hidden">
+          <div class="sticky top-0 z-10 bg-base-100 border-b border-base-200 p-5 flex items-center gap-3">
+            <div class="avatar shrink-0"><div class="w-12 rounded-full bg-base-200"><img :src="characterIcon(selectedCharacterMission.character.id)" :alt="getCharacterName(selectedCharacterMission.character)" /></div></div>
+            <div class="min-w-0 grow"><h2 class="font-bold text-lg">{{ getCharacterName(selectedCharacterMission.character) }} · 角色任务</h2><p class="text-xs text-base-content/50">角色等级 {{ selectedCharacterMission.rank?.characterRank || '—' }} · 已领取 {{ selectedCharacterMission.received }} 个里程碑</p></div>
+            <button class="btn btn-sm btn-circle btn-ghost" aria-label="关闭" @click="selectedMissionCharacterId = null">✕</button>
+          </div>
+          <div class="p-4 sm:p-5 max-h-[72vh] overflow-y-auto">
+            <div class="grid md:grid-cols-2 gap-3">
+              <div v-for="mission in selectedCharacterMission.missions" :key="mission.definition.id" class="rounded-xl border border-base-200 p-3 space-y-2" :class="{ 'bg-success/5 border-success/20': !mission.next }">
+                <div class="flex items-start justify-between gap-3">
+                  <div class="min-w-0"><h3 class="text-sm font-bold">{{ missionTypeLabel(mission.definition.characterMissionType) }}</h3><p class="text-[10px] text-base-content/40">{{ mission.definition.characterMissionType }}</p></div>
+                  <span v-if="!mission.next" class="badge badge-success badge-sm gap-1 shrink-0"><CheckCircle2 class="w-3 h-3" />完成</span>
+                  <span v-else-if="mission.claimable" class="badge badge-secondary badge-sm shrink-0">待领取 {{ mission.claimable }}</span>
+                  <span v-else-if="mission.isEx" class="badge badge-outline badge-sm shrink-0">EX Lv.{{ mission.next.seq }}</span>
+                </div>
+                <template v-if="mission.next">
+                  <div class="flex justify-between text-xs"><span>当前 {{ formatNumber(mission.progress) }}</span><span>下一级 {{ formatNumber(mission.next.requirement) }}</span></div>
+                  <progress class="progress progress-primary w-full h-2" :value="mission.progress" :max="mission.next.requirement || 1"></progress>
+                  <p class="text-xs text-base-content/55">还差 <strong class="text-base-content">{{ formatNumber(mission.remaining) }}</strong> · 已领取 {{ mission.received }}<template v-if="!mission.isEx"> / {{ mission.total }}</template> 级</p>
+                </template>
+                <p v-else class="text-xs text-success">已领取全部 {{ mission.total }} 级里程碑</p>
               </div>
-              <template v-if="mission.next">
-                <div class="flex justify-between text-xs"><span>当前 {{ formatNumber(mission.progress) }}</span><span>下一级 {{ formatNumber(mission.next.requirement) }}</span></div>
-                <progress class="progress progress-primary w-full h-2" :value="mission.progress" :max="mission.next.requirement || 1"></progress>
-                <p class="text-xs text-base-content/55">还差 <strong class="text-base-content">{{ formatNumber(mission.remaining) }}</strong> · 已领取 {{ mission.received }}<template v-if="!mission.isEx"> / {{ mission.total }}</template> 级</p>
-              </template>
-              <p v-else class="text-xs text-success">已领取全部 {{ mission.total }} 级里程碑</p>
             </div>
           </div>
         </div>
-      </div>
-    </div>
+      </template>
+    </dialog>
   </div>
 </template>

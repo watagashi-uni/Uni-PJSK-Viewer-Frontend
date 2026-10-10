@@ -14,6 +14,7 @@ export interface StoredAccount {
 const STORAGE_KEY = 'sekaiUserProfiles'
 const SUITE_CACHE_PREFIX = 'suiteCache_'
 const PROFILE_DATA_KEY = 'sekaiUserProfileData'
+const PUBLIC_ACCESS_HINT_KEY = 'suitePublicAccessHintShown'
 
 function isOAuthTokenError(error: any): boolean {
     const status = Number(error?.status)
@@ -307,7 +308,7 @@ export const useAccountStore = defineStore('account', () => {
             } catch (err: any) {
                 if (err.name === 'RequestError') {
                     if (err.status === 404) throw new Error('用户不存在')
-                    if (err.status === 403) throw new Error('该用户未公开Profile')
+                    if (err.status === 403) throw new Error('该用户未公开个人资料')
                     throw new Error(`请求失败: ${err.status}`)
                 }
                 throw err
@@ -337,18 +338,26 @@ export const useAccountStore = defineStore('account', () => {
         try {
             const oauthStore = useOAuthStore()
             const setSuiteRefreshToast = (source: 'public' | 'oauth') => {
-                suiteRefreshToastMessage.value = source === 'public'
-                    ? '已通过公开API更新'
-                    : '已通过oauth认证更新'
-                suiteRefreshToastHint.value = source === 'public'
-                    ? '打开工具箱的公开访问不安全，有id就可以获取所有抓包信息，如在意可关闭公开访问，本站支持工具箱oauth私有数据获取'
+                suiteRefreshToastMessage.value = '数据已同步'
+                // 公开访问的安全提示每个会话只显示一次
+                let showHint = false
+                if (source === 'public') {
+                    try {
+                        showHint = !sessionStorage.getItem(PUBLIC_ACCESS_HINT_KEY)
+                        if (showHint) sessionStorage.setItem(PUBLIC_ACCESS_HINT_KEY, '1')
+                    } catch {
+                        showHint = false
+                    }
+                }
+                suiteRefreshToastHint.value = showHint
+                    ? '公开访问时任何人凭 ID 即可读取你的上传数据。如介意，可在工具箱关闭公开访问，改用 OAuth 授权。'
                     : ''
                 if (suiteRefreshToastTimer !== null) {
                     window.clearTimeout(suiteRefreshToastTimer)
                 }
                 suiteRefreshToastTimer = window.setTimeout(() => {
                     dismissSuiteRefreshToast()
-                }, source === 'public' ? 12000 : 5000)
+                }, showHint ? 10000 : 4000)
             }
 
             // 已有该账号 token 时，优先走 OAuth 受保护接口，避免先请求 public API

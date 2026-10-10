@@ -120,6 +120,7 @@ const visibleResources = ref<Set<string>>(new Set())
 
 const mysekaiMaterialIconNames = ref<Record<number, string>>({})
 const mysekaiItemIconNames = ref<Record<number, string>>({})
+const resourceDisplayNames = ref<Record<string, string>>({})
 const mysekaiFixtureAssetbundleNames = ref<Record<number, string>>({})
 const mysekaiSiteHarvestFixtureAssetbundleNames = ref<Record<number, string>>({})
 const mysekaiMusicRecordMusicIds = ref<Record<number, number>>({})
@@ -380,6 +381,18 @@ async function ensureMysekaiMasterIconMaps() {
       getFirstAvailableMaster(['mysekaiFixtures', 'mysekai_fixtures']),
     ])
 
+    const displayNames: Record<string, string> = {}
+    const collectNames = (type: string, list: any[], idKeys: string[]) => {
+      for (const item of list) {
+        const id = toNumberId(item, idKeys)
+        const name = pickFirstString(item, ['name'])
+        if (id !== null && name) displayNames[`${type}:${id}`] = name
+      }
+    }
+    collectNames('mysekai_material', materials, ['id', 'mysekaiMaterialId'])
+    collectNames('mysekai_item', items, ['id', 'mysekaiItemId'])
+    collectNames('mysekai_fixture', fixtures, ['id', 'mysekaiFixtureId'])
+
     const materialMap: Record<number, string> = {}
     for (const item of materials) {
       const id = toNumberId(item, ['id', 'mysekaiMaterialId'])
@@ -435,6 +448,7 @@ async function ensureMysekaiMasterIconMaps() {
       }
     }
     mysekaiFixtureAssetbundleNames.value = fixtureMap
+    resourceDisplayNames.value = displayNames
 
     hasLoadedMysekaiMasters.value = true
   })()
@@ -946,9 +960,11 @@ onBeforeUnmount(() => {
                 ? (item.rarity === 2 ? 'resource-chip-super' : item.rarity === 1 ? 'resource-chip-rare' : 'resource-chip-normal')
                 : (isFilterActive ? 'resource-chip-muted' : 'resource-chip-normal')
             ]"
+            :title="`${resourceDisplayNames[item.id] || item.id} ×${item.count}`"
+            :aria-label="`${resourceDisplayNames[item.id] || item.id} ×${item.count}`"
             @click="toggleResource(item.id)"
           >
-            <img :src="item.texture" class="w-4 h-4 object-contain" />
+            <img :src="item.texture" :alt="resourceDisplayNames[item.id] || ''" class="w-4 h-4 object-contain" />
             <span class="text-xs font-bold">{{ item.count }}</span>
           </button>
         </div>
@@ -1014,8 +1030,8 @@ onBeforeUnmount(() => {
 }
 
 .resource-chip-normal {
-  background: color-mix(in srgb, var(--fallback-b2, #e5e7eb) 70%, transparent);
-  border-color: color-mix(in srgb, var(--fallback-b3, #d1d5db) 80%, transparent);
+  background: color-mix(in srgb, var(--color-base-200) 70%, transparent);
+  border-color: color-mix(in srgb, var(--color-base-300) 80%, transparent);
 }
 
 .resource-chip-rare {
@@ -1111,7 +1127,7 @@ onBeforeUnmount(() => {
   bottom: -0.01rem;
   line-height: 1;
   text-align: center;
-  font-size: 0.44rem;
+  font-size: 0.625rem;
   font-weight: 700;
   color: #fff;
   background: transparent;
@@ -1120,16 +1136,16 @@ onBeforeUnmount(() => {
 
 .record-owned {
   position: absolute;
-  top: -0.45rem;
+  top: -0.55rem;
   right: -0.2rem;
-  font-size: 0.52rem;
+  font-size: 0.625rem;
   font-weight: 700;
   color: #fef3c7;
   background: rgba(180, 83, 9, 0.85);
   padding: 0 0.15rem;
   border-radius: 0.2rem;
-  line-height: 0.75rem;
-  height: 0.75rem;
+  line-height: 0.875rem;
+  height: 0.875rem;
 }
 
 .spawn-marker {

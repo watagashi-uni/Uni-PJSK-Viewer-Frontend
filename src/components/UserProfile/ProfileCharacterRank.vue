@@ -20,9 +20,6 @@ const emit = defineEmits<{
 <template>
   <div class="card bg-base-100 shadow-lg">
     <div class="card-body">
-      <h3 class="text-lg font-medium mb-3">
-        {{ characterTab === 'rank' ? 'CHARACTER RANK' : 'CHALLENGE LIVE STAGE' }}
-      </h3>
       <!-- Tab 切换 -->
       <div class="flex flex-wrap gap-2 mb-4">
         <button
@@ -58,7 +55,7 @@ const emit = defineEmits<{
             class="flex items-center gap-1 rounded-full pr-3"
             :style="{ backgroundColor: getCharaPillColor(item.characterId) + '40' }"
           >
-            <div class="w-9 h-9 rounded-full overflow-hidden ring-2 flex-shrink-0" :style="{ borderColor: getCharaPillColor(item.characterId) }">
+            <div class="w-9 h-9 rounded-full overflow-hidden border-2 flex-shrink-0" :style="{ borderColor: getCharaPillColor(item.characterId) }">
               <img :src="getCharaIcon(item.characterId)" class="w-full h-full object-cover" />
             </div>
             <span class="text-sm font-bold flex-1 text-center">{{ item.value }}</span>

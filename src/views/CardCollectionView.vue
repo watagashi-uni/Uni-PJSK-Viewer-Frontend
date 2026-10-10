@@ -52,6 +52,7 @@ const cards = ref<Card[]>([])
 const characters = ref<Character[]>([])
 const isLoading = ref(true)
 const loadError = ref('')
+const refreshError = ref('')
 const selectedCharacterId = ref(1)
 const search = ref('')
 const selectedRarity = ref('')
@@ -226,11 +227,17 @@ function celebrateFullCollection() {
 
 async function refreshUserCards() {
   if (!selectedUserId.value) return
-  await accountStore.refreshSuite(selectedUserId.value)
+  refreshError.value = ''
+  try {
+    await accountStore.refreshSuite(selectedUserId.value)
+  } catch (error) {
+    refreshError.value = error instanceof Error ? error.message : String(error)
+  }
 }
 
 watch([selectedCharacterId, search, selectedRarity, ownershipFilter, progressFilter], () => { page.value = 1 })
 watch(totalPages, total => { page.value = Math.min(page.value, total) })
+watch(selectedUserId, () => { refreshError.value = '' })
 watch([isSelectedFullCollection, selectedCharacterId], ([isFull, characterId], [wasFull, previousCharacterId]) => {
   if (!isLoading.value && isFull && (!wasFull || characterId !== previousCharacterId)) celebrateFullCollection()
 })
@@ -264,10 +271,11 @@ onMounted(async () => {
     <div v-else-if="loadError" class="alert alert-error">卡片养成进度加载失败：{{ loadError }}</div>
     <template v-else>
       <div v-if="!selectedUserId" class="alert alert-warning"><AlertTriangle class="w-5 h-5" /><span>尚未选择账号，可以浏览卡片；绑定账号后可查看完整养成状态。</span><RouterLink to="/profile" class="btn btn-sm btn-primary">前往个人信息</RouterLink></div>
-      <div v-else-if="!hasCardData" class="alert alert-info"><span>当前缓存没有卡片数据，请刷新 Suite。</span><button class="btn btn-sm" :disabled="accountStore.suiteRefreshing" @click="refreshUserCards"><RefreshCw class="w-4 h-4" :class="{ 'animate-spin': accountStore.suiteRefreshing }" />刷新</button></div>
+      <div v-else-if="!hasCardData" class="alert alert-info"><span>当前没有卡片数据，请先同步数据。</span><button class="btn btn-sm" :disabled="accountStore.suiteRefreshing" @click="refreshUserCards"><RefreshCw class="w-4 h-4" :class="{ 'animate-spin': accountStore.suiteRefreshing }" />同步数据</button></div>
+      <div v-if="refreshError" class="alert alert-error"><AlertTriangle class="w-5 h-5" /><span>同步数据失败：{{ refreshError }}</span></div>
 
       <div class="grid grid-cols-2 lg:grid-cols-5 gap-3">
-        <div class="stat bg-base-100 shadow-sm rounded-xl p-4 lg:col-span-1"><div class="stat-title text-xs">卡片收集</div><div class="stat-value text-2xl text-primary">{{ hasCardData ? collectionSummary.owned : '—' }} / {{ collectionSummary.total }}</div><div class="stat-desc"><template v-if="hasCardData">{{ formatPercent(collectionSummary.collectionRate) }}<template v-if="collectionSummary.unmapped"> · Suite {{ collectionSummary.suiteTotal }}，{{ collectionSummary.unmapped }} 张暂未收录</template></template><template v-else>资料库共收录</template></div></div>
+        <div class="stat bg-base-100 shadow-sm rounded-xl p-4 lg:col-span-1"><div class="stat-title text-xs">卡片收集</div><div class="stat-value text-2xl text-primary">{{ hasCardData ? collectionSummary.owned : '—' }} / {{ collectionSummary.total }}</div><div class="stat-desc"><template v-if="hasCardData">{{ formatPercent(collectionSummary.collectionRate) }}<template v-if="collectionSummary.unmapped"> · 上传数据 {{ collectionSummary.suiteTotal }} 张，{{ collectionSummary.unmapped }} 张暂未收录</template></template><template v-else>资料库共收录</template></div></div>
         <div class="stat bg-base-100 shadow-sm rounded-xl p-4"><div class="stat-title text-xs">完成特训</div><div class="stat-value text-2xl">{{ hasCardData ? `${collectionSummary.trained} / ${collectionSummary.trainable}` : '—' }}</div><div class="stat-desc">已拥有的 3★ / 4★</div></div>
         <div class="stat bg-base-100 shadow-sm rounded-xl p-4"><div class="stat-title text-xs">剧情已读</div><div class="stat-value text-2xl text-secondary">{{ hasCardData ? `${collectionSummary.storyRead} / ${collectionSummary.storyTotal}` : '—' }}</div><div class="stat-desc">前篇与后篇</div></div>
         <div class="stat bg-base-100 shadow-sm rounded-xl p-4"><div class="stat-title text-xs">突破 / 技能双满</div><div class="stat-value text-2xl">{{ hasCardData ? collectionSummary.maxed : '—' }}</div><div class="stat-desc">突破 5 · 技能 4</div></div>

@@ -255,7 +255,7 @@ function copyMusicTitle() {
             <div 
               class="absolute inset-0 pointer-events-none z-[5]"
               :style="{ 
-                WebkitMaskImage: 'linear-gradient(97deg, black 0%, black 20%, transparent 38%)',
+                WebkitMaskImage: 'linear-gradient(97deg, black 0%, black 30%, transparent 32%)',
                 maskImage: 'linear-gradient(97deg, black 0%, black 30%, transparent 32%)'
               }"
             >
@@ -405,13 +405,13 @@ function copyMusicTitle() {
               class="menu bg-base-100 border border-base-300 w-full rounded-box shadow-xl absolute top-[60px] z-50 max-h-48 flex-nowrap overflow-y-auto"
             >
               <li v-for="music in searchResults" :key="music.id">
-                <a class="py-2 text-sm" @click="selectMusic(music)">
+                <button type="button" class="py-2 text-sm" @click="selectMusic(music)">
                   <AssetImage 
                     :src="`${settingsStore.assetsHost}/startapp/music/jacket/${music.assetbundleName}/${music.assetbundleName}.png`" 
                     class="w-8 h-8 rounded shrink-0 object-cover"
                   />
                   <span class="truncate">{{ music.title }}</span>
-                </a>
+                </button>
               </li>
             </ul>
           </div>

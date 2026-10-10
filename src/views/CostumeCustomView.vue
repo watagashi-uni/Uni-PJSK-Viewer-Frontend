@@ -631,7 +631,7 @@ onBeforeUnmount(() => {
                   <div class="flex flex-wrap items-center justify-between gap-2">
                     <h2 class="font-bold flex items-center gap-2">
                       <component :is="pickerIcon(activePart)" class="w-5 h-5 text-primary" />
-                      选择{{ COSTUME_PART_LABELS[activePart] }}
+                      2. 选择{{ COSTUME_PART_LABELS[activePart] }}
                       <span class="badge badge-ghost badge-sm">{{ baseItems[activePart].length }} 套</span>
                     </h2>
                     <p v-if="activePart === 'body' && crossBodyEnabled" class="text-xs text-secondary">

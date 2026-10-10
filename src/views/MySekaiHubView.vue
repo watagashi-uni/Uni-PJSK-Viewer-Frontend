@@ -121,7 +121,28 @@ const unitLogoMap: Record<string, string> = {
 
 const unitOrder = ['light_sound', 'idol', 'street', 'theme_park', 'school_refusal', 'piapro']
 
-const showUserData = ref(false)
+const SHOW_USER_DATA_STORAGE_KEY = 'mysekaiHubShowUserData'
+
+function readShowUserDataPreference(): boolean | null {
+  try {
+    const saved = localStorage.getItem(SHOW_USER_DATA_STORAGE_KEY)
+    return saved === null ? null : saved === '1'
+  } catch {
+    return null
+  }
+}
+
+let showUserDataPreference = readShowUserDataPreference()
+const showUserData = ref(showUserDataPreference ?? accountStore.accounts.length > 0)
+
+function persistShowUserData() {
+  showUserDataPreference = showUserData.value
+  try {
+    localStorage.setItem(SHOW_USER_DATA_STORAGE_KEY, showUserData.value ? '1' : '0')
+  } catch {
+    // ignore storage errors
+  }
+}
 const isMasterLoading = ref(true)
 const isManualRefreshing = ref(false)
 const errorMsg = ref('')
@@ -1062,6 +1083,10 @@ watch(talkUnitOptions, (rows) => {
   }
 })
 
+watch(() => accountStore.accounts.length, (count) => {
+  if (count > 0 && showUserDataPreference === null) showUserData.value = true
+})
+
 watch(selectedUserId, (userId) => {
   if (!userId) return
   if (autoShowResolvedUserIds.value.has(userId)) return
@@ -1075,7 +1100,7 @@ watch(selectedUserId, (userId) => {
     Array.isArray(suiteCached?.userMysekaiMaterials) ||
     Array.isArray(suiteCached?.userMysekaiCanvases)
 
-  if (hasLocalData) {
+  if (hasLocalData && showUserDataPreference === null) {
     showUserData.value = true
   }
 
@@ -1589,7 +1614,7 @@ function closeFixtureDetail() {
       <div class="card-body p-4 space-y-3">
         <div class="flex flex-wrap items-center gap-2">
           <label class="label cursor-pointer gap-2 p-0">
-            <input v-model="showUserData" type="checkbox" class="toggle toggle-primary toggle-sm" />
+            <input v-model="showUserData" type="checkbox" class="toggle toggle-primary toggle-sm" @change="persistShowUserData" />
             <span class="label-text font-medium">显示账号状态</span>
           </label>
 
@@ -1849,13 +1874,13 @@ function closeFixtureDetail() {
       <div v-else-if="activeTab === 'canvas'" class="space-y-4">
         <div v-if="!showUserData" class="alert">
           <Images class="w-5 h-5" />
-          <span>开启上方“显示账号状态”后，可查看 Suite API 中的画布收藏。</span>
+          <span>开启上方“显示账号状态”后，可查看上传数据中的画布收藏。</span>
         </div>
         <div v-else-if="!selectedUserId" class="alert alert-warning">
           请先选择一个账号。
         </div>
         <div v-else-if="!hasSuiteCanvasData" class="alert alert-info">
-          当前 Suite API 没有返回画布收藏数据。
+          当前上传数据中没有画布收藏数据。
         </div>
         <template v-else>
           <div class="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
@@ -1896,7 +1921,7 @@ function closeFixtureDetail() {
         <div class="card bg-base-100 shadow-sm">
           <div class="card-body p-4">
             <p v-if="!hasSuiteGateData" class="text-sm text-base-content/70">
-              当前无可用 Suite 大门/材料数据，展示基础全量升级需求。
+              当前上传数据中没有大门/材料数据，展示基础全量升级需求。
             </p>
             <p v-else class="text-sm text-base-content/70">
               当前账号大门材料缺口已按累计需求计算。
@@ -1973,7 +1998,7 @@ function closeFixtureDetail() {
                       <div v-else class="w-7 h-7 sm:w-9 sm:h-9 md:w-10 md:h-10 rounded bg-base-300"></div>
 
                       <div class="text-[10px] sm:text-xs leading-tight">
-                        <div>#{{ cost.materialId }} x{{ cost.quantity }}</div>
+                        <div class="break-all">{{ materialNameMap.get(cost.materialId) || `材料 #${cost.materialId}` }} x{{ cost.quantity }}</div>
                         <div class="text-base-content/60">累计 {{ cost.cumulative }}</div>
                         <div v-if="cost.owned !== null" :class="(cost.missing || 0) > 0 ? 'text-error' : 'text-success'">
                           持有 {{ cost.owned }} / 缺 {{ cost.missing }}

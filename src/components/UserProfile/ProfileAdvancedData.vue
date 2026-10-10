@@ -45,6 +45,14 @@ const emit = defineEmits<{
   (e: 'update:bondCharacterFilter', value: number): void
 }>()
 
+const attrLabelMap: Record<AttrKey, string> = {
+  cute: '可爱',
+  cool: '酷',
+  pure: '纯洁',
+  happy: '开心',
+  mysterious: '神秘',
+}
+
 function onBondCharacterFilterChange(e: Event) {
   const target = e.target as HTMLSelectElement
   emit('update:bondCharacterFilter', Number(target.value))
@@ -58,7 +66,7 @@ function onBondCharacterFilterChange(e: Event) {
     <!-- Challenge Tab -->
     <div v-if="profileTab === 'challenge'" class="space-y-3">
       <div v-if="!hasChallengeSuiteData" class="alert alert-info py-2">
-        <span class="text-sm">当前账号缺少挑战信息数据，请先点击上方“刷新Suite”。</span>
+        <span class="text-sm">当前账号缺少挑战信息数据，请先点击上方“同步数据”。</span>
       </div>
       <template v-else>
         <div class="grid grid-cols-2 gap-2">
@@ -121,7 +129,7 @@ function onBondCharacterFilterChange(e: Event) {
     <!-- Bonus Tab -->
     <div v-else-if="profileTab === 'bonus'" class="space-y-3">
       <div v-if="!hasBonusSuiteData" class="alert alert-info py-2">
-        <span class="text-sm">当前账号缺少加成信息数据，请先点击上方“刷新Suite”。</span>
+        <span class="text-sm">当前账号缺少加成信息数据，请先点击上方“同步数据”。</span>
       </div>
       <template v-else>
         <div class="grid gap-3 lg:grid-cols-2">
@@ -186,8 +194,8 @@ function onBondCharacterFilterChange(e: Event) {
               >
                 <div class="flex items-center justify-between gap-2">
                   <div class="flex items-center gap-2">
-                    <img :src="getAttrIcon(row.attr)" class="w-5 h-5 object-contain" />
-                    <span class="text-xs">{{ row.attr }}</span>
+                    <img :src="getAttrIcon(row.attr)" :alt="attrLabelMap[row.attr as AttrKey] || row.attr" class="w-5 h-5 object-contain" />
+                    <span class="text-xs">{{ attrLabelMap[row.attr as AttrKey] || row.attr }}</span>
                   </div>
                   <span class="font-bold text-success">{{ formatPercent(row.total) }}</span>
                 </div>
@@ -202,7 +210,7 @@ function onBondCharacterFilterChange(e: Event) {
     <!-- Bonds Tab -->
     <div v-else-if="profileTab === 'bonds'" class="space-y-3">
       <div v-if="!hasBondsSuiteData" class="alert alert-info py-2">
-        <span class="text-sm">当前账号缺少牵绊等级数据，请先点击上方“刷新Suite”。</span>
+        <span class="text-sm">当前账号缺少牵绊等级数据，请先点击上方“同步数据”。</span>
       </div>
       <template v-else>
         <div class="flex flex-wrap gap-2 items-center">
@@ -272,7 +280,7 @@ function onBondCharacterFilterChange(e: Event) {
     <!-- Leader / Multi Tab -->
     <div v-else class="space-y-3">
       <div v-if="!hasLeaderCountData" class="alert alert-info py-2">
-        <span class="text-sm">当前账号缺少队长次数数据，请先点击上方“刷新Suite”。</span>
+        <span class="text-sm">当前账号缺少队长次数数据，请先点击上方“同步数据”。</span>
       </div>
       <template v-else>
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-2">
@@ -300,7 +308,7 @@ function onBondCharacterFilterChange(e: Event) {
             class="rounded-2xl border border-base-300 bg-base-100 px-3 py-2.5 shadow-sm"
           >
             <div class="flex items-center gap-2.5 mb-2.5">
-              <div class="w-10 h-10 rounded-full overflow-hidden ring-2 flex-shrink-0" :style="{ borderColor: getCharaPillColor(row.characterId) }">
+              <div class="w-10 h-10 rounded-full overflow-hidden border-2 flex-shrink-0" :style="{ borderColor: getCharaPillColor(row.characterId) }">
                 <img :src="getCharaIcon(row.characterId)" class="w-full h-full object-cover" />
               </div>
               <div>
