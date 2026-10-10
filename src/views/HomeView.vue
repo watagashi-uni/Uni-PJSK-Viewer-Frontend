@@ -22,6 +22,7 @@ const now = ref(Date.now())
 let nowTimer: ReturnType<typeof setInterval> | undefined
 
 import type { Gacha } from '@/types/gacha'
+import { cardImageVariant } from '@/utils/card'
 
 const events = ref<EventData[]>([])
 const musics = ref<MusicData[]>([])
@@ -328,7 +329,7 @@ onMounted(async () => {
         <span class="h-9 w-9 shrink-0 overflow-hidden rounded-full bg-base-300">
           <AssetImage
             v-if="leaderCard"
-            :src="`${assetsHost}/startapp/thumbnail/chara/${leaderCard.assetbundleName}_${leaderCard.userCardInfo.defaultImage === 'training' ? 'after_training' : 'normal'}.png`"
+            :src="`${assetsHost}/startapp/thumbnail/chara/${leaderCard.assetbundleName}_${cardImageVariant(leaderCard, leaderCard.userCardInfo.defaultImage === 'training')}.png`"
             :alt="currentUserProfile.name"
             class="h-full w-full object-cover"
           />

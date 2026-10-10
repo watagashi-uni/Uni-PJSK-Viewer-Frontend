@@ -15,6 +15,7 @@ import AssetImage from '@/components/AssetImage.vue'
 import SekaiHonor from '@/components/SekaiHonor.vue'
 import AccountSelector from '@/components/AccountSelector.vue'
 import type { EventData } from '@/types/master'
+import { cardImageVariant } from '@/utils/card'
 
 const route = useRoute()
 // 上一页是列表时后退以保留筛选与页码，否则打开列表
@@ -534,8 +535,8 @@ function resourceName(resource: ResourceBox['details'][number]): string {
 function resourceIcon(resource: ResourceBox['details'][number]): string {
   const id = Number(resource.resourceId || 0)
   if (resource.resourceType === 'card') {
-    const bundle = cardMap.value.get(id)?.assetbundleName
-    return bundle ? `${assetsHost.value}/startapp/thumbnail/chara/${bundle}_normal.png` : ''
+    const card = cardMap.value.get(id)
+    return card?.assetbundleName ? `${assetsHost.value}/startapp/thumbnail/chara/${card.assetbundleName}_${cardImageVariant(card, false)}.png` : ''
   }
   if (resource.resourceType === 'material') return `${assetsHost.value}/startapp/thumbnail/material/material${id}.png`
   if (resource.resourceType === 'practice_ticket') return `${assetsHost.value}/startapp/thumbnail/practice_ticket/ticket${id}.png`

@@ -11,6 +11,7 @@ import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
 import type { EventData } from '@/types/master'
 import { readQueryPage, readQueryString, replaceListQuery } from '@/utils/routeQuery'
+import { isTrainedOnlyCard } from '@/utils/card'
 
 interface StoryEpisode {
   id: number
@@ -66,6 +67,8 @@ interface StoryCard { id: number; prefix: string; characterId: number; releaseAt
 interface CardEpisode extends Omit<StoryEpisode, 'episodeNo'> { cardId: number; cardEpisodePartType: string }
 const specialStories = ref<SpecialStory[]>([])
 const storyCards = ref<StoryCard[]>([])
+// 只有特训后形态的卡没有 card_normal 卡面
+const trainedOnlyStoryCardIds = computed(() => new Set(storyCards.value.filter(isTrainedOnlyCard).map(card => card.id)))
 const cardEpisodes = ref<CardEpisode[]>([])
 const extraLoading = ref(false)
 const extraError = ref('')
@@ -446,7 +449,7 @@ onMounted(async () => {
         <p class="text-sm opacity-60">{{ extraStories.length }} 篇故事 · {{ activeTab === 'card' ? '卡面前篇与后篇' : '仅展示已有可读剧本的特别篇' }}</p>
         <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <button v-for="story in extraStories.slice((extraPage - 1) * 12, extraPage * 12)" :key="story.id" class="card bg-base-100 border border-base-200 hover:border-primary text-left overflow-hidden" @click="selectedStory = story">
-            <AssetImage v-if="story.kind === 'card'" :src="`${assetsHost}/startapp/character/member/${story.assetbundleName}/card_normal.jpg`" :alt="story.title" class="w-full aspect-video object-cover" />
+            <AssetImage v-if="story.kind === 'card'" :src="`${assetsHost}/startapp/character/member/${story.assetbundleName}/card_${trainedOnlyStoryCardIds.has(Number(story.id)) ? 'after_training' : 'normal'}.jpg`" :alt="story.title" class="w-full aspect-video object-cover" />
             <div class="p-5 space-y-2"><span class="text-xs text-primary">{{ extraLabels[activeTab] }} / {{ story.id }}</span><h2 class="font-bold">{{ story.title }}</h2><p class="text-xs opacity-50">{{ story.episodes.length }} 话 · 点击选集</p></div>
           </button>
         </div>

@@ -38,6 +38,8 @@ export interface CardData {
     cardRarityType: string
     attr: string
     assetbundleName: string
+    /** 'done' 表示获得时即为特训后，没有特训前形态 */
+    initialSpecialTrainingStatus?: string
 }
 
 export interface GameCharacterData {

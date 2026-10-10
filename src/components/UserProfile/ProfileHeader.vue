@@ -4,6 +4,7 @@ import { Eye, EyeOff } from 'lucide-vue-next'
 import type { ProfileData } from '@/types/profile'
 import SekaiProfileHonor from '@/components/SekaiProfileHonor.vue'
 import AssetImage from '@/components/AssetImage.vue'
+import { isTrainedOnlyCard } from '@/utils/card'
 
 const props = defineProps<{
   profileData: ProfileData
@@ -25,7 +26,7 @@ const leaderCard = computed(() => {
     const dc = props.deckCards[0]
     return {
       assetbundleName: dc.masterCard.assetbundleName,
-      trained: dc.trained
+      trained: dc.trained || isTrainedOnlyCard(dc.masterCard)
     }
   }
   return null

@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useSettingsStore } from '@/stores/settings'
 import { handleSvgImageError } from '@/utils/imageRetry'
+import { isTrainedOnlyCard } from '@/utils/card'
 
 interface Card {
   id: number
@@ -10,6 +11,7 @@ interface Card {
   attr: string
   assetbundleName: string
   releaseAt?: number
+  initialSpecialTrainingStatus?: string
 }
 
 // DeckCardDetail from sekai-calculator (simplified interface)
@@ -62,9 +64,12 @@ const isTrainingType = computed(() => {
   return props.card.cardRarityType === 'rarity_3' || props.card.cardRarityType === 'rarity_4'
 })
 
+// 只有特训后形态的卡（initialSpecialTrainingStatus: 'done'）始终按特训后显示
+const showTrained = computed(() => !!props.trained || isTrainedOnlyCard(props.card))
+
 // 卡面 URL
 const cardImageUrl = computed(() => {
-  const suffix = props.trained ? 'after_training' : 'normal'
+  const suffix = showTrained.value ? 'after_training' : 'normal'
   return `${assetsHost.value}/startapp/thumbnail/chara/${props.card.assetbundleName}_${suffix}.png`
 })
 
@@ -79,7 +84,7 @@ const starUrl = computed(() => {
   if (props.card.cardRarityType === 'rarity_birthday') {
     return '/newcard/rare_birthday.png'
   }
-  const suffix = (isTrainingType.value && props.trained) ? 'after_training' : 'normal'
+  const suffix = (isTrainingType.value && showTrained.value) ? 'after_training' : 'normal'
   return `/newcard/rare_star_${suffix}.png`
 })
 

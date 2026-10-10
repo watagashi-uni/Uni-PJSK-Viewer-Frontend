@@ -6,6 +6,7 @@ import AssetImage from '@/components/AssetImage.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
+import { cardImageVariant } from '@/utils/card'
 
 type CalendarCategory = 'event' | 'gacha' | 'music' | 'virtual_live' | 'login_bonus' | 'birthday'
 
@@ -425,7 +426,7 @@ function resourceIcon(resource: ResourceDetail): string {
   if (resource.resourceType === 'practice_ticket') return `${assetsHost.value}/startapp/thumbnail/practice_ticket/ticket${id}.png`
   if (resource.resourceType === 'skill_practice_ticket') return `${assetsHost.value}/startapp/thumbnail/skill_practice_ticket/ticket${id}.png`
   if (resource.resourceType === 'gacha_ticket' && row?.assetbundleName) return `${assetsHost.value}/startapp/thumbnail/gacha_ticket/${row.assetbundleName}.png`
-  if (resource.resourceType === 'card' && row?.assetbundleName) return `${assetsHost.value}/startapp/thumbnail/chara/${row.assetbundleName}_normal.png`
+  if (resource.resourceType === 'card' && row?.assetbundleName) return `${assetsHost.value}/startapp/thumbnail/chara/${row.assetbundleName}_${cardImageVariant(row, false)}.png`
   if (resource.resourceType === 'stamp' && row?.assetbundleName) return `${assetsHost.value}/startapp/stamp/${row.assetbundleName}/${row.assetbundleName}.png`
   if (resource.resourceType === 'mysekai_material' && row?.iconAssetbundleName) return `${assetsHost.value}/ondemand/mysekai/thumbnail/material/${row.iconAssetbundleName}.png`
   if (resource.resourceType === 'mysekai_tool' && row?.assetbundleName) return `${assetsHost.value}/ondemand/mysekai/thumbnail/tool/${row.assetbundleName}.png`
