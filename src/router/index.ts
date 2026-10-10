@@ -32,6 +32,23 @@ function finishRouteLoading(to: object) {
     isRouteLoading.value = false
 }
 
+const SCROLL_RESTORE_TIMEOUT_MS = 2000
+
+function waitForScrollableHeight(top: number): Promise<void> {
+    return new Promise((resolve) => {
+        const startedAt = performance.now()
+        const check = () => {
+            const maxScroll = document.documentElement.scrollHeight - window.innerHeight
+            if (maxScroll >= top || performance.now() - startedAt > SCROLL_RESTORE_TIMEOUT_MS) {
+                resolve()
+            } else {
+                requestAnimationFrame(check)
+            }
+        }
+        check()
+    })
+}
+
 const routes: RouteRecordRaw[] = [
     {
         path: '/',
@@ -290,9 +307,14 @@ const routes: RouteRecordRaw[] = [
 const router = createRouter({
     history: createWebHistory(),
     routes,
-    scrollBehavior(_to, _from, savedPosition) {
+    scrollBehavior(to, from, savedPosition) {
+        // 后退/前进：等列表数据渲染出足够高度后再恢复位置，避免被截断回顶部
         if (savedPosition) {
-            return savedPosition
+            return waitForScrollableHeight(savedPosition.top).then(() => savedPosition)
+        }
+        // 同一页面内只改筛选（不换页码）时保持当前位置
+        if (to.path === from.path && to.query.page === from.query.page) {
+            return false
         }
         return { top: 0 }
     },
