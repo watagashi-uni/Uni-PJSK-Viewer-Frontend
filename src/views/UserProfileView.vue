@@ -39,7 +39,7 @@ const difficultyColors: Record<string, string> = {
 const difficultyOrder = ['easy', 'normal', 'hard', 'expert', 'master', 'append']
 const CHALLENGE_RESOURCE_BOX_PURPOSE = 'challenge_live_high_score'
 const profileTabs: Array<{ key: ProfileTabKey; label: string }> = [
-  { key: 'basic', label: '基本Profile' },
+  { key: 'basic', label: '基本资料' },
   { key: 'challenge', label: '挑战信息' },
   { key: 'bonus', label: '加成信息' },
   { key: 'bonds', label: '牵绊等级' },
@@ -94,6 +94,7 @@ const profileData = ref<ProfileData | null>(null)
 const isLoading = ref(false)
 const isInitLoading = ref(true)
 const errorMsg = ref('')
+const successMsg = ref('')
 const newUserIdInput = ref('')
 const showUserId = ref(true)
 const characterTab = ref<'rank' | 'stage'>('rank')
@@ -250,6 +251,7 @@ async function addAccount() {
 
   isLoading.value = true
   errorMsg.value = ''
+  successMsg.value = ''
   try {
     const data = await fetchProfile(uid)
     accountStore.addAccount({ userId: uid, name: data.user.name, lastRefresh: Date.now() })
@@ -267,6 +269,7 @@ async function refreshProfile() {
   if (!currentUserId.value) return
   isLoading.value = true
   errorMsg.value = ''
+  successMsg.value = ''
   try {
     const data = await fetchProfile(currentUserId.value)
     profileData.value = data
@@ -283,8 +286,22 @@ async function switchAccount(userId: string) {
   showUserId.value = false
 }
 
-function deleteAccount(userId: string) {
-  accountStore.removeAccount(userId)
+async function syncUserData() {
+  if (!currentUserId.value) return
+  errorMsg.value = ''
+  successMsg.value = ''
+  try {
+    await accountStore.refreshSuite(currentUserId.value)
+  } catch (e: any) {
+    errorMsg.value = `同步数据失败：${e?.message || '未知错误'}`
+  }
+}
+
+async function deleteAccount(userId: string) {
+  const account = accounts.value.find(a => a.userId === userId)
+  const label = account?.name ? `${account.name}（${userId}）` : userId
+  if (!confirm(`确定要删除账号 ${label} 吗？该账号的本地缓存数据也会一并删除。`)) return
+  await accountStore.removeAccount(userId)
   loadProfileData()
 }
 
@@ -317,12 +334,33 @@ function importAccounts() {
   input.onchange = async (e: any) => {
     const file = e.target.files?.[0]
     if (!file) return
+    errorMsg.value = ''
+    successMsg.value = ''
+    let entries: [string, any][]
     try {
-      const text = await file.text()
-      const data = JSON.parse(text)
-      for (const [userId, entry] of Object.entries(data) as [string, any][]) {
+      const data = JSON.parse(await file.text())
+      if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('invalid')
+      entries = Object.entries(data)
+      // 先校验全部条目，任意一条无效则整体放弃导入
+      const isValid = entries.length > 0 && entries.every(([userId, entry]) =>
+        /^\d+$/.test(userId)
+        && entry && typeof entry === 'object'
+        && entry.account && typeof entry.account === 'object'
+        && String(entry.account.userId) === userId
+        && typeof entry.account.name === 'string'
+        && (entry.profile == null || typeof entry.profile === 'object'))
+      if (!isValid) throw new Error('invalid')
+    } catch {
+      errorMsg.value = '导入失败：文件格式不正确'
+      return
+    }
+
+    try {
+      let added = 0
+      for (const [userId, entry] of entries) {
         if (!accounts.value.some(a => a.userId === userId)) {
           accountStore.addAccount(entry.account)
+          added += 1
         }
         if (entry.profile) {
           await accountStore.saveProfileCache(userId, entry.profile)
@@ -331,10 +369,11 @@ function importAccounts() {
       saveAccounts()
       if (!currentUserId.value && accounts.value.length > 0) {
         await accountStore.selectAccount(accounts.value[0]!.userId)
-        loadProfileData()
       }
-    } catch {
-      errorMsg.value = '导入失败：文件格式不正确'
+      loadProfileData()
+      successMsg.value = `导入成功：共 ${entries.length} 个账号，新增 ${added} 个`
+    } catch (e: any) {
+      errorMsg.value = `导入失败：${e?.message || '未知错误'}`
     }
   }
   input.click()
@@ -1132,7 +1171,7 @@ watch(currentUserId, async (newId) => {
   <div class="max-w-6xl mx-auto space-y-6">
     <h1 class="text-3xl font-bold flex items-center gap-3">
       <User class="w-8 h-8 text-primary" />
-      用户档案
+      个人信息
     </h1>
 
     <!-- 加载中 -->
@@ -1144,10 +1183,19 @@ watch(currentUserId, async (newId) => {
       <!-- ==================== 账号管理 ==================== -->
       <div class="card bg-base-100 shadow-lg overflow-visible relative z-30">
         <div class="card-body space-y-4">
+          <!-- 尚未添加账号 -->
+          <div v-if="accounts.length === 0" class="space-y-1">
+            <h2 class="text-lg font-semibold">还没有添加账号</h2>
+            <p class="text-sm text-base-content/60">
+              输入日服用户 ID 即可查看公开资料；更详细的数据需先通过 Haruki 工具箱上传。
+              <button type="button" class="link link-primary" @click="openAccountInfoModal">了解更多</button>
+            </p>
+          </div>
+
           <!-- 添加账号 -->
           <div class="flex flex-wrap gap-2 items-end">
-            <div class="form-control flex-1 min-w-[200px] max-w-sm">
-              <label class="label"><span class="label-text font-medium">添加账号</span></label>
+            <div class="flex-1 min-w-[200px] max-w-sm">
+              <label class="label"><span class="font-medium text-base-content">添加账号</span></label>
               <input
                 v-model="newUserIdInput"
                 type="text"
@@ -1167,6 +1215,9 @@ watch(currentUserId, async (newId) => {
           <div v-if="errorMsg" class="alert alert-error py-2">
             <span class="text-sm">{{ errorMsg }}</span>
           </div>
+          <div v-else-if="successMsg" class="alert alert-success py-2">
+            <span class="text-sm">{{ successMsg }}</span>
+          </div>
 
           <!-- 已添加的账号列表 -->
           <div v-if="accounts.length > 0" class="flex flex-wrap gap-2 items-center">
@@ -1185,17 +1236,17 @@ watch(currentUserId, async (newId) => {
               @click="refreshProfile"
             >
               <RefreshCw class="w-3.5 h-3.5" :class="{ 'animate-spin': isLoading }" />
-              刷新Profile
+              刷新资料
             </button>
-            <!-- Suite 刷新 -->
+            <!-- 同步上传数据 -->
             <button
               v-if="currentUserId"
               class="btn btn-sm btn-ghost gap-1"
               :disabled="accountStore.suiteRefreshing"
-              @click="accountStore.refreshSuite(currentUserId)"
+              @click="syncUserData"
             >
               <RefreshCw class="w-3.5 h-3.5" :class="{ 'animate-spin': accountStore.suiteRefreshing }" />
-              刷新Suite
+              同步数据
             </button>
             <!-- 删除 -->
             <button
@@ -1223,8 +1274,8 @@ watch(currentUserId, async (newId) => {
 
           <!-- 上次刷新时间 -->
           <p v-if="lastRefreshText" class="text-xs text-base-content/50">
-            上次刷新: {{ lastRefreshText }}
-            <template v-if="suiteUploadTimeText"> | Suite数据更新: {{ suiteUploadTimeText }}</template>
+            资料刷新于 {{ lastRefreshText }}
+            <template v-if="suiteUploadTimeText"> · 上传数据更新于 {{ suiteUploadTimeText }}</template>
           </p>
         </div>
       </div>
@@ -1236,13 +1287,13 @@ watch(currentUserId, async (newId) => {
             <p class="text-sm text-base-content/70">当前仅支持日服 ID。</p>
             <div class="grid gap-3 sm:grid-cols-2">
               <div class="rounded-xl border border-info/30 bg-info/10 p-4 space-y-2">
-                <p class="text-sm font-medium text-info">公开基础数据（无需上传）</p>
+                <p class="text-sm font-medium text-info">公开资料（无需上传）</p>
                 <p class="text-sm text-base-content/75">
-                  添加账号后即可查看公开基础数据，例如卡组、角色等级、AP/FC 数量等。
+                  添加账号后即可查看公开资料，例如卡组、角色等级、AP/FC 数量等。点击“刷新资料”更新。
                 </p>
               </div>
               <div class="rounded-xl border border-base-300/70 bg-base-100/80 p-4 space-y-2">
-                <p class="text-sm font-medium">Suite 详细数据（需上传）</p>
+                <p class="text-sm font-medium">上传数据（需先上传）</p>
                 <p class="text-sm text-base-content/70">
                   更详细数据（如完整打歌成绩、卡牌持有等）需要先上传到
                   <a
@@ -1251,15 +1302,15 @@ watch(currentUserId, async (newId) => {
                     rel="noopener noreferrer"
                     class="link link-primary font-medium"
                   >
-                    Haruki工具箱
+                    Haruki 工具箱
                   </a>
-                  。
+                  ，之后点击“同步数据”获取。
                 </p>
               </div>
             </div>
             <div class="rounded-xl border border-info/30 bg-info/10 p-4">
-              <p class="text-sm font-medium text-info">OAuth 私有数据获取</p>
-              <p class="text-sm text-base-content/75 mt-1">上传后的数据默认不公开。刷新 Suite 时会通过 OAuth 授权获取你的私有数据，仅当前浏览器可访问，安全性更高。</p>
+              <p class="text-sm font-medium text-info">OAuth 授权</p>
+              <p class="text-sm text-base-content/75 mt-1">上传后的数据默认不公开。同步数据时会通过 OAuth 授权获取你的私有数据，仅当前浏览器可访问，安全性更高。</p>
             </div>
           </div>
           <div class="modal-action">
@@ -1269,7 +1320,7 @@ watch(currentUserId, async (newId) => {
           </div>
         </div>
         <form method="dialog" class="modal-backdrop">
-          <button>close</button>
+          <button>关闭</button>
         </form>
       </dialog>
 
@@ -1359,7 +1410,7 @@ watch(currentUserId, async (newId) => {
                 </h3>
                 <!-- CLEAR -->
                 <div class="mb-3">
-                  <div class="text-center font-bold mb-1">CLEAR</div>
+                  <div class="text-center text-sm font-medium text-base-content/70 mb-1">Clear</div>
                   <div class="grid grid-cols-6 gap-1">
                     <div v-for="c in sortedClearCounts" :key="'clear-' + c.musicDifficultyType" class="text-center">
                       <div class="badge badge-sm w-full" :class="difficultyColors[c.musicDifficultyType]">
@@ -1371,7 +1422,7 @@ watch(currentUserId, async (newId) => {
                 </div>
                 <!-- FULL COMBO -->
                 <div class="mb-3">
-                  <div class="text-center font-bold mb-1">FULL COMBO</div>
+                  <div class="text-center text-sm font-medium text-base-content/70 mb-1">Full Combo</div>
                   <div class="grid grid-cols-6 gap-1">
                     <div v-for="c in sortedClearCounts" :key="'fc-' + c.musicDifficultyType" class="text-center">
                       <div class="badge badge-sm w-full" :class="difficultyColors[c.musicDifficultyType]">
@@ -1383,7 +1434,7 @@ watch(currentUserId, async (newId) => {
                 </div>
                 <!-- ALL PERFECT -->
                 <div>
-                  <div class="text-center font-bold mb-1">ALL PERFECT</div>
+                  <div class="text-center text-sm font-medium text-base-content/70 mb-1">All Perfect</div>
                   <div class="grid grid-cols-6 gap-1">
                     <div v-for="c in sortedClearCounts" :key="'ap-' + c.musicDifficultyType" class="text-center">
                       <div class="badge badge-sm w-full" :class="difficultyColors[c.musicDifficultyType]">
@@ -1405,7 +1456,7 @@ watch(currentUserId, async (newId) => {
                 <div class="card-body">
                   <h3 class="text-lg font-medium mb-3 flex items-center gap-2">
                     <Trophy class="w-5 h-5 text-primary" />
-                    MULTI LIVE
+                    多人 Live
                   </h3>
                   <div class="flex gap-6 justify-center">
                     <div class="text-center">
@@ -1425,7 +1476,7 @@ watch(currentUserId, async (newId) => {
                 <div class="card-body">
                   <h3 class="text-lg font-medium mb-3 flex items-center gap-2">
                     <Star class="w-5 h-5 text-primary" />
-                    CHALLENGE LIVE
+                    挑战 Live
                   </h3>
                   <div class="flex items-center gap-4 justify-center">
                     <span class="badge badge-primary badge-lg">SOLO</span>
@@ -1482,52 +1533,16 @@ watch(currentUserId, async (newId) => {
         </div>
       </template>
 
-      <!-- 无数据提示 -->
-      <div v-else-if="accounts.length === 0" class="py-8">
-        <div class="card bg-gradient-to-br from-base-100 to-base-200 shadow-xl border border-primary/20 overflow-hidden">
-          <div class="card-body space-y-5">
-            <div class="flex items-start sm:items-center justify-between gap-3 flex-col sm:flex-row">
-              <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center">
-                  <User class="w-5 h-5 text-primary" />
-                </div>
-                <div>
-                  <h3 class="text-lg font-semibold">还没有添加账号</h3>
-                  <p class="text-xs text-base-content/60">先添加账号，再按需同步 Suite 详细数据</p>
-                </div>
-              </div>
-              <span class="badge badge-primary badge-outline">仅支持日服 ID</span>
-            </div>
-
-            <div class="grid gap-3 sm:grid-cols-2">
-              <div class="rounded-xl border border-info/30 bg-info/10 p-4 space-y-2">
-                <p class="text-sm font-medium text-info">公开基础数据（无需上传）</p>
-                <p class="text-sm text-base-content/75">
-                  添加账号后即可查看公开基础数据，例如卡组、角色等级、AP/FC 数量等。
-                </p>
-              </div>
-              <div class="rounded-xl border border-base-300/70 bg-base-100/80 p-4 space-y-2">
-                <p class="text-sm font-medium">Suite 详细数据（需上传）</p>
-                <p class="text-sm text-base-content/70">
-                  更详细数据（如完整打歌成绩、卡牌持有等）需要先上传到
-                  <a
-                    href="https://haruki.seiunx.com/upload-data"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="link link-primary font-medium"
-                  >
-                    Haruki工具箱
-                  </a>
-                  。
-                </p>
-              </div>
-            </div>
-
-            <div class="rounded-xl border border-info/30 bg-info/10 p-4">
-              <p class="text-sm font-medium text-info">OAuth 私有数据获取</p>
-              <p class="text-sm text-base-content/75 mt-1">上传后的数据默认不公开。刷新 Suite 时会通过 OAuth 授权获取你的私有数据，仅当前浏览器可访问，安全性更高。</p>
-            </div>
-          </div>
+      <!-- 已有账号但尚无缓存资料 -->
+      <div v-else-if="accounts.length > 0" class="card bg-base-100 shadow-lg">
+        <div class="card-body items-center text-center py-12 gap-3">
+          <User class="w-10 h-10 text-base-content/20" />
+          <p class="font-medium">当前账号还没有缓存资料</p>
+          <p class="text-sm text-base-content/60">刷新后即可查看卡组、角色等级与打歌统计。</p>
+          <button class="btn btn-primary btn-sm gap-1" :disabled="isLoading || !currentUserId" @click="refreshProfile">
+            <RefreshCw class="w-4 h-4" :class="{ 'animate-spin': isLoading }" />
+            刷新资料
+          </button>
         </div>
       </div>
     </template>

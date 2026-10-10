@@ -272,9 +272,6 @@ async function copyUrl() {
         >
           打开预览
         </a>
-        <p class="text-xs text-base-content/40 mt-1">
-          此链接将在 3 天后过期
-        </p>
       </div>
     </div>
   </div>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, onMounted, watch, onBeforeUnmount } from 'vue'
+import { useModalDialog } from '@/composables/useModalDialog'
 import { ArrowLeftRight, CircleHelp, ClipboardCopy, Download, ExternalLink, FileImage, Play, Search, Settings2, Sparkles, Trash2, TriangleAlert, X } from 'lucide-vue-next'
 import {
   renderCustomScoreJsonToPng,
@@ -60,6 +61,7 @@ const isGeneratingRebase = ref(false)
 const rebaseGenerationError = ref<string | null>(null)
 const rebaseGenerationMessage = ref<string | null>(null)
 const showRebaseHelp = ref(false)
+const { onDialogClose: onRebaseHelpDialogClose } = useModalDialog('rebaseHelpDialog', () => showRebaseHelp.value, () => { showRebaseHelp.value = false })
 
 // 可选设置折叠状态（默认折叠，不持久化）
 const showOptionalSettings = ref(false)
@@ -899,9 +901,9 @@ function clearForm() {
             ></textarea>
           </div>
 
-          <div class="form-control w-full">
-            <label class="label">
-              <span class="label-text font-medium">
+          <div class="w-full">
+            <label class="label whitespace-normal">
+              <span class="font-medium">
                 上传{{ isJsonInput ? ' JSON' : ' SUS' }}文件（可选，和上方内容二选一即可）
               </span>
             </label>
@@ -1358,7 +1360,7 @@ function clearForm() {
       </section>
     </div>
 
-    <dialog class="modal" :class="{ 'modal-open': showRebaseHelp }">
+    <dialog ref="rebaseHelpDialog" class="modal" @close="onRebaseHelpDialogClose">
       <div class="modal-box max-h-[calc(100dvh-1rem)] max-w-2xl overflow-y-auto">
         <div class="flex items-start gap-3">
           <CircleHelp class="mt-0.5 h-6 w-6 shrink-0 text-primary" />

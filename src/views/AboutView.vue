@@ -5,13 +5,11 @@ import {
 </script>
 
 <template>
-  <div>
+  <div class="space-y-6">
     <!-- 页面标题 -->
-    <div class="card bg-base-100 shadow-lg mb-6 animate-fade-in-up">
-      <div class="card-body text-center">
-        <h1 class="text-3xl font-bold text-primary mb-2">关于 Uni PJSK Viewer</h1>
-        <p class="text-base-content/60">探索 Project SEKAI 的精彩世界</p>
-      </div>
+    <div>
+      <h1 class="text-3xl font-bold">关于 Uni PJSK Viewer</h1>
+      <p class="text-sm text-base-content/60 mt-1">Project SEKAI 游戏资料查看与工具站</p>
     </div>
 
     <!-- <AlertBanner type="warning">
@@ -19,7 +17,7 @@ import {
     </AlertBanner> -->
 
     <!-- 开发者信息 -->
-    <div class="card bg-base-100 shadow-lg mb-6 animate-fade-in-up animation-delay-100">
+    <div class="card bg-base-100 shadow-lg">
       <div class="card-body">
         <h3 class="card-title text-lg flex items-center gap-2">
           <Music class="w-5 h-5 text-primary" /> 开发团队
@@ -45,7 +43,7 @@ import {
     </div>
 
     <!-- 项目源码 & 参与开发 -->
-    <div class="card bg-base-100 shadow-lg mb-6 animate-fade-in-up animation-delay-150">
+    <div class="card bg-base-100 shadow-lg">
       <div class="card-body">
         <h3 class="card-title text-lg flex items-center gap-2">
           <Github class="w-5 h-5 text-primary" /> 开源项目
@@ -88,7 +86,7 @@ import {
     </div>
 
     <!-- 参与翻译 -->
-    <div class="card bg-base-100 shadow-lg mb-6 animate-fade-in-up animation-delay-200">
+    <div class="card bg-base-100 shadow-lg">
       <div class="card-body">
         <h3 class="card-title text-lg flex items-center gap-2">
           <Languages class="w-5 h-5 text-primary" /> 参与翻译
@@ -113,10 +111,10 @@ import {
 
 
     <!-- 技术栈 -->
-    <div class="card bg-base-100 shadow-lg mt-6 animate-fade-in-up animation-delay-300">
+    <div class="card bg-base-100 shadow-lg">
       <div class="card-body">
         <h3 class="card-title text-lg flex items-center gap-2">
-          <Wrench class="w-5 h-5 text-primary" /> 本网站使用以下技术栈重写
+          <Wrench class="w-5 h-5 text-primary" /> 技术栈
         </h3>
         <div class="flex flex-wrap gap-2 mt-3">
           <span class="badge badge-primary badge-outline">Vue 3</span>
@@ -132,7 +130,7 @@ import {
     </div>
 
     <!-- 开源协议 -->
-    <div class="card bg-base-100 shadow-lg mt-6 animate-fade-in-up animation-delay-400">
+    <div class="card bg-base-100 shadow-lg">
       <div class="card-body">
         <h3 class="card-title text-lg flex items-center gap-2">
           <Code class="w-5 h-5 text-primary" /> 开源协议

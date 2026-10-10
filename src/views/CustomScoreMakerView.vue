@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, toRef } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, toRef, watch } from 'vue'
 import { BarChart3, Copy, Eye, Heart, Music2, Play, PlayCircle, RefreshCw, Search, Sparkles, User, X } from 'lucide-vue-next'
 import { renderCustomScoreJsonToSvg, revokeSus2ImgResult, type Sus2ImgFrontendResult } from '@/vendor/sekai-sus2img'
 import AssetImage from '@/components/AssetImage.vue'
@@ -951,6 +951,22 @@ function closeAuthorOverlay() {
   authorSelectedId.value = null
 }
 
+// 作者投稿浮层：Esc 关闭，打开期间锁定背景滚动
+function handleAuthorOverlayKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape') closeAuthorOverlay()
+}
+
+watch(authorOverlayOpen, (open) => {
+  document.documentElement.style.overflow = open ? 'hidden' : ''
+  if (open) window.addEventListener('keydown', handleAuthorOverlayKeydown)
+  else window.removeEventListener('keydown', handleAuthorOverlayKeydown)
+})
+
+onBeforeUnmount(() => {
+  document.documentElement.style.overflow = ''
+  window.removeEventListener('keydown', handleAuthorOverlayKeydown)
+})
+
 async function openAuthorOverlay(score: DisplayScore) {
   if (score.source !== 'user' || !score.creatorUserId) return
   authorOverlayOpen.value = true
@@ -989,17 +1005,17 @@ function searchById() {
 }
 
 function selectTab(tab: FeedTab) {
+  if (activeTab.value === tab) {
+    if (tab === 'search') searchMode.value = 'music'
+    return
+  }
+
   feedRequestSerial += 1
   feedAbortController?.abort()
   feedAbortController = null
   isLoading.value = false
   error.value = ''
   scores.value = []
-
-  if (activeTab.value === tab) {
-    if (tab === 'search') searchMode.value = 'music'
-    return
-  }
   activeTab.value = tab
   if (tab === 'ranking') {
     rankingMode.value = rankingMode.value || 'daily'
@@ -1021,7 +1037,7 @@ function selectTab(tab: FeedTab) {
 
     <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
       <div>
-        <h1 class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary">谱面Maker</h1>
+        <h1 class="text-3xl font-bold">谱面Maker</h1>
         <p class="text-sm text-base-content/60 mt-1">浏览游戏内自制谱面</p>
       </div>
       
@@ -1166,7 +1182,7 @@ function selectTab(tab: FeedTab) {
                 class="menu bg-base-100/95 backdrop-blur-md border border-base-200 w-full rounded-box shadow-2xl absolute top-14 z-[100] max-h-72 flex-nowrap overflow-y-auto"
               >
                 <li v-for="music in musicSearchResults" :key="music.id">
-                  <a class="py-2.5 px-3 text-sm flex items-center gap-3 hover:bg-base-200 transition-colors" @click="selectSearchMusic(music)">
+                  <button type="button" class="py-2.5 px-3 text-sm flex items-center gap-3 hover:bg-base-200 transition-colors text-left" @click="selectSearchMusic(music)">
                     <AssetImage
                       :src="getMusicJacketUrl(music)"
                       class="w-10 h-10 rounded-md shrink-0 object-cover shadow-sm"
@@ -1176,7 +1192,7 @@ function selectTab(tab: FeedTab) {
                       <span class="text-xs text-base-content/50 truncate">{{ toRomaji(music.pronunciation || '') }}</span>
                     </div>
                     <span class="badge badge-sm badge-ghost font-mono opacity-50">#{{ music.id }}</span>
-                  </a>
+                  </button>
                 </li>
               </ul>
             </div>
@@ -1357,7 +1373,7 @@ function selectTab(tab: FeedTab) {
       </div>
     </div>
 
-    <div v-if="authorOverlayOpen" class="fixed inset-0 z-[180] bg-base-300/70 p-3 backdrop-blur-sm sm:p-6">
+    <div v-if="authorOverlayOpen" class="fixed inset-0 z-[180] bg-base-300/70 p-3 backdrop-blur-sm sm:p-6" role="dialog" aria-modal="true" aria-label="作者投稿" @click.self="closeAuthorOverlay">
       <div class="mx-auto flex h-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-base-200 bg-base-100 shadow-2xl">
         <div class="z-10 shrink-0 flex items-center justify-between gap-3 border-b border-base-200 bg-base-100/95 p-4 backdrop-blur">
           <div class="min-w-0">

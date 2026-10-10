@@ -14,14 +14,16 @@ onMounted(() => {
   notificationStore.initialize()
 })
 
+const ALL_PUSH_TOPICS = ['music', 'vlive', 'apd']
+
 async function togglePush(event: Event) {
   const isChecked = (event.target as HTMLInputElement).checked
   try {
     if (isChecked) {
-      if (!notificationStore.subscribedTopics.length) {
-        notificationStore.subscribedTopics = []
-      }
-      await notificationStore.subscribe(notificationStore.subscribedTopics)
+      const topics = notificationStore.subscribedTopics.length
+        ? notificationStore.subscribedTopics
+        : [...ALL_PUSH_TOPICS]
+      await notificationStore.subscribe(topics)
     } else {
       await notificationStore.unsubscribe()
     }
@@ -87,7 +89,7 @@ const assetSourceNotice = computed(() => {
     return '当前版本未开放国内源，资源会强制使用海外源，并忽略已保存的国内源设置。'
   }
 
-  return '国内源已由当前版本开放，可按访问环境选择源站。'
+  return ''
 })
 
 function isAssetsHostOptionDisabled(value: string): boolean {
@@ -144,19 +146,17 @@ async function handleClearTranslationCache() {
           </h2>
           
           <!-- 剧透开关 -->
-          <div class="form-control">
-            <label class="label cursor-pointer justify-start gap-4">
-              <input 
-                v-model="settingsStore.showSpoilers" 
-                type="checkbox" 
-                class="toggle toggle-primary"
-              />
-              <div>
-                <span class="label-text font-medium">显示未来内容</span>
-                <p class="text-sm text-base-content/60">开启后直接显示尚未发布的歌曲、卡片、活动与日程</p>
-              </div>
-            </label>
-          </div>
+          <label class="label cursor-pointer justify-start gap-4 whitespace-normal">
+            <input 
+              v-model="settingsStore.showSpoilers" 
+              type="checkbox" 
+              class="toggle toggle-primary shrink-0"
+            />
+            <div>
+              <span class="font-medium text-base-content">显示未来内容</span>
+              <p class="text-sm text-base-content/60">开启后直接显示尚未发布的歌曲、卡片、活动与日程</p>
+            </div>
+          </label>
         </div>
       </div>
 
@@ -168,7 +168,7 @@ async function handleClearTranslationCache() {
             主题设置
           </h2>
           
-          <div class="flex gap-2">
+          <div class="flex flex-wrap gap-2">
             <button 
               v-for="theme in themes"
               :key="theme.value"
@@ -231,6 +231,7 @@ async function handleClearTranslationCache() {
             国内源：适合大陆地区访问 ｜ 海外源：Cloudflare CDN，适合海外地区访问
           </p>
           <div
+            v-if="assetSourceNotice"
             class="alert py-2 mt-3 text-xs"
             :class="settingsStore.cnAssetsAllowed ? 'alert-info' : 'alert-warning'"
           >
@@ -264,21 +265,19 @@ async function handleClearTranslationCache() {
 
           <!-- 正常支持推送的环境 -->
           <template v-if="notificationStore.isSupported">
-            <div class="form-control mb-4">
-              <label class="label cursor-pointer justify-start gap-4 p-0">
-                <input 
-                  type="checkbox" 
-                  class="toggle toggle-primary"
-                  :checked="notificationStore.isSubscribed"
-                  :disabled="notificationStore.isLoading"
-                  @change="togglePush"
-                />
-                <div>
-                  <span class="label-text font-medium text-base">开启网页推送</span>
-                  <p class="text-sm text-base-content/60">接收新歌、活动和虚拟 Live 提醒</p>
-                </div>
-              </label>
-            </div>
+            <label class="label cursor-pointer justify-start gap-4 p-0 mb-4 whitespace-normal">
+              <input 
+                type="checkbox" 
+                class="toggle toggle-primary shrink-0"
+                :checked="notificationStore.isSubscribed"
+                :disabled="notificationStore.isLoading"
+                @change="togglePush"
+              />
+              <div>
+                <span class="font-medium text-base text-base-content">开启网页推送</span>
+                <p class="text-sm text-base-content/60">接收新歌、活动和虚拟 Live 提醒</p>
+              </div>
+            </label>
 
             <!-- 安卓警告 (不再依赖 isChina，对所有安卓显示) -->
             <div v-if="notificationStore.isAndroid" class="alert alert-warning shadow-sm py-2 mb-4">
@@ -312,7 +311,7 @@ async function handleClearTranslationCache() {
                       :checked="isTopicSubscribed('music')"
                       @change="toggleTopic('music')"
                     />
-                    <span class="label-text">新歌曲上线提醒</span>
+                    <span class="text-base-content">新歌曲上线提醒</span>
                   </label>
                   <label class="label cursor-pointer justify-start gap-3 py-1">
                     <input
@@ -320,7 +319,7 @@ async function handleClearTranslationCache() {
                       :checked="isTopicSubscribed('vlive')"
                       @change="toggleTopic('vlive')"
                     />
-                    <span class="label-text">虚拟 Live 提醒</span>
+                    <span class="text-base-content">虚拟 Live 提醒</span>
                   </label>
                   <label class="label cursor-pointer justify-start gap-3 py-1">
                     <input
@@ -328,7 +327,7 @@ async function handleClearTranslationCache() {
                       :checked="isTopicSubscribed('apd')"
                       @change="toggleTopic('apd')"
                     />
-                    <span class="label-text">新 APPEND 谱面提醒</span>
+                    <span class="text-base-content">新 APPEND 谱面提醒</span>
                   </label>
                 </div>
               </div>
@@ -357,12 +356,11 @@ async function handleClearTranslationCache() {
           </p>
           
           <button 
-            class="btn btn-warning btn-outline"
+            class="btn"
             :disabled="isClearingTranslation"
             @click="handleClearTranslationCache"
           >
-            <RefreshCw v-if="isClearingTranslation" class="w-4 h-4 animate-spin" />
-            <Trash2 v-else class="w-4 h-4" />
+            <RefreshCw class="w-4 h-4" :class="{ 'animate-spin': isClearingTranslation }" />
             {{ isClearingTranslation ? '刷新中...' : '刷新翻译' }}
           </button>
         </div>

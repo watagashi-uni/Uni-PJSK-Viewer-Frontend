@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
+import { useModalDialog } from '@/composables/useModalDialog'
 import { CalendarDays, ChevronLeft, ChevronRight, Gift, Music2, X } from 'lucide-vue-next'
 import AssetImage from '@/components/AssetImage.vue'
 import PageHeader from '@/components/PageHeader.vue'
@@ -146,13 +147,13 @@ const categoryEnabled = ref<Record<CalendarCategory, boolean>>({
   birthday: true,
 })
 
-const categoryMeta: Record<CalendarCategory, { label: string; dot: string; badge: string }> = {
-  event: { label: '活动', dot: 'bg-primary', badge: 'badge-primary' },
-  gacha: { label: '卡池', dot: 'bg-secondary', badge: 'badge-secondary' },
-  music: { label: '歌曲', dot: 'bg-info', badge: 'badge-info' },
-  virtual_live: { label: 'Virtual Live', dot: 'bg-warning', badge: 'badge-warning' },
-  login_bonus: { label: '登录活动', dot: 'bg-accent', badge: 'badge-accent' },
-  birthday: { label: '生日', dot: 'bg-success', badge: 'badge-success' },
+const categoryMeta: Record<CalendarCategory, { label: string; dot: string; badge: string; content: string }> = {
+  event: { label: '活动', dot: 'bg-primary', badge: 'badge-primary', content: 'text-primary-content' },
+  gacha: { label: '卡池', dot: 'bg-secondary', badge: 'badge-secondary', content: 'text-secondary-content' },
+  music: { label: '歌曲', dot: 'bg-info', badge: 'badge-info', content: 'text-info-content' },
+  virtual_live: { label: 'Virtual Live', dot: 'bg-warning', badge: 'badge-warning', content: 'text-warning-content' },
+  login_bonus: { label: '登录活动', dot: 'bg-accent', badge: 'badge-accent', content: 'text-accent-content' },
+  birthday: { label: '生日', dot: 'bg-success', badge: 'badge-success', content: 'text-success-content' },
 }
 const categoryOrder: CalendarCategory[] = ['event', 'gacha', 'music', 'virtual_live', 'login_bonus', 'birthday']
 const weekdayLabels = ['一', '二', '三', '四', '五', '六', '日']
@@ -286,6 +287,7 @@ const monthLabel = computed(() => new Intl.DateTimeFormat('zh-CN', { year: 'nume
 const canGoNextMonth = computed(() => settingsStore.showSpoilers || monthKey(currentMonth.value) < monthKey(today))
 const assetsHost = computed(() => settingsStore.assetsHost)
 const selectedLoginBonus = computed(() => loginBonuses.value.find(row => row.id === selectedLoginBonusId.value) || null)
+const { onDialogClose: onLoginBonusDialogClose } = useModalDialog('loginBonusDialog', () => !!selectedLoginBonus.value, () => { selectedLoginBonusId.value = 0 })
 const loginBonusBoxMap = computed(() => new Map(resourceBoxes.value
   .filter(box => box.resourceBoxPurpose === 'login_bonus')
   .map(box => [box.id, box])))
@@ -312,11 +314,16 @@ function goToday() {
   selectedDateKey.value = toDateKey(today)
 }
 
+const detailPanelRef = ref<HTMLElement | null>(null)
+
 function selectDay(day: CalendarDay) {
   if (!day.currentMonth) {
     currentMonth.value = new Date(day.date.getFullYear(), day.date.getMonth(), 1)
   }
   selectedDateKey.value = day.key
+  if (typeof window !== 'undefined' && !window.matchMedia('(min-width: 1280px)').matches) {
+    void nextTick(() => detailPanelRef.value?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }))
+  }
 }
 
 function toggleCategory(category: CalendarCategory) {
@@ -513,18 +520,18 @@ onMounted(async () => {
           <div v-if="!calendarDays.some(row => row.currentMonth && (row.entries.length || row.today))" class="card bg-base-100 border border-base-200"><div class="card-body items-center py-12 text-base-content/45">当前筛选在本月没有日程</div></div>
         </div>
 
-        <aside class="card border border-base-200 bg-base-100 shadow-sm xl:min-h-0 xl:self-stretch xl:overflow-hidden">
+        <aside ref="detailPanelRef" class="card border border-base-200 bg-base-100 shadow-sm xl:min-h-0 xl:self-stretch xl:overflow-hidden">
           <div class="card-body flex flex-col gap-3 p-4 xl:h-full xl:min-h-0 xl:overflow-hidden">
             <div class="shrink-0"><p class="text-xs text-base-content/45">日期详情</p><h2 class="font-bold">{{ selectedDateLabel }}</h2></div>
             <div v-if="selectedEntries.length" class="divide-y divide-base-200 xl:min-h-0 xl:flex-1 xl:overflow-y-auto xl:overscroll-contain xl:pr-1 [scrollbar-gutter:stable]">
               <template v-for="entry in selectedEntries" :key="entry.key">
                 <RouterLink v-if="entry.route" :to="entry.route" class="group flex gap-3 py-3">
                   <img v-if="entry.characterId" :src="characterIcon(entry.characterId)" :alt="entry.title" class="h-10 w-10 shrink-0 rounded-full bg-base-200" />
-                  <div v-else class="grid h-10 w-10 shrink-0 place-items-center rounded-lg" :class="categoryMeta[entry.category].dot"><Music2 v-if="entry.category === 'music'" class="h-4 w-4 text-white" /><span v-else class="text-[10px] font-bold text-white">{{ timeLabel(entry) }}</span></div>
+                  <div v-else class="grid h-10 w-10 shrink-0 place-items-center rounded-lg" :class="categoryMeta[entry.category].dot"><Music2 v-if="entry.category === 'music'" class="h-4 w-4" :class="categoryMeta[entry.category].content" /><span v-else class="text-[10px] font-bold" :class="categoryMeta[entry.category].content">{{ timeLabel(entry) }}</span></div>
                   <div class="min-w-0"><div class="flex items-center gap-2"><span class="badge badge-xs" :class="categoryMeta[entry.category].badge">{{ entry.subtitle }}</span><span class="text-[10px] text-base-content/40">{{ timeLabel(entry) }}</span></div><p class="mt-1 line-clamp-2 text-sm font-medium group-hover:text-primary">{{ entry.title }}</p></div>
                 </RouterLink>
                 <button v-else class="group flex w-full gap-3 py-3 text-left" @click="openLoginBonus(entry.loginBonusId)">
-                  <div class="grid h-10 w-10 shrink-0 place-items-center rounded-lg" :class="categoryMeta[entry.category].dot"><Gift class="h-4 w-4 text-white" /></div>
+                  <div class="grid h-10 w-10 shrink-0 place-items-center rounded-lg" :class="categoryMeta[entry.category].dot"><Gift class="h-4 w-4" :class="categoryMeta[entry.category].content" /></div>
                   <div class="min-w-0"><div class="flex items-center gap-2"><span class="badge badge-xs" :class="categoryMeta[entry.category].badge">{{ entry.subtitle }}</span><span class="text-[10px] text-base-content/40">{{ timeLabel(entry) }}</span></div><p class="mt-1 line-clamp-2 text-sm font-medium group-hover:text-primary">{{ entry.title }}</p><p class="mt-0.5 text-[10px] text-base-content/40">点击查看每日奖励</p></div>
                 </button>
               </template>
@@ -535,7 +542,7 @@ onMounted(async () => {
       </div>
     </template>
 
-    <dialog class="modal" :class="{ 'modal-open': selectedLoginBonus }">
+    <dialog ref="loginBonusDialog" class="modal" @close="onLoginBonusDialogClose">
       <div v-if="selectedLoginBonus" class="modal-box max-w-4xl p-0">
         <div class="relative h-20 overflow-hidden bg-gradient-to-br from-primary/20 via-secondary/15 to-accent/20">
           <div class="absolute inset-0 grid place-items-center"><Gift class="h-10 w-10 text-primary/20" /></div>
