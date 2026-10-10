@@ -9,6 +9,7 @@ import { useSettingsStore } from '@/stores/settings'
 import { toRomaji } from '@/utils/kanaToRomaji'
 import PageHeader from '@/components/PageHeader.vue'
 import { difficultyStyle } from '@/utils/difficulty'
+import { cardImageVariant } from '@/utils/card'
 
 type FeedTab = 'ranking' | 'new' | 'search' | 'official_all'
 type RankingMode = 'daily' | 'total'
@@ -926,7 +927,7 @@ function getAuthorCardUrl(profile: AuthorProfile | null) {
   const trained = userCard.specialTrainingStatus === 'done'
     || userCard.defaultImage === 'special_training'
     || userCard.defaultImage === 'training'
-  return `${assetsHost.value}/startapp/thumbnail/chara/${card.assetbundleName}_${trained ? 'after_training' : 'normal'}.png`
+  return `${assetsHost.value}/startapp/thumbnail/chara/${card.assetbundleName}_${cardImageVariant(card, trained)}.png`
 }
 
 function closeAuthorOverlay() {

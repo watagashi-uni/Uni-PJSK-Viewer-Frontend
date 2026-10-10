@@ -8,9 +8,11 @@ import { useSettingsStore } from '@/stores/settings'
 import AssetImage from '@/components/AssetImage.vue'
 import SekaiCard from '@/components/SekaiCard.vue'
 import { ChevronLeft, ScrollText, Zap, Link2, Shirt, Calendar, Gift } from 'lucide-vue-next'
+import { isTrainedOnlyCard } from '@/utils/card'
 
 interface Card {
   id: number
+  initialSpecialTrainingStatus?: string
   characterId: number
   cardRarityType: string
   attr: string
@@ -171,6 +173,9 @@ const cardRarityTypeToRarity: Record<string, number> = {
 const isTrainingType = computed(() => {
   return card.value?.cardRarityType === 'rarity_3' || card.value?.cardRarityType === 'rarity_4'
 })
+
+// 获得时即为特训后的卡：没有特训前的卡面、立绘和缩略图
+const trainedOnly = computed(() => isTrainedOnlyCard(card.value))
 
 function findResourceBoxIdByCardId(cardId: number): number | null {
   for (const box of resourceBoxes.value) {
@@ -568,7 +573,7 @@ const pageDescription = computed(() => {
 
 const pageImage = computed(() => {
   if (card.value) {
-    return `${assetsHost.value}/startapp/character/member/${card.value.assetbundleName}/card_normal.jpg`
+    return trainedOnly.value ? trainedCoverUrl.value : coverUrl.value
   }
   return ''
 })
@@ -636,7 +641,7 @@ onMounted(loadData)
             </p>
             
             <div class="flex justify-center gap-6 mt-4 opacity-90">
-              <div class="w-20 hover:shadow-xl transition-all duration-300 rounded-lg overflow-hidden shrink-0 mt-2">
+              <div v-if="!trainedOnly" class="w-20 hover:shadow-xl transition-all duration-300 rounded-lg overflow-hidden shrink-0 mt-2">
                 <SekaiCard :card="card" :trained="false" />
               </div>
               <div v-if="isTrainingType" class="w-20 hover:shadow-xl transition-all duration-300 rounded-lg overflow-hidden shrink-0 mt-2">
@@ -696,6 +701,7 @@ onMounted(loadData)
               <!-- 卡片类型 & 实装时间 -->
               <div class="space-y-2 text-sm border-t border-base-300 pt-4 mt-4 text-base-content/80">
                 <p><span class="font-medium text-base-content">卡片类型：</span>{{ cardTypeLabel }}</p>
+                <p v-if="trainedOnly"><span class="font-medium text-base-content">特训：</span>获得时即为特训后，没有特训前形态</p>
                 <p><span class="font-medium text-base-content">实装时间：</span>{{ card?.releaseAt ? formatDate(card.releaseAt) : '-' }}</p>
               </div>
             </div>
@@ -825,8 +831,8 @@ onMounted(loadData)
 
           <!-- 卡面图片 -->
           <div class="mt-8 space-y-8">
-            <!-- 普通卡面 + 头像 -->
-            <div class="flex justify-center items-center gap-4 flex-wrap flex-col">
+            <!-- 普通卡面 + 头像（只有特训后形态的卡没有这一组） -->
+            <div v-if="!trainedOnly" class="flex justify-center items-center gap-4 flex-wrap flex-col">
               <div class="flex justify-center items-end gap-4 max-w-full">
                 <a 
                   :href="coverUrl.replace('.jpg', '.png')" 
@@ -860,7 +866,7 @@ onMounted(loadData)
             </div>
             
             <!-- 觉醒卡面 + 立绘 -->
-            <div v-if="isTrainingType" class="flex justify-center items-center gap-4 flex-wrap flex-col border-t border-base-200 pt-8">
+            <div v-if="isTrainingType || trainedOnly" class="flex justify-center items-center gap-4 flex-wrap flex-col" :class="{ 'border-t border-base-200 pt-8': !trainedOnly }">
               <div class="flex justify-center items-end gap-4 max-w-full">
                 <a 
                   :href="trainedCoverUrl.replace('.jpg', '.png')" 

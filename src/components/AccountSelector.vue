@@ -5,6 +5,7 @@ import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
 import AssetImage from '@/components/AssetImage.vue'
 import { User, ChevronDown } from 'lucide-vue-next'
+import { isTrainedOnlyCard } from '@/utils/card'
 
 const props = withDefaults(defineProps<{
   modelValue?: string
@@ -47,6 +48,7 @@ function getAccountInfo(userId: string) {
       isTrained = userCard?.specialTrainingStatus === 'done' || userCard?.defaultImage === 'training'
       const masterCard = masterStore.cache['cards']?.find((c: any) => c.id === leaderCardId)
       if (masterCard) assetbundleName = masterCard.assetbundleName
+      if (isTrainedOnlyCard(masterCard)) isTrained = true
     }
   } else if (suite) {
     rank = suite.user?.rank || ''
@@ -56,6 +58,7 @@ function getAccountInfo(userId: string) {
       isTrained = userCard?.specialTrainingStatus === 'done' || userCard?.defaultImage === 'training'
       const masterCard = masterStore.cache['cards']?.find((c: any) => c.id === mainDeck.member1)
       if (masterCard) assetbundleName = masterCard.assetbundleName
+      if (isTrainedOnlyCard(masterCard)) isTrained = true
     }
   }
 
