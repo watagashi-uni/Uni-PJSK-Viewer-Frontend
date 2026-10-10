@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import { useModalDialog } from '@/composables/useModalDialog'
 import { useRoute, useRouter } from 'vue-router'
 import { CheckCircle2, Search, Trophy, Users, X } from 'lucide-vue-next'
 import Pagination from '@/components/Pagination.vue'
@@ -10,6 +11,7 @@ import PageHeader from '@/components/PageHeader.vue'
 import { useMasterStore } from '@/stores/master'
 import { useAccountStore } from '@/stores/account'
 import type { GameCharacterData } from '@/types/master'
+import { readQueryPage, readQueryString, replaceListQuery } from '@/utils/routeQuery'
 
 interface HonorLevel {
   level: number
@@ -84,20 +86,23 @@ const characters = ref<GameCharacterData[]>([])
 const isLoading = ref(true)
 const loadError = ref('')
 
-const normalSearch = ref('')
-const selectedHonorType = ref('')
-const selectedRarity = ref('')
-const selectedHonorGroup = ref(0)
-const normalPage = ref(1)
+// 两个标签页的筛选与页码都写在 URL 里，离开再返回时保持不变
+const normalSearch = ref(readQueryString(route.query, 'q'))
+const selectedHonorType = ref(readQueryString(route.query, 'type'))
+const selectedRarity = ref(readQueryString(route.query, 'rarity'))
+const selectedHonorGroup = ref(Number(readQueryString(route.query, 'group')) || 0)
+const normalPage = ref(readQueryPage(route.query))
 const selectedHonor = ref<HonorData | null>(null)
+const { onDialogClose: onHonorDialogClose } = useModalDialog('honorDialog', () => !!selectedHonor.value, () => { selectedHonor.value = null })
 const selectedHonorLevel = ref(1)
 const normalOwnedOnly = ref(false)
 
-const bondsSearch = ref('')
-const selectedBondsCharacter = ref(0)
-const selectedBondsRarity = ref('')
-const bondsPage = ref(1)
+const bondsSearch = ref(readQueryString(route.query, 'bq'))
+const selectedBondsCharacter = ref(Number(readQueryString(route.query, 'chara')) || 0)
+const selectedBondsRarity = ref(readQueryString(route.query, 'brarity'))
+const bondsPage = ref(readQueryPage(route.query, 'bpage'))
 const selectedBondsHonor = ref<BondsHonor | null>(null)
+const { onDialogClose: onBondsHonorDialogClose } = useModalDialog('bondsHonorDialog', () => !!selectedBondsHonor.value, () => { selectedBondsHonor.value = null })
 const selectedBondsLevel = ref(1)
 const selectedBondsWordId = ref(0)
 const reverseBonds = ref(false)
@@ -245,6 +250,22 @@ watch(hasBondsOwnership, value => { if (!value) bondsOwnedOnly.value = false })
 watch(normalTotalPages, total => { normalPage.value = Math.min(normalPage.value, total) })
 watch(bondsTotalPages, total => { bondsPage.value = Math.min(bondsPage.value, total) })
 watch(selectedHonorType, () => { selectedHonorGroup.value = 0 })
+watch(
+  [normalSearch, selectedHonorType, selectedRarity, selectedHonorGroup, normalPage, bondsSearch, selectedBondsCharacter, selectedBondsRarity, bondsPage],
+  () => {
+    void replaceListQuery(router, route, {
+      q: normalSearch.value.trim(),
+      type: selectedHonorType.value,
+      rarity: selectedRarity.value,
+      group: selectedHonorGroup.value ? String(selectedHonorGroup.value) : null,
+      page: normalPage.value > 1 ? String(normalPage.value) : null,
+      bq: bondsSearch.value.trim(),
+      chara: selectedBondsCharacter.value ? String(selectedBondsCharacter.value) : null,
+      brarity: selectedBondsRarity.value,
+      bpage: bondsPage.value > 1 ? String(bondsPage.value) : null,
+    }, { resetPage: false })
+  },
+)
 
 function setTab(tab: HonorTab) {
   const query = { ...route.query }
@@ -472,7 +493,7 @@ onMounted(async () => {
       />
     </template>
 
-    <dialog class="modal" :class="{ 'modal-open': selectedHonor }">
+    <dialog ref="honorDialog" class="modal" @close="onHonorDialogClose">
       <div v-if="selectedHonor" class="modal-box max-w-2xl overflow-x-hidden">
         <button class="btn btn-sm btn-circle btn-ghost absolute! right-3 top-3 z-20" aria-label="关闭" @click="selectedHonor = null"><X class="w-4 h-4" /></button>
         <h2 class="font-bold text-xl pr-10">{{ honorGroupMap.get(selectedHonor.groupId)?.name || selectedHonor.name }}</h2>
@@ -489,7 +510,7 @@ onMounted(async () => {
       <form method="dialog" class="modal-backdrop"><button @click="selectedHonor = null">关闭</button></form>
     </dialog>
 
-    <dialog class="modal" :class="{ 'modal-open': selectedBondsHonor }">
+    <dialog ref="bondsHonorDialog" class="modal" @close="onBondsHonorDialogClose">
       <div v-if="selectedBondsHonor" class="modal-box max-w-2xl overflow-x-hidden">
         <button class="btn btn-sm btn-circle btn-ghost absolute! right-3 top-3 z-20" aria-label="关闭" @click="selectedBondsHonor = null"><X class="w-4 h-4" /></button>
         <h2 class="font-bold text-xl pr-10">{{ getCharacterNameByUnitId(selectedBondsHonor.gameCharacterUnitId1) }} × {{ getCharacterNameByUnitId(selectedBondsHonor.gameCharacterUnitId2) }}</h2>

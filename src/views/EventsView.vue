@@ -1,18 +1,29 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
-import { Calendar, Trophy, Users, EyeOff } from 'lucide-vue-next'
+import { Calendar, Trophy, Users, EyeOff, Globe } from 'lucide-vue-next'
 import AssetImage from '@/components/AssetImage.vue'
 import type { EventData } from '@/types/master'
+import { readQueryString, replaceListQuery } from '@/utils/routeQuery'
 
 const masterStore = useMasterStore()
 const settingsStore = useSettingsStore()
 
 const events = ref<EventData[]>([])
-const searchQuery = ref('')
-const selectedType = ref<string>('')
+const route = useRoute()
+const router = useRouter()
+
+// 筛选状态写在 URL 里，从活动详情返回时保持不变
+const searchQuery = ref(readQueryString(route.query, 'q'))
+const selectedType = ref<string>(readQueryString(route.query, 'type'))
+
+watch([searchQuery, selectedType], () => {
+  void replaceListQuery(router, route, { q: searchQuery.value.trim(), type: selectedType.value })
+})
 const isLoading = ref(true)
+const loadError = ref(false)
 
 const assetsHost = computed(() => settingsStore.assetsHost)
 
@@ -65,16 +76,21 @@ function getBannerUrl(assetbundleName: string): string {
   return `${assetsHost.value}/startapp/home/banner/${assetbundleName}/${assetbundleName}.png`
 }
 
-onMounted(async () => {
+async function loadData() {
+  isLoading.value = true
+  loadError.value = false
   try {
     const data = await masterStore.getMaster<EventData>('events')
     events.value = data
   } catch (e) {
     console.error('加载活动数据失败:', e)
+    loadError.value = true
   } finally {
     isLoading.value = false
   }
-})
+}
+
+onMounted(loadData)
 
 </script>
 
@@ -100,7 +116,7 @@ onMounted(async () => {
       </div>
 
       <!-- 类型筛选 -->
-      <div class="flex gap-2">
+      <div class="flex flex-wrap gap-2">
         <button 
           class="btn btn-sm"
           :class="selectedType === '' ? 'btn-primary' : 'btn-ghost'"
@@ -124,12 +140,26 @@ onMounted(async () => {
           <Users class="w-4 h-4" />
           5v5
         </button>
+        <button 
+          class="btn btn-sm"
+          :class="selectedType === 'world_bloom' ? 'btn-accent' : 'btn-ghost'"
+          @click="selectedType = 'world_bloom'"
+        >
+          <Globe class="w-4 h-4" />
+          World Link
+        </button>
       </div>
     </div>
 
     <!-- 加载状态 -->
     <div v-if="isLoading" class="flex justify-center py-20">
       <span class="loading loading-spinner loading-lg"></span>
+    </div>
+
+    <!-- 加载失败 -->
+    <div v-else-if="loadError" role="alert" class="alert alert-error">
+      <span>活动数据加载失败，请检查网络后重试。</span>
+      <button type="button" class="btn btn-sm" @click="loadData">重试</button>
     </div>
 
     <!-- 活动列表 -->
@@ -152,7 +182,7 @@ onMounted(async () => {
           <div v-if="event.startAt > Date.now()" class="absolute top-2 left-2 z-20 badge badge-warning gap-1 font-bold shadow-md">
             <EyeOff class="w-3 h-3" /> 即将开始
           </div>
-          <div v-else-if="Date.now() >= event.startAt && Date.now() < event.aggregateAt" class="absolute top-2 left-2 z-20 badge badge-success text-white gap-1 font-bold shadow-md">
+          <div v-else-if="Date.now() >= event.startAt && Date.now() < event.aggregateAt" class="absolute top-2 left-2 z-20 badge badge-success gap-1 font-bold shadow-md">
             <Calendar class="w-3 h-3" /> 进行中
           </div>
 
@@ -183,7 +213,7 @@ onMounted(async () => {
     </div>
 
     <!-- 空状态 -->
-    <div v-if="!isLoading && filteredEvents.length === 0" class="text-center py-20 text-base-content/60">
+    <div v-if="!isLoading && !loadError && filteredEvents.length === 0" class="text-center py-20 text-base-content/60">
       没有找到符合条件的活动
     </div>
   </div>

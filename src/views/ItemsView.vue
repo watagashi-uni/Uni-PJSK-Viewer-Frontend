@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import { useModalDialog } from '@/composables/useModalDialog'
 import { Boxes, CalendarClock, Search, X } from 'lucide-vue-next'
 import AccountSelector from '@/components/AccountSelector.vue'
 import AssetImage from '@/components/AssetImage.vue'
@@ -115,6 +116,7 @@ const selectedCategory = ref<ItemCategory | ''>('')
 const ownedOnly = ref(false)
 const currentPage = ref(1)
 const selectedItem = ref<DisplayItem | null>(null)
+const { onDialogClose: onItemDialogClose } = useModalDialog('itemDialog', () => !!selectedItem.value, () => { selectedItem.value = null })
 const pageSize = 48
 
 const selectedUserId = computed({
@@ -301,7 +303,7 @@ onMounted(async () => {
       <Pagination v-if="totalPages > 1" :current-page="currentPage" :total-pages="totalPages" base-url="/items" @page-change="goToPage" />
     </template>
 
-    <dialog class="modal" :class="{ 'modal-open': selectedItem }">
+    <dialog ref="itemDialog" class="modal" @close="onItemDialogClose">
       <div v-if="selectedItem" class="modal-box max-w-xl">
         <button class="btn btn-sm btn-circle btn-ghost absolute! right-3 top-3 z-20" aria-label="关闭" @click="selectedItem = null"><X class="w-4 h-4" /></button>
         <div class="flex flex-col sm:flex-row gap-6">

@@ -38,8 +38,13 @@ async function toggleVliveSub() {
 }
 
 const vlives = ref<any[]>([])
-const searchQuery = ref('')
-const showEnded = ref(false)
+function readQueryString(value: unknown): string {
+  return typeof value === 'string' ? value : ''
+}
+
+// 搜索词与“展示已结束”保存在 URL query 中, 返回时可恢复
+const searchQuery = ref(readQueryString(route.query.q))
+const showEnded = ref(route.query.ended === '1')
 const isLoading = ref(true)
 
 const currentPage = computed(() => Number(route.query.page) || 1)
@@ -49,11 +54,11 @@ const assetsHost = computed(() => settingsStore.assetsHost)
 const now = ref(Date.now())
 let timer: ReturnType<typeof setInterval>
 
-// 更新当前时间，用于状态反应
+// 更新当前时间，用于状态反应 (状态与排期精确到分钟, 30 秒刷新足够)
 onMounted(() => {
   timer = setInterval(() => {
     now.value = Date.now()
-  }, 1000)
+  }, 30_000)
 })
 onUnmounted(() => {
   clearInterval(timer)
@@ -104,8 +109,19 @@ const paginatedVlives = computed(() => {
   return filteredVlives.value.slice(start, end)
 })
 
-watch([searchQuery, showEnded], () => {
-  router.push({ query: { ...route.query, page: '1' } })
+watch([searchQuery, showEnded], ([q, ended]) => {
+  const nextQ = q || undefined
+  const nextEnded = ended ? '1' : undefined
+  if ((route.query.q ?? undefined) === nextQ && (route.query.ended ?? undefined) === nextEnded) return
+  router.replace({ query: { ...route.query, q: nextQ, ended: nextEnded, page: undefined } })
+})
+
+// 浏览器前进/后退时同步筛选状态
+watch(() => [route.query.q, route.query.ended], ([q, ended]) => {
+  const nextQ = readQueryString(q)
+  if (searchQuery.value !== nextQ) searchQuery.value = nextQ
+  const nextEnded = ended === '1'
+  if (showEnded.value !== nextEnded) showEnded.value = nextEnded
 })
 
 function handlePageChange(page: number) {
@@ -148,7 +164,7 @@ function getStatusInfo(vlive: any) {
     return { status: 'upcoming', label: '即将开始', color: 'badge-warning', icon: Clock }
   }
   if (current >= bounds.start && current <= bounds.end) {
-    return { status: 'ongoing', label: '进行中', color: 'badge-success text-white', icon: PlayCircle }
+    return { status: 'ongoing', label: '进行中', color: 'badge-success', icon: PlayCircle }
   }
   return { status: 'ended', label: '已结束', color: 'badge-ghost', icon: null }
 }
@@ -266,7 +282,7 @@ onMounted(async () => {
               剩余 {{ getNextSchedule(vlive)?.remainingCount }} 场
             </span>
           </div>
-          <div v-else-if="getStatusInfo(vlive).status === 'ongoing'" class="flex items-center justify-center rounded-lg bg-warning/10 p-2 text-xs text-warning">
+          <div v-else-if="getStatusInfo(vlive).status === 'ongoing'" class="flex items-center justify-center rounded-lg bg-warning/15 p-2 text-xs text-base-content/80">
             所有场次已结束 / 随时入场
           </div>
         </div>

@@ -10,6 +10,7 @@ import { loadStoryMedia, storyAssetHost } from '@/utils/storyPlayback'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
 import type { EventData } from '@/types/master'
+import { readQueryPage, readQueryString, replaceListQuery } from '@/utils/routeQuery'
 
 interface StoryEpisode {
   id: number
@@ -95,10 +96,16 @@ const unitEpisodeGroups = ref<UnitEpisodeGroup[]>([])
 const isLoading = ref(true)
 const loadError = ref('')
 
-const searchQuery = ref('')
+// 搜索、团体与页码写在 URL 里，离开再返回时保持不变
+const searchQuery = ref(readQueryString(route.query, 'q'))
 const episodeSearch = ref('')
-const selectedUnit = ref('')
-const eventPage = ref(1)
+const selectedUnit = ref(readQueryString(route.query, 'unit'))
+const eventPage = ref(readQueryPage(route.query))
+
+function handleEventPageChange(page: number) {
+  eventPage.value = page
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
 const selectedStory = ref<SelectedStory | null>(null)
 const selectedEpisode = ref<StoryEpisode | null>(null)
 const storyDialog = ref<HTMLDialogElement | null>(null)
@@ -259,12 +266,24 @@ function getUnitLogo(unit?: string): string {
 }
 
 function setTab(tab: StoryTab) {
-  searchQuery.value = ''
-  selectedUnit.value = ''
   const query: Record<string, string> = {}
   if (tab !== 'event') query.tab = tab
   void router.replace({ query })
 }
+
+// 切换标签页后清空筛选（在路由更新之后进行，避免与上面的 replace 互相覆盖）
+watch(activeTab, () => {
+  searchQuery.value = ''
+  selectedUnit.value = ''
+})
+
+watch([searchQuery, selectedUnit, eventPage], () => {
+  void replaceListQuery(router, route, {
+    q: searchQuery.value.trim(),
+    unit: selectedUnit.value,
+    page: eventPage.value > 1 ? String(eventPage.value) : null,
+  }, { resetPage: false })
+})
 
 function formatDate(timestamp?: number): string {
   if (!timestamp) return ''
@@ -359,7 +378,7 @@ onMounted(async () => {
 
 <template>
   <div class="max-w-7xl mx-auto space-y-6">
-    <PageHeader title="剧情档案" description="在熟悉的场景里，听他们把故事说完。支持原文阅读、角色语音和场景播放。"><template #icon><BookOpen class="w-8 h-8 text-primary" /></template></PageHeader>
+    <PageHeader title="剧情档案" description="主线、活动、卡面与特别剧情，支持原文、语音与场景播放。"><template #icon><BookOpen class="w-8 h-8 text-primary" /></template></PageHeader>
 
     <section class="grid grid-cols-3 gap-2">
       <div class="rounded-xl bg-base-100 border border-base-200 px-3 py-2"><p class="text-[11px] text-base-content/45">活动故事</p><p class="font-bold text-lg">{{ storyStats.events }}</p></div>
@@ -403,7 +422,7 @@ onMounted(async () => {
           </div>
         </button>
       </div>
-      <Pagination v-if="eventTotalPages > 1" :current-page="eventPage" :total-pages="eventTotalPages" base-url="/stories" @page-change="eventPage = $event" />
+      <Pagination v-if="eventTotalPages > 1" :current-page="eventPage" :total-pages="eventTotalPages" base-url="/stories" @page-change="handleEventPageChange" />
     </template>
 
     <template v-else-if="activeTab === 'unit'">

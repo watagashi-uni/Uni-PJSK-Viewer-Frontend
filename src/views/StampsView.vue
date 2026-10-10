@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import { useModalDialog } from '@/composables/useModalDialog'
 import { useRoute, useRouter } from 'vue-router'
 import { Download, ImageDown, Search, Smile, X } from 'lucide-vue-next'
 import AssetImage from '@/components/AssetImage.vue'
@@ -19,6 +20,7 @@ const characters = ref<GameCharacterData[]>([])
 const isLoading = ref(true)
 const loadError = ref('')
 const selectedStamp = ref<StampData | null>(null)
+const { onDialogClose: onStampDialogClose } = useModalDialog('stampDialog', () => !!selectedStamp.value, () => { selectedStamp.value = null })
 const actionMessage = ref('')
 
 const searchQuery = ref(typeof route.query.q === 'string' ? route.query.q : '')
@@ -241,7 +243,7 @@ onMounted(async () => {
       @page-change="setPage"
     />
 
-    <dialog class="modal" :class="{ 'modal-open': selectedStamp }">
+    <dialog ref="stampDialog" class="modal" @close="onStampDialogClose">
       <div v-if="selectedStamp" class="modal-box max-w-2xl p-0 overflow-hidden">
         <button class="btn btn-sm btn-circle btn-ghost absolute! right-3 top-3 z-20 bg-base-100/80" aria-label="关闭" @click="selectedStamp = null">
           <X class="w-4 h-4" />

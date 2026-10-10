@@ -87,10 +87,9 @@ function selectArtist() {
 </script>
 
 <template>
-  <RouterLink 
-    :to="`/musics/${id}`"
-    class="card bg-base-100 shadow-sm overflow-hidden group relative"
-    :class="results ? 'hover:border-primary/30 border border-transparent transition-colors' : 'hover:shadow-md transition-all hover:-translate-y-1'"
+  <div
+    class="card bg-base-100 shadow-sm overflow-hidden relative has-[a:focus-visible]:outline has-[a:focus-visible]:outline-2 has-[a:focus-visible]:outline-offset-2 has-[a:focus-visible]:outline-primary"
+    :class="results ? 'hover:border-primary/30 border border-transparent transition-colors' : 'hover:shadow-md transition-shadow'"
   >
     <!-- 封面 -->
     <figure class="relative aspect-square">
@@ -98,20 +97,19 @@ function selectArtist() {
         :src="coverUrl" 
         :alt="title"
         class="w-full h-full object-cover"
-        :class="results ? '' : 'group-hover:scale-105 transition-transform duration-300'"
       />
       <!-- 简单角标 (替代之前的内部遮罩) -->
-      <div v-if="isLeak" class="absolute top-2 right-2 badge badge-warning shadow-md z-20">
+      <div v-if="isLeak" class="absolute top-2 right-2 badge badge-warning shadow-md z-20 pointer-events-none">
         剧透
       </div>
-      <div v-if="isLimitedTime" class="absolute top-2 left-2 badge badge-warning text-warning-content font-bold shadow-md z-20">
+      <div v-if="isLimitedTime" class="absolute top-2 left-2 badge badge-warning text-warning-content font-bold shadow-md z-20 pointer-events-none">
         期间限定
       </div>
-      <div v-else-if="isExpired" class="absolute top-2 left-2 badge border-none bg-base-300 text-base-content/60 font-bold shadow-md z-20">
+      <div v-else-if="isExpired" class="absolute top-2 left-2 badge border-none bg-base-300 text-base-content/60 font-bold shadow-md z-20 pointer-events-none">
         已过期
       </div>
       <!-- 类别图标 -->
-      <div v-if="matchedIcons.length" class="absolute bottom-1.5 left-1.5 flex gap-1 z-20">
+      <div v-if="matchedIcons.length" class="absolute bottom-1.5 left-1.5 flex gap-1 z-20 pointer-events-none">
         <img
           v-for="cat in matchedIcons"
           :key="cat"
@@ -126,7 +124,13 @@ function selectArtist() {
       <!-- 标题 -->
       <div class="min-h-[3rem]">
         <h3 class="font-bold text-sm leading-tight line-clamp-2" :title="title">
-          {{ title }}
+          <!-- 拉伸链接: 覆盖整张卡片, 作曲者筛选按钮作为兄弟元素置于其上 -->
+          <RouterLink
+            :to="`/musics/${id}`"
+            class="outline-none after:absolute after:inset-0 after:z-10 after:content-['']"
+          >
+            {{ title }}
+          </RouterLink>
         </h3>
         <p v-if="translation" class="text-xs text-base-content/60 mt-0.5 line-clamp-1" :title="translation">
           {{ translation }}
@@ -138,9 +142,9 @@ function selectArtist() {
         <span>#{{ id }}</span>
         <button
           type="button"
-          class="inline-flex max-w-[68%] items-center gap-1 rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-primary transition-colors hover:border-primary/50 hover:bg-primary/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          class="relative z-30 inline-flex max-w-[68%] items-center gap-1 rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 text-primary transition-colors hover:border-primary/50 hover:bg-primary/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           :title="`筛选 ${composer}`"
-          @click.prevent.stop="selectArtist"
+          @click="selectArtist"
         >
           <ListFilter class="h-3 w-3 shrink-0" />
           <span class="truncate">{{ composer }}</span>
@@ -169,7 +173,7 @@ function selectArtist() {
           :class="difficultyColors[diff]"
           :title="`${difficultyLabels[diff]}: ${difficulties[diff]}`"
         >
-          <span class="text-[10px] font-black leading-none">{{ difficulties[diff] }}</span>
+          <span class="text-xs font-black leading-none">{{ difficulties[diff] }}</span>
         </div>
       </div>
 
@@ -207,7 +211,7 @@ function selectArtist() {
         </div>
       </div>
     </div>
-  </RouterLink>
+  </div>
 </template>
 
 <style scoped>

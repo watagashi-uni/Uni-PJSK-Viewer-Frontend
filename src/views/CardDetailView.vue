@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useSeoMeta, useHead } from '@unhead/vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
+import { useBackToList } from '@/composables/useBackToList'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
 import AssetImage from '@/components/AssetImage.vue'
@@ -105,7 +106,6 @@ interface Skill {
 }
 
 const route = useRoute()
-const router = useRouter()
 const masterStore = useMasterStore()
 const settingsStore = useSettingsStore()
 
@@ -596,14 +596,8 @@ useHead({
   ]
 })
 
-function goBack() {
-  const backState = window.history.state?.back
-  if (typeof backState === 'string' && backState.startsWith('/cards')) {
-    router.back()
-  } else {
-    router.push('/cards')
-  }
-}
+// 上一页是列表时后退以保留筛选与页码，否则打开列表
+const goBack = useBackToList('/cards')
 
 onMounted(loadData)
 </script>
@@ -725,22 +719,22 @@ onMounted(loadData)
                 </div>
               </div>
 
-              <div class="flex flex-nowrap gap-3 mt-4 border-t border-base-300 pt-4">
-                <div class="bg-base-100 rounded-lg p-3 text-center flex-1">
-                  <div class="text-xs text-base-content/60">Performance</div>
-                  <div class="text-lg font-bold text-primary">{{ totalPower.perf }}</div>
+              <div class="grid grid-cols-3 gap-2 sm:gap-3 mt-4 border-t border-base-300 pt-4">
+                <div class="bg-base-100 rounded-lg p-2 sm:p-3 text-center min-w-0">
+                  <div class="text-[11px] sm:text-xs text-base-content/60 truncate">Performance</div>
+                  <div class="text-base sm:text-lg font-bold text-primary truncate">{{ totalPower.perf }}</div>
                 </div>
-                <div class="bg-base-100 rounded-lg p-3 text-center flex-1">
-                  <div class="text-xs text-base-content/60">Technique</div>
-                  <div class="text-lg font-bold text-primary">{{ totalPower.tech }}</div>
+                <div class="bg-base-100 rounded-lg p-2 sm:p-3 text-center min-w-0">
+                  <div class="text-[11px] sm:text-xs text-base-content/60 truncate">Technique</div>
+                  <div class="text-base sm:text-lg font-bold text-primary truncate">{{ totalPower.tech }}</div>
                 </div>
-                <div class="bg-base-100 rounded-lg p-3 text-center flex-1">
-                  <div class="text-xs text-base-content/60">Stamina</div>
-                  <div class="text-lg font-bold text-primary">{{ totalPower.stam }}</div>
+                <div class="bg-base-100 rounded-lg p-2 sm:p-3 text-center min-w-0">
+                  <div class="text-[11px] sm:text-xs text-base-content/60 truncate">Stamina</div>
+                  <div class="text-base sm:text-lg font-bold text-primary truncate">{{ totalPower.stam }}</div>
                 </div>
               </div>
-              <div class="bg-gradient-to-br from-primary to-success text-white rounded-lg p-3 text-center mt-3 shadow-md" style="width: 100%">
-                <div class="text-xs opacity-90">总综合力</div>
+              <div class="bg-base-100 rounded-lg p-3 text-center mt-3 w-full">
+                <div class="text-xs text-base-content/60">总综合力</div>
                 <div class="text-xl font-bold">{{ totalPower.total }}</div>
               </div>
               <p class="text-xs text-base-content/60 mt-3 flex items-center gap-1 justify-center">注：前篇和后篇看完的值</p>
@@ -837,6 +831,7 @@ onMounted(loadData)
                 <a 
                   :href="coverUrl.replace('.jpg', '.png')" 
                   target="_blank"
+                  rel="noopener noreferrer"
                   class="block rounded-xl overflow-hidden shadow-lg hover:-translate-y-1 hover:shadow-xl transition-all duration-300 min-w-0 flex-shrink"
                 >
                   <AssetImage 
@@ -851,6 +846,7 @@ onMounted(loadData)
                   v-if="showNormalCutout"
                   :href="`${assetsHost}/startapp/character/member_cutout_trm/${card.assetbundleName}/normal.png`" 
                   target="_blank"
+                  rel="noopener noreferrer"
                   class="block rounded-xl overflow-hidden shadow-lg hover:-translate-y-1 hover:shadow-xl transition-all duration-300 min-w-0 flex-shrink"
                 >
                   <AssetImage 
@@ -869,6 +865,7 @@ onMounted(loadData)
                 <a 
                   :href="trainedCoverUrl.replace('.jpg', '.png')" 
                   target="_blank"
+                  rel="noopener noreferrer"
                   class="block rounded-xl overflow-hidden shadow-lg hover:-translate-y-1 hover:shadow-xl transition-all duration-300 min-w-0 flex-shrink"
                 >
                   <AssetImage 
@@ -883,6 +880,7 @@ onMounted(loadData)
                   v-if="showTrainedCutout"
                   :href="`${assetsHost}/startapp/character/member_cutout_trm/${card.assetbundleName}/after_training.png`" 
                   target="_blank"
+                  rel="noopener noreferrer"
                   class="block rounded-xl overflow-hidden shadow-lg hover:-translate-y-1 hover:shadow-xl transition-all duration-300 min-w-0 flex-shrink"
                 >
                   <AssetImage 

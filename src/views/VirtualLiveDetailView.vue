@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import { useBackToList } from '@/composables/useBackToList'
 import { Calendar, ChevronLeft, Clock, Disc3, FileText, Gift, Radio, Ticket, Users } from 'lucide-vue-next'
 import AssetImage from '@/components/AssetImage.vue'
 import PageHeader from '@/components/PageHeader.vue'
@@ -163,6 +164,8 @@ interface BeginnerScheduleGroup {
 }
 
 const route = useRoute()
+// 上一页是列表时后退以保留筛选与页码，否则打开列表
+const goBack = useBackToList('/vlives')
 const masterStore = useMasterStore()
 const settingsStore = useSettingsStore()
 
@@ -457,7 +460,7 @@ const informationText = computed(() => {
     <template v-else>
       <PageHeader :title="vlive.name" :description="`#${vlive.id} · ${typeMap[vlive.virtualLiveType]?.label || vlive.virtualLiveType} · ${vlive.virtualLivePlatform.toUpperCase()}`">
         <template #icon><Radio class="h-8 w-8 text-primary" /></template>
-        <template #actions><RouterLink to="/vlives" class="btn btn-sm btn-ghost"><ChevronLeft class="h-4 w-4" />返回列表</RouterLink></template>
+        <template #actions><button type="button" class="btn btn-sm btn-ghost" @click="goBack"><ChevronLeft class="h-4 w-4" />返回列表</button></template>
       </PageHeader>
 
       <section class="grid overflow-hidden rounded-xl border border-base-200 bg-base-100 shadow-sm lg:grid-cols-[minmax(0,1.45fr)_minmax(20rem,.75fr)]">

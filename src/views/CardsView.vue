@@ -1,5 +1,5 @@
 <script lang="ts">
-// RouterView 以 fullPath 为 key，query 变化会重建整个视图；
+// RouterView 以 path 为 key，query 变化不会重建视图，但离开再返回列表时会重建；
 // <script setup> 内的变量每次重建都会重置，这里用真正的模块作用域
 // 在重建之间保留筛选面板的展开状态（null 表示本次会话还没手动开关过）
 let filterPanelOpenMemory: boolean | null = null
@@ -51,7 +51,8 @@ const masterStore = useMasterStore()
 const settingsStore = useSettingsStore()
 const accountStore = useAccountStore()
 
-const showUserCards = ref(false)
+// 初始状态由 URL 推导: owned=1 时必须显示拥有状态, 否则“只看已拥有”不生效
+const showUserCards = ref(route.query.owned === '1')
 const selectedUserId = computed({
   get: () => accountStore.currentUserId || '',
   set: (val: string) => accountStore.selectAccount(val)
@@ -111,6 +112,14 @@ const selectedSkillTypes = computed<string[]>(() => queryList('skills'))
 // 只看已拥有卡片
 const filterOwnedOnly = computed<boolean>(() => {
   return route.query.owned === '1'
+})
+
+// 前进/后退恢复 owned=1 时同步打开拥有状态; 关闭拥有状态时移除 owned 参数
+watch(filterOwnedOnly, (ownedOnly) => {
+  if (ownedOnly) showUserCards.value = true
+})
+watch(showUserCards, (show) => {
+  if (!show && filterOwnedOnly.value) pushQuery({ owned: undefined })
 })
 
 // 组合列表
@@ -324,7 +333,8 @@ function isLeak(releaseAt: number): boolean {
 const FILTER_KEYS = ['charaIds', 'units', 'attrs', 'rarities', 'skills'] as const
 
 // 更新 URL 筛选参数（patch 中值为 undefined 表示删除该参数）
-function pushQuery(patch: Record<string, string | undefined>, page: string = '1') {
+// 筛选变化用 replace，避免每次点选都产生历史记录；翻页用 push
+function pushQuery(patch: Record<string, string | undefined>, page: string = '1', mode: 'push' | 'replace' = 'replace') {
   const query: Record<string, string> = {}
   for (const key of [...FILTER_KEYS, 'owned']) {
     const value = route.query[key]
@@ -335,7 +345,8 @@ function pushQuery(patch: Record<string, string | undefined>, page: string = '1'
     else query[key] = value
   }
   query.page = page
-  router.push({ query })
+  if (mode === 'push') router.push({ query })
+  else router.replace({ query })
 }
 
 // 切换列表型筛选参数中的某个值
@@ -396,7 +407,7 @@ async function loadData() {
 
 // 页码变化
 function handlePageChange(page: number) {
-  pushQuery({}, page.toString())
+  pushQuery({}, page.toString(), 'push')
 }
 
 // 清除筛选

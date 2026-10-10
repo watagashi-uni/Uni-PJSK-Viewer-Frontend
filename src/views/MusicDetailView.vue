@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, onBeforeUnmount, nextTick } from 'vue'
+import { useModalDialog } from '@/composables/useModalDialog'
 import { useSeoMeta, useHead } from '@unhead/vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useBackToList } from '@/composables/useBackToList'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
 import { useAccountStore } from '@/stores/account'
@@ -171,6 +173,7 @@ const isAudioLoaded = ref(false)
 
 // ===== 谱面 SVG 预览 =====
 const chartSvgPreviewOpen = ref(false)
+const { onDialogClose: onChartSvgPreviewDialogClose } = useModalDialog('chartSvgPreviewDialog', () => chartSvgPreviewOpen.value, () => closeChartSvgPreview())
 const chartSvgPreviewLoading = ref(false)
 const chartSvgPreviewError = ref<string | null>(null)
 const chartSvgPreviewSvgText = ref<string | null>(null)
@@ -1204,15 +1207,8 @@ useHead({
   ]
 })
 
-// 返回上一页
-function goBack() {
-  const backState = window.history.state?.back
-  if (typeof backState === 'string' && backState.startsWith('/musics')) {
-    router.back()
-  } else {
-    router.push('/musics')
-  }
-}
+// 上一页是列表时后退以保留筛选与页码，否则打开列表
+const goBack = useBackToList('/musics', ['/musics/search'])
 
 onMounted(loadData)
 
@@ -1257,7 +1253,7 @@ const isExpired = computed(() => {
         >
           <!-- 封面 -->
           <div class="relative group w-full max-w-sm">
-            <a :href="coverUrl" target="_blank" class="block rounded-2xl overflow-hidden shadow-2xl transition-transform duration-300 hover:scale-[1.02]">
+            <a :href="coverUrl" target="_blank" rel="noopener noreferrer" class="block rounded-2xl overflow-hidden shadow-2xl transition-transform duration-300 hover:scale-[1.02]">
               <AssetImage 
                 :src="coverUrl" 
                 :alt="music.title"
@@ -1419,7 +1415,7 @@ const isExpired = computed(() => {
               <figure class="aspect-[2/1]">
                 <AssetImage 
                   :src="`${assetsHost}/startapp/home/banner/${relatedEvent.assetbundleName}/${relatedEvent.assetbundleName}.png`" 
-                  alt="Event Banner" 
+                  alt="活动横幅" 
                   class="w-full h-full object-cover"
                 />
               </figure>
@@ -1474,6 +1470,7 @@ const isExpired = computed(() => {
                       tabindex="0"
                       class="btn btn-ghost btn-sm gap-1.5 hover:bg-base-200/50"
                       :disabled="!currentVocal"
+                      aria-label="下载"
                     >
                       <Download class="w-4 h-4" />
                       <span class="hidden sm:inline">下载</span>
@@ -1539,6 +1536,7 @@ const isExpired = computed(() => {
                     <button 
                       class="btn btn-ghost btn-sm btn-circle hover:bg-base-200/50"
                       title="后退10秒"
+                      aria-label="后退10秒"
                       @click="skipBackward"
                     >
                       <SkipBack class="w-4 h-4" />
@@ -1547,6 +1545,7 @@ const isExpired = computed(() => {
                     <button 
                       class="btn btn-primary btn-circle w-11 h-11 shadow-lg hover:shadow-xl hover:scale-105 transition-all"
                       :disabled="!isAudioLoaded"
+                      :aria-label="isPlaying ? '暂停' : '播放'"
                       @click="togglePlay"
                     >
                       <Pause v-if="isPlaying" class="w-5 h-5" />
@@ -1556,6 +1555,7 @@ const isExpired = computed(() => {
                     <button 
                       class="btn btn-ghost btn-sm btn-circle hover:bg-base-200/50"
                       title="前进10秒"
+                      aria-label="前进10秒"
                       @click="skipForward"
                     >
                       <SkipForward class="w-4 h-4" />
@@ -1571,7 +1571,7 @@ const isExpired = computed(() => {
 
                 <!-- 音量控制 -->
                 <div class="flex items-center gap-2 pt-2">
-                  <button class="btn btn-ghost btn-xs btn-circle" @click="toggleMute">
+                  <button class="btn btn-ghost btn-xs btn-circle" :aria-label="isMuted || volume === 0 ? '取消静音' : '静音'" @click="toggleMute">
                     <VolumeX v-if="isMuted || volume === 0" class="w-4 h-4 text-base-content/60" />
                     <Volume2 v-else class="w-4 h-4 text-base-content/60" />
                   </button>
@@ -1580,6 +1580,7 @@ const isExpired = computed(() => {
                     min="0" 
                     max="1" 
                     step="0.01"
+                    aria-label="音量"
                     :value="volume"
                     class="range range-xs range-primary w-24 focus:outline-none focus:ring-0"
                     @input="onVolumeChange"
@@ -1717,9 +1718,9 @@ const isExpired = computed(() => {
 
     <!-- 谱面 SVG 预览弹窗 -->
     <dialog
+      ref="chartSvgPreviewDialog"
       class="modal"
-      :class="{ 'modal-open': chartSvgPreviewOpen }"
-      @close="closeChartSvgPreview"
+      @close="onChartSvgPreviewDialogClose"
     >
       <div
         class="modal-box fixed inset-0 flex h-screen w-screen max-w-none flex-col overflow-hidden rounded-none p-0"
@@ -1747,14 +1748,14 @@ const isExpired = computed(() => {
           <div class="flex items-center gap-1 sm:gap-2 shrink-0">
             <!-- 缩放控制 -->
             <div class="flex items-center gap-0 sm:gap-0.5">
-              <button class="btn btn-xs sm:btn-sm btn-ghost btn-square h-7 w-7 sm:h-8 sm:w-8" title="缩小" @click="previewZoomOut">
+              <button class="btn btn-xs sm:btn-sm btn-ghost btn-square h-7 w-7 sm:h-8 sm:w-8" title="缩小" aria-label="缩小" @click="previewZoomOut">
                 <ZoomOut class="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </button>
               <span class="text-[10px] sm:text-xs font-mono w-8 sm:w-12 text-center tabular-nums">{{ Math.round(previewZoom * 100) }}%</span>
-              <button class="btn btn-xs sm:btn-sm btn-ghost btn-square h-7 w-7 sm:h-8 sm:w-8" title="放大" @click="previewZoomIn">
+              <button class="btn btn-xs sm:btn-sm btn-ghost btn-square h-7 w-7 sm:h-8 sm:w-8" title="放大" aria-label="放大" @click="previewZoomIn">
                 <ZoomIn class="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </button>
-              <button class="btn btn-xs sm:btn-sm btn-ghost btn-square h-7 w-7 sm:h-8 sm:w-8" title="适应高度" @click="previewZoomFit">
+              <button class="btn btn-xs sm:btn-sm btn-ghost btn-square h-7 w-7 sm:h-8 sm:w-8" title="适应高度" aria-label="适应高度" @click="previewZoomFit">
                 <Maximize class="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </button>
             </div>
@@ -1762,13 +1763,14 @@ const isExpired = computed(() => {
             <button
               class="btn btn-xs sm:btn-sm btn-ghost btn-outline h-7 sm:h-8"
               title="下载 PNG"
+              aria-label="下载 PNG"
               :disabled="!chartSvgPreviewSvgText || isDownloadingPreviewPng"
               @click="downloadPreviewPng"
             >
               <span v-if="isDownloadingPreviewPng" class="loading loading-spinner loading-xs"></span>
               <FileImage v-else class="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </button>
-            <button class="btn btn-xs sm:btn-sm btn-ghost btn-circle h-7 w-7 sm:h-8 sm:w-8" @click="closeChartSvgPreview">
+            <button class="btn btn-xs sm:btn-sm btn-ghost btn-circle h-7 w-7 sm:h-8 sm:w-8" aria-label="关闭" @click="closeChartSvgPreview">
               <X class="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </button>
           </div>
@@ -1816,7 +1818,7 @@ const isExpired = computed(() => {
       </div>
 
       <form method="dialog" class="modal-backdrop">
-        <button @click="closeChartSvgPreview">close</button>
+        <button @click="closeChartSvgPreview">关闭</button>
       </form>
     </dialog>
   </div>
@@ -1913,11 +1915,11 @@ const isExpired = computed(() => {
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: oklch(var(--bc) / 0.2);
+  background: color-mix(in oklab, var(--color-base-content) 20%, transparent);
   border-radius: 4px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: oklch(var(--bc) / 0.3);
+  background: color-mix(in oklab, var(--color-base-content) 30%, transparent);
 }
 </style>

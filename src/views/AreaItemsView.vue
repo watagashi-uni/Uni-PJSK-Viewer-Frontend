@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import { useModalDialog } from '@/composables/useModalDialog'
 import { Coins, Search, Wrench, X } from 'lucide-vue-next'
 import AccountSelector from '@/components/AccountSelector.vue'
 import AssetImage from '@/components/AssetImage.vue'
@@ -89,6 +90,7 @@ const searchQuery = ref('')
 const selectedAreaId = ref(0)
 const selectedTargetType = ref('')
 const selectedItem = ref<AreaItem | null>(null)
+const { onDialogClose: onItemDialogClose } = useModalDialog('itemDialog', () => !!selectedItem.value, () => { selectedItem.value = null })
 const currentLevel = ref(0)
 const targetLevel = ref(20)
 
@@ -297,6 +299,7 @@ onMounted(async () => {
 
     <div v-if="isLoading" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 gap-3"><div v-for="index in 18" :key="index" class="skeleton h-52 rounded-xl"></div></div>
     <div v-else-if="loadError" class="alert alert-error">区域道具数据加载失败：{{ loadError }}</div>
+    <div v-else-if="filteredItems.length === 0" class="text-center py-20 text-base-content/60">没有找到符合条件的区域道具</div>
     <div v-else class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 gap-3">
       <button v-for="item in filteredItems" :key="item.id" class="group card bg-base-100 border border-base-200 hover:border-primary/30 hover:shadow-md hover:-translate-y-0.5 transition-all overflow-hidden text-left" @click="openItem(item)">
         <figure class="relative h-28 sm:h-32 bg-gradient-to-br from-base-200 to-base-100 p-2.5"><AssetImage :src="itemImage(item)" :alt="item.name" class="w-full h-full object-contain group-hover:scale-105 transition-transform" /><span v-if="currentLevelMap.has(item.id)" class="absolute top-2 right-2 badge badge-primary badge-sm shadow-sm">Lv.{{ currentLevelMap.get(item.id) }}</span></figure>
@@ -304,7 +307,7 @@ onMounted(async () => {
       </button>
     </div>
 
-    <dialog class="modal" :class="{ 'modal-open': selectedItem }">
+    <dialog ref="itemDialog" class="modal" @close="onItemDialogClose">
       <div v-if="selectedItem" class="modal-box flex max-h-[calc(100dvh-1rem)] max-w-3xl flex-col overflow-hidden p-0 sm:max-h-[calc(100dvh-2rem)]">
         <button class="btn btn-sm btn-circle btn-ghost absolute! right-3 top-3 z-20 bg-base-100/85" aria-label="关闭" @click="selectedItem = null"><X class="w-4 h-4" /></button>
         <div class="min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]">
