@@ -235,7 +235,7 @@ onMounted(async () => {
         v-for="vlive in paginatedVlives" 
         :key="vlive.id"
         :to="'/vlives/' + vlive.id"
-        class="group block overflow-hidden rounded-xl border border-base-200 bg-base-100 shadow-sm transition hover:-translate-y-0.5 hover:border-primary/35 hover:shadow-md"
+        class="group block overflow-hidden rounded-xl border border-base-200 bg-base-100 shadow-sm transition hover:border-primary/35 hover:shadow-md"
       >
         <figure class="relative bg-base-200 aspect-[122/52]">
           <AssetImage 

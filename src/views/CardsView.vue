@@ -606,7 +606,7 @@ onMounted(() => {
                 <SekaiCard
                   :card="card"
                   :master-rank="getMasterRank(card.id)"
-                  class="transition-transform group-hover:scale-105"
+                  class="transition-transform"
                 />
                 <!-- 未拥有遮罩 -->
                 <div v-if="showUserCards && !userCardsMap.has(card.id)" class="absolute inset-0 bg-black/60 pointer-events-none z-30 transition-opacity"></div>
@@ -624,7 +624,7 @@ onMounted(() => {
                   :card="card"
                   :trained="true"
                   :master-rank="getMasterRank(card.id)"
-                  class="transition-transform group-hover:scale-105"
+                  class="transition-transform"
                 />
                 <!-- 未拥有遮罩 -->
                 <div v-if="showUserCards && !userCardsMap.has(card.id)" class="absolute inset-0 bg-black/60 pointer-events-none z-30 transition-opacity"></div>

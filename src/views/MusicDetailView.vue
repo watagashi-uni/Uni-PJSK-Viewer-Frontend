@@ -1410,7 +1410,7 @@ const isExpired = computed(() => {
             </h3>
             <RouterLink 
               :to="`/events/${relatedEvent.id}`"
-              class="block card bg-base-100 shadow-lg hover:shadow-xl transition-all hover:-translate-y-1 overflow-hidden"
+              class="block card bg-base-100 shadow-lg hover:shadow-xl transition-all overflow-hidden"
             >
               <figure class="aspect-[2/1]">
                 <AssetImage 
@@ -1543,7 +1543,7 @@ const isExpired = computed(() => {
                     </button>
                     
                     <button 
-                      class="btn btn-primary btn-circle w-11 h-11 shadow-lg hover:shadow-xl hover:scale-105 transition-all"
+                      class="btn btn-primary btn-circle w-11 h-11 shadow-lg hover:shadow-xl transition-all"
                       :disabled="!isAudioLoaded"
                       :aria-label="isPlaying ? '暂停' : '播放'"
                       @click="togglePlay"
@@ -1648,7 +1648,7 @@ const isExpired = computed(() => {
               <div
                 v-for="diff in difficulties"
                 :key="diff.id"
-                class="rounded-xl shadow-sm transition-all hover:shadow-md hover:-translate-y-1"
+                class="rounded-xl shadow-sm transition-all hover:shadow-md"
                 :style="difficultyCardStyle(diff.musicDifficulty)"
               >
                 <div class="flex h-full flex-col items-center rounded-[calc(0.75rem-4px)] bg-base-100 mt-1 p-2 sm:p-4">

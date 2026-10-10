@@ -898,7 +898,7 @@ watch(() => route.params.id, loadData)
               v-for="card in eventCardList" 
               :key="card?.id"
               :to="`/cards/${card?.id}`"
-              class="hover:scale-105 transition-transform w-16 sm:w-20"
+              class="transition-transform w-16 sm:w-20"
             >
               <SekaiCard 
                 v-if="card" 
@@ -949,7 +949,7 @@ watch(() => route.params.id, loadData)
                   v-for="card in charData?.cards" 
                   :key="card.id"
                   :to="`/cards/${card.id}`"
-                  class="hover:scale-105 transition-transform w-12 sm:w-14"
+                  class="transition-transform w-12 sm:w-14"
                 >
                   <SekaiCard 
                     :card="card" 
@@ -1045,7 +1045,7 @@ watch(() => route.params.id, loadData)
 
           <div class="grid md:grid-cols-2 gap-3">
             <div v-for="row in exchangeRows" :key="row.id" class="flex items-center gap-3 rounded-xl border border-base-200 bg-base-200/35 p-3">
-              <RouterLink v-if="row.reward.resourceType === 'card'" :to="`/cards/${row.reward.resourceId}`" class="w-16 h-16 rounded-lg overflow-hidden bg-base-200 shrink-0 hover:scale-105 transition-transform"><AssetImage :src="resourceIcon(row.reward)" :alt="resourceName(row.reward)" class="w-full h-full object-cover" /></RouterLink>
+              <RouterLink v-if="row.reward.resourceType === 'card'" :to="`/cards/${row.reward.resourceId}`" class="w-16 h-16 rounded-lg overflow-hidden bg-base-200 shrink-0 transition-transform"><AssetImage :src="resourceIcon(row.reward)" :alt="resourceName(row.reward)" class="w-full h-full object-cover" /></RouterLink>
               <div v-else class="w-16 h-16 rounded-lg bg-base-200 p-2 shrink-0"><AssetImage :src="resourceIcon(row.reward)" :alt="resourceName(row.reward)" class="w-full h-full object-contain" /></div>
               <div class="min-w-0 flex-1">
                 <p class="font-medium text-sm truncate">{{ resourceName(row.reward) }}</p>
@@ -1077,7 +1077,7 @@ watch(() => route.params.id, loadData)
           <div 
             v-for="honor in rankingHonors" 
             :key="honor.id"
-            class="group relative rounded-2xl bg-base-200/40 border border-base-200 hover:bg-base-200 hover:-translate-y-1 hover:shadow-md transition-all duration-300 overflow-hidden"
+            class="group relative rounded-2xl bg-base-200/40 border border-base-200 hover:bg-base-200 hover:shadow-md transition-all duration-300 overflow-hidden"
           >
             <!-- 排名标签 -->
             <div class="absolute top-0 left-0 bg-primary/90 backdrop-blur text-primary-content font-black italic px-4 py-1 rounded-br-2xl text-sm shadow-sm z-10 flex items-center gap-1">
@@ -1090,7 +1090,7 @@ watch(() => route.params.id, loadData)
 
             <!-- 牌子图片容器 -->
             <div class="relative py-8 px-4 flex justify-center items-center h-full w-full">
-              <div class="w-full max-w-[280px] drop-shadow-sm group-hover:drop-shadow-md group-hover:scale-105 transition-all duration-300">
+              <div class="w-full max-w-[280px] drop-shadow-sm group-hover:drop-shadow-md transition-all duration-300">
                 <SekaiHonor 
                   :honor-id="honor.honorId" 
                   :honor-level="honor.honorLevel"

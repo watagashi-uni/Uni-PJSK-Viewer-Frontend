@@ -1797,7 +1797,7 @@ watch(totalPages, (pages) => {
               <AssetImage 
                 :src="getMusicThumbnailUrl(music.id)" 
                 :alt="music.title"
-                class="w-14 h-14 sm:w-[3.25rem] sm:h-[3.25rem] lg:w-[3.75rem] lg:h-[3.75rem] rounded shadow-sm group-hover:scale-105 transition-transform object-cover"
+                class="w-14 h-14 sm:w-[3.25rem] sm:h-[3.25rem] lg:w-[3.75rem] lg:h-[3.75rem] rounded shadow-sm transition-transform object-cover"
               />
               <template v-if="showUserResults">
                 <img

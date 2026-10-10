@@ -294,8 +294,8 @@ onMounted(async () => {
     <div v-else-if="loadError" class="alert alert-error">物品数据加载失败：{{ loadError }}</div>
     <template v-else>
       <div v-if="paginatedItems.length" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-        <button v-for="item in paginatedItems" :key="item.key" class="group card bg-base-100 border border-base-200 hover:border-primary/30 hover:shadow-md hover:-translate-y-0.5 transition-all overflow-hidden text-left" @click="selectedItem = item">
-          <figure class="relative h-28 sm:h-32 bg-gradient-to-br from-base-200 to-base-100 p-2.5"><AssetImage :src="item.icon" :alt="item.name" class="w-full h-full object-contain group-hover:scale-105 transition-transform" /><span class="absolute top-2 left-2 badge badge-xs badge-neutral">{{ categoryMeta[item.category].shortLabel }}</span><span v-if="hasInventory(item.category)" class="absolute top-2 right-2 badge badge-xs badge-primary shadow-sm">×{{ formatNumber(getOwned(item)) }}</span></figure>
+        <button v-for="item in paginatedItems" :key="item.key" class="group card bg-base-100 border border-base-200 hover:border-primary/30 hover:shadow-md transition-all overflow-hidden text-left" @click="selectedItem = item">
+          <figure class="relative h-28 sm:h-32 bg-gradient-to-br from-base-200 to-base-100 p-2.5"><AssetImage :src="item.icon" :alt="item.name" class="w-full h-full object-contain transition-transform" /><span class="absolute top-2 left-2 badge badge-xs badge-neutral">{{ categoryMeta[item.category].shortLabel }}</span><span v-if="hasInventory(item.category)" class="absolute top-2 right-2 badge badge-xs badge-primary shadow-sm">×{{ formatNumber(getOwned(item)) }}</span></figure>
           <div class="card-body p-3 gap-1"><span class="text-[10px] text-base-content/45">#{{ item.id }} · {{ item.detail }}</span><h2 class="font-bold text-sm line-clamp-2 min-h-10">{{ item.name }}</h2><p class="text-[11px] text-base-content/55 line-clamp-2 min-h-8">{{ item.description || '暂无说明' }}</p></div>
         </button>
       </div>

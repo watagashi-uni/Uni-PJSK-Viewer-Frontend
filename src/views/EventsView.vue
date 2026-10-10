@@ -166,7 +166,7 @@ onMounted(loadData)
         v-for="event in filteredEvents" 
         :key="event.id"
         :to="`/events/${event.id}`"
-        class="card bg-base-100 shadow-lg hover:shadow-xl transition-all hover:-translate-y-1 overflow-hidden animate-fade-in-up relative group"
+        class="card bg-base-100 shadow-lg hover:shadow-xl transition-all overflow-hidden animate-fade-in-up relative group"
       >
         <!-- Banner 图片 -->
         <figure class="relative">

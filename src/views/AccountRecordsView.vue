@@ -873,7 +873,7 @@ onMounted(async () => {
                 </div>
                 <div class="grid grid-cols-5 gap-1.5">
                   <div v-for="(card, index) in challengeDeckCards(row.deck)" :key="card.cardId" class="min-w-0">
-                    <RouterLink :to="`/cards/${card.cardId}`" class="block hover:scale-105 transition-transform"><SekaiCard v-if="card.master" :card="card.master" :trained="card.user?.defaultImage === 'special_training'" :master-rank="card.user?.masterRank || 0" /></RouterLink>
+                    <RouterLink :to="`/cards/${card.cardId}`" class="block transition-transform"><SekaiCard v-if="card.master" :card="card.master" :trained="card.user?.defaultImage === 'special_training'" :master-rank="card.user?.masterRank || 0" /></RouterLink>
                     <p class="text-[10px] text-center mt-1 truncate"><span v-if="index === 0" class="text-primary font-bold">Leader · </span>Lv.{{ card.user?.level || '?' }}</p>
                   </div>
                 </div>
@@ -931,7 +931,7 @@ onMounted(async () => {
 
       <section v-else-if="activeTab === 'decks'" class="space-y-4">
         <div v-if="!userDecks.length" class="alert alert-info"><span>当前上传数据中没有保存卡组数据。</span><button class="btn btn-sm shrink-0" :disabled="accountStore.suiteRefreshing" @click="syncUserData"><RefreshCw class="w-4 h-4" :class="{ 'animate-spin': accountStore.suiteRefreshing }" />同步数据</button></div>
-        <div v-else class="grid md:grid-cols-2 xl:grid-cols-3 gap-3"><article v-for="deck in userDecks" :key="deck.deckId" class="card bg-base-100 shadow-sm border border-base-200"><div class="card-body p-3"><div class="flex items-center justify-between"><h2 class="font-bold text-sm flex items-center gap-2"><LayoutGrid class="w-4 h-4 text-primary" />{{ deck.name || `卡组 ${deck.deckId}` }}</h2><span class="badge badge-sm badge-outline">卡组 {{ deck.deckId }}</span></div><div class="grid grid-cols-5 gap-1.5"><div v-for="row in deckCards(deck)" :key="row.cardId" class="min-w-0"><RouterLink :to="`/cards/${row.cardId}`" class="block hover:scale-105 transition-transform"><SekaiCard v-if="row.master" :card="row.master" :trained="row.user?.defaultImage === 'special_training'" :master-rank="row.user?.masterRank || 0" /></RouterLink><p class="text-xs text-center mt-1 truncate">Lv.{{ row.user?.level || '?' }}<span v-if="row.cardId === deck.leader" class="text-primary"> · 队长</span></p></div></div></div></article></div>
+        <div v-else class="grid md:grid-cols-2 xl:grid-cols-3 gap-3"><article v-for="deck in userDecks" :key="deck.deckId" class="card bg-base-100 shadow-sm border border-base-200"><div class="card-body p-3"><div class="flex items-center justify-between"><h2 class="font-bold text-sm flex items-center gap-2"><LayoutGrid class="w-4 h-4 text-primary" />{{ deck.name || `卡组 ${deck.deckId}` }}</h2><span class="badge badge-sm badge-outline">卡组 {{ deck.deckId }}</span></div><div class="grid grid-cols-5 gap-1.5"><div v-for="row in deckCards(deck)" :key="row.cardId" class="min-w-0"><RouterLink :to="`/cards/${row.cardId}`" class="block transition-transform"><SekaiCard v-if="row.master" :card="row.master" :trained="row.user?.defaultImage === 'special_training'" :master-rank="row.user?.masterRank || 0" /></RouterLink><p class="text-xs text-center mt-1 truncate">Lv.{{ row.user?.level || '?' }}<span v-if="row.cardId === deck.leader" class="text-primary"> · 队长</span></p></div></div></div></article></div>
       </section>
     </template>
 

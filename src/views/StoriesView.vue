@@ -412,8 +412,8 @@ onMounted(async () => {
     <template v-else-if="activeTab === 'event'">
       <div class="flex items-center justify-between gap-3"><p class="text-sm font-medium">{{ filteredEventStories.length }} 个活动故事</p><span class="text-xs text-base-content/45">按活动时间从新到旧</span></div>
       <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <button v-for="story in paginatedEventStories" :key="story.id" class="group card bg-base-100 border border-base-200 hover:border-primary/30 hover:shadow-lg hover:-translate-y-0.5 transition-all overflow-hidden text-left" @click="openEventStory(story)">
-          <figure class="relative aspect-[122/52] bg-base-200 overflow-hidden"><AssetImage :src="eventBanner(story)" :alt="eventMap.get(story.eventId)?.name" class="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-300" /><span class="absolute top-2 right-2 badge badge-sm border-0 bg-base-100/90 text-base-content shadow-sm"><Play class="w-3 h-3" /> 可阅读</span></figure>
+        <button v-for="story in paginatedEventStories" :key="story.id" class="group card bg-base-100 border border-base-200 hover:border-primary/30 hover:shadow-lg transition-all overflow-hidden text-left" @click="openEventStory(story)">
+          <figure class="relative aspect-[122/52] bg-base-200 overflow-hidden"><AssetImage :src="eventBanner(story)" :alt="eventMap.get(story.eventId)?.name" class="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-300" /></figure>
           <div class="card-body p-4 gap-2.5">
             <div class="flex items-center justify-between gap-2"><img v-if="getUnitLogo(mainUnitByEventStory.get(story.id))" :src="getUnitLogo(mainUnitByEventStory.get(story.id))" class="h-5 max-w-24 object-contain object-left" /><span class="text-[11px] text-base-content/45">{{ formatDate(eventMap.get(story.eventId)?.startAt) }}</span></div>
             <h2 class="font-bold line-clamp-2 leading-5">{{ eventMap.get(story.eventId)?.name || `活动故事 #${story.id}` }}</h2>
@@ -428,7 +428,7 @@ onMounted(async () => {
     <template v-else-if="activeTab === 'unit'">
       <p class="text-sm font-medium">{{ flattenedUnitChapters.length }} 个主线章节</p>
       <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <button v-for="chapter in flattenedUnitChapters" :key="chapter.id" class="group card bg-base-100 border border-base-200 hover:border-primary/30 hover:shadow-lg hover:-translate-y-0.5 transition-all text-left overflow-hidden" @click="openUnitChapter(chapter)">
+        <button v-for="chapter in flattenedUnitChapters" :key="chapter.id" class="group card bg-base-100 border border-base-200 hover:border-primary/30 hover:shadow-lg transition-all text-left overflow-hidden" @click="openUnitChapter(chapter)">
           <div class="h-1.5 bg-primary/70"></div><div class="card-body p-5 gap-3">
             <div class="flex items-center justify-between gap-3"><img :src="getUnitLogo(chapter.unit)" :alt="getUnitLabel(chapter.unit)" class="h-8 max-w-40 object-contain object-left" /><span class="badge badge-sm badge-ghost">Chapter {{ chapter.chapterNo }}</span></div>
             <h2 class="font-bold leading-5">{{ chapter.title }}</h2>

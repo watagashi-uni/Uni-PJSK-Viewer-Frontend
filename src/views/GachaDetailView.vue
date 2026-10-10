@@ -650,7 +650,7 @@ watch(() => route.params.id, loadData)
               v-for="card in featuredCards" 
               :key="card?.id"
               :to="`/cards/${card?.id}`"
-              class="hover:scale-105 transition-transform w-16 sm:w-20"
+              class="transition-transform w-16 sm:w-20"
             >
               <SekaiCard 
                 v-if="card" 
@@ -773,7 +773,7 @@ watch(() => route.params.id, loadData)
                 v-for="(result, index) in rareCards" 
                 :key="'rare-' + index"
                 :to="result.card ? `/cards/${result.card.id}` : '#'"
-                class="hover:scale-105 transition-transform w-14 sm:w-16"
+                class="transition-transform w-14 sm:w-16"
               >
                 <SekaiCard 
                   v-if="result.card" 
@@ -792,7 +792,7 @@ watch(() => route.params.id, loadData)
                 v-for="(result, index) in simulationResults" 
                 :key="index"
                 :to="result.card ? `/cards/${result.card.id}` : '#'"
-                class="hover:scale-105 transition-transform w-12 sm:w-14"
+                class="transition-transform w-12 sm:w-14"
               >
                 <SekaiCard 
                   v-if="result.card" 

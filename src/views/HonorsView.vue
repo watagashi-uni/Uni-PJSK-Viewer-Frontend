@@ -400,7 +400,7 @@ onMounted(async () => {
           v-for="honor in paginatedHonors"
           :key="honor.id"
           type="button"
-          class="group card w-full min-w-0 overflow-hidden bg-base-100 border border-base-200 hover:border-primary/50 hover:shadow-md hover:-translate-y-0.5 transition-all text-left"
+          class="group card w-full min-w-0 overflow-hidden bg-base-100 border border-base-200 hover:border-primary/50 hover:shadow-md transition-all text-left"
           @click="openHonor(honor)"
         >
           <div class="card-body min-w-0 p-3 gap-2.5">
@@ -458,7 +458,7 @@ onMounted(async () => {
           v-for="honor in paginatedBondsHonors"
           :key="honor.id"
           type="button"
-          class="group card w-full min-w-0 overflow-hidden bg-base-100 border border-base-200 hover:border-secondary/50 hover:shadow-md hover:-translate-y-0.5 transition-all text-left"
+          class="group card w-full min-w-0 overflow-hidden bg-base-100 border border-base-200 hover:border-secondary/50 hover:shadow-md transition-all text-left"
           @click="openBondsHonor(honor)"
         >
           <div class="card-body min-w-0 p-3 gap-2.5">

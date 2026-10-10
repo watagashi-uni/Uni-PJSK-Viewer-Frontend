@@ -546,7 +546,7 @@ onMounted(async () => {
             v-for="character in group.items"
             :key="character.id"
             type="button"
-            class="card bg-base-100 border border-base-200 hover:-translate-y-1 hover:shadow-lg transition-all overflow-hidden text-left group"
+            class="card bg-base-100 border border-base-200 hover:shadow-lg transition-all overflow-hidden text-left group"
             @click="openCharacter(character)"
           >
             <figure
@@ -556,7 +556,7 @@ onMounted(async () => {
               <AssetImage
                 :src="getStandingUrl(character)"
                 :alt="getCharacterName(character)"
-                class="w-full h-full object-contain object-bottom pt-2 group-hover:scale-105 transition-transform duration-300"
+                class="w-full h-full object-contain object-bottom pt-2 transition-transform duration-300"
               />
               <span
                 v-if="userCharacterMap.get(character.id)"

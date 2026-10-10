@@ -636,10 +636,10 @@ onMounted(loadData)
             </p>
             
             <div class="flex justify-center gap-6 mt-4 opacity-90">
-              <div class="w-20 hover:-translate-y-1 hover:shadow-xl transition-all duration-300 rounded-lg overflow-hidden shrink-0 mt-2">
+              <div class="w-20 hover:shadow-xl transition-all duration-300 rounded-lg overflow-hidden shrink-0 mt-2">
                 <SekaiCard :card="card" :trained="false" />
               </div>
-              <div v-if="isTrainingType" class="w-20 hover:-translate-y-1 hover:shadow-xl transition-all duration-300 rounded-lg overflow-hidden shrink-0 mt-2">
+              <div v-if="isTrainingType" class="w-20 hover:shadow-xl transition-all duration-300 rounded-lg overflow-hidden shrink-0 mt-2">
                 <SekaiCard :card="card" :trained="true" />
               </div>
             </div>
@@ -832,7 +832,7 @@ onMounted(loadData)
                   :href="coverUrl.replace('.jpg', '.png')" 
                   target="_blank"
                   rel="noopener noreferrer"
-                  class="block rounded-xl overflow-hidden shadow-lg hover:-translate-y-1 hover:shadow-xl transition-all duration-300 min-w-0 flex-shrink"
+                  class="block rounded-xl overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 min-w-0 flex-shrink"
                 >
                   <AssetImage 
                     :src="coverUrl"
@@ -847,7 +847,7 @@ onMounted(loadData)
                   :href="`${assetsHost}/startapp/character/member_cutout_trm/${card.assetbundleName}/normal.png`" 
                   target="_blank"
                   rel="noopener noreferrer"
-                  class="block rounded-xl overflow-hidden shadow-lg hover:-translate-y-1 hover:shadow-xl transition-all duration-300 min-w-0 flex-shrink"
+                  class="block rounded-xl overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 min-w-0 flex-shrink"
                 >
                   <AssetImage 
                     :src="`${assetsHost}/startapp/character/member_cutout_trm/${card.assetbundleName}/normal.png`"
@@ -866,7 +866,7 @@ onMounted(loadData)
                   :href="trainedCoverUrl.replace('.jpg', '.png')" 
                   target="_blank"
                   rel="noopener noreferrer"
-                  class="block rounded-xl overflow-hidden shadow-lg hover:-translate-y-1 hover:shadow-xl transition-all duration-300 min-w-0 flex-shrink"
+                  class="block rounded-xl overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 min-w-0 flex-shrink"
                 >
                   <AssetImage 
                     :src="trainedCoverUrl"
@@ -881,7 +881,7 @@ onMounted(loadData)
                   :href="`${assetsHost}/startapp/character/member_cutout_trm/${card.assetbundleName}/after_training.png`" 
                   target="_blank"
                   rel="noopener noreferrer"
-                  class="block rounded-xl overflow-hidden shadow-lg hover:-translate-y-1 hover:shadow-xl transition-all duration-300 min-w-0 flex-shrink"
+                  class="block rounded-xl overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 min-w-0 flex-shrink"
                 >
                   <AssetImage 
                     :src="`${assetsHost}/startapp/character/member_cutout_trm/${card.assetbundleName}/after_training.png`"
