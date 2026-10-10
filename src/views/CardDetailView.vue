@@ -791,7 +791,7 @@ onMounted(loadData)
                 <RouterLink
                   v-for="(gacha, index) in displayedGachas"
                   :key="gacha.id"
-                  :to="`/gacha/${gacha.id}`"
+                  :to="`/gachas/${gacha.id}`"
                   class="flex items-center gap-3 bg-base-100 rounded-lg p-2 hover:shadow-md transition-all"
                 >
                   <AssetImage

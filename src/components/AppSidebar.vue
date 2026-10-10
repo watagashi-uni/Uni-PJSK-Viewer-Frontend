@@ -49,7 +49,7 @@ const groups: NavGroup[] = [
     items: [
       { to: '/events', label: '活动', icon: Calendar },
       { to: '/ranking', label: '实时榜线', icon: BarChart3 },
-      { to: '/gachas', label: '卡池', icon: Gift, also: ['/gacha/'] },
+      { to: '/gachas', label: '卡池', icon: Gift },
       { to: '/vlives', label: '虚拟 Live', icon: Radio },
       { to: '/calendar', label: '游戏日历', icon: CalendarDays },
     ],
