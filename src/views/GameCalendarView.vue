@@ -184,8 +184,8 @@ const permanentEntries = computed<CalendarEntry[]>(() => {
     rows.push({ key: `event-end-${event.id}`, category: 'event', timestamp: Number(event.aggregateAt), title: event.name, subtitle: '活动结算', route: `/events/${event.id}` })
   }
   for (const gacha of gachas.value.filter(row => row.isShowPeriod !== false)) {
-    rows.push({ key: `gacha-start-${gacha.id}`, category: 'gacha', timestamp: Number(gacha.startAt), title: gacha.name, subtitle: '卡池开放', route: `/gacha/${gacha.id}` })
-    rows.push({ key: `gacha-end-${gacha.id}`, category: 'gacha', timestamp: Number(gacha.endAt), title: gacha.name, subtitle: '卡池结束', route: `/gacha/${gacha.id}` })
+    rows.push({ key: `gacha-start-${gacha.id}`, category: 'gacha', timestamp: Number(gacha.startAt), title: gacha.name, subtitle: '卡池开放', route: `/gachas/${gacha.id}` })
+    rows.push({ key: `gacha-end-${gacha.id}`, category: 'gacha', timestamp: Number(gacha.endAt), title: gacha.name, subtitle: '卡池结束', route: `/gachas/${gacha.id}` })
   }
   for (const music of musics.value) {
     rows.push({ key: `music-${music.id}`, category: 'music', timestamp: Number(music.publishedAt), title: music.title, subtitle: '歌曲发布', route: `/musics/${music.id}` })

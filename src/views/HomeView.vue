@@ -122,8 +122,8 @@ const allScheduleItems = computed<ScheduleItem[]>(() => {
     rows.push({ key: `event-end-${event.id}`, category: 'event', timestamp: event.aggregateAt, title: event.name, subtitle: '活动结算', route: `/events/${event.id}` })
   }
   for (const gacha of gachas.value) {
-    rows.push({ key: `gacha-start-${gacha.id}`, category: 'gacha', timestamp: gacha.startAt, title: gacha.name, subtitle: '卡池开放', route: `/gacha/${gacha.id}` })
-    rows.push({ key: `gacha-end-${gacha.id}`, category: 'gacha', timestamp: gacha.endAt, title: gacha.name, subtitle: '卡池结束', route: `/gacha/${gacha.id}` })
+    rows.push({ key: `gacha-start-${gacha.id}`, category: 'gacha', timestamp: gacha.startAt, title: gacha.name, subtitle: '卡池开放', route: `/gachas/${gacha.id}` })
+    rows.push({ key: `gacha-end-${gacha.id}`, category: 'gacha', timestamp: gacha.endAt, title: gacha.name, subtitle: '卡池结束', route: `/gachas/${gacha.id}` })
   }
   for (const music of musics.value) {
     rows.push({ key: `music-${music.id}`, category: 'music', timestamp: music.publishedAt, title: music.title, subtitle: '歌曲发布', route: `/musics/${music.id}` })
@@ -432,7 +432,7 @@ onMounted(async () => {
             <RouterLink
               v-for="gacha in visibleGachas"
               :key="gacha.id"
-              :to="`/gacha/${gacha.id}`"
+              :to="`/gachas/${gacha.id}`"
               class="group flex min-w-0 flex-col overflow-hidden rounded-box border border-base-300 bg-base-100 transition-colors hover:border-primary/50"
             >
               <span class="flex aspect-[2/1] items-center justify-center p-2">

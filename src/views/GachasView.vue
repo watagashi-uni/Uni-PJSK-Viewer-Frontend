@@ -170,7 +170,7 @@ onMounted(loadData)
         <router-link
           v-for="gacha in paginatedGachas"
           :key="gacha.id"
-          :to="`/gacha/${gacha.id}`"
+          :to="`/gachas/${gacha.id}`"
           class="card bg-base-100 shadow-sm hover:shadow-lg transition-all group overflow-hidden relative"
         >
           <figure class="relative aspect-[7/2] bg-base-200 overflow-hidden flex items-center justify-center">

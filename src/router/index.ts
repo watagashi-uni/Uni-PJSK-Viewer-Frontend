@@ -262,10 +262,15 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '卡池' },
     },
     {
-        path: '/gacha/:id',
+        path: '/gachas/:id',
         name: 'GachaDetail',
         component: () => import('@/views/GachaDetailView.vue'),
         meta: { title: '卡池详情' },
+    },
+    {
+        // 旧链接，与其他列表/详情（/musics/:id、/events/:id…）统一为复数形式
+        path: '/gacha/:id',
+        redirect: (to) => ({ path: `/gachas/${to.params.id}`, query: to.query, hash: to.hash }),
     },
     {
         path: '/profile',
