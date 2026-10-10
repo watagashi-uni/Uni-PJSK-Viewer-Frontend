@@ -1,7 +1,8 @@
 <script lang="ts">
 // RouterView 以 fullPath 为 key，query 变化（翻页/筛选重置页码）会重建整个视图，
-// <script setup> 内的 ref 会全部重置。筛选/排序/视图状态持久化到 localStorage：
-// 重建、进出详情页、刷新后均恢复，只有用户主动修改时才会变化。
+// <script setup> 内的 ref 会全部重置。筛选/排序/视图状态保存到 sessionStorage：
+// 重建、进出详情页、刷新后均恢复，只有用户主动修改时才会变化；
+// 关闭标签页/窗口或重启浏览器后还原为默认值。
 const MUSICS_VIEW_STATE_KEY = 'musicsView_state'
 
 interface StoredMusicsViewState {
@@ -26,7 +27,13 @@ interface StoredMusicsViewState {
 // 读取并逐字段校验存储的状态，异常数据回落到默认值
 function loadStoredMusicsViewState(): StoredMusicsViewState | null {
   try {
-    const raw = localStorage.getItem(MUSICS_VIEW_STATE_KEY)
+    // 清理旧版本持久化到 localStorage 的状态
+    localStorage.removeItem(MUSICS_VIEW_STATE_KEY)
+  } catch {
+    // 存储不可用时忽略
+  }
+  try {
+    const raw = sessionStorage.getItem(MUSICS_VIEW_STATE_KEY)
     if (!raw) return null
     const parsed = JSON.parse(raw)
     if (!parsed || typeof parsed !== 'object') return null
@@ -208,7 +215,7 @@ const assetsHost = computed(() => settingsStore.assetsHost)
 const EMPTY_OBJ: Record<string, any> = Object.freeze({})
 const EMPTY_ARR: string[] = Object.freeze([]) as unknown as string[]
 
-// 状态（从 localStorage 恢复，见文件顶部说明）
+// 状态（从 sessionStorage 恢复，见文件顶部说明）
 const restored: StoredMusicsViewState | null = loadStoredMusicsViewState()
 const searchText = ref(restored?.searchText ?? '')
 const selectedArtist = ref(restored?.selectedArtist ?? '')
@@ -1260,7 +1267,7 @@ watch([searchText, selectedArtist, sortKey, sortOrder, resultFilter, collectionF
   window.scrollTo({ top: 0, behavior: 'auto' })
 })
 
-// 用户修改筛选/排序/视图状态时写入 localStorage（Set 均为整体替换赋值，浅层监听即可）
+// 用户修改筛选/排序/视图状态时写入 sessionStorage（Set 均为整体替换赋值，浅层监听即可）
 watch(
   [searchText, selectedArtist, sortKey, sortOrder, selectedDiffType, isFilterPanelOpen,
     selectedMusicTags, selectedCollaborationIds, selectedMvTypes, selectedVocalCharacters, selectedReleaseConditionIds,
@@ -1285,7 +1292,7 @@ watch(
       filterDifficulty: filterDifficulty.value,
     }
     try {
-      localStorage.setItem(MUSICS_VIEW_STATE_KEY, JSON.stringify(state))
+      sessionStorage.setItem(MUSICS_VIEW_STATE_KEY, JSON.stringify(state))
     } catch {
       // 存储不可用（如隐私模式）时静默忽略
     }
