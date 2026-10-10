@@ -4,6 +4,78 @@
   exclude: properties;
 }
 
+/* 默认浅色主题（设置里的「浅色」/跟随系统的浅色都用它） */
+@plugin "daisyui/theme" {
+  name: "unipjsk";
+  default: true;
+  prefersdark: false;
+  color-scheme: "light";
+  --color-base-100: #ffffff;
+  --color-base-200: #f4f5f7;
+  --color-base-300: #e2e5ea;
+  --color-base-content: #1d2330;
+  --color-primary: #0b8196;
+  --color-primary-content: #ffffff;
+  --color-secondary: #c93a6e;
+  --color-secondary-content: #ffffff;
+  --color-accent: #6d5bd0;
+  --color-accent-content: #ffffff;
+  --color-neutral: #374151;
+  --color-neutral-content: #ffffff;
+  --color-info: #0277b6;
+  --color-info-content: #ffffff;
+  --color-success: #16803c;
+  --color-success-content: #ffffff;
+  --color-warning: #e08a00;
+  --color-warning-content: #1d2330;
+  --color-error: #d42a2a;
+  --color-error-content: #ffffff;
+  --radius-selector: 0.375rem;
+  --radius-field: 0.5rem;
+  --radius-box: 0.75rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 0;
+  --noise: 0;
+}
+
+/* 覆盖内置 dark，使深色与浅色共用同一套品牌色 */
+@plugin "daisyui/theme" {
+  name: "dark";
+  default: false;
+  prefersdark: true;
+  color-scheme: "dark";
+  --color-base-100: #1a1d24;
+  --color-base-200: #13151a;
+  --color-base-300: #2a2f39;
+  --color-base-content: #e4e7ec;
+  --color-primary: #3cc4d8;
+  --color-primary-content: #06282e;
+  --color-secondary: #f07aa5;
+  --color-secondary-content: #3a0d1e;
+  --color-accent: #a497ff;
+  --color-accent-content: #1b1240;
+  --color-neutral: #2b313c;
+  --color-neutral-content: #e4e7ec;
+  --color-info: #38bdf8;
+  --color-info-content: #062033;
+  --color-success: #4ade80;
+  --color-success-content: #052e16;
+  --color-warning: #fbbf24;
+  --color-warning-content: #2a1a00;
+  --color-error: #f87171;
+  --color-error-content: #3b0909;
+  --radius-selector: 0.375rem;
+  --radius-field: 0.5rem;
+  --radius-box: 0.75rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 0;
+  --noise: 0;
+}
+
 @plugin "daisyui/theme" {
   name: "moe";
   default: false;
@@ -30,7 +102,7 @@
 @plugin "daisyui/theme" {
   name: "jirai";
   default: false;
-  prefersdark: true;
+  prefersdark: false;
   color-scheme: "dark";
   --color-base-100: #1a151b;
   --color-base-200: #261f28;
@@ -53,7 +125,24 @@
 
 /* 自定义基础样式 */
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Hiragino Sans GB', 'Hiragino Sans', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Noto Sans SC', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* 键盘焦点可见，鼠标点击不出现 */
+:where(a, button, [role="button"], summary, input, select, textarea):focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* Moe Theme UI Overrides */
@@ -496,4 +585,11 @@ html {
 
 .range::-webkit-slider-thumb {
   transform: translateY(-50%) !important;
+}
+
+/* 侧边栏当前页：用品牌色浅底代替 daisyUI 默认的深色块（地雷主题有自己的规则，优先级更高） */
+.sidebar-wrapper .menu li > a.menu-active {
+  background-color: color-mix(in oklab, var(--color-primary) 12%, transparent);
+  color: var(--color-primary);
+  font-weight: 600;
 }

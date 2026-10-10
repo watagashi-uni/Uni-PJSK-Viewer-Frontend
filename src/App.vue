@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, watch } from 'vue'
+import { useModalDialog } from '@/composables/useModalDialog'
 import { RouterView, useRoute } from 'vue-router'
 import { isRouteLoading } from '@/router'
 import AppNavbar from '@/components/AppNavbar.vue'
@@ -9,8 +10,7 @@ import { useSettingsStore } from '@/stores/settings'
 import { useAccountStore } from '@/stores/account'
 import { useOAuthStore } from '@/stores/oauth'
 import { useNotificationStore } from '@/stores/notification'
-import { Music, Image, BarChart3, Info, Settings, Calendar, CalendarDays, Gift, Zap, User, RefreshCw, Github, House, Radio, Shirt, Dices, Smile, Users, Trophy, BookOpen, Wrench, Boxes, History } from 'lucide-vue-next'
-import AccountSelector from '@/components/AccountSelector.vue'
+import AppSidebar from '@/components/AppSidebar.vue'
 
 const route = useRoute()
 const masterStore = useMasterStore()
@@ -18,8 +18,13 @@ const settingsStore = useSettingsStore()
 const accountStore = useAccountStore()
 const oauthStore = useOAuthStore()
 const notificationStore = useNotificationStore()
+const { onDialogClose: onOAuthConfirmClose } = useModalDialog(
+  'oauthConfirmDialog',
+  () => accountStore.oauthConfirmVisible,
+  () => accountStore.cancelOAuth(),
+)
 
-const refreshError = ref('')
+const currentYear = new Date().getFullYear()
 
 const isFullscreen = computed(() => route.meta.fullscreen === true)
 // key 只含 path：翻页/筛选等 query 变化由各页面自身响应（均为 computed/watch 驱动），
@@ -45,26 +50,6 @@ watch(
     masterStore.checkVersionInBackground()
   }
 )
-
-async function handleProfileRefresh() {
-  if (!accountStore.currentUserId) return
-  refreshError.value = ''
-  try {
-    await accountStore.refreshProfile(accountStore.currentUserId)
-  } catch (e: any) {
-    refreshError.value = e.message
-  }
-}
-
-async function handleSuiteRefresh() {
-  if (!accountStore.currentUserId) return
-  refreshError.value = ''
-  try {
-    await accountStore.refreshSuite(accountStore.currentUserId)
-  } catch (e: any) {
-    refreshError.value = e.message
-  }
-}
 </script>
 
 <template>
@@ -89,212 +74,27 @@ async function handleSuiteRefresh() {
     <div class="drawer-content flex flex-col">
       <AppNavbar />
       
-      <main class="flex-1 w-full max-w-7xl mx-auto px-4 py-6">
+      <main class="flex-1 w-full max-w-7xl mx-auto px-4 py-5 sm:px-6 lg:py-8">
         <RouterView :key="routerViewKey" />
       </main>
       
-      <footer class="footer items-center p-4 bg-base-300 text-base-content mt-auto">
-        <aside class="items-center grid-flow-col">
-          <p>Uni PJSK Viewer © {{ new Date().getFullYear() }} - Created by 綿菓子ウニ</p>
-        </aside>
+      <footer class="mt-auto border-t border-base-300 px-4 py-4 text-xs text-base-content/50 sm:px-6">
+        <div class="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-x-4 gap-y-1">
+          <span>Uni PJSK Viewer © {{ currentYear }} · 綿菓子ウニ</span>
+          <span v-if="masterStore.version" class="font-mono">数据 {{ masterStore.version }}<template v-if="masterStore.assetVersion && masterStore.assetVersion !== masterStore.version"> · 资源 {{ masterStore.assetVersion }}</template></span>
+        </div>
       </footer>
     </div>
     
-    <!-- Sidebar -->
-    <div class="drawer-side z-50 overflow-hidden">
-      <label for="my-drawer-2" aria-label="close sidebar" class="drawer-overlay"></label>
-      <div class="sidebar-wrapper w-80 h-full relative z-10">
-        <ul class="menu p-4 w-full h-full overflow-y-auto overflow-x-hidden overscroll-y-contain flex flex-col flex-nowrap bg-base-100 text-base-content shadow-xl gap-2">
-          <li class="mb-4 relative">
-            <RouterLink to="/" class="text-2xl font-bold text-primary px-2 hover:bg-transparent pr-12">
-              Uni PJSK
-              <span class="text-base-content/60 text-sm font-normal">Viewer</span>
-            </RouterLink>
-            <a 
-              href="https://github.com/watagashi-uni/Uni-PJSK-Viewer-Frontend" 
-              target="_blank" 
-              class="absolute right-2 top-1/2 -translate-y-1/2 p-2 hover:bg-base-200 rounded-full transition-colors z-10"
-              title="GitHub 仓库"
-            >
-              <Github class="w-5 h-5 text-base-content/60 hover:text-base-content" />
-            </a>
-          </li>
-
-          <li>
-            <RouterLink to="/musics" active-class="active">
-              <Music class="w-5 h-5" /> 歌曲列表
-            </RouterLink>
-          </li>
-          <li>
-            <RouterLink to="/cards" active-class="active">
-              <Image class="w-5 h-5" /> 卡片查询
-            </RouterLink>
-          </li>
-          <li>
-            <RouterLink to="/costumes" active-class="active">
-              <Shirt class="w-5 h-5" /> 衣装
-            </RouterLink>
-          </li>
-          <li>
-            <RouterLink to="/costumes/custom" active-class="active">
-              <Dices class="w-5 h-5" /> 衣装自由搭配
-            </RouterLink>
-          </li>
-          <li>
-            <RouterLink to="/events" active-class="active">
-              <Calendar class="w-5 h-5" /> 活动
-            </RouterLink>
-          </li>
-          <li>
-            <RouterLink to="/vlives" active-class="active">
-              <Radio class="w-5 h-5" /> 虚拟 Live
-            </RouterLink>
-          </li>
-          <li>
-            <RouterLink to="/ranking" active-class="active">
-              <BarChart3 class="w-5 h-5" /> 实时榜线
-            </RouterLink>
-          </li>
-          <li>
-            <RouterLink to="/gachas" active-class="active">
-              <Gift class="w-5 h-5" /> 卡池
-            </RouterLink>
-          </li>
-          <li>
-            <RouterLink to="/sus2img" active-class="active">
-              <BarChart3 class="w-5 h-5" /> 谱面转图片
-            </RouterLink>
-          </li>
-          <li>
-            <RouterLink to="/custom-score-maker" active-class="active">
-              <Music class="w-5 h-5" /> 谱面 Maker
-            </RouterLink>
-          </li>
-          <li>
-            <RouterLink to="/deck-recommend" active-class="active">
-              <Zap class="w-5 h-5" /> 自动组队
-            </RouterLink>
-          </li>
-          <li>
-            <RouterLink to="/mysekai" active-class="active">
-              <House class="w-5 h-5" /> MySekai
-            </RouterLink>
-          </li>
-          <li>
-            <RouterLink to="/stamps" active-class="active">
-              <Smile class="w-5 h-5" /> 表情贴图
-            </RouterLink>
-          </li>
-          <li>
-            <RouterLink to="/characters" active-class="active">
-              <Users class="w-5 h-5" /> 角色图鉴
-            </RouterLink>
-          </li>
-          <li>
-            <RouterLink to="/honors" active-class="active">
-              <Trophy class="w-5 h-5" /> 称号图鉴
-            </RouterLink>
-          </li>
-          <li>
-            <RouterLink to="/stories" active-class="active">
-              <BookOpen class="w-5 h-5" /> 剧情档案
-            </RouterLink>
-          </li>
-          <li>
-            <RouterLink to="/area-items" active-class="active">
-              <Wrench class="w-5 h-5" /> 区域道具
-            </RouterLink>
-          </li>
-          <li>
-            <RouterLink to="/items" active-class="active">
-              <Boxes class="w-5 h-5" /> 物品图鉴
-            </RouterLink>
-          </li>
-          <li>
-            <RouterLink to="/account-records" active-class="active">
-              <History class="w-5 h-5" /> 账号记录
-            </RouterLink>
-          </li>
-
-          <li>
-            <RouterLink to="/calendar" active-class="active">
-              <CalendarDays class="w-5 h-5" /> 游戏日历
-            </RouterLink>
-          </li>
-          <div class="divider my-1"></div>
-
-          <!-- 账号管理 -->
-          <li class="menu-title text-xs mt-2">账号</li>
-          <li v-if="accountStore.accounts.length > 0" class="px-2 mb-1 [&>*]:!bg-transparent [&>*:hover]:!bg-transparent">
-            <AccountSelector
-              :model-value="accountStore.currentUserId"
-              @update:model-value="accountStore.selectAccount"
-            />
-          </li>
-          <li v-else class="px-2">
-            <span class="text-xs text-base-content/40 p-0 hover:bg-transparent cursor-default">
-              在个人信息页添加账号
-            </span>
-          </li>
-          <li v-if="accountStore.currentUserId" class="px-2">
-            <div class="flex gap-1 p-0 hover:bg-transparent">
-              <button
-                class="btn btn-xs btn-ghost flex-1 gap-1"
-                :disabled="accountStore.profileRefreshing"
-                @click="handleProfileRefresh"
-              >
-                <RefreshCw class="w-3 h-3" :class="{ 'animate-spin': accountStore.profileRefreshing }" />
-                Profile
-              </button>
-              <button
-                class="btn btn-xs btn-ghost flex-1 gap-1"
-                :disabled="accountStore.suiteRefreshing"
-                @click="handleSuiteRefresh"
-              >
-                <RefreshCw class="w-3 h-3" :class="{ 'animate-spin': accountStore.suiteRefreshing }" />
-                Suite
-              </button>
-            </div>
-          </li>
-          <li v-if="accountStore.currentUserId && (accountStore.lastRefreshText || accountStore.uploadTimeText)" class="px-2">
-            <div class="flex flex-col gap-0 p-0 hover:bg-transparent cursor-default">
-              <span v-if="accountStore.lastRefreshText" class="text-[10px] text-base-content/40">
-                Profile: {{ accountStore.lastRefreshText }}
-              </span>
-              <span v-if="accountStore.uploadTimeText" class="text-[10px] text-base-content/40">
-                Suite数据: {{ accountStore.uploadTimeText }}
-              </span>
-            </div>
-          </li>
-          <li v-if="refreshError" class="px-2">
-            <span class="text-[10px] text-error p-0 hover:bg-transparent">{{ refreshError }}</span>
-          </li>
-
-          <div class="divider my-1"></div>
-        
-          <li>
-            <RouterLink to="/about" active-class="active">
-              <Info class="w-5 h-5" /> 关于项目
-            </RouterLink>
-          </li>
-          <li>
-            <RouterLink to="/profile" active-class="active">
-              <User class="w-5 h-5" /> 个人信息
-            </RouterLink>
-          </li>
-          <li>
-            <RouterLink to="/settings" active-class="active">
-              <Settings class="w-5 h-5" /> 设置
-            </RouterLink>
-          </li>
-        </ul>
-      </div>
+    <div class="drawer-side z-50">
+      <label for="my-drawer-2" aria-label="关闭菜单" class="drawer-overlay"></label>
+      <AppSidebar />
     </div>
     
     <ToastContainer />
 
     <!-- OAuth 授权确认弹窗 -->
-    <dialog class="modal" :class="{ 'modal-open': accountStore.oauthConfirmVisible }">
+    <dialog ref="oauthConfirmDialog" class="modal" @close="onOAuthConfirmClose">
       <div class="modal-box">
         <h3 class="text-lg font-bold">需要 OAuth 授权</h3>
         <p class="py-4">你没有勾选公开访问，需要 OAuth 授权本站访问游戏数据。是否现在去授权？</p>
@@ -304,7 +104,7 @@ async function handleSuiteRefresh() {
         </div>
       </div>
       <form method="dialog" class="modal-backdrop" @click="accountStore.cancelOAuth()">
-        <button>close</button>
+        <button>关闭</button>
       </form>
     </dialog>
   </div>

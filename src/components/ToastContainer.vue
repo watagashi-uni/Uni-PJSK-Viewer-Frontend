@@ -3,10 +3,16 @@ import { useMasterStore } from '@/stores/master'
 import { useAccountStore } from '@/stores/account'
 import { applyPwaUpdate, subscribeToPwaState } from '@/pwa'
 import { ref, onMounted, onUnmounted } from 'vue'
+import { useModalDialog } from '@/composables/useModalDialog'
 import { Download, RefreshCw, X, CheckCircle2 } from 'lucide-vue-next'
 
 const masterStore = useMasterStore()
 const accountStore = useAccountStore()
+const { onDialogClose: onSuiteNotFoundClose } = useModalDialog(
+  'suiteNotFoundDialog',
+  () => accountStore.suiteNotFoundModalVisible,
+  () => accountStore.dismissSuiteNotFoundModal(),
+)
 
 // PWA 更新状态
 const needRefresh = ref(false)
@@ -45,16 +51,16 @@ function dismissUpdate() {
               {{ accountStore.suiteRefreshToastHint }}
             </p>
           </div>
-          <button class="btn btn-sm btn-ghost" @click="accountStore.dismissSuiteRefreshToast">
+          <button type="button" class="btn btn-sm btn-ghost" aria-label="关闭" @click="accountStore.dismissSuiteRefreshToast">
             <X class="w-4 h-4" />
           </button>
         </div>
       </Transition>
     </div>
 
-    <dialog :open="accountStore.suiteNotFoundModalVisible" class="modal modal-bottom sm:modal-middle">
+    <dialog ref="suiteNotFoundDialog" class="modal modal-bottom sm:modal-middle" @close="onSuiteNotFoundClose">
       <div class="modal-box">
-        <h3 class="font-bold text-lg">未查询到 Suite 数据</h3>
+        <h3 class="font-bold text-lg">没有找到上传数据</h3>
         <div class="py-3 space-y-3">
           <p class="text-sm text-base-content/80">
             Haruki工具箱没有查询到该玩家的数据。你可能需要前往
@@ -85,26 +91,26 @@ function dismissUpdate() {
         </div>
       </div>
       <form method="dialog" class="modal-backdrop" @submit.prevent="accountStore.dismissSuiteNotFoundModal">
-        <button type="button" @click="accountStore.dismissSuiteNotFoundModal">close</button>
+        <button type="button" @click="accountStore.dismissSuiteNotFoundModal">关闭</button>
       </form>
     </dialog>
 
 
     <!-- Toast 容器 (底部右侧) -->
-    <div class="fixed bottom-4 right-4 z-50 flex flex-col gap-3 max-w-sm">
+    <div class="fixed bottom-4 left-4 right-4 z-50 flex flex-col gap-3 sm:left-auto sm:max-w-sm">
       <!-- PWA 更新提示 Toast -->
       <Transition name="slide-up">
         <div 
           v-if="needRefresh"
           class="alert shadow-2xl bg-base-100 border border-primary/30"
         >
-          <RefreshCw class="w-5 h-5 text-primary animate-spin" />
+          <RefreshCw class="w-5 h-5 text-primary" />
           <div>
             <h3 class="font-bold text-sm">有新版本可用</h3>
             <p class="text-xs text-base-content/60">点击更新以获取最新功能</p>
           </div>
           <div class="flex gap-2">
-            <button class="btn btn-sm btn-ghost" @click="dismissUpdate">
+            <button type="button" class="btn btn-sm btn-ghost" aria-label="关闭" @click="dismissUpdate">
               <X class="w-4 h-4" />
             </button>
             <button class="btn btn-sm btn-primary" @click="handleUpdate">

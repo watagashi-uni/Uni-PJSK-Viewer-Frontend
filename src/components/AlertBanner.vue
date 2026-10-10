@@ -33,7 +33,9 @@ const emit = defineEmits<{
     
     <button 
       v-if="dismissible" 
+      type="button"
       class="btn btn-sm btn-ghost btn-circle"
+      aria-label="关闭"
       @click="emit('dismiss')"
     >
       ✕

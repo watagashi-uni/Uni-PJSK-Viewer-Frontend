@@ -10,10 +10,12 @@ const props = withDefaults(defineProps<{
   modelValue?: string
   showId?: boolean
   readonly?: boolean
+  placement?: 'bottom' | 'top'
 }>(), {
   modelValue: '',
   showId: false,
-  readonly: false
+  readonly: false,
+  placement: 'bottom'
 })
 
 const emit = defineEmits<{
@@ -97,10 +99,15 @@ onUnmounted(() => document.removeEventListener('click', onClickOutside))
 <template>
   <div ref="containerRef" class="relative w-full">
     <!-- Trigger Button -->
-    <div
-      class="flex items-center justify-between w-full px-2 py-1.5 rounded-lg transition-colors"
-      :class="readonly ? '' : 'cursor-pointer bg-base-100 hover:bg-base-200'"
+    <button
+      type="button"
+      class="flex items-center justify-between w-full px-2 py-1.5 rounded-lg transition-colors text-left"
+      :class="readonly ? 'cursor-default' : 'cursor-pointer bg-base-100 hover:bg-base-200'"
+      :disabled="readonly"
+      :aria-expanded="readonly ? undefined : isOpen"
+      aria-haspopup="listbox"
       @click.stop="readonly ? undefined : toggle()"
+      @keydown.esc="isOpen = false"
     >
       <template v-if="currentAccount">
         <div class="flex items-center gap-2 min-w-0 flex-1">
@@ -131,17 +138,23 @@ onUnmounted(() => document.removeEventListener('click', onClickOutside))
         </div>
         <ChevronDown v-if="!readonly" class="w-4 h-4 opacity-50 shrink-0 ml-1" />
       </template>
-    </div>
+    </button>
     
     <!-- Dropdown List -->
     <div
       v-if="isOpen"
-      class="absolute left-0 right-0 mt-1 p-1 shadow-lg bg-base-100 rounded-lg z-50 max-h-[60vh] overflow-y-auto border border-base-200"
+      role="listbox"
+      aria-label="切换账号"
+      class="absolute left-0 right-0 p-1 shadow-lg bg-base-100 rounded-lg z-50 max-h-[60vh] overflow-y-auto border border-base-200"
+      :class="placement === 'top' ? 'bottom-full mb-1' : 'mt-1'"
     >
-      <div
+      <button
         v-for="acc in accountStore.accounts"
         :key="acc.userId"
-        class="flex flex-row items-center gap-2 py-2 px-3 rounded-lg cursor-pointer transition-colors"
+        type="button"
+        role="option"
+        :aria-selected="acc.userId === effectiveUserId"
+        class="flex w-full flex-row items-center gap-2 py-2 px-3 rounded-lg cursor-pointer transition-colors"
         :class="acc.userId === effectiveUserId ? 'bg-primary/10 text-primary' : 'hover:bg-base-200'"
         @click.stop="select(acc.userId)"
       >
@@ -160,7 +173,7 @@ onUnmounted(() => document.removeEventListener('click', onClickOutside))
             <template v-if="showId"> | <span class="font-mono">{{ acc.userId }}</span></template>
           </span>
         </div>
-      </div>
+      </button>
       <div v-if="accountStore.accounts.length === 0" class="text-sm text-base-content/50 p-4 text-center">
         暂无账号
       </div>

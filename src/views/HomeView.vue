@@ -1,13 +1,11 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useMasterStore } from '@/stores/master'
 import { useAccountStore } from '@/stores/account'
 import { useSettingsStore } from '@/stores/settings'
-import { 
-  Music, Calendar, Clock, 
-  ChevronRight, Sparkles, BarChart3,
-  CreditCard, User, Gift, Palette,
-  ExternalLink, Link, CalendarDays, History, House, Layers3, BookOpen, Radio, Users
+import {
+  Music, Calendar, Clock, ChevronRight, BarChart3, Image, User, Gift,
+  CalendarDays, Zap, BookOpen,
 } from 'lucide-vue-next'
 import AssetImage from '@/components/AssetImage.vue'
 import type { EventData, MusicData } from '@/types/master'
@@ -17,24 +15,11 @@ const accountStore = useAccountStore()
 const settingsStore = useSettingsStore()
 const assetsHost = computed(() => settingsStore.assetsHost)
 
-const dataVersion = computed(() => masterStore.version || '加载中...')
-const assetVersion = computed(() => masterStore.assetVersion || '加载中...')
 const isLoading = ref(true)
 
-const themesList = [
-  { value: 'light', label: '浅色' },
-  { value: 'dark', label: '深色' },
-  { value: 'moe', label: 'Moe' },
-  { value: 'jirai', label: '地雷' },
-  { value: 'auto', label: '跟随系统' }
-]
-
-function selectTheme(val: any) {
-  settingsStore.setTheme(val)
-  if (document.activeElement instanceof HTMLElement) {
-    document.activeElement.blur()
-  }
-}
+// 每分钟刷新一次，用于倒计时与“今天/明天”判断
+const now = ref(Date.now())
+let nowTimer: ReturnType<typeof setInterval> | undefined
 
 import type { Gacha } from '@/types/gacha'
 
@@ -86,16 +71,16 @@ const eventTypeMap: Record<string, { label: string; color: string }> = {
 // 当前活动（主页严格不显示未开始的活动）
 type CurrentEventType = EventData & { status: string; statusLabel: string }
 const currentEvent = computed<CurrentEventType | null>(() => {
-  const now = Date.now()
-  
+  const nowMs = now.value
+
   // 1. 查找正在进行的活动
-  const ongoing = events.value.find(e => now >= e.startAt && now <= e.aggregateAt)
+  const ongoing = events.value.find(e => nowMs >= e.startAt && nowMs <= e.aggregateAt)
   if (ongoing) {
     return { ...ongoing, status: 'ongoing', statusLabel: '正在进行' } as CurrentEventType
   }
   
   // 2. 查找最近已经开始过的活动（已结束）
-  const startedEvents = events.value.filter(e => now >= e.startAt)
+  const startedEvents = events.value.filter(e => nowMs >= e.startAt)
   if (startedEvents.length === 0) return null
   
   // 取最近结束的活动
@@ -105,8 +90,7 @@ const currentEvent = computed<CurrentEventType | null>(() => {
 
 // 最近新曲（前5首，主页严格不显示未发布的歌曲）
 const recentMusics = computed(() => {
-  const now = Date.now()
-  let list = musics.value.filter(m => m.publishedAt <= now)
+  const list = musics.value.filter(m => m.publishedAt <= now.value)
   
   // 按发布时间倒序，如果相同按 ID 倒序
   list.sort((a, b) => {
@@ -119,13 +103,17 @@ const recentMusics = computed(() => {
   return list.slice(0, 5)
 })
 
-// 正在进行中的卡池
+// 正在进行中的限时卡池：常驻卡池（剩余一年以上）不在首页展示，按结束时间先后排序
 const ongoingGachas = computed(() => {
-  const now = Date.now()
-  let list = gachas.value.filter(g => now >= g.startAt && now <= g.endAt)
-  list.sort((a, b) => b.startAt - a.startAt)
-  return list
+  const permanentThreshold = now.value + 365 * 24 * 60 * 60 * 1000
+  return gachas.value
+    .filter(g => now.value >= g.startAt && now.value <= g.endAt && g.endAt < permanentThreshold)
+    .sort((a, b) => a.endAt - b.endAt || b.startAt - a.startAt)
 })
+
+const GACHA_PREVIEW_COUNT = 6
+const showAllGachas = ref(false)
+const visibleGachas = computed(() => showAllGachas.value ? ongoingGachas.value : ongoingGachas.value.slice(0, GACHA_PREVIEW_COUNT))
 
 const allScheduleItems = computed<ScheduleItem[]>(() => {
   const rows: ScheduleItem[] = []
@@ -151,46 +139,72 @@ const allScheduleItems = computed<ScheduleItem[]>(() => {
 })
 
 const upcomingScheduleItems = computed(() => {
-  const now = Date.now()
-  const horizon = now + 90 * 24 * 60 * 60 * 1000
+  const horizon = now.value + 90 * 24 * 60 * 60 * 1000
   return allScheduleItems.value
-    .filter(row => row.timestamp > now && row.timestamp <= horizon)
+    .filter(row => row.timestamp > now.value && row.timestamp <= horizon)
     .sort((a, b) => a.timestamp - b.timestamp)
-    .slice(0, 6)
+    .slice(0, 7)
 })
 
 const recentScheduleItems = computed(() => {
-  const now = Date.now()
   return allScheduleItems.value
-    .filter(row => row.timestamp <= now)
+    .filter(row => row.timestamp <= now.value)
     .sort((a, b) => b.timestamp - a.timestamp)
-    .slice(0, 6)
+    .slice(0, 7)
 })
 
 const isShowingUpcomingSchedule = computed(() => settingsStore.showSpoilers && upcomingScheduleItems.value.length > 0)
 const homeScheduleItems = computed(() => isShowingUpcomingSchedule.value ? upcomingScheduleItems.value : recentScheduleItems.value)
-const scheduleTitle = computed(() => isShowingUpcomingSchedule.value ? '近期日程' : '最近动态')
+const scheduleTitle = computed(() => isShowingUpcomingSchedule.value ? '接下来' : '最近动态')
 
-function scheduleTime(timestamp: number): string {
+const DAY_MS = 24 * 60 * 60 * 1000
+
+function startOfDay(timestamp: number): number {
   const date = new Date(timestamp)
-  const now = new Date()
-  const dateKey = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`
-  const nowKey = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`
-  const time = date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false })
-  if (dateKey === nowKey) return `今天 ${time}`
-  return date.toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })
+  date.setHours(0, 0, 0, 0)
+  return date.getTime()
 }
 
-const gachaScrollContainer = ref<HTMLElement | null>(null)
-function handleGachaScroll(e: WheelEvent) {
-  if (!gachaScrollContainer.value) return
-  // 如果是垂直滚动（传统鼠标滚轮）
-  if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
-    e.preventDefault() // 阻止页面整体下滚
-    gachaScrollContainer.value.scrollLeft += e.deltaY * 1.5 // 稍微放大一点滚动速度
-  }
-  // 触控板横向滑动不阻止默认行为，保留原生惯性
+function scheduleDay(timestamp: number): string {
+  const diffDays = Math.round((startOfDay(timestamp) - startOfDay(now.value)) / DAY_MS)
+  if (diffDays === 0) return '今天'
+  if (diffDays === 1) return '明天'
+  if (diffDays === -1) return '昨天'
+  return new Date(timestamp).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' })
 }
+
+function scheduleClock(timestamp: number): string {
+  return new Date(timestamp).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false })
+}
+
+function durationText(ms: number): string {
+  if (ms <= 0) return '已结束'
+  const days = Math.floor(ms / DAY_MS)
+  const hours = Math.floor((ms % DAY_MS) / (60 * 60 * 1000))
+  const minutes = Math.floor((ms % (60 * 60 * 1000)) / 60000)
+  if (days > 0) return `${days} 天 ${hours} 小时`
+  if (hours > 0) return `${hours} 小时 ${minutes} 分`
+  return `${Math.max(minutes, 1)} 分钟`
+}
+
+const eventProgress = computed(() => {
+  const event = currentEvent.value
+  if (!event || event.status !== 'ongoing') return 0
+  const total = event.aggregateAt - event.startAt
+  if (total <= 0) return 0
+  return Math.min(100, Math.max(0, ((now.value - event.startAt) / total) * 100))
+})
+
+const greeting = computed(() => {
+  const hour = new Date(now.value).getHours()
+  if (hour < 5) return '夜深了'
+  if (hour < 11) return '早上好'
+  if (hour < 13) return '中午好'
+  if (hour < 18) return '下午好'
+  return '晚上好'
+})
+
+const todayLabel = computed(() => new Date(now.value).toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' }))
 
 // 格式化日期
 function formatDate(timestamp: number): string {
@@ -202,20 +216,6 @@ function formatDate(timestamp: number): string {
   })
 }
 
-// 格式化剩余时间
-function getRemainingTime(event: EventData): string {
-  const now = Date.now()
-  const end = event.aggregateAt
-  const remaining = end - now
-  
-  if (remaining <= 0) return '已结束'
-  
-  const days = Math.floor(remaining / (1000 * 60 * 60 * 24))
-  const hours = Math.floor((remaining % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
-  
-  if (days > 0) return `剩余 ${days}天${hours}小时`
-  return `剩余 ${hours}小时`
-}
 
 // 用户账号信息
 const currentUserProfile = computed(() => {
@@ -276,18 +276,12 @@ const currentUserProfileData = computed(() => {
   return accountStore.getProfileCache(currentUserProfile.value.userId)
 })
 
-const accountDataTime = computed(() => {
-  if (!currentUserProfile.value) return ''
-  const hasSuiteTime = Boolean(currentUserProfile.value.uploadTime)
-  const timestamp = hasSuiteTime
-    ? Number(currentUserProfile.value.uploadTime) * 1000
-    : Number(currentUserProfile.value.lastRefresh)
-  if (!Number.isFinite(timestamp) || timestamp <= 0) return ''
-  const label = hasSuiteTime ? 'Suite 数据' : '资料刷新'
-  return `${label}：${new Date(timestamp).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })}`
+onUnmounted(() => {
+  if (nowTimer) clearInterval(nowTimer)
 })
 
 onMounted(async () => {
+  nowTimer = setInterval(() => { now.value = Date.now() }, 60_000)
   try {
     masterStore.checkVersionInBackground()
 
@@ -317,347 +311,220 @@ onMounted(async () => {
 
 <template>
   <div class="space-y-6">
-    <!-- 头部欢迎区与用户简影 -->
-    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-base-100 p-6 rounded-xl shadow-sm">
-      <!-- App Info & Theme Dropdown -->
-      <div class="flex-1 flex flex-row items-center gap-2 sm:gap-4 w-full">
-        <div class="min-w-0">
-          <h1 class="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent truncate">
-            Uni PJSK Viewer
-          </h1>
-          <p class="text-base-content/60 text-xs sm:text-sm mt-1 truncate">
-            Data: {{ dataVersion }} • Asset: {{ assetVersion }}
-          </p>
-        </div>
-        
-        <!-- Theme Quick Selector -->
-        <div class="dropdown dropdown-end z-20 ml-auto shrink-0">
-          <label tabindex="0" class="btn btn-sm btn-ghost gap-1 px-2">
-            <Palette class="w-4 h-4" />
-            <span>
-              {{ themesList.find(t => t.value === settingsStore.theme)?.label || '主题' }}
-            </span>
-          </label>
-          <ul tabindex="0" class="dropdown-content z-20 menu p-2 shadow bg-base-100 rounded-box w-32">
-            <li v-for="t in themesList" :key="t.value">
-              <a 
-                :class="{ 'active': settingsStore.theme === t.value }"
-                @click="selectTheme(t.value)"
-              >
-                {{ t.label }}
-              </a>
-            </li>
-          </ul>
-        </div>
+    <!-- 问候 + 账号 -->
+    <header class="flex items-center justify-between gap-4">
+      <div class="min-w-0">
+        <h1 class="truncate text-2xl font-bold tracking-tight">
+          {{ greeting }}<template v-if="currentUserProfile">，{{ currentUserProfile.name }}</template>
+        </h1>
+        <p class="mt-0.5 text-sm text-base-content/55">{{ todayLabel }}</p>
       </div>
-      
-      <!-- User Profile Thumbnail -->
-      <RouterLink v-if="currentUserProfile" to="/profile" class="flex items-center gap-3 bg-base-200/50 p-2 pr-4 rounded-full border border-base-200 shadow-sm shrink-0 hover:bg-base-200 transition-colors cursor-pointer">
-        <div class="relative w-12 h-12 rounded-full overflow-hidden border-2 border-primary/20 shrink-0 bg-base-300">
-          <AssetImage 
+      <RouterLink
+        v-if="currentUserProfile"
+        to="/profile"
+        class="flex shrink-0 items-center gap-2.5 rounded-full border border-base-300 bg-base-100 py-1 pl-1 pr-3 transition-colors hover:border-primary/50"
+        title="查看个人信息"
+      >
+        <span class="h-9 w-9 shrink-0 overflow-hidden rounded-full bg-base-300">
+          <AssetImage
             v-if="leaderCard"
             :src="`${assetsHost}/startapp/thumbnail/chara/${leaderCard.assetbundleName}_${leaderCard.userCardInfo.defaultImage === 'training' ? 'after_training' : 'normal'}.png`"
-            class="w-full h-full object-cover"
+            :alt="currentUserProfile.name"
+            class="h-full w-full object-cover"
           />
-          <User v-else class="w-6 h-6 m-3 text-base-content/30" />
-        </div>
-        <div class="flex flex-col">
-          <span class="font-bold text-sm">{{ currentUserProfile.name }}</span>
-          <span class="text-xs text-base-content/60 font-medium">
-            <span class="text-primary">Lv.{{ currentUserProfileData?.user?.rank || currentUserSuite?.user?.rank || '未知' }}</span>
-          </span>
-        </div>
+          <User v-else class="m-2 h-5 w-5 text-base-content/40" />
+        </span>
+        <span class="hidden text-sm sm:block">
+          <span class="text-base-content/55">等级</span>
+          <span class="ml-1 font-semibold">{{ currentUserProfileData?.user?.rank || currentUserSuite?.user?.rank || '—' }}</span>
+        </span>
       </RouterLink>
-      <div v-else class="flex flex-col sm:flex-row items-center gap-3">
-        <span class="text-sm text-base-content/60 text-center sm:text-left">尚未绑定账号</span>
-        <RouterLink to="/profile" class="btn btn-sm btn-primary btn-outline rounded-full">去添加账号</RouterLink>
-      </div>
-    </div>
-    
-    <!-- 顶部快捷入口 -->
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-      <RouterLink to="/musics" class="btn bg-base-100 border-base-200 hover:border-primary hover:bg-base-200 h-auto py-3 gap-2 justify-start shadow-sm hover:shadow-md transition-all">
-        <Music class="w-5 h-5 flex-shrink-0 text-primary" /> 
-        <div class="flex flex-col items-start leading-tight">
-          <span class="font-bold text-base-content">歌曲一览</span>
-          <span class="text-[10px] font-normal text-base-content/60">Musics</span>
-        </div>
+      <RouterLink v-else to="/profile" class="btn btn-sm btn-primary btn-outline shrink-0">
+        <User class="h-4 w-4" /> 绑定账号
       </RouterLink>
-      <RouterLink to="/cards" class="btn bg-base-100 border-base-200 hover:border-secondary hover:bg-base-200 h-auto py-3 gap-2 justify-start shadow-sm hover:shadow-md transition-all">
-        <CreditCard class="w-5 h-5 flex-shrink-0 text-secondary" />
-        <div class="flex flex-col items-start leading-tight">
-          <span class="font-bold text-base-content">卡片一览</span>
-          <span class="text-[10px] font-normal text-base-content/60">Cards</span>
-        </div>
-      </RouterLink>
-      <RouterLink to="/events" class="btn bg-base-100 border-base-200 hover:border-accent hover:bg-base-200 h-auto py-3 gap-2 justify-start shadow-sm hover:shadow-md transition-all">
-        <Calendar class="w-5 h-5 flex-shrink-0 text-accent" />
-        <div class="flex flex-col items-start leading-tight">
-          <span class="font-bold text-base-content">活动总览</span>
-          <span class="text-[10px] font-normal text-base-content/60">Events</span>
-        </div>
-      </RouterLink>
-      <RouterLink to="/gachas" class="btn bg-base-100 border-base-200 hover:border-orange-500 hover:bg-base-200 h-auto py-3 gap-2 justify-start shadow-sm hover:shadow-md transition-all">
-        <Sparkles class="w-5 h-5 flex-shrink-0 text-orange-500" />
-        <div class="flex flex-col items-start leading-tight">
-          <span class="font-bold text-base-content">活动卡池</span>
-          <span class="text-[10px] font-normal text-base-content/60">Gachas</span>
-        </div>
-      </RouterLink>
-    </div>
+    </header>
 
-    <div class="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(17rem,1fr)]">
-      <section class="card border border-base-200 bg-base-100 shadow-sm">
-        <div class="card-body gap-3 p-4 md:p-5">
-          <div class="flex items-center justify-between gap-3">
-            <div>
-              <h2 class="flex items-center gap-2 text-lg font-bold"><CalendarDays class="h-5 w-5 text-primary" />{{ scheduleTitle }}</h2>
-              <p class="mt-0.5 text-xs text-base-content/45">{{ isShowingUpcomingSchedule ? '已开启未来内容，列出未来 90 天内接下来发生的事项' : settingsStore.showSpoilers ? '未来 90 天暂无日程，暂时显示最近动态' : '未来内容已隐藏，仅列出最近发生的事项' }}</p>
-            </div>
-            <RouterLink to="/calendar" class="btn btn-ghost btn-sm shrink-0">完整日历 <ChevronRight class="h-4 w-4" /></RouterLink>
-          </div>
-          <div v-if="isLoading" class="grid gap-2 sm:grid-cols-2"><div v-for="index in 4" :key="index" class="skeleton h-16 rounded-lg"></div></div>
-          <div v-else-if="homeScheduleItems.length" class="grid gap-2 sm:grid-cols-2 lg:flex-1 lg:grid-rows-3">
-            <RouterLink v-for="item in homeScheduleItems" :key="item.key" :to="item.route" class="group flex h-full min-w-0 items-center gap-3 rounded-xl border border-base-200 px-3 py-2.5 transition-colors hover:border-primary/35 hover:bg-base-200/45">
-              <span class="h-2.5 w-2.5 shrink-0 rounded-full" :class="scheduleMeta[item.category].dot"></span>
-              <div class="min-w-0 flex-1"><div class="flex items-center gap-1.5"><span class="badge badge-xs" :class="scheduleMeta[item.category].badge">{{ scheduleMeta[item.category].label }}</span><span class="truncate text-[10px] text-base-content/40">{{ item.subtitle }}</span></div><p class="mt-1 truncate text-sm font-medium group-hover:text-primary" :title="item.title">{{ item.title }}</p></div>
-              <time class="shrink-0 text-[10px] text-base-content/45">{{ scheduleTime(item.timestamp) }}</time>
-            </RouterLink>
-          </div>
-          <div v-else class="rounded-xl bg-base-200/45 py-8 text-center text-sm text-base-content/45">当前没有可显示的日程</div>
-        </div>
-      </section>
+    <!-- 手机端常用入口（桌面端由侧边栏提供） -->
+    <nav class="grid grid-cols-4 gap-2 lg:hidden" aria-label="常用入口">
+      <RouterLink
+        v-for="entry in [
+          { to: '/musics', label: '歌曲', icon: Music },
+          { to: '/cards', label: '卡片', icon: Image },
+          { to: '/events', label: '活动', icon: Calendar },
+          { to: '/gachas', label: '卡池', icon: Gift },
+          { to: '/ranking', label: '榜线', icon: BarChart3 },
+          { to: '/calendar', label: '日历', icon: CalendarDays },
+          { to: '/deck-recommend', label: '组队', icon: Zap },
+          currentUserProfile ? { to: '/profile', label: '我的', icon: User } : { to: '/stories', label: '剧情', icon: BookOpen },
+        ]"
+        :key="entry.to"
+        :to="entry.to"
+        class="flex flex-col items-center gap-1 rounded-box border border-base-300 bg-base-100 py-2.5 text-xs active:bg-base-200"
+      >
+        <component :is="entry.icon" class="h-5 w-5 text-primary" />
+        {{ entry.label }}
+      </RouterLink>
+    </nav>
 
-      <section class="card border border-base-200 bg-base-100 shadow-sm">
-        <div class="card-body gap-3 p-4 md:p-5">
-          <div><h2 class="text-lg font-bold">{{ currentUserProfile ? '账号工作台' : '常用工具' }}</h2><p v-if="currentUserProfile" class="mt-0.5 text-xs text-base-content/45">{{ currentUserProfile.name }}</p><p v-else class="mt-0.5 text-xs text-base-content/45">无需绑定账号也可以直接使用</p></div>
-          <template v-if="currentUserProfile">
-            <div class="grid grid-cols-2 gap-2 lg:flex-1 lg:grid-rows-3">
-              <RouterLink to="/card-collection" class="btn h-full min-h-[3.25rem] justify-start gap-2 border-base-200 bg-base-200/45 px-3 py-2 text-left"><Layers3 class="h-4 w-4 shrink-0 text-primary" /><span class="min-w-0 leading-tight"><span class="block text-xs font-bold">养成进度</span><span class="mt-1 block truncate text-[9px] font-normal text-base-content/45">卡片培养与角色任务</span></span></RouterLink>
-              <RouterLink to="/account-records" class="btn h-full min-h-[3.25rem] justify-start gap-2 border-base-200 bg-base-200/45 px-3 py-2 text-left"><History class="h-4 w-4 shrink-0 text-secondary" /><span class="min-w-0 leading-tight"><span class="block text-xs font-bold">账号记录</span><span class="mt-1 block truncate text-[9px] font-normal text-base-content/45">活动、挑战与卡组</span></span></RouterLink>
-              <RouterLink to="/deck-recommend" class="btn h-full min-h-[3.25rem] justify-start gap-2 border-base-200 bg-base-200/45 px-3 py-2 text-left"><Sparkles class="h-4 w-4 shrink-0 text-warning" /><span class="min-w-0 leading-tight"><span class="block text-xs font-bold">卡组推荐</span><span class="mt-1 block truncate text-[9px] font-normal text-base-content/45">活动编成与自动推荐</span></span></RouterLink>
-              <RouterLink to="/mysekai" class="btn h-full min-h-[3.25rem] justify-start gap-2 border-base-200 bg-base-200/45 px-3 py-2 text-left"><House class="h-4 w-4 shrink-0 text-accent" /><span class="min-w-0 leading-tight"><span class="block text-xs font-bold">MySekai</span><span class="mt-1 block truncate text-[9px] font-normal text-base-content/45">收藏、家具与天气</span></span></RouterLink>
-              <RouterLink to="/characters" class="btn h-full min-h-[3.25rem] justify-start gap-2 border-base-200 bg-base-200/45 px-3 py-2 text-left"><Users class="h-4 w-4 shrink-0 text-info" /><span class="min-w-0 leading-tight"><span class="block text-xs font-bold">角色成长</span><span class="mt-1 block truncate text-[9px] font-normal text-base-content/45">角色等级与任务进度</span></span></RouterLink>
-              <RouterLink to="/profile" class="btn h-full min-h-[3.25rem] justify-start gap-2 border-base-200 bg-base-200/45 px-3 py-2 text-left"><User class="h-4 w-4 shrink-0" /><span class="min-w-0 leading-tight"><span class="block text-xs font-bold">个人信息</span><span class="mt-1 block truncate text-[9px] font-normal text-base-content/45">资料、卡组与综合力</span></span></RouterLink>
-            </div>
-            <p v-if="accountDataTime" class="mt-auto text-center text-[10px] text-base-content/35">{{ accountDataTime }}</p>
-          </template>
-          <div v-else class="grid grid-cols-2 gap-2 lg:flex-1 lg:grid-rows-3">
-            <RouterLink to="/calendar" class="btn h-full min-h-[3.25rem] justify-start gap-2 border-base-200 bg-base-200/45 px-3 py-2 text-left"><CalendarDays class="h-4 w-4 shrink-0 text-primary" /><span class="min-w-0 leading-tight"><span class="block text-xs font-bold">游戏日历</span><span class="mt-1 block truncate text-[9px] font-normal text-base-content/45">活动与更新时间</span></span></RouterLink>
-            <RouterLink to="/deck-recommend" class="btn h-full min-h-[3.25rem] justify-start gap-2 border-base-200 bg-base-200/45 px-3 py-2 text-left"><Sparkles class="h-4 w-4 shrink-0 text-warning" /><span class="min-w-0 leading-tight"><span class="block text-xs font-bold">卡组推荐</span><span class="mt-1 block truncate text-[9px] font-normal text-base-content/45">活动编成与自动推荐</span></span></RouterLink>
-            <RouterLink to="/stories" class="btn h-full min-h-[3.25rem] justify-start gap-2 border-base-200 bg-base-200/45 px-3 py-2 text-left"><BookOpen class="h-4 w-4 shrink-0 text-secondary" /><span class="min-w-0 leading-tight"><span class="block text-xs font-bold">剧情档案</span><span class="mt-1 block truncate text-[9px] font-normal text-base-content/45">剧情目录与章节阅读</span></span></RouterLink>
-            <RouterLink to="/sus2img" class="btn h-full min-h-[3.25rem] justify-start gap-2 border-base-200 bg-base-200/45 px-3 py-2 text-left"><Music class="h-4 w-4 shrink-0 text-info" /><span class="min-w-0 leading-tight"><span class="block text-xs font-bold">谱面图片</span><span class="mt-1 block truncate text-[9px] font-normal text-base-content/45">谱面导入与图片生成</span></span></RouterLink>
-            <RouterLink to="/vlives" class="btn h-full min-h-[3.25rem] justify-start gap-2 border-base-200 bg-base-200/45 px-3 py-2 text-left"><Radio class="h-4 w-4 shrink-0 text-accent" /><span class="min-w-0 leading-tight"><span class="block text-xs font-bold">Virtual Live</span><span class="mt-1 block truncate text-[9px] font-normal text-base-content/45">场次、节目与奖励</span></span></RouterLink>
-            <RouterLink to="/profile" class="btn h-full min-h-[3.25rem] justify-start gap-2 border-primary/35 bg-primary/8 px-3 py-2 text-left"><User class="h-4 w-4 shrink-0 text-primary" /><span class="min-w-0 leading-tight"><span class="block text-xs font-bold">添加账号</span><span class="mt-1 block truncate text-[9px] font-normal text-base-content/45">查看自己的账号资料</span></span></RouterLink>
+    <div class="grid gap-6 lg:grid-cols-3">
+      <div class="min-w-0 space-y-6 lg:col-span-2">
+        <!-- 当前活动 -->
+        <section aria-labelledby="home-event-title">
+          <div class="mb-2 flex items-baseline justify-between">
+            <h2 id="home-event-title" class="text-base font-semibold">
+              {{ currentEvent?.status === 'ongoing' ? '正在进行的活动' : '最近的活动' }}
+            </h2>
+            <RouterLink to="/events" class="text-sm text-base-content/55 hover:text-primary">全部活动</RouterLink>
           </div>
-        </div>
-      </section>
-    </div>
-    
-    <!-- 主体两列内容 -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <!-- 左侧：当前活动 (占 2 列) -->
-      <div class="lg:col-span-2 space-y-6 min-w-0">
-        <h2 class="text-xl font-bold flex items-center gap-2">
-          <Sparkles class="w-5 h-5 text-primary" />
-          {{ currentEvent?.status === 'ongoing' ? '当前活动' : '最近活动' }}
-        </h2>
-        
-        <div v-if="isLoading" class="skeleton h-64 w-full rounded-xl"></div>
-        
-        <RouterLink 
-          v-else-if="currentEvent"
-          :to="`/events/${currentEvent.id}`"
-          class="block group relative rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all border border-base-200 bg-base-100 flex flex-col xl:flex-row cursor-pointer"
-        >
-          <!-- Banner 图片侧 (左侧/顶部) -->
-          <div class="w-full xl:w-1/2 p-4 xl:p-6 xl:pr-0 flex flex-col items-center justify-start order-1 shrink-0 bg-base-100 z-10">
-            <div class="w-full max-w-[488px] overflow-hidden rounded-lg shadow-sm relative pointer-events-none">
-              <AssetImage 
+
+          <div v-if="isLoading" class="skeleton h-56 w-full rounded-box"></div>
+          <article v-else-if="currentEvent" class="overflow-hidden rounded-box border border-base-300 bg-base-100 md:grid md:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
+            <RouterLink :to="`/events/${currentEvent.id}`" class="block self-center bg-base-200 md:m-3 md:overflow-hidden md:rounded-lg" :aria-label="currentEvent.name">
+              <AssetImage
                 :src="`${assetsHost}/startapp/home/banner/${currentEvent.assetbundleName}/${currentEvent.assetbundleName}.png`"
-                class="w-full aspect-[122/52] object-cover group-hover:scale-105 transition-transform duration-500"
+                :alt="currentEvent.name"
+                class="aspect-[122/52] w-full object-cover"
               />
-            </div>
-            <!-- 左下角额外板块：活动快捷入口 -->
-          </div>
+            </RouterLink>
+            <div class="flex flex-col gap-3 p-4 md:pl-1">
+              <div class="flex flex-wrap items-center gap-2 text-xs">
+                <span class="badge badge-sm badge-outline">{{ eventTypeMap[currentEvent.eventType]?.label || currentEvent.eventType }}</span>
+                <span class="text-base-content/55">{{ formatDate(currentEvent.startAt) }} – {{ formatDate(currentEvent.aggregateAt) }}</span>
+              </div>
+              <RouterLink :to="`/events/${currentEvent.id}`" class="block text-lg font-bold leading-snug hover:text-primary">
+                {{ currentEvent.name }}
+              </RouterLink>
 
-          <!-- 内容侧 (右侧/底部) -->
-          <div class="p-5 md:p-6 flex flex-col justify-center relative z-10 order-2 flex-1">
-            <div class="flex items-center gap-2 mb-3">
-              <span 
-                class="badge border-none"
-                :class="eventTypeMap[currentEvent.eventType]?.color || 'badge-ghost'"
-              >
-                {{ eventTypeMap[currentEvent.eventType]?.label || currentEvent.eventType }}
-              </span>
-              <span 
-                v-if="currentEvent.status === 'ongoing'"
-                class="badge badge-success gap-1 border-none text-white shadow-sm"
-              >
-                <Clock class="w-3 h-3" />
-                {{ getRemainingTime(currentEvent) }}
-              </span>
-              <span 
-                v-else
-                class="badge badge-ghost gap-1 border-none text-base-content/80 shadow-sm"
-              >
-                {{ currentEvent.statusLabel }}
-              </span>
-            </div>
-            
-            <h3 class="text-xl md:text-2xl font-bold leading-tight mb-4 group-hover:text-primary transition-colors">
-              {{ currentEvent.name }}
-            </h3>
-            
-            <div class="space-y-2 text-sm text-base-content/70">
-              <div class="flex items-center gap-2">
-                <Calendar class="w-4 h-4 opacity-50" />
-                <span>{{ formatDate(currentEvent.startAt) }} - {{ formatDate(currentEvent.aggregateAt) }}</span>
+              <div v-if="currentEvent.status === 'ongoing'">
+                <div class="mb-1 flex items-center justify-between text-sm">
+                  <span class="flex items-center gap-1.5 text-base-content/70"><Clock class="h-4 w-4" />距离结束</span>
+                  <span class="font-semibold tabular-nums">{{ durationText(currentEvent.aggregateAt - now) }}</span>
+                </div>
+                <progress class="progress progress-primary h-1.5 w-full" :value="eventProgress" max="100" :aria-label="`活动进度 ${Math.round(eventProgress)}%`"></progress>
+              </div>
+              <p v-else class="text-sm text-base-content/55">已于 {{ formatDate(currentEvent.aggregateAt) }} 结束</p>
+
+              <div class="mt-auto flex flex-wrap gap-2 pt-1">
+                <RouterLink v-if="currentEvent.status === 'ongoing'" to="/ranking" class="btn btn-sm btn-primary">
+                  <BarChart3 class="h-4 w-4" /> 实时榜线
+                </RouterLink>
+                <RouterLink :to="`/events/${currentEvent.id}`" class="btn btn-sm btn-ghost border-base-300">
+                  活动详情 <ChevronRight class="h-4 w-4" />
+                </RouterLink>
               </div>
             </div>
+          </article>
+          <p v-else class="rounded-box border border-dashed border-base-300 py-10 text-center text-sm text-base-content/55">暂时没有活动数据</p>
+        </section>
 
-            <!-- 榜线按钮放回由底部对齐 -->
-            <div class="mt-auto pt-4">
-              <RouterLink 
-                v-if="currentEvent.status === 'ongoing'"
-                to="/ranking"
-                class="btn btn-sm btn-primary btn-outline w-fit z-20 relative pointer-events-auto shadow-sm"
-                @click.stop
-              >
-                <BarChart3 class="w-4 h-4" />
-                查看榜线
-              </RouterLink>
-            </div>
-          </div>
-        </RouterLink>
-        <div v-else class="text-center py-10 text-base-content/60 bg-base-100 rounded-xl">
-          暂无活动信息
-        </div>
-
-        <!-- 当前卡池板块 (放置在活动内容下方) -->
-        <div v-if="ongoingGachas.length > 0" class="space-y-4 pt-2">
-          <div class="flex justify-between items-end pb-2 border-b border-base-200">
-            <h2 class="text-xl font-bold flex items-center gap-2">
-              <Gift class="w-5 h-5 text-orange-500" />
-              正在进行的卡池
+        <!-- 进行中的卡池 -->
+        <section v-if="isLoading || ongoingGachas.length" aria-labelledby="home-gacha-title">
+          <div class="mb-2 flex items-baseline justify-between">
+            <h2 id="home-gacha-title" class="text-base font-semibold">
+              限时卡池 <span v-if="!isLoading" class="font-normal text-base-content/45">{{ ongoingGachas.length }}</span>
             </h2>
+            <RouterLink to="/gachas" class="text-sm text-base-content/55 hover:text-primary">全部卡池</RouterLink>
           </div>
-          
-          <!-- 横向滚动容器 -->
-          <div 
-            ref="gachaScrollContainer"
-            class="flex overflow-x-auto gap-4 pb-4 w-full"
-            @wheel="handleGachaScroll"
-          >
-            <RouterLink 
-              v-for="gacha in ongoingGachas" 
+          <div v-if="isLoading" class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <div v-for="i in 3" :key="i" class="skeleton aspect-[2/1] rounded-box"></div>
+          </div>
+          <div v-else class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <RouterLink
+              v-for="gacha in visibleGachas"
               :key="gacha.id"
               :to="`/gacha/${gacha.id}`"
-              class="shrink-0 w-[240px] md:w-[320px] aspect-[21/10] relative rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all hover:-translate-y-1 bg-base-100 group border border-base-200 pointer-events-auto cursor-pointer flex items-center justify-center p-2"
+              class="group flex min-w-0 flex-col overflow-hidden rounded-box border border-base-300 bg-base-100 transition-colors hover:border-primary/50"
             >
-              <AssetImage 
-                :src="`${assetsHost}/ondemand/gacha/${gacha.assetbundleName}/logo/logo.png`" 
-                :alt="gacha.name"
-                class="w-full h-full object-contain group-hover:scale-105 transition-transform"
-              />
+              <span class="flex aspect-[2/1] items-center justify-center p-2">
+                <AssetImage
+                  :src="`${assetsHost}/ondemand/gacha/${gacha.assetbundleName}/logo/logo.png`"
+                  :alt="gacha.name"
+                  class="h-full w-full object-contain"
+                />
+              </span>
+              <span class="border-t border-base-300 px-2.5 py-1.5">
+                <span class="block truncate text-xs font-medium group-hover:text-primary" :title="gacha.name">{{ gacha.name }}</span>
+                <span class="block text-xs text-base-content/50">剩 {{ durationText(gacha.endAt - now) }}</span>
+              </span>
             </RouterLink>
           </div>
-        </div>
-      </div>
-
-      <!-- 右侧：最新歌曲 (占 1 列) -->
-      <div class="space-y-4">
-        <div class="flex justify-between items-end pb-2 border-b border-base-200">
-          <h2 class="text-xl font-bold flex items-center gap-2">
-            <Music class="w-5 h-5 text-secondary" />
-            最新歌曲
-          </h2>
-          <RouterLink to="/musics" class="text-xs link link-hover text-secondary">
-            查看更多
-          </RouterLink>
-        </div>
-
-        <div v-if="isLoading" class="space-y-4">
-          <div v-for="i in 5" :key="i" class="skeleton h-16 w-full rounded-lg"></div>
-        </div>
-
-        <div v-else class="space-y-3">
-          <RouterLink 
-            v-for="music in recentMusics" 
-            :key="music.id"
-            :to="`/musics/${music.id}`"
-            class="flex items-center gap-3 p-3 bg-base-100 border border-base-200 rounded-xl shadow-sm hover:shadow-md hover:border-secondary transition-all group"
+          <button
+            v-if="!isLoading && ongoingGachas.length > GACHA_PREVIEW_COUNT"
+            type="button"
+            class="btn btn-ghost btn-sm mt-2 w-full border-base-300"
+            @click="showAllGachas = !showAllGachas"
           >
-            <!-- 封面 -->
-            <div class="relative w-14 h-14 rounded-lg overflow-hidden flex-shrink-0 shadow-sm">
-              <AssetImage 
-                :src="`${assetsHost}/startapp/music/jacket/${music.assetbundleName}/${music.assetbundleName}.png`"
-                class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-              />
-            </div>
-            
-            <!-- 信息 -->
-            <div class="flex-1 min-w-0">
-              <h4 class="font-bold text-sm truncate group-hover:text-secondary transition-colors">
-                {{ music.title }}
-              </h4>
-              <p class="text-[10px] text-base-content/50 truncate mt-0.5 font-medium">
-                {{ music.composer }}
-              </p>
-            </div>
-            
-            <ChevronRight class="w-4 h-4 text-base-content/30 group-hover:text-secondary group-hover:translate-x-1 transition-all" />
-          </RouterLink>
-        </div>
+            {{ showAllGachas ? '收起' : `显示其余 ${ongoingGachas.length - GACHA_PREVIEW_COUNT} 个` }}
+          </button>
+        </section>
       </div>
-    </div>
-    
-    <!-- 友情链接 -->
-    <div class="space-y-4 border-t border-base-200 pt-6">
-      <h2 class="text-lg font-bold flex items-center gap-2 text-base-content/80 px-1">
-        <Link class="w-4 h-4 opacity-70" />
-        友情链接
-      </h2>
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <a 
-          href="https://pjsk.moe" 
-          target="_blank" 
-          rel="noopener noreferrer"
-          class="flex items-center justify-between p-4 bg-base-100 border border-base-200 rounded-xl shadow-sm hover:shadow-md hover:border-primary/50 transition-all group"
-        >
-          <div class="flex flex-col">
-            <span class="font-bold text-base-content group-hover:text-primary transition-colors">MoeSekai</span>
-            <span class="text-xs text-base-content/50 mt-0.5">多功能 PJSK Viewer</span>
-          </div>
-          <ExternalLink class="w-4 h-4 text-base-content/30 group-hover:text-primary group-hover:-translate-y-0.5 group-hover:translate-x-0.5 transition-all" />
-        </a>
-        
-        <a 
-          href="https://haruki.seiunx.com" 
-          target="_blank" 
-          rel="noopener noreferrer"
-          class="flex items-center justify-between p-4 bg-base-100 border border-base-200 rounded-xl shadow-sm hover:shadow-md hover:border-secondary/50 transition-all group"
-        >
-          <div class="flex flex-col">
-            <span class="font-bold text-base-content group-hover:text-secondary transition-colors">Haruki 工具箱</span>
-            <span class="text-xs text-base-content/50 mt-0.5">上传抓包数据</span>
-          </div>
-          <ExternalLink class="w-4 h-4 text-base-content/30 group-hover:text-secondary group-hover:-translate-y-0.5 group-hover:translate-x-0.5 transition-all" />
-        </a>
 
-        <a 
-          href="https://3-3.dev" 
-          target="_blank" 
-          rel="noopener noreferrer"
-          class="flex items-center justify-between p-4 bg-base-100 border border-base-200 rounded-xl shadow-sm hover:shadow-md hover:border-accent/50 transition-all group"
-        >
-          <div class="flex flex-col">
-            <span class="font-bold text-base-content group-hover:text-accent transition-colors">33 Kit</span>
-            <span class="text-xs text-base-content/50 mt-0.5">在线组卡 / 活动预测</span>
+      <aside class="min-w-0 space-y-6">
+        <!-- 日程 -->
+        <section aria-labelledby="home-schedule-title">
+          <div class="mb-2 flex items-baseline justify-between">
+            <h2 id="home-schedule-title" class="text-base font-semibold">{{ scheduleTitle }}</h2>
+            <RouterLink to="/calendar" class="text-sm text-base-content/55 hover:text-primary">日历</RouterLink>
           </div>
-          <ExternalLink class="w-4 h-4 text-base-content/30 group-hover:text-accent group-hover:-translate-y-0.5 group-hover:translate-x-0.5 transition-all" />
-        </a>
-      </div>
+          <div v-if="isLoading" class="space-y-2">
+            <div v-for="i in 5" :key="i" class="skeleton h-12 rounded-lg"></div>
+          </div>
+          <ol v-else-if="homeScheduleItems.length" class="divide-y divide-base-300 overflow-hidden rounded-box border border-base-300 bg-base-100">
+            <li v-for="item in homeScheduleItems" :key="item.key">
+              <RouterLink :to="item.route" class="flex items-center gap-3 px-3 py-2.5 hover:bg-base-200/60">
+                <span class="w-11 shrink-0 text-right leading-tight">
+                  <span class="block text-xs font-medium">{{ scheduleDay(item.timestamp) }}</span>
+                  <span class="block text-xs tabular-nums text-base-content/50">{{ scheduleClock(item.timestamp) }}</span>
+                </span>
+                <span class="h-8 w-0.5 shrink-0 rounded-full" :class="scheduleMeta[item.category].dot"></span>
+                <span class="min-w-0 flex-1">
+                  <span class="block truncate text-sm" :title="item.title">{{ item.title }}</span>
+                  <span class="block text-xs text-base-content/50">{{ item.subtitle }}</span>
+                </span>
+              </RouterLink>
+            </li>
+          </ol>
+          <p v-else class="rounded-box border border-dashed border-base-300 py-8 text-center text-sm text-base-content/55">没有可显示的日程</p>
+          <p v-if="!isLoading && !settingsStore.showSpoilers" class="mt-2 text-xs text-base-content/45">
+            未来日程已隐藏，可在<RouterLink to="/settings" class="link">设置</RouterLink>中开启剧透显示。
+          </p>
+        </section>
+
+        <!-- 新曲 -->
+        <section aria-labelledby="home-music-title">
+          <div class="mb-2 flex items-baseline justify-between">
+            <h2 id="home-music-title" class="text-base font-semibold">最新歌曲</h2>
+            <RouterLink to="/musics" class="text-sm text-base-content/55 hover:text-primary">全部歌曲</RouterLink>
+          </div>
+          <div v-if="isLoading" class="space-y-2">
+            <div v-for="i in 5" :key="i" class="skeleton h-14 rounded-lg"></div>
+          </div>
+          <ul v-else class="divide-y divide-base-300 overflow-hidden rounded-box border border-base-300 bg-base-100">
+            <li v-for="music in recentMusics" :key="music.id">
+              <RouterLink :to="`/musics/${music.id}`" class="group flex items-center gap-3 px-3 py-2 hover:bg-base-200/60">
+                <AssetImage
+                  :src="`${assetsHost}/startapp/music/jacket/${music.assetbundleName}/${music.assetbundleName}.png`"
+                  :alt="music.title"
+                  class="h-11 w-11 shrink-0 rounded-md object-cover"
+                />
+                <span class="min-w-0 flex-1">
+                  <span class="block truncate text-sm font-medium group-hover:text-primary">{{ music.title }}</span>
+                  <span class="block truncate text-xs text-base-content/50">{{ music.composer }}</span>
+                </span>
+                <span class="shrink-0 text-xs text-base-content/45">{{ scheduleDay(music.publishedAt) }}</span>
+              </RouterLink>
+            </li>
+          </ul>
+        </section>
+      </aside>
     </div>
+
+    <!-- 友站 -->
+    <footer class="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-base-300 pt-4 text-sm text-base-content/55">
+      <span>友站</span>
+      <a href="https://pjsk.moe" target="_blank" rel="noopener noreferrer" class="hover:text-primary" title="多功能 PJSK Viewer">MoeSekai ↗</a>
+      <a href="https://haruki.seiunx.com" target="_blank" rel="noopener noreferrer" class="hover:text-primary" title="上传游戏数据">Haruki 工具箱 ↗</a>
+      <a href="https://3-3.dev" target="_blank" rel="noopener noreferrer" class="hover:text-primary" title="在线组卡 / 活动预测">33 Kit ↗</a>
+    </footer>
   </div>
 </template>
