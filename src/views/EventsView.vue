@@ -6,8 +6,9 @@ import { useSettingsStore } from '@/stores/settings'
 import { Calendar, Trophy, Users, EyeOff, Globe } from 'lucide-vue-next'
 import AssetImage from '@/components/AssetImage.vue'
 import type { EventData } from '@/types/master'
-import { readQueryString, replaceListQuery } from '@/utils/routeQuery'
+import { pushListPage, readQueryPage, readQueryString, replaceListQuery } from '@/utils/routeQuery'
 import PageHeader from '@/components/PageHeader.vue'
+import Pagination from '@/components/Pagination.vue'
 
 const masterStore = useMasterStore()
 const settingsStore = useSettingsStore()
@@ -62,6 +63,19 @@ const filteredEvents = computed(() => {
   // 按 ID 倒序
   return [...result].sort((a, b) => b.id - a.id)
 })
+
+// 分页：一次渲染全部 ~190 张 banner 太重
+const PAGE_SIZE = 24
+const currentPage = computed(() => readQueryPage(route.query))
+const totalPages = computed(() => Math.max(1, Math.ceil(filteredEvents.value.length / PAGE_SIZE)))
+const paginatedEvents = computed(() => {
+  const page = Math.min(currentPage.value, totalPages.value)
+  return filteredEvents.value.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+})
+
+function handlePageChange(page: number) {
+  void pushListPage(router, route, page)
+}
 
 // 格式化日期
 function formatDate(timestamp: number): string {
@@ -163,10 +177,10 @@ onMounted(loadData)
     <!-- 活动列表 -->
     <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       <RouterLink 
-        v-for="event in filteredEvents" 
+        v-for="event in paginatedEvents" 
         :key="event.id"
         :to="`/events/${event.id}`"
-        class="card bg-base-100 shadow-lg hover:shadow-xl transition-all overflow-hidden animate-fade-in-up relative group"
+        class="card bg-base-100 shadow-sm hover:shadow-md transition-shadow overflow-hidden relative group"
       >
         <!-- Banner 图片 -->
         <figure class="relative">
@@ -209,6 +223,15 @@ onMounted(loadData)
         </div>
       </RouterLink>
     </div>
+
+    <Pagination
+      v-if="!isLoading && !loadError && totalPages > 1"
+      class="mt-6"
+      :current-page="Math.min(currentPage, totalPages)"
+      :total-pages="totalPages"
+      base-url="/events"
+      @page-change="handlePageChange"
+    />
 
     <!-- 空状态 -->
     <div v-if="!isLoading && !loadError && filteredEvents.length === 0" class="text-center py-20 text-base-content/60">
