@@ -7,6 +7,7 @@ import { Calendar, Trophy, Users, EyeOff, Globe } from 'lucide-vue-next'
 import AssetImage from '@/components/AssetImage.vue'
 import type { EventData } from '@/types/master'
 import { readQueryString, replaceListQuery } from '@/utils/routeQuery'
+import PageHeader from '@/components/PageHeader.vue'
 
 const masterStore = useMasterStore()
 const settingsStore = useSettingsStore()
@@ -96,10 +97,7 @@ onMounted(loadData)
 
 <template>
   <div>
-    <h1 class="text-3xl font-bold mb-6 flex items-center gap-3">
-      <Calendar class="w-8 h-8" />
-      活动列表
-    </h1>
+    <PageHeader title="活动" class="mb-6"><template #icon><Calendar /></template></PageHeader>
 
     <!-- 筛选区 -->
     <div class="flex flex-wrap gap-4 mb-6">

@@ -5,6 +5,7 @@ import { useMasterStore } from '@/stores/master'
 import { useNotificationStore } from '@/stores/notification'
 import { Settings, Trash2, Database, Eye, Palette, RefreshCw, Languages, Mic, Bell, AlertTriangle, MonitorSmartphone, Send } from 'lucide-vue-next'
 import { clearAllCache } from '@/utils/masterDB'
+import PageHeader from '@/components/PageHeader.vue'
 
 const settingsStore = useSettingsStore()
 const masterStore = useMasterStore()
@@ -131,10 +132,7 @@ async function handleClearTranslationCache() {
 
 <template>
   <div class="max-w-2xl mx-auto">
-    <h1 class="text-3xl font-bold mb-8 flex items-center gap-3">
-      <Settings class="w-8 h-8" />
-      设置
-    </h1>
+    <PageHeader title="设置" class="mb-6"><template #icon><Settings /></template></PageHeader>
 
     <div class="space-y-6">
       <!-- 显示设置 -->

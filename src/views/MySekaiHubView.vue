@@ -19,6 +19,7 @@ import type {
   CharacterArchiveMysekaiCharacterTalkGroupRow, MysekaiGateCharacterLotteryRow,
   TalkCharacterOption, TalkUnitOption, FixtureTalkStat
 } from '@/types/mysekai'
+import PageHeader from '@/components/PageHeader.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -1608,7 +1609,7 @@ function closeFixtureDetail() {
 
 <template>
   <div class="max-w-7xl mx-auto space-y-5 pb-10">
-    <h1 class="text-3xl font-bold">MySekai</h1>
+    <PageHeader title="MySekai" />
 
     <div class="card bg-base-100 shadow-md relative z-10">
       <div class="card-body p-4 space-y-3">

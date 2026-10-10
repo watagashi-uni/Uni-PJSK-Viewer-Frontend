@@ -2,15 +2,13 @@
 import { 
   Music, Code, Wrench, ExternalLink, Github, Heart, Languages
 } from 'lucide-vue-next'
+import PageHeader from '@/components/PageHeader.vue'
 </script>
 
 <template>
   <div class="space-y-6">
     <!-- 页面标题 -->
-    <div>
-      <h1 class="text-3xl font-bold">关于 Uni PJSK Viewer</h1>
-      <p class="text-sm text-base-content/60 mt-1">Project SEKAI 游戏资料查看与工具站</p>
-    </div>
+    <PageHeader title="关于 Uni PJSK Viewer" description="Project SEKAI 游戏资料查看与工具站" />
 
     <!-- <AlertBanner type="warning">
       <strong class="flex items-center gap-1"><AlertTriangle class="w-4 h-4" /> 内测中！</strong> 该网站还在内部测试中，出现问题请及时反馈

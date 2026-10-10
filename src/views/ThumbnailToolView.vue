@@ -213,7 +213,7 @@ function copyMusicTitle() {
     <!-- 左侧：预览区域 -->
     <div class="lg:w-2/3 flex flex-col gap-4">
       <div class="flex items-center justify-between">
-        <h1 class="text-2xl font-black flex items-center gap-2">
+        <h1 class="text-2xl font-bold tracking-tight flex items-center gap-2">
           <ImageIcon class="w-6 h-6 text-primary" />
           截图生成工具
         </h1>

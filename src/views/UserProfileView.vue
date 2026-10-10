@@ -21,6 +21,7 @@ import type {
   PowerBonusUnitView, PowerBonusAttrView, PowerBonusCharacterGroupView, BondViewRow,
   LeaderCountRow
 } from '@/types/profile'
+import PageHeader from '@/components/PageHeader.vue'
 
 const masterStore = useMasterStore()
 const accountStore = useAccountStore()
@@ -1169,10 +1170,7 @@ watch(currentUserId, async (newId) => {
 
 <template>
   <div class="max-w-6xl mx-auto space-y-6">
-    <h1 class="text-3xl font-bold flex items-center gap-3">
-      <User class="w-8 h-8 text-primary" />
-      个人信息
-    </h1>
+    <PageHeader title="个人信息"><template #icon><User /></template></PageHeader>
 
     <!-- 加载中 -->
     <div v-if="isInitLoading" class="flex justify-center py-20">

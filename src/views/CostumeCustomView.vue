@@ -26,6 +26,7 @@ import type {
   CostumeGroup,
   CostumePart,
 } from '@/types/costume'
+import PageHeader from '@/components/PageHeader.vue'
 
 interface Character {
   id: number
@@ -497,13 +498,9 @@ onBeforeUnmount(() => {
         <RouterLink to="/costumes" class="btn btn-ghost btn-sm gap-1 -ml-3 mb-1">
           <ArrowLeft class="w-4 h-4" /> 返回衣装一览
         </RouterLink>
-        <h1 class="text-2xl font-bold flex items-center gap-2">
-          <Dices class="w-6 h-6 text-primary" />
-          衣装自由选择器
-        </h1>
-        <p class="text-sm text-base-content/55 mt-1">
-          自由组合服装、发饰与发型；选中一个部件后，同套部件会排到其他栏最前。
-        </p>
+        <PageHeader title="衣装自由搭配" description="自由组合服装、发饰与发型；选中一个部件后，同套部件会排到其他栏最前。">
+          <template #icon><Dices /></template>
+        </PageHeader>
       </div>
     </div>
 
