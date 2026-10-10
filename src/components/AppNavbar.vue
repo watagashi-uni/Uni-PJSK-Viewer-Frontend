@@ -1,13 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { useRoute } from 'vue-router'
 import { Menu, Search } from 'lucide-vue-next'
-
-const route = useRoute()
-const pageTitle = computed(() => {
-  const title = route.meta.title as string | undefined
-  return route.path === '/' || !title ? 'Uni PJSK Viewer' : title
-})
 </script>
 
 <template>
@@ -15,10 +7,12 @@ const pageTitle = computed(() => {
     <label for="my-drawer-2" class="btn btn-square btn-ghost btn-sm drawer-button" aria-label="打开菜单">
       <Menu class="h-5 w-5" />
     </label>
-    <RouterLink v-if="route.path === '/'" to="/" class="min-w-0 flex-1 truncate px-1 text-base font-bold text-primary">
-      Uni PJSK Viewer
-    </RouterLink>
-    <span v-else class="min-w-0 flex-1 truncate px-1 text-base font-semibold">{{ pageTitle }}</span>
+    <!-- 左上角始终是网站标题，点击回到首页 -->
+    <div class="min-w-0 flex-1">
+      <RouterLink to="/" class="inline-block max-w-full truncate rounded-md px-1 text-base font-bold text-primary">
+        Uni PJSK Viewer
+      </RouterLink>
+    </div>
     <RouterLink to="/musics/search" class="btn btn-ghost btn-square btn-sm" aria-label="搜索歌曲" title="搜索歌曲">
       <Search class="h-5 w-5" />
     </RouterLink>
