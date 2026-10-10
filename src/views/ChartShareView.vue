@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { Upload, Link, Copy, Check, Music, FileText, AlertCircle } from 'lucide-vue-next'
 import { request } from '@/utils/request'
+import PageHeader from '@/components/PageHeader.vue'
 
 const susFile = ref<File | null>(null)
 const bgmFile = ref<File | null>(null)
@@ -156,11 +157,8 @@ async function copyUrl() {
 </script>
 
 <template>
-  <div class="max-w-2xl mx-auto p-4">
-    <h1 class="text-2xl font-bold mb-2">谱面分享</h1>
-    <p class="text-base-content/60 mb-6">
-      上传谱面文件和音频文件，生成可分享的预览链接
-    </p>
+  <div class="max-w-2xl mx-auto">
+    <PageHeader title="谱面分享" description="上传谱面文件和音频文件，生成可分享的预览链接" class="mb-6" />
 
     <div class="card bg-base-100 shadow-lg mb-4">
       <div class="card-body flex-row items-center gap-4 p-4">

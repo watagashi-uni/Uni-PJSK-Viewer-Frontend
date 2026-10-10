@@ -22,6 +22,7 @@ import {
   type Sus2ImgSkin,
   type ConflictDiagnostic,
 } from '@/vendor/sekai-sus2img'
+import PageHeader from '@/components/PageHeader.vue'
 
 const FORM_STORAGE_KEY = 'sus2img-form-data'
 
@@ -860,10 +861,9 @@ function clearForm() {
 
 <template>
   <div class="max-w-4xl mx-auto">
-    <h1 class="text-2xl font-bold text-center text-primary mb-2">SUS / JSON 谱面转图片</h1>
-    <p class="text-center text-base-content/60 text-sm mb-6">粘贴谱面内容和上传文件二选一即可，支持 SUS / JSON 转图片与 SUS ⇄ JSON 互转</p>
+    <PageHeader title="谱面转图片" description="粘贴谱面内容或上传文件，支持 SUS / JSON 转图片与 SUS ⇄ JSON 互转" class="mb-6" />
 
-    <div class="card bg-base-100 shadow-lg animate-fade-in-up">
+    <div class="card bg-base-100 shadow-lg">
       <div class="card-body">
         <form class="space-y-6" @submit.prevent="handleFormSubmit">
           <div class="form-control">

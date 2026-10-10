@@ -10,6 +10,7 @@ import type {
   ParsedMySekaiData, AggregatedResource, PointGroup, PositionedPoint,
   ResourceRenderCall, ResourceStat
 } from '@/types/mysekai'
+import PageHeader from '@/components/PageHeader.vue'
 
 const SITE_SCENES: SceneConfig[] = [
   {
@@ -887,7 +888,7 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="max-w-6xl mx-auto space-y-6">
-    <h1 class="text-3xl font-bold">MySekai 资源地图</h1>
+    <PageHeader title="MySekai 资源地图" />
 
     <div class="card bg-base-100 shadow-lg">
       <div class="card-body space-y-4">

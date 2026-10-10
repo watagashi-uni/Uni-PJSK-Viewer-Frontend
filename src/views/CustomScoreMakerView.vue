@@ -7,6 +7,7 @@ import SekaiProfileHonor from '@/components/SekaiProfileHonor.vue'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
 import { toRomaji } from '@/utils/kanaToRomaji'
+import PageHeader from '@/components/PageHeader.vue'
 
 type FeedTab = 'ranking' | 'new' | 'search' | 'official_all'
 type RankingMode = 'daily' | 'total'
@@ -1036,10 +1037,7 @@ function selectTab(tab: FeedTab) {
     </div>
 
     <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
-      <div>
-        <h1 class="text-3xl font-bold">谱面Maker</h1>
-        <p class="text-sm text-base-content/60 mt-1">浏览游戏内自制谱面</p>
-      </div>
+      <PageHeader title="谱面 Maker" description="浏览游戏内自制谱面" />
       
       <div class="flex items-center gap-2 w-full lg:w-auto">
         <input

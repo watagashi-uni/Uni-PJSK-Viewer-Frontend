@@ -21,6 +21,7 @@ const assetsHost = computed(() => settingsStore.assetsHost)
 
 // ==================== 类型定义 ====================
 import type { EventData, MusicData, CardData } from '@/types/master'
+import PageHeader from '@/components/PageHeader.vue'
 
 interface MusicDiffData {
   id: number
@@ -464,10 +465,7 @@ const rarityList = [
 
 <template>
   <div class="max-w-4xl mx-auto space-y-6">
-    <h1 class="text-3xl font-bold flex items-center gap-3">
-      <Zap class="w-8 h-8 text-primary" />
-      自动组队
-    </h1>
+    <PageHeader title="自动组队"><template #icon><Zap /></template></PageHeader>
 
 
 

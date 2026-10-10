@@ -9,6 +9,7 @@ import Pagination from '@/components/Pagination.vue'
 import AssetImage from '@/components/AssetImage.vue'
 
 import type { Gacha } from '@/types/gacha'
+import PageHeader from '@/components/PageHeader.vue'
 
 const masterStore = useMasterStore()
 const settingsStore = useSettingsStore()
@@ -127,12 +128,7 @@ onMounted(loadData)
 <template>
   <div class="space-y-6">
     <!-- 标题 -->
-    <div class="flex items-center justify-between">
-      <h1 class="text-2xl font-bold flex items-center gap-2">
-        <Gift class="w-6 h-6 text-primary" />
-        卡池一览
-      </h1>
-    </div>
+    <PageHeader title="卡池"><template #icon><Gift /></template></PageHeader>
 
     <!-- 搜索和筛选 -->
     <div class="card bg-base-100 shadow-sm">

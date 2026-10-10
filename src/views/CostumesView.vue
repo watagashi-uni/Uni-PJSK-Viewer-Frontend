@@ -1,5 +1,6 @@
 <script lang="ts">
 import type { CostumeGroup } from '@/types/costume'
+import PageHeader from '@/components/PageHeader.vue'
 
 // RouterView 以 path 为 key，query 变化不会重建视图，但离开再返回列表时会重建；
 // costume3ds 有 11 万+ 条目，用模块作用域缓存聚合结果避免每次重建都重新聚合
@@ -237,16 +238,15 @@ onMounted(() => {
 <template>
   <div class="space-y-6 pb-10">
     <!-- 标题 -->
-    <div class="flex flex-wrap items-center justify-between gap-3">
-      <h1 class="text-2xl font-bold flex items-center gap-2">
-        <Shirt class="w-6 h-6 text-primary" />
-        衣装一览
-      </h1>
-      <RouterLink to="/costumes/custom" class="btn btn-primary btn-sm gap-2">
-        <Dices class="w-4 h-4" />
-        自由搭配
-      </RouterLink>
-    </div>
+    <PageHeader title="衣装">
+      <template #icon><Shirt /></template>
+      <template #actions>
+        <RouterLink to="/costumes/custom" class="btn btn-primary btn-sm gap-2">
+          <Dices class="w-4 h-4" />
+          自由搭配
+        </RouterLink>
+      </template>
+    </PageHeader>
 
     <!-- 角色选择 -->
     <div class="card bg-base-100 shadow-sm">
