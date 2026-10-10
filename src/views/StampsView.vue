@@ -221,11 +221,11 @@ onMounted(async () => {
         v-for="stamp in paginatedStamps"
         :key="stamp.id"
         type="button"
-        class="card bg-base-100 border border-base-200 hover:border-primary/60 hover:-translate-y-0.5 hover:shadow-md transition-all text-left overflow-hidden group"
+        class="card bg-base-100 border border-base-200 hover:border-primary/60 hover:shadow-md transition-all text-left overflow-hidden group"
         @click="selectedStamp = stamp; actionMessage = ''"
       >
         <figure class="relative aspect-square bg-[radial-gradient(circle_at_center,var(--color-base-100),var(--color-base-200))] p-2">
-          <AssetImage :src="getStampUrl(stamp)" :alt="cleanName(stamp.name)" class="w-full h-full object-contain group-hover:scale-105 transition-transform" />
+          <AssetImage :src="getStampUrl(stamp)" :alt="cleanName(stamp.name)" class="w-full h-full object-contain transition-transform" />
           <div class="absolute top-2 right-2 badge badge-sm bg-base-100/80 border-0">#{{ stamp.id }}</div>
         </figure>
         <div class="card-body p-3 gap-1 min-w-0">

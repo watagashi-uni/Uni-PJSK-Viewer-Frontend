@@ -722,7 +722,7 @@ const rarityList = [
                       <RouterLink
                         v-if="getCardForResult(dc.cardId)"
                         :to="`/cards/${dc.cardId}`"
-                        class="block hover:scale-105 transition-transform"
+                        class="block transition-transform"
                       >
                         <SekaiCard
                           :card="getCardForResult(dc.cardId)!"

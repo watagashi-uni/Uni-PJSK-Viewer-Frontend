@@ -171,14 +171,14 @@ onMounted(loadData)
           v-for="gacha in paginatedGachas"
           :key="gacha.id"
           :to="`/gacha/${gacha.id}`"
-          class="card bg-base-100 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all group overflow-hidden relative"
+          class="card bg-base-100 shadow-sm hover:shadow-lg transition-all group overflow-hidden relative"
         >
           <figure class="relative aspect-[7/2] bg-base-200 overflow-hidden flex items-center justify-center">
             <AssetImage
               v-if="gachaImgSrc(gacha)"
               :src="gachaImgSrc(gacha)!"
               :alt="gacha.name"
-              class="h-full object-contain group-hover:scale-105 transition-transform"
+              class="h-full object-contain transition-transform"
               @error="onGachaImgError(gacha)"
             />
             <Gift v-else class="w-10 h-10 text-base-content/20" />

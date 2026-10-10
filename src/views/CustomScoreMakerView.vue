@@ -1294,7 +1294,7 @@ function selectTab(tab: FeedTab) {
                   v-if="getJacketUrl(score)"
                   :src="getJacketUrl(score)"
                   :alt="score.musicTitle"
-                  class="w-24 h-24 rounded-xl object-cover shadow-sm group-hover:scale-105 transition-transform duration-300"
+                  class="w-24 h-24 rounded-xl object-cover shadow-sm transition-transform duration-300"
                   loading="lazy"
                 />
                 <div v-if="activeTab === 'ranking'" class="absolute -top-2 -left-2 badge badge-neutral shadow-sm font-mono border-none">{{ index + 1 }}</div>

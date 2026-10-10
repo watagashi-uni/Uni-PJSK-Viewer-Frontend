@@ -356,7 +356,7 @@ onMounted(() => {
               <CostumeThumb
                 :assetbundle-name="itemThumb(item)"
                 :alt="item.group.name"
-                class="w-full h-full p-1 transition-transform group-hover:scale-105"
+                class="w-full h-full p-1 transition-transform"
               />
             </div>
 

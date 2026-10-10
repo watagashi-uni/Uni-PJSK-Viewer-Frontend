@@ -405,7 +405,7 @@ onMounted(loadData)
                 :to="`/costumes/${related.representativeId}`"
                 class="flex flex-col items-center gap-1 group"
               >
-                <div class="w-16 h-16 sm:w-20 sm:h-20 bg-base-200 rounded-xl overflow-hidden shadow-sm group-hover:shadow-md group-hover:-translate-y-0.5 transition-all">
+                <div class="w-16 h-16 sm:w-20 sm:h-20 bg-base-200 rounded-xl overflow-hidden shadow-sm group-hover:shadow-md transition-all">
                   <CostumeThumb
                     :assetbundle-name="related.thumbAssetbundleName"
                     :alt="related.name"

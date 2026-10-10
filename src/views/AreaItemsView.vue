@@ -301,8 +301,8 @@ onMounted(async () => {
     <div v-else-if="loadError" class="alert alert-error">区域道具数据加载失败：{{ loadError }}</div>
     <div v-else-if="filteredItems.length === 0" class="text-center py-20 text-base-content/60">没有找到符合条件的区域道具</div>
     <div v-else class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-      <button v-for="item in filteredItems" :key="item.id" class="group card bg-base-100 border border-base-200 hover:border-primary/30 hover:shadow-md hover:-translate-y-0.5 transition-all overflow-hidden text-left" @click="openItem(item)">
-        <figure class="relative h-28 sm:h-32 bg-gradient-to-br from-base-200 to-base-100 p-2.5"><AssetImage :src="itemImage(item)" :alt="item.name" class="w-full h-full object-contain group-hover:scale-105 transition-transform" /><span v-if="currentLevelMap.has(item.id)" class="absolute top-2 right-2 badge badge-primary badge-sm shadow-sm">Lv.{{ currentLevelMap.get(item.id) }}</span></figure>
+      <button v-for="item in filteredItems" :key="item.id" class="group card bg-base-100 border border-base-200 hover:border-primary/30 hover:shadow-md transition-all overflow-hidden text-left" @click="openItem(item)">
+        <figure class="relative h-28 sm:h-32 bg-gradient-to-br from-base-200 to-base-100 p-2.5"><AssetImage :src="itemImage(item)" :alt="item.name" class="w-full h-full object-contain transition-transform" /><span v-if="currentLevelMap.has(item.id)" class="absolute top-2 right-2 badge badge-primary badge-sm shadow-sm">Lv.{{ currentLevelMap.get(item.id) }}</span></figure>
         <div class="card-body p-3 gap-1"><span class="text-[10px] text-base-content/45 truncate">{{ areaMap.get(item.areaId)?.name || `区域 #${item.areaId}` }}</span><h2 class="font-bold text-sm line-clamp-2 min-h-10 leading-5">{{ item.name }}</h2><div class="flex items-center justify-between gap-1 mt-1"><span class="badge badge-xs badge-outline max-w-[70%] truncate">{{ getTargetLabel(item) }}</span><span class="text-[10px] font-semibold text-primary whitespace-nowrap">+{{ getLevel(item, 20)?.power1BonusRate || 0 }}%</span></div></div>
       </button>
     </div>
