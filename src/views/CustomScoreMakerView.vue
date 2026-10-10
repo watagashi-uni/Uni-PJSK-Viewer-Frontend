@@ -8,6 +8,7 @@ import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
 import { toRomaji } from '@/utils/kanaToRomaji'
 import PageHeader from '@/components/PageHeader.vue'
+import { difficultyStyle } from '@/utils/difficulty'
 
 type FeedTab = 'ranking' | 'new' | 'search' | 'official_all'
 type RankingMode = 'daily' | 'total'
@@ -353,22 +354,6 @@ function formatDate(timestamp?: number) {
   })
 }
 
-const difficultyColors: Record<string, string> = {
-  easy: '#6EE1D6',
-  normal: '#34DDFF',
-  hard: '#FBCC26',
-  expert: '#EA5B75',
-  master: '#C656EA',
-  append: 'linear-gradient(135deg, #ab9fef, #e192d7)',
-}
-
-function difficultyStyle(difficulty: string) {
-  const key = difficulty.toLowerCase()
-  return {
-    background: difficultyColors[key] || '#9ca3af',
-    color: ['easy', 'normal', 'hard'].includes(key) ? '#111827' : '#ffffff',
-  }
-}
 
 function getTagNames(score: DisplayScore) {
   return score.tagIds

@@ -22,6 +22,7 @@ const assetsHost = computed(() => settingsStore.assetsHost)
 // ==================== 类型定义 ====================
 import type { EventData, MusicData, CardData } from '@/types/master'
 import PageHeader from '@/components/PageHeader.vue'
+import { difficultyStyle } from '@/utils/difficulty'
 
 interface MusicDiffData {
   id: number
@@ -191,14 +192,6 @@ function getCharacterName(c: CharacterData | null): string {
   return c.firstName ? `${c.firstName}${c.givenName}` : c.givenName
 }
 
-const difficultyColors: Record<string, string> = {
-  easy: 'btn-success',
-  normal: 'btn-info',
-  hard: 'btn-warning',
-  expert: 'btn-error',
-  master: 'btn-secondary',
-  append: 'btn-accent',
-}
 
 // ==================== 初始化 ====================
 function closeDropdowns(e: MouseEvent) {
@@ -623,7 +616,7 @@ const rarityList = [
                 </ul>
               </div>
               <div class="flex gap-1">
-                <button v-for="d in availableDifficulties" :key="d" class="btn btn-sm" :class="selectedDifficulty === d ? (difficultyColors[d] || 'btn-primary') : 'btn-ghost'" @click="selectedDifficulty = d">
+                <button v-for="d in availableDifficulties" :key="d" class="btn btn-sm" :class="selectedDifficulty === d ? 'border-0' : 'btn-ghost'" :style="selectedDifficulty === d ? difficultyStyle(d) : undefined" @click="selectedDifficulty = d">
                   {{ d.toUpperCase().slice(0, 3) }}
                 </button>
               </div>

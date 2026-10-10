@@ -19,6 +19,7 @@ import { alignFurigana } from '@/utils/furigana'
 import { parseSusBpm, type SusBpmEvent } from '@/utils/susBpm'
 import type { EventData } from '@/types/master'
 import { renderSusToSvg, type Sus2ImgFrontendResult } from '@/vendor/sekai-sus2img'
+import { DIFFICULTY_LABELS, difficultyBackground } from '@/utils/difficulty'
 
 interface Music {
   id: number
@@ -634,35 +635,14 @@ function getVocalSingers(vocal: MusicVocal, separator = '・'): string {
   }).filter(Boolean).join(separator)
 }
 
-const appendDifficultyGradient = 'linear-gradient(135deg, #ab9fef, #e192d7)'
-
-// 难度颜色映射
-const difficultyColors: Record<string, string> = {
-  easy: '#6EE1D6',
-  normal: '#34DDFF',
-  hard: '#FBCC26',
-  expert: '#EA5B75',
-  master: '#C656EA',
-  append: appendDifficultyGradient,
-}
-
-const difficultyLabels: Record<string, string> = {
-  easy: 'EASY',
-  normal: 'NORMAL',
-  hard: 'HARD',
-  expert: 'EXPERT',
-  master: 'MASTER',
-  append: 'APPEND',
-}
+const difficultyLabels = DIFFICULTY_LABELS
 
 function difficultyBadgeStyle(difficulty: string) {
-  const bg = difficultyColors[difficulty] || '#9ca3af'
-  return { background: bg }
+  return { background: difficultyBackground(difficulty) }
 }
 
 function difficultyCardStyle(difficulty: string) {
-  const bg = difficultyColors[difficulty] || '#9ca3af'
-  return { background: bg }
+  return { background: difficultyBackground(difficulty) }
 }
 
 // 封面图片 URL (startapp)

@@ -22,20 +22,13 @@ import type {
   LeaderCountRow
 } from '@/types/profile'
 import PageHeader from '@/components/PageHeader.vue'
+import { difficultyStyle } from '@/utils/difficulty'
 
 const masterStore = useMasterStore()
 const accountStore = useAccountStore()
 const settingsStore = useSettingsStore()
 const assetsHost = computed(() => settingsStore.assetsHost)
 
-const difficultyColors: Record<string, string> = {
-  easy: 'bg-success text-success-content',
-  normal: 'bg-info text-info-content',
-  hard: 'bg-warning text-warning-content',
-  expert: 'bg-error text-error-content',
-  master: 'diff-master',
-  append: 'diff-append',
-}
 
 const difficultyOrder = ['easy', 'normal', 'hard', 'expert', 'master', 'append']
 const CHALLENGE_RESOURCE_BOX_PURPOSE = 'challenge_live_high_score'
@@ -1411,7 +1404,7 @@ watch(currentUserId, async (newId) => {
                   <div class="text-center text-sm font-medium text-base-content/70 mb-1">Clear</div>
                   <div class="grid grid-cols-6 gap-1">
                     <div v-for="c in sortedClearCounts" :key="'clear-' + c.musicDifficultyType" class="text-center">
-                      <div class="badge badge-sm w-full" :class="difficultyColors[c.musicDifficultyType]">
+                      <div class="badge badge-sm w-full border-0" :style="difficultyStyle(c.musicDifficultyType)">
                         {{ c.musicDifficultyType.toUpperCase() }}
                       </div>
                       <div class="text-sm font-bold mt-0.5">{{ c.liveClear }}</div>
@@ -1423,7 +1416,7 @@ watch(currentUserId, async (newId) => {
                   <div class="text-center text-sm font-medium text-base-content/70 mb-1">Full Combo</div>
                   <div class="grid grid-cols-6 gap-1">
                     <div v-for="c in sortedClearCounts" :key="'fc-' + c.musicDifficultyType" class="text-center">
-                      <div class="badge badge-sm w-full" :class="difficultyColors[c.musicDifficultyType]">
+                      <div class="badge badge-sm w-full border-0" :style="difficultyStyle(c.musicDifficultyType)">
                         {{ c.musicDifficultyType.toUpperCase() }}
                       </div>
                       <div class="text-sm font-bold mt-0.5">{{ c.fullCombo }}</div>
@@ -1435,7 +1428,7 @@ watch(currentUserId, async (newId) => {
                   <div class="text-center text-sm font-medium text-base-content/70 mb-1">All Perfect</div>
                   <div class="grid grid-cols-6 gap-1">
                     <div v-for="c in sortedClearCounts" :key="'ap-' + c.musicDifficultyType" class="text-center">
-                      <div class="badge badge-sm w-full" :class="difficultyColors[c.musicDifficultyType]">
+                      <div class="badge badge-sm w-full border-0" :style="difficultyStyle(c.musicDifficultyType)">
                         {{ c.musicDifficultyType.toUpperCase() }}
                       </div>
                       <div class="text-sm font-bold mt-0.5">{{ c.allPerfect }}</div>
@@ -1553,18 +1546,6 @@ watch(currentUserId, async (newId) => {
 :deep(.sekai-honor-bonds) {
   width: auto !important;
   height: 100% !important;
-}
-
-/* 难度颜色: MASTER 紫色 */
-.diff-master {
-  background-color: #9b59b6;
-  color: #fff;
-}
-
-/* 难度颜色: APPEND 浅紫色 */
-.diff-append {
-  background-color: #c39bd3;
-  color: #fff;
 }
 
 </style>
