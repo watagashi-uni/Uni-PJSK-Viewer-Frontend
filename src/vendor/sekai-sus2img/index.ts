@@ -38,6 +38,7 @@ export interface Sus2ImgRenderInput {
     isOfficial?: boolean
     /** 密集 highspeed 变化折叠为趋势箭头，默认开启 */
     condenseSpeedTrend?: boolean
+    interactiveJudgment?: boolean
 }
 
 export interface CustomScoreJsonRenderInput {
@@ -57,6 +58,7 @@ export interface CustomScoreJsonRenderInput {
     isOfficial?: boolean
     /** 密集 highspeed 变化折叠为趋势箭头，默认开启 */
     condenseSpeedTrend?: boolean
+    interactiveJudgment?: boolean
 }
 
 export interface Sus2ImgRuntimeOptions {
@@ -205,6 +207,7 @@ const customScoreJsonToSvgPayload = (
         crashMarkers,
         focusAnchors,
         condenseSpeedTrend: input.condenseSpeedTrend,
+        interactiveJudgment: input.interactiveJudgment,
     })
     return {
         svgText: rendered.svg,

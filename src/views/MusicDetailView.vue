@@ -19,6 +19,7 @@ import { alignFurigana } from '@/utils/furigana'
 import { parseSusBpm, type SusBpmEvent } from '@/utils/susBpm'
 import type { EventData } from '@/types/master'
 import { renderSusToSvg, type Sus2ImgFrontendResult } from '@/vendor/sekai-sus2img'
+import ChartJudgmentPreview from '@/components/ChartJudgmentPreview.vue'
 import { DIFFICULTY_LABELS, difficultyBackground } from '@/utils/difficulty'
 
 interface Music {
@@ -178,6 +179,8 @@ const { onDialogClose: onChartSvgPreviewDialogClose } = useModalDialog('chartSvg
 const chartSvgPreviewLoading = ref(false)
 const chartSvgPreviewError = ref<string | null>(null)
 const chartSvgPreviewSvgText = ref<string | null>(null)
+const chartJudgmentPreviewRef = ref<InstanceType<typeof ChartJudgmentPreview> | null>(null)
+const chartSvgPreviewImageUrl = ref('')
 const chartSvgPreviewWidth = ref(0)
 const chartSvgPreviewHeight = ref(0)
 const previewDifficultyData = ref<MusicDifficulty | null>(null)
@@ -857,9 +860,11 @@ async function openChartSvgPreview(diff: MusicDifficulty) {
       skin: 'custom01',
       jacket: coverUrl.value || undefined,
       isOfficial: true,
+      interactiveJudgment: true,
     })
 
     chartSvgPreviewResult = result
+    chartSvgPreviewImageUrl.value = result.url
     chartSvgPreviewSvgText.value = result.svgText
     chartSvgPreviewWidth.value = result.width
     chartSvgPreviewHeight.value = result.height
@@ -889,7 +894,7 @@ async function downloadPreviewPng() {
   if (!chartSvgPreviewSvgText.value) return
   isDownloadingPreviewPng.value = true
   try {
-    const svgText = chartSvgPreviewSvgText.value
+    const svgText = chartJudgmentPreviewRef.value?.getSvgForExport() ?? chartSvgPreviewSvgText.value
     const width = chartSvgPreviewWidth.value || chartSvgPreviewResult?.width || 0
     const height = chartSvgPreviewHeight.value || chartSvgPreviewResult?.height || 0
 
@@ -1708,7 +1713,7 @@ const isExpired = computed(() => {
         <!-- 标题栏 -->
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-3 py-2 sm:px-6 sm:py-4 border-b border-base-200 shrink-0">
           <!-- 左侧：标题 + 难度 -->
-          <div class="min-w-0 flex items-center gap-2 sm:gap-3 flex-wrap">
+          <div class="min-w-0 flex items-center gap-2 sm:gap-3">
             <h3 class="text-sm sm:text-lg font-bold truncate">{{ music?.title }}</h3>
             <span
               v-if="previewDifficultyData"
@@ -1722,6 +1727,7 @@ const isExpired = computed(() => {
               <span class="mx-1">·</span>
               {{ previewDifficultyData.totalNoteCount }} COMBO
             </span>
+            <span class="min-w-0 truncate text-xs text-base-content/50" title="点击音符查看判定，可多选，再点关闭。">点击音符查看判定，可多选，再点关闭。</span>
           </div>
 
           <!-- 右侧：操作按钮 -->
@@ -1740,6 +1746,7 @@ const isExpired = computed(() => {
               </button>
             </div>
             <div class="w-px h-5 sm:h-6 bg-base-300 hidden sm:block"></div>
+            <button class="btn btn-xs sm:btn-sm btn-ghost h-7 sm:h-8" :disabled="!chartSvgPreviewSvgText" @click="chartJudgmentPreviewRef?.clearJudgments()">取消全部判定</button>
             <button
               class="btn btn-xs sm:btn-sm btn-ghost btn-outline h-7 sm:h-8"
               title="下载 PNG"
@@ -1785,13 +1792,13 @@ const isExpired = computed(() => {
                 overflow: 'hidden',
               }"
             >
-              <!-- eslint-disable vue/no-v-html -->
-              <div
-                class="inline-block origin-top-left [&_svg]:max-w-none [&_svg]:block"
+              <ChartJudgmentPreview
+                ref="chartJudgmentPreviewRef"
+                class="origin-top-left"
                 :style="{ transform: `scale(${previewZoom})` }"
-                v-html="chartSvgPreviewSvgText"
-              ></div>
-              <!-- eslint-enable vue/no-v-html -->
+                :svg-text="chartSvgPreviewSvgText"
+                :image-url="chartSvgPreviewImageUrl"
+              />
             </div>
           </div>
         </div>

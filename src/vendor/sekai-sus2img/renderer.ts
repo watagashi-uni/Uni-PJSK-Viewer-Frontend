@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { Fraction } from './fraction'
+import { getNoteJudgment, JUDGMENT_FPS } from './judgmentTiming'
 import {
     Directional,
     DirectionalType,
@@ -349,6 +350,8 @@ export interface RenderOptions {
     focusAnchors?: CrashMarkerRender[]
     /** 密集 highspeed 变化折叠为趋势箭头展示，默认开启；关闭后逐条展示每个变化 */
     condenseSpeedTrend?: boolean
+    /** Only official inline previews opt into note hit targets; exports stay plain SVG. */
+    interactiveJudgment?: boolean
 }
 
 export interface RenderedSvg {
@@ -477,6 +480,34 @@ class SentenceRenderer {
 
     private getRelativeY(bar: Fraction): number {
         return this.drawing.timeHeight * this.drawing.score.getTimeDelta(bar, new Fraction(this.barStop)) + this.yBaseTop
+    }
+
+    private renderJudgmentTargets(height: number): string {
+        if (!this.drawing.interactiveJudgment) return ''
+        const bottom = height + this.drawing.timePadding * 2
+        const parts: string[] = []
+        const stopTime = this.drawing.score.getTime(this.barStop)
+        const earliest = stopTime - (height + this.drawing.timePadding) / this.drawing.timeHeight
+        const latest = stopTime + this.drawing.timePadding / this.drawing.timeHeight
+        const notes = this.drawing.judgmentNotes
+        let low = 0
+        let high = notes.length
+        while (low < high) {
+            const mid = (low + high) >>> 1
+            if (notes[mid].time < earliest) low = mid + 1
+            else high = mid
+        }
+        for (let index = low; index < notes.length && notes[index].time <= latest; index += 1) {
+            const { note, profile, id, time } = notes[index]
+            const y = (stopTime - time) * this.drawing.timeHeight + this.yBaseTop
+            const x = this.drawing.laneWidth * (note.lane - 2) + this.drawing.lanePadding - 3
+            const width = this.drawing.laneWidth * note.width + 6
+            const flick = note instanceof Directional || (note instanceof Slide && note.type === SlideType.END && note.directional)
+            const top = Math.max(0, y - (flick ? this.drawing.flickHeight : 7))
+            const label = this.drawing.judgmentProfiles[profile].label
+            parts.push(`<rect data-judge-note="${id}" data-profile="${profile}" data-center="${fmt(y)}" x="${fmt(x)}" y="${fmt(top)}" width="${fmt(width)}" height="${fmt(Math.min(bottom, y + 7) - top)}" fill="transparent" tabindex="0" role="button" aria-label="${escapeXml(label)}判定区间" aria-pressed="false" style="cursor:pointer" />`)
+        }
+        return `<g data-judge-targets="" data-pixels-per-frame="${this.drawing.timeHeight / JUDGMENT_FPS}" data-bottom="${fmt(bottom)}">${parts.join('')}</g>`
     }
 
     private getBezierCoordinates(slide0: Slide, slide1: Slide): [Bezier, Bezier] {
@@ -1289,6 +1320,7 @@ class SentenceRenderer {
         parts.push(...this.noteSpeedTexts)
         parts.push(...this.crashMarkerElements)
         parts.push(...this.tickTexts)
+        parts.push(this.renderJudgmentTargets(height))
 
         const focusAnchors = this.renderFocusAnchors()
         if (focusAnchors) {
@@ -1322,6 +1354,9 @@ class DrawingRenderer {
     readonly crashMarkers: CrashMarkerRender[]
     readonly focusAnchors: CrashMarkerRender[]
     readonly condenseSpeedTrend: boolean
+    readonly interactiveJudgment: boolean
+    readonly judgmentProfiles: NonNullable<ReturnType<typeof getNoteJudgment>>[] = []
+    readonly judgmentNotes: Array<{ note: Tap | Directional | Slide; profile: number; id: number; time: number }>
 
     constructor(score: Score, options: RenderOptions) {
         this.score = score
@@ -1345,6 +1380,20 @@ class DrawingRenderer {
         this.crashMarkers = options.crashMarkers ?? []
         this.focusAnchors = options.focusAnchors ?? []
         this.condenseSpeedTrend = options.condenseSpeedTrend ?? true
+        this.interactiveJudgment = options.interactiveJudgment ?? false
+        const profiles = new Map<string, number>()
+        this.judgmentNotes = this.interactiveJudgment ? score.notes.flatMap((note, id) => {
+            const judgment = getNoteJudgment(note)
+            if (!judgment) return []
+            const key = JSON.stringify(judgment)
+            let profile = profiles.get(key)
+            if (profile === undefined) {
+                profile = this.judgmentProfiles.length
+                profiles.set(key, profile)
+                this.judgmentProfiles.push(judgment)
+            }
+            return [{ note, profile, id, time: score.getTime(note.bar) }]
+        }).sort((a, b) => a.time - b.time) : []
 
         this.styleSheet = `${DEFAULT_STYLE}\n${WHITE_STYLE}${options.styleSheet ? `\n${options.styleSheet}` : ''}`
     }
@@ -1477,12 +1526,14 @@ class DrawingRenderer {
         const parts: string[] = []
         parts.push(`<?xml version="1.0" encoding="UTF-8"?>`)
         parts.push(
-            `<svg xmlns="http://www.w3.org/2000/svg" width="${fmt(width)}" height="${fmt(
+            `<svg xmlns="http://www.w3.org/2000/svg"${this.interactiveJudgment ? ' data-judge-preview=""' : ''} width="${fmt(width)}" height="${fmt(
                 height,
             )}" viewBox="0 0 ${fmt(width)} ${fmt(height)}">`,
         )
+        if (this.interactiveJudgment) parts.push(`<metadata data-judge-profiles="">${escapeXml(JSON.stringify(this.judgmentProfiles))}</metadata>`)
         parts.push('<defs>')
         parts.push(`<style><![CDATA[${this.styleSheet}]]></style>`)
+
         parts.push(
             `<linearGradient id="decoration-gradient" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="var(--color-start)" /><stop offset="1" stop-color="var(--color-stop)" /></linearGradient>`,
         )
