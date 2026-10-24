@@ -1666,7 +1666,7 @@ const isExpired = computed(() => {
                       :class="{ 'chart-difficulty-action': difficulties.length >= 6 }"
                       @click="openChartPreview(diff.musicDifficulty)"
                     >
-                      <PlayCircle class="w-4 h-4 shrink-0" /> 3D谱面播放
+                      <PlayCircle class="w-4 h-4 shrink-0" /> 在线游玩
                     </button>
 
                     <!-- 下载文件 (.sus) -->

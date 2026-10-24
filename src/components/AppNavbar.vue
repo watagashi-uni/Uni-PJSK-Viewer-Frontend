@@ -8,8 +8,8 @@ import { Menu, Search } from 'lucide-vue-next'
       <Menu class="h-5 w-5" />
     </label>
     <!-- 左上角始终是网站标题，点击回到首页 -->
-    <div class="min-w-0 flex-1">
-      <RouterLink to="/" class="inline-block max-w-full truncate rounded-md px-1 text-base font-bold text-primary">
+    <div class="flex min-w-0 flex-1 items-center">
+      <RouterLink to="/" class="block max-w-full truncate rounded-md px-1 text-base font-bold leading-8 text-primary">
         Uni PJSK Viewer
       </RouterLink>
     </div>
