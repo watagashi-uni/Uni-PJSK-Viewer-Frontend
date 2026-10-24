@@ -191,28 +191,28 @@ const suiteAge = computed(() => {
         />
         <div v-if="accountStore.currentUserId" class="grid grid-cols-2 gap-1.5">
           <button
-            class="btn btn-xs btn-ghost h-auto min-h-0 flex-col items-start gap-0 rounded-md px-2 py-1.5 text-left font-normal"
+            class="btn btn-xs btn-ghost h-auto min-h-0 items-start gap-0 rounded-md px-2 py-1 text-left font-normal lg:flex-col lg:py-1.5"
             :disabled="accountStore.profileRefreshing"
-            title="从公开接口刷新等级、卡组、名片等资料"
+            :title="`从公开接口刷新等级、卡组、名片等资料（${profileAge || '未刷新'}）`"
             @click="runRefresh('profile')"
           >
             <span class="flex items-center gap-1 text-xs font-medium">
               <RefreshCw class="h-3 w-3" :class="{ 'animate-spin': accountStore.profileRefreshing }" />
               刷新资料
             </span>
-            <span class="text-[11px] text-base-content/45">{{ profileAge || '未刷新' }}</span>
+            <span class="hidden text-[11px] text-base-content/45 lg:inline">{{ profileAge || '未刷新' }}</span>
           </button>
           <button
-            class="btn btn-xs btn-ghost h-auto min-h-0 flex-col items-start gap-0 rounded-md px-2 py-1.5 text-left font-normal"
+            class="btn btn-xs btn-ghost h-auto min-h-0 items-start gap-0 rounded-md px-2 py-1 text-left font-normal lg:flex-col lg:py-1.5"
             :disabled="accountStore.suiteRefreshing"
-            title="获取你在 Haruki 工具箱上传的完整游戏数据"
+            :title="`获取你在 Haruki 工具箱上传的完整游戏数据（${suiteAge ? `上传于 ${suiteAge}` : '未同步'}）`"
             @click="runRefresh('suite')"
           >
             <span class="flex items-center gap-1 text-xs font-medium">
               <RefreshCw class="h-3 w-3" :class="{ 'animate-spin': accountStore.suiteRefreshing }" />
               同步数据
             </span>
-            <span class="text-[11px] text-base-content/45">{{ suiteAge ? `上传于 ${suiteAge}` : '未同步' }}</span>
+            <span class="hidden text-[11px] text-base-content/45 lg:inline">{{ suiteAge ? `上传于 ${suiteAge}` : '未同步' }}</span>
           </button>
         </div>
         <p v-if="refreshError" class="px-1 text-xs text-error">{{ refreshError }}</p>
