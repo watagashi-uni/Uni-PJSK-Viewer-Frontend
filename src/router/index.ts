@@ -219,24 +219,6 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '正在生成预览', fullscreen: true },
     },
     {
-        path: '/chart-share',
-        name: 'ChartShare',
-        component: () => import('@/views/ChartShareView.vue'),
-        meta: { title: '谱面分享' },
-    },
-    {
-        path: '/chart/s/:id',
-        name: 'ChartShareRedirect',
-        component: () => import('@/views/ChartShareRedirectView.vue'),
-        meta: { title: '谱面分享跳转', fullscreen: true },
-    },
-    {
-        path: '/thumbnail',
-        name: 'Thumbnail',
-        component: () => import('@/views/ThumbnailToolView.vue'),
-        meta: { title: '封面生成' },
-    },
-    {
         path: '/sus2img/preview',
         name: 'Sus2ImgPreview',
         component: () => import('@/views/Sus2ImgPreviewView.vue'),
