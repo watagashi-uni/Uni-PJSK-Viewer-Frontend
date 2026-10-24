@@ -1,33 +1,27 @@
 import { registerSW } from 'virtual:pwa-register'
 
-export interface PwaState {
-  needRefresh: boolean
-  offlineReady: boolean
-}
-
-type PwaStateListener = (state: Readonly<PwaState>) => void
-
-const state: PwaState = {
-  needRefresh: false,
-  offlineReady: false,
-}
-const listeners = new Set<PwaStateListener>()
+// Updates are forced (see public/push-sw.js): the new worker takes over at
+// once and asks every page to reload. Acknowledging tells it this page reloads
+// itself, so it does not have to navigate the window.
+const RELOAD_MESSAGE = 'PWA_RELOAD'
+const RELOAD_ACK_MESSAGE = 'PWA_RELOAD_ACK'
 let registration: ServiceWorkerRegistration | undefined
 
-function notify() {
-  const snapshot = { ...state }
-  listeners.forEach(listener => listener(snapshot))
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('message', (event) => {
+    if ((event.data as { type?: string } | null)?.type !== RELOAD_MESSAGE) return
+    event.source?.postMessage({ type: RELOAD_ACK_MESSAGE })
+    window.location.reload()
+  })
 }
 
 const updateServiceWorker = registerSW({
   immediate: true,
   onNeedRefresh() {
-    state.needRefresh = true
-    notify()
+    // Only reached if a worker still ends up waiting; activate it straight away.
+    void updateServiceWorker(true)
   },
   onOfflineReady() {
-    state.offlineReady = true
-    notify()
     console.log('PWA: App ready for offline use')
   },
   onRegisteredSW(_swUrl, currentRegistration) {
@@ -37,16 +31,6 @@ const updateServiceWorker = registerSW({
     console.error('PWA: Service worker registration failed', error)
   },
 })
-
-export function subscribeToPwaState(listener: PwaStateListener): () => void {
-  listeners.add(listener)
-  listener({ ...state })
-  return () => listeners.delete(listener)
-}
-
-export async function applyPwaUpdate(): Promise<void> {
-  await updateServiceWorker(true)
-}
 
 function waitForWorkerState(
   worker: ServiceWorker,

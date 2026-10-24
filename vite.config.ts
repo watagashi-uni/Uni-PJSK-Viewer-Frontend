@@ -10,12 +10,14 @@ export default defineConfig({
     vue(),
     tailwindcss(),
     VitePWA({
-      registerType: 'prompt',  // 改为 prompt 模式，让用户手动点击更新
+      // 强制更新：新 SW 装好立即接管（skipWaiting + clientsClaim），push-sw.js 通知
+      // 所有页面刷新到新版本，不再等用户点击。保留 prompt 是为了不让插件再注入
+      // 自己的自动刷新逻辑，刷新统一由 push-sw.js 的握手负责。
+      registerType: 'prompt',
       injectRegister: 'auto',
       workbox: {
         importScripts: ['push-sw.js'],
-        // 用户确认更新或启动恢复发送 SKIP_WAITING 后，立即接管现有页面，
-        // 避免普通刷新仍由旧 SW 控制，直到浏览器完全退出才完成切换。
+        skipWaiting: true,
         clientsClaim: true,
         // 只预缓存入口与 PWA 元数据；页面 chunk 继续按实际访问情况写入运行时缓存。
         globPatterns: ['**/*.{html,ico,svg,webmanifest}'],

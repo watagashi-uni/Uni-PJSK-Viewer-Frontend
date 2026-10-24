@@ -1,7 +1,7 @@
 /* global clients */
 // Permanent compatibility bridge for clients that can only load an older
 // cached index.html. The migration runs once per browser profile, even if the
-// user skips several releases, then all later updates return to prompt mode.
+// user skips several releases; later updates use the forced reload below.
 const lifecycleMigrationCache = 'pwa-lifecycle-migration-v1';
 const lifecycleMigrationPending = '/__pwa_lifecycle_migration_pending__';
 const lifecycleMigrationComplete = '/__pwa_lifecycle_migration_complete__';
@@ -22,43 +22,98 @@ self.addEventListener('install', function (e) {
     );
 });
 
+// Resolves true when the migration navigated the open windows itself.
+let lifecycleMigrationNavigated = Promise.resolve(false);
+
 self.addEventListener('activate', function (e) {
-    e.waitUntil(
-        caches.open(lifecycleMigrationCache).then(async function (cache) {
-            if (await cache.match(lifecycleMigrationComplete)) {
-                return;
+    lifecycleMigrationNavigated = caches.open(lifecycleMigrationCache).then(async function (cache) {
+        if (await cache.match(lifecycleMigrationComplete)) {
+            return false;
+        }
+
+        const pendingMigration = await cache.match(lifecycleMigrationPending);
+        const migrationType = pendingMigration ? await pendingMigration.text() : 'update';
+
+        // Persist completion before navigating so a reload can never repeat
+        // the migration or enter a controller-change loop.
+        await cache.put(lifecycleMigrationComplete, new Response('complete'));
+        await cache.delete(lifecycleMigrationPending);
+        await clients.claim();
+
+        if (migrationType !== 'update') {
+            return false;
+        }
+
+        const windowClients = await clients.matchAll({
+            type: 'window',
+            includeUncontrolled: true
+        });
+        await Promise.all(windowClients.map(function (client) {
+            if (
+                new URL(client.url).origin === self.location.origin &&
+                'navigate' in client
+            ) {
+                return client.navigate(client.url).catch(function () {
+                    return null;
+                });
             }
+            return null;
+        }));
+        return true;
+    }).catch(function () {
+        return false;
+    });
+    e.waitUntil(lifecycleMigrationNavigated);
+});
 
-            const pendingMigration = await cache.match(lifecycleMigrationPending);
-            const migrationType = pendingMigration ? await pendingMigration.text() : 'update';
+// Updates are forced and do not wait for the user: workbox skips waiting and
+// claims clients, then every open window reloads into the new build. Pages
+// from this build onwards acknowledge the message and reload themselves;
+// older pages never answer, so they are navigated directly.
+const reloadMessage = 'PWA_RELOAD';
+const reloadAckMessage = 'PWA_RELOAD_ACK';
+const reloadAckTimeoutMs = 3000;
+const pendingReloadAcks = new Map();
+let replacingPreviousWorker = false;
 
-            // Persist completion before navigating so a reload can never repeat
-            // the migration or enter a controller-change loop.
-            await cache.put(lifecycleMigrationComplete, new Response('complete'));
-            await cache.delete(lifecycleMigrationPending);
-            await clients.claim();
+self.addEventListener('install', function () {
+    replacingPreviousWorker = Boolean(self.registration.active);
+});
 
-            if (migrationType !== 'update') {
-                return;
-            }
+self.addEventListener('message', function (e) {
+    if (e.data && e.data.type === reloadAckMessage && e.source && 'id' in e.source) {
+        const acknowledge = pendingReloadAcks.get(e.source.id);
+        if (acknowledge) acknowledge();
+    }
+});
 
-            const windowClients = await clients.matchAll({
-                type: 'window',
-                includeUncontrolled: true
-            });
-            await Promise.all(windowClients.map(function (client) {
-                if (
-                    new URL(client.url).origin === self.location.origin &&
-                    'navigate' in client
-                ) {
-                    return client.navigate(client.url).catch(function () {
-                        return null;
-                    });
-                }
+async function reloadOpenPages() {
+    const windowClients = await clients.matchAll({ type: 'window' });
+    await Promise.all(windowClients.map(async function (client) {
+        const acknowledged = new Promise(function (resolve) {
+            pendingReloadAcks.set(client.id, function () { resolve(true); });
+            setTimeout(function () { resolve(false); }, reloadAckTimeoutMs);
+        });
+        client.postMessage({ type: reloadMessage });
+        const handled = await acknowledged;
+        pendingReloadAcks.delete(client.id);
+        if (!handled && 'navigate' in client) {
+            await client.navigate(client.url).catch(function () {
                 return null;
-            }));
-        })
-    );
+            });
+        }
+    }));
+}
+
+self.addEventListener('activate', function () {
+    if (!replacingPreviousWorker) {
+        return;
+    }
+    // Not inside waitUntil: a page navigated here would wait for activation.
+    // The one-time migration above may already have navigated every window.
+    void lifecycleMigrationNavigated.then(function (navigated) {
+        return navigated ? null : clients.claim().then(reloadOpenPages);
+    });
 });
 
 self.addEventListener('push', function (e) {

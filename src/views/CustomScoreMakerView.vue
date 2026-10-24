@@ -235,6 +235,7 @@ let svgRenderResult: Sus2ImgFrontendResult | null = null
 let feedRequestSerial = 0
 let feedAbortController: AbortController | null = null
 let copyMessageTimer: number | null = null
+const previewBridgeCleanups = new Set<() => void>()
 
 const assetsHost = computed(() => settingsStore.assetsHost.replace(/\/+$/, ''))
 const translations = toRef(masterStore, 'translations')
@@ -838,11 +839,19 @@ function postChartPreviewPayload(previewTab: Window | null, payload: ReturnType<
   const targetOrigin = new URL(previewBase).origin
   let retryTimer: number | null = null
   let timeoutTimer: number | null = null
+  let closedTimer: number | null = null
 
-  const cleanup = () => {
-    window.removeEventListener('message', handleReady)
+  const stopRetrying = () => {
     if (retryTimer !== null) window.clearInterval(retryTimer)
     if (timeoutTimer !== null) window.clearTimeout(timeoutTimer)
+    retryTimer = null
+    timeoutTimer = null
+  }
+  const cleanup = () => {
+    window.removeEventListener('message', handleReady)
+    stopRetrying()
+    if (closedTimer !== null) window.clearInterval(closedTimer)
+    previewBridgeCleanups.delete(cleanup)
   }
   const send = () => {
     if (previewTab.closed) return
@@ -856,13 +865,19 @@ function postChartPreviewPayload(previewTab: Window | null, payload: ReturnType<
     if (event.source !== previewTab || event.origin !== targetOrigin) return
     if ((event.data as { type?: string } | null)?.type !== 'sekai-mmw-preview:ready') return
     send()
-    cleanup()
+    stopRetrying()
   }
 
+  // The preview announces ready again after every reload (e.g. a forced PWA
+  // update), so keep answering until the tab is closed.
   window.addEventListener('message', handleReady)
+  previewBridgeCleanups.add(cleanup)
   replacePreviewTab(previewTab, `${previewBase}/preview?post=1`)
   retryTimer = window.setInterval(send, 800)
-  timeoutTimer = window.setTimeout(cleanup, 60000)
+  timeoutTimer = window.setTimeout(stopRetrying, 60000)
+  closedTimer = window.setInterval(() => {
+    if (previewTab.closed) cleanup()
+  }, 5000)
 }
 
 async function open3dPreview(score: DisplayScore) {
@@ -952,6 +967,7 @@ watch(authorOverlayOpen, (open) => {
 onBeforeUnmount(() => {
   document.documentElement.style.overflow = ''
   window.removeEventListener('keydown', handleAuthorOverlayKeydown)
+  for (const cleanup of [...previewBridgeCleanups]) cleanup()
 })
 
 async function openAuthorOverlay(score: DisplayScore) {
