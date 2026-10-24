@@ -1213,6 +1213,39 @@ function clearForm() {
             </button>
           </div>
         </form>
+
+        <!-- 在线预览宣传：chartview.unipjsk.com -->
+        <a
+          href="https://chartview.unipjsk.com/"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="group mt-2 flex flex-col gap-3 rounded-xl border border-base-300 bg-base-200/40 p-3 transition-colors hover:border-primary/50 sm:flex-row sm:items-center"
+        >
+          <span class="relative block w-full shrink-0 overflow-hidden rounded-lg sm:w-56">
+            <img
+              src="/img/chartview-gameplay.webp"
+              alt="预览画面：分数与评级条、459 连击、PERFECT 判定和金色打击特效"
+              class="aspect-[16/9] w-full object-cover"
+              loading="lazy"
+            />
+            <img
+              src="/img/chartview-result.webp"
+              alt="在线手动游玩后的原版结算画面"
+              class="absolute bottom-1 right-1 w-[46%] rounded shadow-md ring-1 ring-base-100/90"
+              loading="lazy"
+            />
+          </span>
+          <span class="min-w-0 flex-1">
+            <span class="badge badge-primary badge-xs mr-1.5 align-middle">NEW</span>
+            <span class="align-middle font-bold group-hover:text-primary">在线 1:1 预览本家谱面效果，还能录制视频和手动游玩</span>
+            <span class="mt-1 block text-sm text-base-content/70">
+              上传 SUS + 音频即可在浏览器里播放 3D 谱面预览；可直接在线录制导出 MP4，也可以用触屏游玩，曲终显示原版结算画面。
+            </span>
+            <span class="mt-1.5 inline-flex items-center gap-1 text-sm font-medium text-primary">
+              立即体验 <ExternalLink class="h-3.5 w-3.5" />
+            </span>
+          </span>
+        </a>
       </div>
     </div>
 
@@ -1404,24 +1437,6 @@ function clearForm() {
     </dialog>
 
     <footer class="text-center text-sm text-base-content/60 mt-8 space-y-2">
-      <a
-        href="https://chartview.unipjsk.com/"
-        class="card bg-base-100 shadow-lg text-left transition-transform duration-200 hover:shadow-xl block"
-      >
-        <div class="card-body flex-row items-center gap-4 p-4">
-          <img
-            src="/img/chart.webp"
-            alt="本家 1:1 复刻谱面在线预览"
-            class="w-28 h-20 rounded-lg object-cover shrink-0"
-          />
-          <div class="min-w-0">
-            <h2 class="card-title text-base leading-snug">在线1:1预览本家谱面效果</h2>
-            <p class="text-sm text-base-content/70 mt-1">
-              点击这里上传谱面，直接体验在线可播放的 3D 谱面预览。
-            </p>
-          </div>
-        </div>
-      </a>
       <p>如浏览器无法保存 PNG，请直接拖动到桌面保存。</p>
       <p>
         模块修改自

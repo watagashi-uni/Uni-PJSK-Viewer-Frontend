@@ -58,7 +58,7 @@ const groups: NavGroup[] = [
     title: '工具',
     items: [
       { to: '/deck-recommend', label: '自动组队', icon: Zap },
-      { to: '/sus2img', label: '谱面转图片', icon: FileImage, also: ['/chart-share'] },
+      { to: '/sus2img', label: '谱面转图片', icon: FileImage },
       { to: '/custom-score-maker', label: '谱面 Maker', icon: PenLine },
       { to: '/costumes/custom', label: '衣装自由搭配', icon: Dices },
     ],
