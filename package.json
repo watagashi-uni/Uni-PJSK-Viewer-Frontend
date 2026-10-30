@@ -5,10 +5,16 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:3d": "VITE_LOCAL_3D_STORE=1 vite --host 127.0.0.1 --port 5178",
+    "test:costume-preview": "node --test tests/costumePreview.test.mjs",
     "build": "vue-tsc -b && vite build",
     "preview": "vite preview",
     "lint": "eslint .",
-    "lint:fix": "eslint . --fix"
+    "lint:fix": "eslint . --fix",
+    "test:costume-preview:browser": "node tests/costume-preview-browser.mjs",
+    "test:costume-preview:legacy": "node tests/costume-preview-legacy-browser.mjs",
+    "test:story": "node --test tests/storyPlayback.test.mjs tests/storyPlayerAssets.test.mjs",
+    "test:story:browser": "node tests/story-player-browser.mjs"
   },
   "dependencies": {
     "@breezystack/lamejs": "^1.2.7",
@@ -21,6 +27,8 @@
     "idb": "^8.0.3",
     "lucide-vue-next": "^0.563.0",
     "pinia": "^3.0.4",
+    "pixi.js": "^7.4.3",
+    "pjsk-scenario-player": "github:Team-Haruki/sekai-scenario-player#c64e645013c48f009c93758fe930954326b7a290",
     "sekai-calculator": "^0.17.10",
     "three": "^0.178.0",
     "vue": "^3.5.24",
@@ -41,6 +49,7 @@
     "eslint-plugin-vue-scoped-css": "^2.12.0",
     "globals": "^17.3.0",
     "js-md5": "^0.8.3",
+    "playwright": "1.63.0",
     "tailwindcss": "^4.1.18",
     "ts-node": "^10.9.2",
     "typescript": "~5.9.3",

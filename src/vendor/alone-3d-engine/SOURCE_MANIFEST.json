@@ -1,0 +1,614 @@
+{
+  "upstream": "https://github.com/storyxy3/ALONE",
+  "revision": "1a49f794c93625c1c8f42f8ae68d37db31aa1ecd",
+  "sourceCheckout": "/data/watagashi/Haruki-3D-Engine-Integration-20261028/",
+  "buildDate": "2026-10-28",
+  "kernelVersion": "Hopeful_Stage",
+  "sourceLicense": "No project-level license declared at the pinned revision; retain upstream attribution and component notices.",
+  "patch": {
+    "path": "cross-body.patch",
+    "sha256": "687045865198f826844872a8ee5ccb6f01e6203883b2053a077d42db3295b01b"
+  },
+  "lockfile": {
+    "path": "bun.lock",
+    "sha256": "c054bfc12d3dc88329867d14f7174c5abbc1d2cb50ee7dd72586e1923e8fdae1"
+  },
+  "commands": [
+    "bun install --frozen-lockfile",
+    "bun run build:lib",
+    "bun run build:types",
+    "bun run build:consumer",
+    "bun scripts/checks/check-consumer-build.mjs"
+  ],
+  "validation": {
+    "targetedTests": 56,
+    "failures": 0,
+    "consumerBuild": "passed",
+    "consumerAssetCheck": "passed",
+    "publicFactoryFramingBrowser": {
+      "test": "tests/public-framing-browser.mjs",
+      "status": "passed",
+      "omittedAndExplicitDefaultIdentical": true,
+      "upperBodyCamera": "capture/official-default; position 0,1.25,2.3; target 0,1.25,0; FOV 25",
+      "persistsThroughResizeAndViewRotation": true
+    },
+    "realResultBrowser": {
+      "test": "sekai-mmw-preview-web/tests/gameplay-result-character-gpu-browser.mjs",
+      "status": "passed",
+      "initialPoseSilhouetteIoU": "> 0.8 against initial playing frames",
+      "reducedMotionPoseStable": true,
+      "animationAdvances": true,
+      "transparentPixels": true
+    }
+  },
+  "dependencies": {
+    "three": "0.178.0",
+    "@msgpack/msgpack": "3.1.3",
+    "brotli-wasm": "3.0.1"
+  },
+  "externalRuntimePackages": [
+    "three"
+  ],
+  "assetContract": "ALONE original-bundle store; legacy exported runtime packages are unsupported.",
+  "localChanges": [
+    "bodyRoleId recipe normalization and validation",
+    "lazy same-master-version foreign role catalog merge",
+    "foreign body and source height with active head/hair/skin/compatibility",
+    "independent motionRoleId retained",
+    "prepared-model cache key includes source body role",
+    "zero-time paused frames sample the selected body/facial pose without advancing animation or spring simulation",
+    "optional public factory framing upper-body selects the existing close camera; omitted/default framing remains unchanged"
+  ],
+  "files": [
+    {
+      "path": "assets/brotli_wasm_bg-NfWIZley.wasm",
+      "bytes": 1056860,
+      "sha256": "9ef0a025046bf7d87b7cdb8eac3f73a5c8fea2f1adb848cc9768345573fcd8a9"
+    },
+    {
+      "path": "assets/originalPartWorker-DvUowgFh.js",
+      "bytes": 144419,
+      "sha256": "1edd9bb395b0ced1737920b8143ac954eafe42a569147a0511662f8ae78326b6"
+    },
+    {
+      "path": "assets/runtimeDecodeWorker-ztxrM9TB.js",
+      "bytes": 18893,
+      "sha256": "6156b9f1a922986578c32ff59e5253080604f9370fadc2c576512d1b8703d145"
+    },
+    {
+      "path": "basis/basis_transcoder.js",
+      "bytes": 57529,
+      "sha256": "8478b5b6d6b74e7d3082b89f6417321d8d1dc0307f2b30d4484bb11b441696a1"
+    },
+    {
+      "path": "basis/basis_transcoder.wasm",
+      "bytes": 527333,
+      "sha256": "6cf17dc889352c42e9acf8897107978d127005fe3386c36a0e3845e27967630a"
+    },
+    {
+      "path": "brotliWasmRuntime-BtvLObJW.js",
+      "bytes": 4498,
+      "sha256": "78c366e32bc919a0c2ee38f65966c78af1b6dc05860e4075549ea1224afd8977"
+    },
+    {
+      "path": "CostumeShopKernel-B9BMx6oB.js",
+      "bytes": 270101,
+      "sha256": "63346e3eb18bb64e7d1f07c7f142173f3bf6aa4fc5a29db22c32867834a4e833"
+    },
+    {
+      "path": "cross-body.patch",
+      "bytes": 30960,
+      "sha256": "687045865198f826844872a8ee5ccb6f01e6203883b2053a077d42db3295b01b"
+    },
+    {
+      "path": "haruki-3d-engine-base.d.ts",
+      "bytes": 35,
+      "sha256": "73a666609cd57208bcd7f0baadad1fb66de4c6304f0571f8225684ec76539d3f"
+    },
+    {
+      "path": "haruki-3d-engine-base.js",
+      "bytes": 548,
+      "sha256": "647f7ba4249535d3af4c3a8a095c75c204630410f49bc46c62747af65d33a699"
+    },
+    {
+      "path": "haruki-3d-engine-costume-shop.d.ts",
+      "bytes": 43,
+      "sha256": "84d558eb332372add0fd50570e1bb13da395a2a351be1fdd31e54c9c5497ec22"
+    },
+    {
+      "path": "haruki-3d-engine-costume-shop.js",
+      "bytes": 698,
+      "sha256": "f7a28704aa0850d5295bc88300693ee434474a82d780f9e4579b7c99751ed5e2"
+    },
+    {
+      "path": "haruki-3d-engine-internal.d.ts",
+      "bytes": 33,
+      "sha256": "81654e591092cb10809187c0b9cfce62a889fa540b30442443e043851b29a1ea"
+    },
+    {
+      "path": "haruki-3d-engine-internal.js",
+      "bytes": 28340,
+      "sha256": "010ad35602b66b5036b9d83ceff2241bb1ab72f66602093ca247efe0c381c9d8"
+    },
+    {
+      "path": "haruki-3d-engine-mv.d.ts",
+      "bytes": 33,
+      "sha256": "33963fb4308802c7f7f6739967d7d1296ed8ef09e950c06242034ee650ad8b91"
+    },
+    {
+      "path": "haruki-3d-engine-mv.js",
+      "bytes": 30735,
+      "sha256": "484b7001dd3974463e1b0772cd6dde0727846948111d0a0e884eb8867f78104e"
+    },
+    {
+      "path": "haruki-3d-engine.d.ts",
+      "bytes": 30,
+      "sha256": "c69bcd373bd6759d792f779087b619ce7c0503f299ce7761200475911aacbf21"
+    },
+    {
+      "path": "haruki-3d-engine.js",
+      "bytes": 258,
+      "sha256": "f14cab60b158e6b2f8ebe3b4add57296a1eaf9d592a9b986df82795ab995a15b"
+    },
+    {
+      "path": "kernelVersion-C1zz-irZ.js",
+      "bytes": 88,
+      "sha256": "cda1cbb13aad9c023e124a640d8c28587baf91f06c98c6d28173bcaaf236c11a"
+    },
+    {
+      "path": "licenses/ALONE-UPSTREAM-NOTICES.md",
+      "bytes": 1693,
+      "sha256": "2b761db3d64201f02c98ab74bd0639e2f589f44e7206b6dd2c8841ba26d07294"
+    },
+    {
+      "path": "licenses/ASTC-LICENSE.md",
+      "bytes": 4717,
+      "sha256": "d0f75b7b3456668aa19dd798c285cf34b5747f0a34105034a7c9934a2f828602"
+    },
+    {
+      "path": "licenses/BASIS-README.md",
+      "bytes": 1448,
+      "sha256": "930b11bbbb742b2525491b0964f0462d63d8b21383c0623ec4c98c43d53723c6"
+    },
+    {
+      "path": "licenses/BROTLI-APACHE-2.0.txt",
+      "bytes": 11357,
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+    },
+    {
+      "path": "licenses/MSGPACK-LICENSE.txt",
+      "bytes": 740,
+      "sha256": "d95a411bcdadac85d678a99367ff51719e53539fa5ee9994943cd760c4ae64e4"
+    },
+    {
+      "path": "licenses/PL_MPEG-LICENSE.txt",
+      "bytes": 1153,
+      "sha256": "afd6a62c63eb755a6d8acdd1a654c42ec5b5c4709321e39c1b193abd1aa11ea1"
+    },
+    {
+      "path": "licenses/THREE-LICENSE.txt",
+      "bytes": 1081,
+      "sha256": "bfe119ea4fd413f5f7ca3fcd63adb0c4a073ed39daa2fe7d3e6b769e21272601"
+    },
+    {
+      "path": "originalPartWorker-BAqn-_Lw.js",
+      "bytes": 4476,
+      "sha256": "fd99d7b42b33b3a5d53ee4144e5ab89210136f57d4ee7b0826477cebc5f0539f"
+    },
+    {
+      "path": "partBuilder-BINYc9p5.js",
+      "bytes": 60974,
+      "sha256": "2af3ecfc7865ec92b37b4e36c5b4b7d44214f1b34ab4cea832899fddfd9058f0"
+    },
+    {
+      "path": "README.md",
+      "bytes": 3858,
+      "sha256": "a8c346322dd0a60780a5da42a6f5dc6c5eb6f90d40e7509fa5fc63d5f71db849"
+    },
+    {
+      "path": "runtimeMessagePackDecodeCore-BMQK7vja.js",
+      "bytes": 19362,
+      "sha256": "0fc4b36a761663c784b7efa891cab88f1d22d728122e8319d7fde6a903c5a4bd"
+    },
+    {
+      "path": "Sekai_Live_Accessory_Toon-LzVE9cS0.js",
+      "bytes": 186793,
+      "sha256": "088df48629170d22bbe0c4a8037af94d47b894af90ce0bbc385e0acd0543c12c"
+    },
+    {
+      "path": "Sekai_Live_Character_Eye-Base-DLHDyaOn.js",
+      "bytes": 190960,
+      "sha256": "5e88e73cfb31380deb656b9807280ff15432c44857466c51dae04bab65dc68c4"
+    },
+    {
+      "path": "Sekai_Live_Character_Eye-Highlight-B3sbvzqR.js",
+      "bytes": 106519,
+      "sha256": "663515ee761d7190066cda4007738455ed572a79d10b5bf4e2fa2b0eedaa46d9"
+    },
+    {
+      "path": "Sekai_Live_Character_Toon-Dm8eHoZX.js",
+      "bytes": 309310,
+      "sha256": "b67309ceb273946c8c5b0c05e5f2d82f0276271d6d4f96fed0ed7fc6ab840495"
+    },
+    {
+      "path": "Sekai_Live_Character_Toon-v3-XGZIb5UQ.js",
+      "bytes": 2352661,
+      "sha256": "2659eee781aa7209dc91b003e665c58d811dd685c57ba9bca51e198d1ea24db7"
+    },
+    {
+      "path": "THIRD_PARTY_NOTICES.md",
+      "bytes": 2522,
+      "sha256": "c884d673a894d674097cc8ef330e6d9adf0d6d82b106df44c19ba5d7327b5798"
+    },
+    {
+      "path": "types/base/browserCharacterRuntime.d.ts",
+      "bytes": 1490,
+      "sha256": "c9b8c759a3f8634fa6662c3882783043d5ed319a418043c5d21e10fbec9f5144"
+    },
+    {
+      "path": "types/base/index.d.ts",
+      "bytes": 836,
+      "sha256": "dfdc76fb853cde36f865bf7d28545db74a1070e870d6c03b614e6fa37e5624f2"
+    },
+    {
+      "path": "types/capture/captureAdapter.d.ts",
+      "bytes": 555,
+      "sha256": "85a747d414b18add094f6a5535930b645e073480130976b7ac3009a4e56abf13"
+    },
+    {
+      "path": "types/capture/captureTypes.d.ts",
+      "bytes": 1508,
+      "sha256": "c85e0c61b7ff7139361acb7400a5da4022336c8a4f63171719dc848de7d2778c"
+    },
+    {
+      "path": "types/capture/Haruki3DCaptureEngine.d.ts",
+      "bytes": 900,
+      "sha256": "7859cb1baaaa5795073e1b1a4c8b26917532301f17111dd8ebd39abf87d5f642"
+    },
+    {
+      "path": "types/config/viewerConfig.d.ts",
+      "bytes": 795,
+      "sha256": "77d20758f94b23af4bf7d79c0a53ba006a3b06bbee424a63df0190c9530f5669"
+    },
+    {
+      "path": "types/costume_shop/archiveViewerBackground.d.ts",
+      "bytes": 3686,
+      "sha256": "6279a4246e04d1b6d7b1e2693a72bd9fc5d0ab2c464c8ea540c64fb1a4447d8b"
+    },
+    {
+      "path": "types/costume_shop/cameraPolicy.d.ts",
+      "bytes": 1989,
+      "sha256": "85e36e157d2a744c656a6d6dbea2630231c231da236ac35b88a010b2887eabbc"
+    },
+    {
+      "path": "types/costume_shop/CostumeShopEngine.d.ts",
+      "bytes": 303,
+      "sha256": "dcde8a85bdfbefc50ee62509902f2448831aed7fcaca10ccba700f22ba13a56e"
+    },
+    {
+      "path": "types/costume_shop/CostumeShopKernel.d.ts",
+      "bytes": 1024,
+      "sha256": "6ff0c0ce743b1a9672a84fe647fa2ef563ac7283d23b3adace91068e557e5a2a"
+    },
+    {
+      "path": "types/costume_shop/costumeShopViewerComposite.d.ts",
+      "bytes": 597,
+      "sha256": "b17f18f65b572ee43414bd8603bb65288a8f6c5f016cdf9076eb21ef1bcf3293"
+    },
+    {
+      "path": "types/costume_shop/heightPolicy.d.ts",
+      "bytes": 180,
+      "sha256": "41721c493f38dea69ed666049b363b22b95e4f94a4ed934964ac9519e308c6ea"
+    },
+    {
+      "path": "types/costume_shop/index.d.ts",
+      "bytes": 924,
+      "sha256": "466847770736e3095bcbb419cde53c50d9f92fd081b94db208b3712c006e2cd7"
+    },
+    {
+      "path": "types/costume_shop/modelRenderStudio.d.ts",
+      "bytes": 1605,
+      "sha256": "5f07770dbde2b12cc63e2de06531ebcd96bba996fe25df19c94e9cf2df82d463"
+    },
+    {
+      "path": "types/costume_shop/renderStudioLights.d.ts",
+      "bytes": 1262,
+      "sha256": "6063138f53fbbbedc0acc223b7cb4dc0d9552b92f09c69cde6c478d0d4637c07"
+    },
+    {
+      "path": "types/costume_shop/uiParts3DCharacterViewer.d.ts",
+      "bytes": 1970,
+      "sha256": "2ac7552ba3c71ffe00e4670dd3880fd699fd48bec3cf5364b74fde09e282d697"
+    },
+    {
+      "path": "types/data/sampleScene.d.ts",
+      "bytes": 9887,
+      "sha256": "c2224195aa35959f4acc192dbaa6b79070350cf3e489a4bde8230ac937e39feb"
+    },
+    {
+      "path": "types/engine/costumeShopMotion.d.ts",
+      "bytes": 1564,
+      "sha256": "8d077de96b36fe533b856f709e8da39fa36afdccb5abe51a86246e9efdfbfeaa"
+    },
+    {
+      "path": "types/engine/Haruki3DEngine.d.ts",
+      "bytes": 14479,
+      "sha256": "2dd4a9aebde7bbacb8d3ef3085feb4d41e58c161061b01de83f0c4ce7cad2d47"
+    },
+    {
+      "path": "types/engine/official/characterModelMaterials.d.ts",
+      "bytes": 2448,
+      "sha256": "f51d776d0ab2d9cbc728c52ca59bebe26d4b1e29eaeccbb7ab36bd6d32ba9a4b"
+    },
+    {
+      "path": "types/engine/official/installOfficialCharacter.d.ts",
+      "bytes": 1787,
+      "sha256": "9479b5caceeb1d8fd61bd20ec60946e0a99545bc8ddedf4639060efbb66b3ac9"
+    },
+    {
+      "path": "types/engine/official/officialCharacterRenderer.d.ts",
+      "bytes": 1064,
+      "sha256": "52d8f4310407b1c3fd308bb471c3e281c9bd621eca64cad220cabd4f8f8bac5b"
+    },
+    {
+      "path": "types/engine/official/officialMaterialState.d.ts",
+      "bytes": 1589,
+      "sha256": "7d39acc9836bebee65ff85a6dcc1fb758650e869461488170e3b5e020606fe5c"
+    },
+    {
+      "path": "types/engine/official/sekaiCharacterEye.d.ts",
+      "bytes": 1903,
+      "sha256": "33ecd4b9ce066dde1b53f6d54e79640a06fc28bc214e484017e0c21f090ac64d"
+    },
+    {
+      "path": "types/engine/official/sekaiCharacterHair.d.ts",
+      "bytes": 756,
+      "sha256": "74d8d6cecf090726c3ffa1df6972bb9ece6622dca80cefdc59010ca7577f50d6"
+    },
+    {
+      "path": "types/engine/official/sekaiCharacterOutlinePass.d.ts",
+      "bytes": 267,
+      "sha256": "b4bab028d311badffe8fdd6d9b012a69778b80f7389f15e870ef158865c2a178"
+    },
+    {
+      "path": "types/engine/official/sekaiLightComponents.d.ts",
+      "bytes": 3505,
+      "sha256": "a97d7b9487a3180ce96f3ad67e8117730ebc307203816799ca385d63a5ada0d5"
+    },
+    {
+      "path": "types/engine/official/unityBuiltinTextures.d.ts",
+      "bytes": 181,
+      "sha256": "af4bf09b7fc0d37b1e8cfacdd1d43f607e5d3182d8333dcf680d4b4acab6372c"
+    },
+    {
+      "path": "types/engine/prefabNodeLookup.d.ts",
+      "bytes": 158,
+      "sha256": "5d99155e4f4d3224ab37cc57a400c68c1314d67e51781fd8138cff303f1a4eb2"
+    },
+    {
+      "path": "types/engine/runtimeTextureLoader.d.ts",
+      "bytes": 291,
+      "sha256": "734efa7a7bf57d583c99a2cdbae37e1b680db0a70ffab98cc1c24735d0f0b76e"
+    },
+    {
+      "path": "types/engine/sekaiExtraBoneRuntime.d.ts",
+      "bytes": 518,
+      "sha256": "ce5dcbb71446d00fa4729b11178629792a57a9149840d7fdce7678a1278f1eb6"
+    },
+    {
+      "path": "types/engine/sekaiPreviewPostProcessor.d.ts",
+      "bytes": 245,
+      "sha256": "82920fb7d236ab1d3991077cfc6ab2af58877496b161f7f12ced690b3c887a2b"
+    },
+    {
+      "path": "types/engine/springRuntimeTypes.d.ts",
+      "bytes": 8931,
+      "sha256": "4e05d78f236c23f7e0b0e16c48c13bfdc3ac1ff89e4013c4af38a58a98ed10fd"
+    },
+    {
+      "path": "types/engine/unityConstraintRuntime.d.ts",
+      "bytes": 2911,
+      "sha256": "9396e5800009de902d28566c15dbee01665840353640a906f2ac94da2f65d04d"
+    },
+    {
+      "path": "types/engine/unityCoordinateConversion.d.ts",
+      "bytes": 3735,
+      "sha256": "6ed7dc816927b6318f9a2353b2eb8e39cd38908e282af9b139d51355b644781c"
+    },
+    {
+      "path": "types/engine/unityMotionController.d.ts",
+      "bytes": 1867,
+      "sha256": "6f335b6b75e5ef99c088f13f2d7ede7dd4937ab4cca6df72b2bf1dc0e42f3e39"
+    },
+    {
+      "path": "types/engine/unityPlayableAnimator.d.ts",
+      "bytes": 7056,
+      "sha256": "ae1a0423e385fa64141f23e08b6e1d5dd4f6d6794cb233aeb46fc0a7d69fa0a6"
+    },
+    {
+      "path": "types/engine/unityPrefabRuntime.d.ts",
+      "bytes": 4106,
+      "sha256": "d2ef2c3dc9b668e69d41c621c167806173bb228fcd6a9abcfa0e028310ec84fe"
+    },
+    {
+      "path": "types/engine/unityPrefabSpringRuntimeAdapter.d.ts",
+      "bytes": 2872,
+      "sha256": "2bcb2331c7b9e141aaed496197900ec636557d19f0e1cb974b8c18670afa2845"
+    },
+    {
+      "path": "types/engine/utjSpringBoneRuntime.d.ts",
+      "bytes": 8697,
+      "sha256": "0278af43eb173257cd785d9642daa8fff5d0379b9a9490ef3f327d220fa678ca"
+    },
+    {
+      "path": "types/host/orbitControlsFactory.d.ts",
+      "bytes": 148,
+      "sha256": "27fa6e1a1e7d8c9a96b0cd1e2524ee69edeb0f308251b3a7f2af099d1a698090"
+    },
+    {
+      "path": "types/index.d.ts",
+      "bytes": 300,
+      "sha256": "80411cab0a427e970287115d93dfeea8e868e732cbeddb6d415e1a02d9d20e04"
+    },
+    {
+      "path": "types/internal.d.ts",
+      "bytes": 3672,
+      "sha256": "a89df6ccd6cfafe19a17d65ad6b3c82e734fbef577581b8a3096f8ad246c2851"
+    },
+    {
+      "path": "types/kernel/renderRecipe.d.ts",
+      "bytes": 873,
+      "sha256": "b9899c7f20904d663818bd25e72a1bb18c11894b80a83031e2a1fe7825629037"
+    },
+    {
+      "path": "types/kernelVersion.d.ts",
+      "bytes": 62,
+      "sha256": "ce81eb08d35350386c53f392710d5a9f2b9e956dd0fe3652c90b1e3d3ee89ddf"
+    },
+    {
+      "path": "types/materials/official/officialUnityMaterial.d.ts",
+      "bytes": 2957,
+      "sha256": "f9431c488120d6fd0a3c5b999afea459d923126414e5b43e79a769b01d703857"
+    },
+    {
+      "path": "types/materials/official/unityGlesProgram.d.ts",
+      "bytes": 628,
+      "sha256": "2e847ce8edeccce263b6c8d00169f46f705f09046c5a1dcbdf2725aa561f7e1f"
+    },
+    {
+      "path": "types/materials/official/unityShaderGlobals.d.ts",
+      "bytes": 869,
+      "sha256": "db3bbe0caa4dc2f8fe1f97851ab1f6e19faee8102b90f277e468555af0131e83"
+    },
+    {
+      "path": "types/mv/HarukiMvBridge.d.ts",
+      "bytes": 23961,
+      "sha256": "9bd16ef78bf1ae2f65216102871854c3f9974b8f006445bd070ac4e7e81ab177"
+    },
+    {
+      "path": "types/mv/HarukiMvRuntime.d.ts",
+      "bytes": 2514,
+      "sha256": "f36a0a570260c0b899a7876f64ecbb1c4283ecf3ab15f59803935a3c7eb736d5"
+    },
+    {
+      "path": "types/mv/index.d.ts",
+      "bytes": 1532,
+      "sha256": "ff9ce86053c2e75dd1a2042686d59a0e03fb9cb6de835b0e0a11caf5e73c3c27"
+    },
+    {
+      "path": "types/mv/unityWebGLBuild.d.ts",
+      "bytes": 1875,
+      "sha256": "b75eba2a48f968beb1ced19411529bb93cb855ef74dc3f2fb15c0a77308f85b4"
+    },
+    {
+      "path": "types/mv/VirtualLiveGyro.d.ts",
+      "bytes": 538,
+      "sha256": "d43edaef4586f9e8075baba57e3b645831c1c80aa10d760a416275d858d35099"
+    },
+    {
+      "path": "types/original/costumeIndex.d.ts",
+      "bytes": 3277,
+      "sha256": "cc875d5916a7edc4921c08bfae54e874b61396aa2f55273e10356533cef8d022"
+    },
+    {
+      "path": "types/original/originalBundleStore.d.ts",
+      "bytes": 942,
+      "sha256": "8396dac4f6e625fadebd5a8d9108959b93869ea3b9d0f5f9a78f4d95ea79ce65"
+    },
+    {
+      "path": "types/original/originalPartProvider.d.ts",
+      "bytes": 814,
+      "sha256": "b3c1154499ef337b2d01e02b5f4bc1638a02978414bbf66816427542bf755540"
+    },
+    {
+      "path": "types/original/originalPartWorker.d.ts",
+      "bytes": 1063,
+      "sha256": "e0a82940f3267e1c0fac383db77770a4891f3272937a3380a6cecd2195dbdc62"
+    },
+    {
+      "path": "types/original/originalTextures.d.ts",
+      "bytes": 1418,
+      "sha256": "01ce4660d95bb386196425cea6ca14711f3c09c00b498763cc4b5e24e7a0f9d3"
+    },
+    {
+      "path": "types/original/partBuilder.d.ts",
+      "bytes": 785,
+      "sha256": "150a156cdbf1d2dfb5149f8dff5ac3f43db53fab841ccd62b087504c538f3194"
+    },
+    {
+      "path": "types/original/partSpring.d.ts",
+      "bytes": 18670,
+      "sha256": "d12d78f28bd18953a749d367a558de3cf95cdf0ea17c643c87cf0b0b6d519146"
+    },
+    {
+      "path": "types/original/unityAnimationClip.d.ts",
+      "bytes": 2839,
+      "sha256": "d27f24c52256de28617e97e59bd07bf0801255c44eb9e81398779ff107f9341d"
+    },
+    {
+      "path": "types/original/unityBundle.d.ts",
+      "bytes": 2318,
+      "sha256": "c9685c8b0822131be252631e7a30fba88b07542057e85f92d4b7fa491a072fa9"
+    },
+    {
+      "path": "types/original/unityFile.d.ts",
+      "bytes": 1513,
+      "sha256": "41a173dbe2c8f8460496fa7ac96bf043d2abb6d5334ab766a7b8896e4857fb39"
+    },
+    {
+      "path": "types/original/unityMesh.d.ts",
+      "bytes": 2760,
+      "sha256": "8f7e7ac0a6d8d2a69afc6f37f1de01becbb0e17aa5d7d6f5084bdc105a170aa6"
+    },
+    {
+      "path": "types/parts/customWardrobeController.d.ts",
+      "bytes": 1876,
+      "sha256": "19aaeed7a6abbbf237e80c524cd2c638c4b9a526003d3eb211092169fc3d7257"
+    },
+    {
+      "path": "types/parts/runtimePartComposer.d.ts",
+      "bytes": 6733,
+      "sha256": "5fadf3648dbc92a3dbfe535e30048c689f01602e55617864a7a1bba1396f86d2"
+    },
+    {
+      "path": "types/runtime/brotliWasmAsset.d.ts",
+      "bytes": 120,
+      "sha256": "4bfd5d6b4a7fde7a2f5afc61c9a4bada910e43a8870275401d7177f6a4147f4b"
+    },
+    {
+      "path": "types/runtime/brotliWasmRuntime.d.ts",
+      "bytes": 190,
+      "sha256": "df5dbd8a49bcf426269e7e620b52f3f65d8951cbf47943277f456fcf77094395"
+    },
+    {
+      "path": "types/runtime/runtimeDecodeWorker.d.ts",
+      "bytes": 11,
+      "sha256": "8e609bb71c20b858c77f0e9f90bb1319db8477b13f9f965f1a1e18524bf50881"
+    },
+    {
+      "path": "types/runtime/runtimeMessagePackDecodeCore.d.ts",
+      "bytes": 117,
+      "sha256": "ed05fa810a230604d8f492a7fdb19f77ea6c5e2bd938a9c42f4af56314ecdfdf"
+    },
+    {
+      "path": "types/runtime/runtimeMessagePackDecoder.d.ts",
+      "bytes": 94,
+      "sha256": "464dad039ee26f1fc807718cac5e3917b7ec54b3470320b7dfdfa5a8c15d3ca3"
+    },
+    {
+      "path": "types/runtime/runtimePackageLoader.d.ts",
+      "bytes": 1581,
+      "sha256": "91b585c02d52ebd4449737c79e2e8b6dea989fbe9880e03c6f11b2e4b4117699"
+    },
+    {
+      "path": "types/runtime/runtimeTypes.d.ts",
+      "bytes": 686,
+      "sha256": "164b125047787ba87157414ed12dd17e8557dae1314cff5072ad0506b214244e"
+    },
+    {
+      "path": "unityPrefabRuntime-BiYdXsAt.js",
+      "bytes": 224219,
+      "sha256": "2406bba59196281a3f2ba044a5f53b6fdc5eeb6ab7a3185c503b1545b035a45b"
+    }
+  ]
+}

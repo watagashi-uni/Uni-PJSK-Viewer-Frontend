@@ -3,10 +3,12 @@ import vue from '@vitejs/plugin-vue'
 import tailwindcss from '@tailwindcss/vite'
 import { resolve } from 'path'
 import { VitePWA } from 'vite-plugin-pwa'
+import { local3dStore } from './scripts/local3dStore'
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
+    local3dStore(),
     vue(),
     tailwindcss(),
     VitePWA({
@@ -221,6 +223,7 @@ export default defineConfig({
       // internal 在前：别名按前缀匹配，防止被 haruki-3d-engine 吞掉
       'haruki-3d-engine/internal': resolve(__dirname, 'src/vendor/haruki-3d-engine/haruki-3d-engine-internal.js'),
       'haruki-3d-engine': resolve(__dirname, 'src/vendor/haruki-3d-engine/haruki-3d-engine.js'),
+      'alone-3d-engine': resolve(__dirname, 'src/vendor/alone-3d-engine/haruki-3d-engine.js'),
     },
   },
   optimizeDeps: {

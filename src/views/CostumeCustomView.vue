@@ -754,6 +754,7 @@ onBeforeUnmount(() => {
             </p>
             <Costume3DPreview
               :character-id="selectedCharacterId"
+              :unit="selectedUnit"
               :selection="previewSelection"
               :body-role="previewBodyRole"
             />

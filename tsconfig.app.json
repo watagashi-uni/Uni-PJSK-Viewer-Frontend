@@ -18,6 +18,9 @@
       ],
       "haruki-3d-engine/internal": [
         "src/vendor/haruki-3d-engine/types/internal.d.ts"
+      ],
+      "alone-3d-engine": [
+        "src/vendor/alone-3d-engine/types/index.d.ts"
       ]
     },
     /* Linting */

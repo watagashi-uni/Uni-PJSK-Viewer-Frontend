@@ -7,8 +7,7 @@ let preconnectAdded = false
 /**
  * Costume3DPreview - 衣装 3D 预览
  *
- * 基于 Haruki 3D Engine（src/vendor/haruki-3d-engine）。引擎与 three.js
- * 通过动态 import 按需加载，点击"加载 3D 预览"前不产生任何开销。
+ * 引擎按需加载。日常使用转换资源版 Haruki，本地原包预览使用 ALONE 公共 kernel。
  *
  * 相机交互（拖动旋转 / 滚轮及双指缩放）通过 internal 入口的 Haruki3DEngine
  * controlsFactory 注入 three 的 OrbitControls 实现（公开 kernel 不暴露相机）。
@@ -24,7 +23,7 @@ import { Box, RotateCcw, Maximize2, Minimize2 } from 'lucide-vue-next'
 import type { Haruki3DKernel } from 'haruki-3d-engine'
 import type { Haruki3DEngine as Haruki3DEngineType } from 'haruki-3d-engine/internal'
 import { useMasterStore } from '@/stores/master'
-import { PJSK_3D_ASSETS_BASE_URL, PJSK_3D_BASIS_PATH, isWebGL2Supported } from '@/utils/haruki3d'
+import { HARUKI_ORIGINAL_ENABLED, PJSK_3D_ASSETS_BASE_URL, PJSK_3D_BASIS_PATH, isWebGL2Supported } from '@/utils/haruki3d'
 import {
   findRuntimePart,
   loadRuntimeRoleData,
@@ -35,6 +34,8 @@ import type { CostumePart, CostumeColorVariant } from '@/types/costume'
 interface Character {
   id: number
   unit: string
+  firstName?: string | null
+  givenName?: string
 }
 
 interface Character3dRole {
@@ -45,6 +46,7 @@ interface Character3dRole {
 
 const props = defineProps<{
   characterId: number
+  unit?: string
   parts?: CostumePart[]
   selection?: {
     body?: CostumeColorVariant | null
@@ -67,7 +69,18 @@ const canvasEl = ref<HTMLCanvasElement | null>(null)
 
 const unitOptions = ref<string[]>([])
 const selectedUnit = ref('')
+// 自由搭配由父页面统一选择组合；详情页仍可使用内部的组合选择器。
+const effectiveUnit = computed(() => props.unit ?? selectedUnit.value)
 const selectedColorId = ref(1)
+const motionOptions = ref<{ roleId: string; label: string }[]>([])
+const selectedMotionRole = ref('')
+const archiveBackground = ref(false)
+const backgroundBusy = ref(false)
+const backgroundError = ref('')
+const unitNames: Record<string, string> = {
+  piapro: 'VIRTUAL SINGER', light_sound: 'Leo/need', light_music_club: 'Leo/need', idol: 'MORE MORE JUMP!',
+  street: 'Vivid BAD SQUAD', theme_park: 'Wonderlands×Showtime', school_refusal: '25时，在Nightcord。',
+}
 
 // 加载进度：引擎不暴露进度，且需要哪些包是解析过程中逐步发现的，无法事先知道总数。
 // 加载期间临时接管 fetch，按"已完成 / 已发现"做收敛式进度条（Content-Length
@@ -80,15 +93,24 @@ const progressText = computed(() => {
   return `已加载 ${progressDone.value} / ${progressStarted.value} 个文件${mb > 0.05 ? ` · ${mb.toFixed(1)} MB` : ''}`
 })
 
-let kernel: Haruki3DKernel | null = null
+type PreviewKernel = Haruki3DKernel & Partial<{
+  setViewYawDegrees(degrees: number): void
+  setBackground(background: 'transparent' | 'archive'): Promise<void>
+}>
+let kernel: PreviewKernel | null = null
 let engineInstance: Haruki3DEngineType | null = null
 let resizeObserver: ResizeObserver | null = null
 let intersectionObserver: IntersectionObserver | null = null
 let viewerInView = true
 let originalFetch: typeof window.fetch | null = null
 let recipeLoadGeneration = 0
+let initializing = false
+let disposed = false
+let viewYaw = 0
+let dragPointer: { id: number; startX: number; yaw: number } | null = null
 
-const assetsOrigin = new URL(PJSK_3D_ASSETS_BASE_URL).origin
+const assetsRoot = new URL(PJSK_3D_ASSETS_BASE_URL, window.location.href)
+const assetsOrigin = assetsRoot.origin
 
 function beginProgress() {
   progressStarted.value = 0
@@ -99,7 +121,8 @@ function beginProgress() {
   originalFetch = window.fetch
   window.fetch = async (input, init) => {
     const url = typeof input === 'string' ? input : (input instanceof URL ? input.href : input.url)
-    const tracked = url.startsWith(assetsOrigin)
+    const trackedUrl = new URL(url, window.location.href)
+    const tracked = trackedUrl.origin === assetsOrigin && trackedUrl.pathname.startsWith(assetsRoot.pathname)
     if (tracked) progressStarted.value += 1
     try {
       const response = await baseFetch(input, init)
@@ -144,11 +167,11 @@ function pickVariant(partType: string): CostumeColorVariant | null {
 }
 
 async function buildRecipe() {
-  const roleData = await loadRuntimeRoleData(props.characterId, selectedUnit.value)
+  const roleData = await loadRuntimeRoleData(props.characterId, effectiveUnit.value)
   const defaults = roleData.defaults
   const bodyCharacterId = props.bodyRole?.characterId ?? props.characterId
-  const bodyUnit = props.bodyRole?.unit ?? selectedUnit.value
-  const bodyRoleData = bodyCharacterId === props.characterId && bodyUnit === selectedUnit.value
+  const bodyUnit = props.bodyRole?.unit ?? effectiveUnit.value
+  const bodyRoleData = bodyCharacterId === props.characterId && bodyUnit === effectiveUnit.value
     ? roleData
     : await loadRuntimeRoleData(bodyCharacterId, bodyUnit)
   const body = pickVariant('body')
@@ -184,12 +207,13 @@ async function buildRecipe() {
   }
 
   return {
-    roleId: `${props.characterId}:${selectedUnit.value}`,
+    roleId: `${props.characterId}:${effectiveUnit.value}`,
     bodyRoleId: `${bodyCharacterId}:${bodyUnit}`,
     bodyCostume3dId: body?.costume3dId ?? bodyRoleData.defaults.bodyCostume3dId,
     headCostume3dId,
     hairCostume3dId: hair?.costume3dId ?? defaults.hairCostume3dId,
     headOptionalCostume3dId,
+    ...(HARUKI_ORIGINAL_ENABLED ? { motionRoleId: selectedMotionRole.value || null } : {}),
   }
 }
 
@@ -206,6 +230,16 @@ async function loadContextData() {
       .map(role => role.unit)
   )]
   const chara = charactersData.find(c => c.id === props.characterId)
+  if (HARUKI_ORIGINAL_ENABLED) {
+    const seen = new Set<string>()
+    motionOptions.value = characterRolesData.flatMap(role => {
+      const character = charactersData.find(entry => entry.id === role.characterId)
+      const roleId = `${role.characterId}:${role.unit}`
+      if (!character || !role.unit || seen.has(roleId)) return []
+      seen.add(roleId)
+      return [{ roleId, label: `${character.firstName ?? ''}${character.givenName ?? role.characterId} · ${unitNames[role.unit] ?? role.unit}` }]
+    })
+  }
   unitOptions.value = units.length > 0 ? units : (chara ? [chara.unit] : [])
   if (!unitOptions.value.includes(selectedUnit.value)) {
     selectedUnit.value = unitOptions.value[0] || ''
@@ -276,8 +310,63 @@ function handleVisibilityChange() {
   syncPlayState()
 }
 
+function beginViewDrag(event: PointerEvent) {
+  if (!HARUKI_ORIGINAL_ENABLED || !kernel || isBusy.value || event.button !== 0 || !event.isPrimary) return
+  dragPointer = { id: event.pointerId, startX: event.clientX, yaw: viewYaw }
+  canvasEl.value?.setPointerCapture(event.pointerId)
+}
+
+function updateViewDrag(event: PointerEvent) {
+  if (dragPointer?.id !== event.pointerId || !kernel?.setViewYawDegrees) return
+  const width = canvasEl.value?.getBoundingClientRect().width ?? 1
+  viewYaw = dragPointer.yaw + (event.clientX - dragPointer.startX) / Math.max(width, 1) * 180
+  kernel.setViewYawDegrees(viewYaw)
+}
+
+function endViewDrag(event: PointerEvent) {
+  if (dragPointer?.id !== event.pointerId) return
+  dragPointer = null
+  if (canvasEl.value?.hasPointerCapture(event.pointerId)) canvasEl.value.releasePointerCapture(event.pointerId)
+}
+
+async function toggleArchiveBackground() {
+  const activeKernel = kernel
+  if (!activeKernel?.setBackground || backgroundBusy.value) return
+  backgroundBusy.value = true
+  backgroundError.value = ''
+  const next = !archiveBackground.value
+  try {
+    await activeKernel.setBackground(next ? 'archive' : 'transparent')
+    if (kernel === activeKernel && !disposed) archiveBackground.value = next
+  } catch (error) {
+    if (kernel === activeKernel && !disposed) backgroundError.value = `背景加载失败：${error instanceof Error ? error.message : String(error)}`
+  } finally {
+    if (kernel === activeKernel && !disposed) backgroundBusy.value = false
+  }
+}
+
+async function releaseViewer() {
+  recipeLoadGeneration += 1
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
+  document.removeEventListener('keydown', handleFullscreenKeydown)
+  endProgress()
+  resizeObserver?.disconnect()
+  resizeObserver = null
+  intersectionObserver?.disconnect()
+  intersectionObserver = null
+  const activeKernel = kernel
+  const activeEngine = engineInstance
+  kernel = null
+  engineInstance = null
+  dragPointer = null
+  backgroundBusy.value = false
+  if (activeKernel) await activeKernel.destroy()
+  else activeEngine?.destroy()
+}
+
 async function start() {
-  if (started.value) return
+  if (initializing || kernel || disposed) return
+  initializing = true
   started.value = true
   isBusy.value = true
   errorMsg.value = ''
@@ -287,120 +376,135 @@ async function start() {
     }
     await nextTick()
     await loadContextData()
+    if (disposed) return
 
-    const [{ Haruki3DEngine, createHaruki3DKernelRuntime, previewLightDefaults }, { OrbitControls }, THREE] = await Promise.all([
-      import('haruki-3d-engine/internal'),
-      import('three/examples/jsm/controls/OrbitControls.js'),
-      import('three'),
-    ])
-    if (!canvasEl.value || !viewerHost.value) {
-      throw new Error('预览画布初始化失败')
-    }
+    if (HARUKI_ORIGINAL_ENABLED) {
+      const { createHaruki3DKernel } = await import('alone-3d-engine')
+      if (disposed) return
+      if (!canvasEl.value || !viewerHost.value) throw new Error('预览画布初始化失败')
+      kernel = createHaruki3DKernel({
+        canvas: canvasEl.value,
+        assetBaseUrl: assetsRoot.href,
+        ktx2TranscoderPath: PJSK_3D_BASIS_PATH,
+        background: archiveBackground.value ? 'archive' : 'transparent',
+      })
+      kernel.setViewYawDegrees?.(viewYaw)
+    } else {
+      const [{ Haruki3DEngine, createHaruki3DKernelRuntime, previewLightDefaults }, { OrbitControls }, THREE] = await Promise.all([
+        import('haruki-3d-engine/internal'),
+        import('three/examples/jsm/controls/OrbitControls.js'),
+        import('three'),
+      ])
+      if (disposed) return
+      if (!canvasEl.value || !viewerHost.value) {
+        throw new Error('预览画布初始化失败')
+      }
 
-    // 公开 kernel 不暴露相机，用 internal 引擎注入 OrbitControls 后再套 kernel 运行时
-    const engine = new Haruki3DEngine({
-      canvas: canvasEl.value,
-      initialLight: { ...previewLightDefaults },
-      autoRender: false,
-      manageResize: false,
-      ktx2TranscoderPath: PJSK_3D_BASIS_PATH,
-      controlsFactory: ({ camera, canvas, target, onChange }) => {
-        const controls = new OrbitControls(camera, canvas)
-        controls.target.copy(target)
-        controls.enableDamping = true
-        controls.dampingFactor = 0.1
-        controls.rotateSpeed = 0.9
-        controls.zoomSpeed = 0.8
-        controls.panSpeed = 0.8
-        controls.minDistance = 0.4
-        controls.maxDistance = 8
-        // 触屏：单指旋转、双指捏合缩放 + 划动平移；鼠标：左键旋转、右键平移
-        controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN }
-        controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN }
+      // 公开 kernel 不暴露相机，用 internal 引擎注入 OrbitControls 后再套 kernel 运行时
+      const engine = new Haruki3DEngine({
+        canvas: canvasEl.value,
+        initialLight: { ...previewLightDefaults },
+        autoRender: false,
+        manageResize: false,
+        ktx2TranscoderPath: PJSK_3D_BASIS_PATH,
+        controlsFactory: ({ camera, canvas, target, onChange }) => {
+          const controls = new OrbitControls(camera, canvas)
+          controls.target.copy(target)
+          controls.enableDamping = true
+          controls.dampingFactor = 0.1
+          controls.rotateSpeed = 0.9
+          controls.zoomSpeed = 0.8
+          controls.panSpeed = 0.8
+          controls.minDistance = 0.4
+          controls.maxDistance = 8
+          // 触屏：单指旋转、双指捏合缩放 + 划动平移；鼠标：左键旋转、右键平移
+          controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN }
+          controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN }
 
-        // 触控板双指划动平移（wheel 事件）：捏合是 ctrl+wheel 走缩放，
-        // 鼠标滚轮（行模式或大步进）也走缩放，其余按平移处理
-        const panByScreenDelta = (dx: number, dy: number) => {
-          const targetDistance = camera.position.distanceTo(controls.target)
-            * Math.tan((camera.fov / 2) * Math.PI / 180)
-          const panX = (2 * dx * targetDistance) / canvas.clientHeight
-          const panY = (2 * dy * targetDistance) / canvas.clientHeight
-          const te = camera.matrix.elements
-          const pan = new THREE.Vector3(
-            -te[0] * panX + te[4] * panY,
-            -te[1] * panX + te[5] * panY,
-            -te[2] * panX + te[6] * panY,
-          )
-          camera.position.add(pan)
-          controls.target.add(pan)
-          onChange(controls.target)
-        }
-        const isTrackpadPanScroll = (event: WheelEvent) => {
-          if (event.ctrlKey) return false
-          if (event.deltaMode !== 0) return false
-          if (Math.abs(event.deltaX) > 0) return true
-          return Math.abs(event.deltaY) < 40
-        }
-        const handleWheel = (event: WheelEvent) => {
-          if (!isTrackpadPanScroll(event)) return
-          event.preventDefault()
-          event.stopPropagation()
-          panByScreenDelta(-event.deltaX, -event.deltaY)
-        }
-        const wheelTarget = canvas.parentElement ?? canvas
-        wheelTarget.addEventListener('wheel', handleWheel, { passive: false, capture: true })
+          // 触控板双指划动平移（wheel 事件）：捏合是 ctrl+wheel 走缩放，
+          // 鼠标滚轮（行模式或大步进）也走缩放，其余按平移处理
+          const panByScreenDelta = (dx: number, dy: number) => {
+            const targetDistance = camera.position.distanceTo(controls.target)
+              * Math.tan((camera.fov / 2) * Math.PI / 180)
+            const panX = (2 * dx * targetDistance) / canvas.clientHeight
+            const panY = (2 * dy * targetDistance) / canvas.clientHeight
+            const te = camera.matrix.elements
+            const pan = new THREE.Vector3(
+              -te[0] * panX + te[4] * panY,
+              -te[1] * panX + te[5] * panY,
+              -te[2] * panX + te[6] * panY,
+            )
+            camera.position.add(pan)
+            controls.target.add(pan)
+            onChange(controls.target)
+          }
+          const isTrackpadPanScroll = (event: WheelEvent) => {
+            if (event.ctrlKey) return false
+            if (event.deltaMode !== 0) return false
+            if (Math.abs(event.deltaX) > 0) return true
+            return Math.abs(event.deltaY) < 40
+          }
+          const handleWheel = (event: WheelEvent) => {
+            if (!isTrackpadPanScroll(event)) return
+            event.preventDefault()
+            event.stopPropagation()
+            panByScreenDelta(-event.deltaX, -event.deltaY)
+          }
+          const wheelTarget = canvas.parentElement ?? canvas
+          wheelTarget.addEventListener('wheel', handleWheel, { passive: false, capture: true })
 
-        // 游戏内方向光挂在 CameraRoot 下（动态光源）：转相机时光要一起转。
-        // 引擎不自动处理，这里按相机方位角的变化量旋转默认光向量。
-        const baseAzimuth = Math.atan2(
-          camera.position.x - controls.target.x,
-          camera.position.z - controls.target.z
-        )
-        const baseLight = { x: previewLightDefaults.x, y: previewLightDefaults.y, z: previewLightDefaults.z }
-        let lightSyncQueued = false
-        const syncLightToCamera = () => {
-          lightSyncQueued = false
-          if (!engineInstance) return
-          const azimuth = Math.atan2(
+          // 游戏内方向光挂在 CameraRoot 下（动态光源）：转相机时光要一起转。
+          // 引擎不自动处理，这里按相机方位角的变化量旋转默认光向量。
+          const baseAzimuth = Math.atan2(
             camera.position.x - controls.target.x,
             camera.position.z - controls.target.z
           )
-          const yaw = azimuth - baseAzimuth
-          const cos = Math.cos(yaw)
-          const sin = Math.sin(yaw)
-          engineInstance.updatePreviewLight({
-            ...previewLightDefaults,
-            x: baseLight.x * cos + baseLight.z * sin,
-            y: baseLight.y,
-            z: -baseLight.x * sin + baseLight.z * cos,
-          })
-        }
-
-        controls.addEventListener('change', () => {
-          onChange(controls.target)
-          if (!lightSyncQueued) {
-            lightSyncQueued = true
-            requestAnimationFrame(syncLightToCamera)
+          const baseLight = { x: previewLightDefaults.x, y: previewLightDefaults.y, z: previewLightDefaults.z }
+          let lightSyncQueued = false
+          const syncLightToCamera = () => {
+            lightSyncQueued = false
+            if (!engineInstance) return
+            const azimuth = Math.atan2(
+              camera.position.x - controls.target.x,
+              camera.position.z - controls.target.z
+            )
+            const yaw = azimuth - baseAzimuth
+            const cos = Math.cos(yaw)
+            const sin = Math.sin(yaw)
+            engineInstance.updatePreviewLight({
+              ...previewLightDefaults,
+              x: baseLight.x * cos + baseLight.z * sin,
+              y: baseLight.y,
+              z: -baseLight.x * sin + baseLight.z * cos,
+            })
           }
-        })
-        return {
-          target: controls.target,
-          minPolarAngle: controls.minPolarAngle,
-          maxPolarAngle: controls.maxPolarAngle,
-          update: () => controls.update(),
-          dispose: () => {
-            wheelTarget.removeEventListener('wheel', handleWheel, true)
-            controls.dispose()
-          },
-        }
-      },
-    })
-    // 不显示地面投影阴影
-    engine.setProjectedShadowSettings({ opacity: 0, crossOpacity: 0 })
-    engineInstance = engine
-    kernel = createHaruki3DKernelRuntime(engine, PJSK_3D_ASSETS_BASE_URL)
 
-    const host = viewerHost.value
+          controls.addEventListener('change', () => {
+            onChange(controls.target)
+            if (!lightSyncQueued) {
+              lightSyncQueued = true
+              requestAnimationFrame(syncLightToCamera)
+            }
+          })
+          return {
+            target: controls.target,
+            minPolarAngle: controls.minPolarAngle,
+            maxPolarAngle: controls.maxPolarAngle,
+            update: () => controls.update(),
+            dispose: () => {
+              wheelTarget.removeEventListener('wheel', handleWheel, true)
+              controls.dispose()
+            },
+          }
+        },
+      })
+      engineInstance = engine
+      // 不显示地面投影阴影
+      engine.setProjectedShadowSettings({ opacity: 0, crossOpacity: 0 })
+      kernel = createHaruki3DKernelRuntime(engine, PJSK_3D_ASSETS_BASE_URL)
+    }
+
+    const host = viewerHost.value!
     const resize = () => {
       const { width, height } = host.getBoundingClientRect()
       if (width > 0 && height > 0) kernel?.resize(width, height)
@@ -420,14 +524,24 @@ async function start() {
 
     await applyRecipe()
   } catch (error) {
+    await releaseViewer()
+    if (disposed) return
     console.error('3D 预览初始化失败:', error)
     errorMsg.value = error instanceof Error ? error.message : String(error)
     isBusy.value = false
+  } finally {
+    initializing = false
   }
 }
 
+async function retry() {
+  if (isBusy.value || disposed) return
+  if (kernel) await applyRecipe()
+  else await start()
+}
+
 // 切换配色 / 组合（VS 角色分组合角色包）时重新装配；引擎内部会序列化并丢弃过期请求
-watch([selectedColorId, selectedUnit], () => {
+watch([selectedColorId, effectiveUnit, selectedMotionRole], () => {
   if (kernel) applyRecipe()
 })
 
@@ -451,7 +565,7 @@ watch(
 
 onMounted(() => {
   // 提前和 3d-export 建立连接，点开预览时省一次握手
-  if (!preconnectAdded) {
+  if (!preconnectAdded && assetsOrigin !== window.location.origin) {
     preconnectAdded = true
     const link = document.createElement('link')
     link.rel = 'preconnect'
@@ -462,20 +576,9 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
-  recipeLoadGeneration += 1
-  document.removeEventListener('visibilitychange', handleVisibilityChange)
-  document.removeEventListener('keydown', handleFullscreenKeydown)
+  disposed = true
   document.body.style.overflow = ''
-  endProgress()
-  resizeObserver?.disconnect()
-  resizeObserver = null
-  intersectionObserver?.disconnect()
-  intersectionObserver = null
-  if (kernel) {
-    void kernel.destroy()
-    kernel = null
-  }
-  engineInstance = null
+  void releaseViewer()
 })
 </script>
 
@@ -487,7 +590,7 @@ onBeforeUnmount(() => {
 
     <!-- 未开始：按需加载入口 -->
     <div v-if="!started" class="bg-base-200 rounded-xl p-6 flex flex-col items-center gap-3">
-      <p class="text-sm text-base-content/60">在线预览该衣装的 3D 模型（首次加载约 5~10 MB）</p>
+      <p class="text-sm text-base-content/60">{{ HARUKI_ORIGINAL_ENABLED ? '按需加载该衣装的 3D 模型' : '在线预览该衣装的 3D 模型（首次加载约 5~10 MB）' }}</p>
       <button class="btn btn-primary btn-sm" @click="start">
         <Box class="w-4 h-4" /> 加载 3D 预览
       </button>
@@ -509,19 +612,32 @@ onBeforeUnmount(() => {
           </button>
         </div>
         <select
-          v-if="unitOptions.length > 1"
+          v-if="props.unit === undefined && unitOptions.length > 1"
           v-model="selectedUnit"
           class="select select-bordered select-xs w-40"
           :disabled="isBusy"
         >
-          <option v-for="unit in unitOptions" :key="unit" :value="unit">{{ unit }}</option>
+          <option v-for="unitOption in unitOptions" :key="unitOption" :value="unitOption">{{ unitOption }}</option>
         </select>
         <button class="btn btn-xs btn-outline gap-1" @click="toggleFullscreen">
           <Minimize2 v-if="isFullscreen" class="w-3.5 h-3.5" />
           <Maximize2 v-else class="w-3.5 h-3.5" />
           {{ isFullscreen ? '退出全屏' : '全屏' }}
         </button>
+        <template v-if="HARUKI_ORIGINAL_ENABLED">
+          <button class="btn btn-xs btn-outline" :aria-pressed="archiveBackground" :disabled="isBusy || backgroundBusy" @click="toggleArchiveBackground">
+            {{ backgroundBusy ? '正在加载背景…' : archiveBackground ? '隐藏原版背景' : '显示原版背景' }}
+          </button>
+          <label v-if="motionOptions.length" class="flex items-center gap-2 text-xs">
+            展示动作
+            <select v-model="selectedMotionRole" aria-label="展示动作来源" class="select select-bordered select-xs w-48" :disabled="isBusy">
+              <option value="">当前角色</option>
+              <option v-for="motion in motionOptions" :key="motion.roleId" :value="motion.roleId">{{ motion.label }}</option>
+            </select>
+          </label>
+        </template>
       </div>
+      <p v-if="backgroundError" role="status" class="text-xs text-error mb-3">{{ backgroundError }}</p>
 
       <!-- 画布。CSS 全屏时 Teleport 到 body：详情页卡片的入场动画会在祖先留下
            transform，fixed 定位会被它劫持导致盖不住页面 header（Safari 尤其明显） -->
@@ -531,7 +647,15 @@ onBeforeUnmount(() => {
           class="bg-base-200 overflow-hidden"
           :class="cssFullscreen ? 'fixed inset-0 z-[1000]' : 'relative w-full aspect-[7/5] rounded-xl'"
         >
-          <canvas ref="canvasEl" class="block w-full h-full touch-none cursor-grab active:cursor-grabbing"></canvas>
+          <canvas
+            ref="canvasEl"
+            class="block w-full h-full touch-none cursor-grab active:cursor-grabbing"
+            @pointerdown="beginViewDrag"
+            @pointermove="updateViewDrag"
+            @pointerup="endViewDrag"
+            @pointercancel="endViewDrag"
+            @lostpointercapture="endViewDrag"
+          ></canvas>
 
           <!-- 进入全屏（transform-gpu 强制独立合成层，避免 Safari 把它画到 WebGL canvas 下面；
                全屏中的退出按钮在下方 body 层单独渲染，避开 canvas 兄弟元素的合成问题） -->
@@ -559,7 +683,7 @@ onBeforeUnmount(() => {
 
           <div v-if="errorMsg" class="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-base-200/90 p-4 text-center">
             <p class="text-sm text-error break-all max-w-full">{{ errorMsg }}</p>
-            <button class="btn btn-sm btn-outline" @click="applyRecipe">
+            <button class="btn btn-sm btn-outline" :disabled="isBusy" @click="retry">
               <RotateCcw class="w-4 h-4" /> 重试
             </button>
           </div>
@@ -581,7 +705,7 @@ onBeforeUnmount(() => {
       </Teleport>
 
       <p class="text-xs text-base-content/50 mt-2">
-        拖动旋转 · 滚轮 / 捏合缩放 · 双指划动 / 右键平移
+        {{ HARUKI_ORIGINAL_ENABLED ? '左右拖动旋转视角' : '拖动旋转 · 滚轮 / 捏合缩放 · 双指划动 / 右键平移' }}
       </p>
     </template>
   </div>

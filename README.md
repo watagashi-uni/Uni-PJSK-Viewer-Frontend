@@ -65,6 +65,7 @@ If you want to deploy your own backend, you can refer to [API_README.md](API_REA
 | [Team-Haruki/pjsekai-scores-rs](https://github.com/Team-Haruki/pjsekai-scores-rs) | Optional browser-side JSON-to-SVG renderer | [MIT](https://github.com/Team-Haruki/pjsekai-scores-rs/blob/main/LICENSE) |
 | [Sekai-World/MikuMikuWorld](https://github.com/Sekai-World/MikuMikuWorld) | Basis of the modified JSON-to-SUS exporter | [MIT](https://github.com/Sekai-World/MikuMikuWorld/blob/master/LICENSE) |
 | [Team-Haruki/Haruki-3D-Exporter](https://github.com/Team-Haruki/Haruki-3D-Exporter) | Costume 3D preview runtime asset export; author: storyxy3 | [MIT](https://github.com/Team-Haruki/Haruki-3D-Exporter/blob/main/LICENSE) |
+| [Team-Haruki/sekai-scenario-player](https://github.com/Team-Haruki/sekai-scenario-player) | Live2D story playback | [MIT](https://github.com/Team-Haruki/sekai-scenario-player/blob/main/LICENSE) |
 | [NeuraXmy/lunabot](https://github.com/NeuraXmy/lunabot) | Project reference | [MIT](https://github.com/NeuraXmy/lunabot/blob/master/LICENSE) |
 
 ### WebAssembly and generated JavaScript
@@ -144,3 +145,40 @@ in the adjacent `assets/` directory.
 Files under `public/wasm/` and generated bundles under
 `src/vendor/haruki-3d-engine/` should be updated from their respective build
 outputs rather than edited by hand.
+
+The local branch `feat/3d-engine-local-update` also includes the newer
+[ALONE engine](https://github.com/storyxy3/ALONE/tree/1a49f794c93625c1c8f42f8ae68d37db31aa1ecd)
+under `src/vendor/alone-3d-engine/`. Its upstream commit was checked against
+the remote `main` on 2026-10-28. This build preserves the local cross-role
+`bodyRoleId` extension and adds the current original-bundle renderer,
+transparent character canvas, archive background and independent costume
+display motion selection. Source revision, patch, build commands and artifact
+hashes are recorded in that directory's `SOURCE_MANIFEST.json`.
+
+Run `npm run dev:3d` for this local preview at `http://127.0.0.1:5178`.
+It reads `/data/xy/cs-unity-ref/store` through a read-only development endpoint;
+override the location with `SEKAI_LOCAL_3D_STORE`. The current fixture has a
+complete default Miku (`21:piapro`, body/head/hair `42/121/221`) and all 31
+role motions. Other characters and costumes are not complete in this fixture
+and report unavailable parts. The existing online asset service does not yet
+provide this new format, so ordinary development and production builds retain
+the existing engine and full online costume catalog. No asset upload or
+deployment is part of this update.
+
+The preview now keeps the custom wardrobe's unit selection synchronized with
+the renderer, and initialization failures can be retried without reloading the
+page. `npm run test:costume-preview` checks these host behaviors.
+With `npm run dev:3d` running, `npm run test:costume-preview:browser`
+loads the real Miku model and validates transparency, archive background,
+motion selection, view rotation, fullscreen and error recovery. Set `BASE_URL`
+for another local host, or `CHROMIUM_PATH` for a local Chromium executable.
+The existing online-asset path is covered separately by
+`npm run test:costume-preview:legacy`, against a normal dev server at
+`http://127.0.0.1:5179` (or `BASE_URL`). It checks the real model and preserved
+OrbitControls rotation, zoom, pan and unavailable-unit recovery.
+
+ALONE is a private upstream with no project-level open-source license declared
+at this revision; copyright remains with storyxy3 and its contributors. It is
+not relabeled with the exporter's MIT license. Component licenses, copyright
+notices and the original game-material attribution are retained in
+`src/vendor/alone-3d-engine/THIRD_PARTY_NOTICES.md` and `licenses/`.

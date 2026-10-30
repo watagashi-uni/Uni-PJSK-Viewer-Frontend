@@ -1,0 +1,636 @@
+diff --git a/src/base/browserCharacterRuntime.ts b/src/base/browserCharacterRuntime.ts
+index 38e3b3b8..0870ca53 100644
+--- a/src/base/browserCharacterRuntime.ts
++++ b/src/base/browserCharacterRuntime.ts
+@@ -176,6 +176,7 @@ export function createHarukiBaseCharacterRuntime(
+ function renderRecipeKey(recipe: HarukiRenderRecipe) {
+   return [
+     recipe.roleId,
++    recipe.bodyRoleId ?? recipe.roleId,
+     recipe.bodyCostume3dId,
+     recipe.headCostume3dId,
+     recipe.headPackagePath ?? "",
+diff --git a/src/costume_shop/CostumeShopKernel.ts b/src/costume_shop/CostumeShopKernel.ts
+index 780708aa..31d0d987 100644
+--- a/src/costume_shop/CostumeShopKernel.ts
++++ b/src/costume_shop/CostumeShopKernel.ts
+@@ -14,6 +14,9 @@ export type CostumeShopKernelOptions = {
+   ktx2TranscoderPath?: string;
+   // Canvas background (default transparent); "archive" is the background inside the game's character archive costume viewer.
+   background?: HarukiCanvasBackground;
++  // Keep the existing full-character view by default; upper-body uses the
++  // original close CostumeShop camera without its full-screen UI composite.
++  framing?: "default" | "upper-body";
+ };
+ 
+ export type CostumeShopKernel = HarukiBaseCharacterRuntime;
+@@ -32,6 +35,8 @@ export function createCostumeShopKernel(
+     autoRender: false,
+     manageResize: false,
+     ktx2TranscoderPath: options.ktx2TranscoderPath,
++    cameraPreset: options.framing === "upper-body" ? "capture" : undefined,
++    cameraProfile: options.framing === "upper-body" ? "official-default" : undefined,
+   });
+   const kernel = createCostumeShopKernelRuntime(engine, assetBaseUrl);
+   if (options.background && options.background !== "transparent") {
+diff --git a/src/engine/Haruki3DEngine.ts b/src/engine/Haruki3DEngine.ts
+index 6900acc4..64448e80 100644
+--- a/src/engine/Haruki3DEngine.ts
++++ b/src/engine/Haruki3DEngine.ts
+@@ -1,5 +1,6 @@
+ import * as THREE from "three";
+ import {
++  ensureRolePartRegistry,
+   ensureRoleRuntimePackage,
+   loadRuntimePackageFromBaseUrl,
+   type RuntimePackageLoadOptions,
+@@ -1157,9 +1158,18 @@ export class Haruki3DEngine {
+       costumeShopMotion.update(animationDelta);
+       costumeShopMotion.evaluate(animationDelta);
+       this.onCostumeShopAnimatorEvaluated?.();
++    } else if (costumeShopMotion && stepDelta === 0) {
++      // A newly loaded, paused kernel still needs its selected animation pose.
++      // Sample the current clip time without Update/LateUpdate or a clock step;
++      // this also rebinds a replacement costume at the retained motion time.
++      costumeShopMotion.evaluate(0);
++      this.onCostumeShopAnimatorEvaluated?.();
+     }
+     this.syncOfficialModelCombineSetup();
+     this.currentExtraBoneRuntime?.update();
++    // Static presentation must not consume PlayMotion's pending spring settle
++    // or integrate/reset springs. Leave that work for the first positive step.
++    if (stepDelta === 0) return;
+     if (this.isSpringRuntimeEnabled()) {
+       if (costumeShopMotion?.takeCalmDown()) {
+         // CharacterModel.CalmDownSpringBone: FindSpringBones(true), UpdateForceProviders, then UpdateDynamics
+@@ -1629,6 +1639,7 @@ export class Haruki3DEngine {
+     }
+     const normalized = normalizeHarukiRenderRecipe(recipe);
+     const requestedRole = parseRuntimeRoleId(normalized.roleId);
++    const requestedBodyRole = parseRuntimeRoleId(normalized.bodyRoleId);
+     const nextRoleId = runtimeRoleId(requestedRole.characterId, requestedRole.unit);
+     const currentPackage = this.currentLoadedRuntimePackage;
+     const currentBaseUrl = currentPackage?.partSet?.baseUrl ?? null;
+@@ -1651,6 +1662,7 @@ export class Haruki3DEngine {
+     }
+     const partSet = wardrobe.getPartPackageSet();
+     if (partSet) {
++      await ensureRolePartRegistry(partSet, requestedBodyRole.characterId, requestedBodyRole.unit);
+       await ensureRoleRuntimePackage(partSet, requestedRole.characterId, requestedRole.unit);
+     }
+     const motionRole = normalized.motionRoleId ? parseRuntimeRoleId(normalized.motionRoleId) : null;
+@@ -1661,6 +1673,8 @@ export class Haruki3DEngine {
+     const selection: CustomPartSelection = {
+       characterId: requestedRole.characterId,
+       unit: requestedRole.unit,
++      bodyCharacterId: requestedBodyRole.characterId,
++      bodyUnit: requestedBodyRole.unit,
+       bodyCostume3dId: normalized.bodyCostume3dId,
+       headCostume3dId: normalized.headCostume3dId,
+       headPackagePath: normalized.headPackagePath,
+diff --git a/src/internal.ts b/src/internal.ts
+index 1b00908f..60e5b815 100644
+--- a/src/internal.ts
++++ b/src/internal.ts
+@@ -37,6 +37,7 @@ export type {
+   HarukiPrepareCaptureFrameRequest,
+ } from "./capture/captureTypes";
+ export {
++  ensureRolePartRegistry,
+   loadRuntimePackageFromBaseUrl,
+   resolveRuntimePackageUrl,
+   type RuntimePackageLoadOptions,
+diff --git a/src/kernel/renderRecipe.ts b/src/kernel/renderRecipe.ts
+index 6d6a29f1..924d5b76 100644
+--- a/src/kernel/renderRecipe.ts
++++ b/src/kernel/renderRecipe.ts
+@@ -1,5 +1,7 @@
+ export type HarukiRenderRecipe = {
+   roleId: string;
++  /** Optional body source role. Head, hair, skin and default motion stay on roleId. */
++  bodyRoleId?: string | null;
+   bodyCostume3dId: number;
+   headCostume3dId: number;
+   headPackagePath?: string | null;
+@@ -16,6 +18,7 @@ export type HarukiRuntimeRenderRecipe = HarukiRenderRecipe & {
+ 
+ export type NormalizedHarukiRenderRecipe = {
+   roleId: string;
++  bodyRoleId: string;
+   bodyCostume3dId: number;
+   headCostume3dId: number;
+   headPackagePath: string | null;
+@@ -33,6 +36,10 @@ export function normalizeHarukiRenderRecipe(
+   if (!ROLE_ID.test(roleId)) {
+     throw new Error("roleId must be '<characterId>:<unit>' or '<characterId>'.");
+   }
++  const bodyRoleId = recipe.bodyRoleId == null ? roleId : String(recipe.bodyRoleId).trim();
++  if (!ROLE_ID.test(bodyRoleId)) {
++    throw new Error("bodyRoleId must be null, '<characterId>:<unit>' or '<characterId>'.");
++  }
+   const motionRoleId = recipe.motionRoleId == null ? null : String(recipe.motionRoleId).trim();
+   if (motionRoleId !== null && !ROLE_ID.test(motionRoleId)) {
+     throw new Error("motionRoleId must be null, '<characterId>:<unit>' or '<characterId>'.");
+@@ -65,6 +72,7 @@ export function normalizeHarukiRenderRecipe(
+ 
+   return {
+     roleId,
++    bodyRoleId,
+     bodyCostume3dId: readPartId("bodyCostume3dId"),
+     headCostume3dId: readPartId("headCostume3dId"),
+     headPackagePath,
+diff --git a/src/parts/customWardrobeController.ts b/src/parts/customWardrobeController.ts
+index 1994389d..bccc2dcd 100644
+--- a/src/parts/customWardrobeController.ts
++++ b/src/parts/customWardrobeController.ts
+@@ -176,14 +176,16 @@ export class CustomWardrobeController {
+       return;
+     }
+     const selectedHead = resolveHeadRegistryEntry(this.partSet, selection);
+-    const role = this.partSet.roles.find((candidate) =>
++    const bodyCharacterId = selection.bodyCharacterId ?? selection.characterId;
++    const bodyUnit = selection.bodyUnit === undefined ? selection.unit : selection.bodyUnit;
++    const bodyRole = this.partSet.roles.find((candidate) =>
+       runtimeRoleId(candidate.characterId, candidate.unit) ===
+-      runtimeRoleId(selection.characterId, selection.unit)
++      runtimeRoleId(bodyCharacterId, bodyUnit)
+     );
+     const entries = [
+-      this.findRegistryEntry(selection, "body", selection.bodyCostume3dId),
+-      role
+-        ? this.findRegistryEntry(selection, "body", role.bodyCostume3dId)
++      this.findRegistryEntryForRole(bodyCharacterId, bodyUnit, "body", selection.bodyCostume3dId),
++      bodyRole
++        ? this.findRegistryEntryForRole(bodyCharacterId, bodyUnit, "body", bodyRole.bodyCostume3dId)
+         : null,
+       selectedHead,
+       resolveHairRegistryEntry(this.partSet, selection),
+@@ -206,21 +208,22 @@ export class CustomWardrobeController {
+     }));
+   }
+ 
+-  private findRegistryEntry(
+-    selection: CustomPartSelection,
++  private findRegistryEntryForRole(
++    characterId: number,
++    unit: string | null,
+     partType: RuntimePartType,
+     costume3dId: number
+   ): PartRegistryEntry {
+     if (!this.partSet) {
+       throw new Error("No custom part package set is loaded.");
+     }
+-    const entry = listSelectableParts(this.partSet, selection.characterId, partType, {
+-      unit: selection.unit,
++    const entry = listSelectableParts(this.partSet, characterId, partType, {
++      unit,
+       loadedOnly: false,
+     }).find((candidate) => candidate.costume3dId === costume3dId);
+     if (!entry) {
+       throw new Error(
+-        `No ${partType} registry entry for role ${runtimeRoleId(selection.characterId, selection.unit)}, costume3dId ${costume3dId}.`
++        `No ${partType} registry entry for role ${runtimeRoleId(characterId, unit)}, costume3dId ${costume3dId}.`
+       );
+     }
+     return entry;
+diff --git a/src/parts/runtimePartComposer.ts b/src/parts/runtimePartComposer.ts
+index 4817d56c..95806534 100644
+--- a/src/parts/runtimePartComposer.ts
++++ b/src/parts/runtimePartComposer.ts
+@@ -151,6 +151,9 @@ export type PartPackageSet = {
+ export type CustomPartSelection = {
+   characterId: number;
+   unit: string | null;
++  /** Optional source role for the body. Head, face and hair remain on characterId/unit. */
++  bodyCharacterId?: number;
++  bodyUnit?: string | null;
+   bodyCostume3dId: number;
+   headCostume3dId: number;
+   headPackagePath?: string | null;
+@@ -506,13 +509,16 @@ export function composeRuntimeCombinedCharacterAsset(
+ ): RuntimeCombinedCharacterAsset {
+   const { partSet, selection, activeRoleId, resolveUrl } = input;
+   const selectionRoleId = runtimeRoleId(selection.characterId, selection.unit);
++  const bodyCharacterId = selection.bodyCharacterId ?? selection.characterId;
++  const bodyUnit = selection.bodyUnit === undefined ? selection.unit : selection.bodyUnit;
++  const bodyRoleId = runtimeRoleId(bodyCharacterId, bodyUnit);
+   if (activeRoleId !== null && selectionRoleId !== activeRoleId) {
+     throw new Error(
+       `Custom switching is limited to role ${activeRoleId}. Reload/select another role before switching to ${selectionRoleId}.`
+     );
+   }
+ 
+-  const body = requirePart(partSet, selection.characterId, selection.unit, "body", selection.bodyCostume3dId);
++  const body = requirePart(partSet, bodyCharacterId, bodyUnit, "body", selection.bodyCostume3dId);
+   const selectedHeadEntry = resolveHeadRegistryEntry(partSet, selection);
+   const hair = requireRegistryRuntime(partSet, resolveHairRegistryEntry(partSet, selection), "hair");
+   const resolvedSelection = {
+@@ -534,7 +540,8 @@ export function composeRuntimeCombinedCharacterAsset(
+   if (head) {
+     assertPartRuntimeProxyMetadata(head, "head");
+   }
+-  assertSameRole(selection.characterId, selection.unit, [body, head, accessory, optional].filter(Boolean) as PartRuntimePackage[]);
++  assertSameRole(bodyCharacterId, bodyUnit, [body]);
++  assertSameRole(selection.characterId, selection.unit, [head, accessory, optional].filter(Boolean) as PartRuntimePackage[]);
+   assertHeadHairCompatible(partSet.compatibility, resolvedSelection, runtimePartSlot(selectedHeadEntry));
+   const allRuntimes = [body, head, accessory, optional].filter(Boolean) as PartRuntimePackage[];
+   const headHairComposition = resolveHeadHairComposition(selectedHeadEntry);
+@@ -544,7 +551,10 @@ export function composeRuntimeCombinedCharacterAsset(
+   const role = partSet.roles.find((candidate) =>
+     runtimeRoleId(candidate.characterId, candidate.unit) === selectionRoleId
+   );
+-  const characterHeightMeters = resolveRoleCharacterHeightMeters(partSet, role, body);
++  const bodyRole = partSet.roles.find((candidate) =>
++    runtimeRoleId(candidate.characterId, candidate.unit) === bodyRoleId
++  );
++  const characterHeightMeters = resolveRoleCharacterHeightMeters(partSet, bodyRole, body);
+   const bodyManifest = normalizeBodyManifestFromPart(body, resolveUrl);
+   bodyManifest.characterHeightMeters = characterHeightMeters;
+   applyRoleRuntimeMotion(bodyManifest, roleRuntime);
+@@ -565,6 +575,7 @@ export function composeRuntimeCombinedCharacterAsset(
+     partSet.baseUrl,
+     partSet.masterVersion ?? "unknown-master",
+     selectionRoleId,
++    `body-role:${bodyRoleId}`,
+     `requested:${selection.bodyCostume3dId}:${selection.headCostume3dId}:${selection.hairCostume3dId}:${selection.headOptionalCostume3dId ?? "none"}`,
+     `body:${body.packagePath ?? "unknown"}`,
+     `head:${selectedHeadEntry.packagePath}`,
+diff --git a/src/runtime/runtimePackageLoader.ts b/src/runtime/runtimePackageLoader.ts
+index 5ea9214d..f6a9566c 100644
+--- a/src/runtime/runtimePackageLoader.ts
++++ b/src/runtime/runtimePackageLoader.ts
+@@ -68,6 +68,42 @@ export async function loadRuntimePackageFromBaseUrl(
+   };
+ }
+ 
++/** Merge another role's catalog for cross-role bodies; part assets remain lazy. */
++export async function ensureRolePartRegistry(
++  partSet: PartPackageSet,
++  characterId: number,
++  unit: string | null
++): Promise<void> {
++  const targetRoleId = runtimeRoleId(characterId, unit);
++  const hasRole = partSet.roles.some((entry) =>
++    runtimeRoleId(entry.characterId, entry.unit) === targetRoleId
++  );
++  const hasRegistry = partSet.registry.some((entry) =>
++    runtimeRoleId(entry.characterId, entry.unit) === targetRoleId
++  );
++  if (hasRole && hasRegistry) return;
++
++  const scopedRoot = `parts/by-role/${characterId}/${runtimePathUnitSegment(unit)}`;
++  const roleCatalog = await fetchRuntimeMessagePack(
++    resolveRuntimePackageUrl(partSet.baseUrl, `${scopedRoot}/runtime-role-catalog.msgpack.br`)
++  ) as RuntimeRoleCatalog;
++  const roles = validateScopedRoleCatalog(roleCatalog, characterId, unit);
++  if (partSet.masterVersion && partSet.masterVersion !== roleCatalog.masterVersion) {
++    throw new Error(
++      `Cross-role registry version mismatch: ${partSet.masterVersion} != ${roleCatalog.masterVersion}.`
++    );
++  }
++  const registryInput = await fetchRuntimeMessagePack(
++    withRuntimeMasterVersion(
++      resolveRuntimePackageUrl(partSet.baseUrl, `${scopedRoot}/part-registry.msgpack.br`),
++      roleCatalog.masterVersion
++    )
++  ) as PartRegistryInput;
++  const registry = normalizePartRegistry(registryInput);
++  if (!hasRole) partSet.roles.push(...roles);
++  if (!hasRegistry) partSet.registry.push(...registry);
++}
++
+ export function resolveRuntimePackageUrl(baseUrl: string, relativePath: string) {
+   const base = new URL(baseUrl, window.location.href);
+   if (!base.pathname.endsWith("/")) {
+diff --git a/tests/accessory-package-selection.test.mjs b/tests/accessory-package-selection.test.mjs
+index e3ea87f2..c10333aa 100644
+--- a/tests/accessory-package-selection.test.mjs
++++ b/tests/accessory-package-selection.test.mjs
+@@ -179,6 +179,53 @@ test("selecting another role clears the previous combined character", async () =
+   assert.equal(wardrobe.getCustomSelection(), null);
+ });
+ 
++test("a foreign body role composes with the active role head and hair", async () => {
++  const fixture = makeFixture();
++  const foreignBody = {
++    costume3dId: 500,
++    partType: "body",
++    characterId: 5,
++    unit: "idol",
++    packagePath: "parts/foreign-body",
++    status: "available",
++  };
++  const registry = [...fixture.registry, foreignBody];
++  const partSet = makeComposablePartSet(registry, ["hair", "head_optional"]);
++  const skinColors = { default: "#fedcba", shadow1: "#987654", shadow2: "#654321" };
++  partSet.roles = [
++    { characterId: 2, unit: "light_sound", bodyCostume3dId: 100, characterHeightMeters: 1.6, skinColors },
++    { characterId: 5, unit: "idol", bodyCostume3dId: 500, characterHeightMeters: 1.8 },
++  ];
++  partSet.packages.delete(foreignBody.packagePath);
++  const loaded = [];
++  const wardrobe = new CustomWardrobeController({
++    resolveUrl: (value) => value,
++    loadPartRuntime: async (entry) => {
++      loaded.push(entry.packagePath);
++      const runtime = makeRuntime(entry);
++      partSet.packages.set(entry.packagePath, runtime);
++      return runtime;
++    },
++  });
++  wardrobe.loadPartPackageSet(partSet, { composeDefault: false });
++  wardrobe.selectRole(2, "light_sound");
++
++  const combined = await wardrobe.setCustomSelection({
++    ...selection(fixture.shared.packagePath),
++    bodyCharacterId: 5,
++    bodyUnit: "idol",
++    bodyCostume3dId: 500,
++  });
++
++  assert.equal(combined.bodyAsset.characterId, "05");
++  assert.equal(combined.headAsset.characterId, "02");
++  assert.equal(combined.bodyAsset.characterHeightMeters, 1.8);
++  assert.equal(combined.headAsset.characterHeightMeters, 1.8);
++  assert.deepEqual(combined.skinColors, skinColors);
++  assert.match(combined.id, /body-role%3A5%3Aidol/);
++  assert.deepEqual(loaded, [foreignBody.packagePath]);
++});
++
+ test("same raw accessory id without a package path is rejected as ambiguous", async () => {
+   const fixture = makeFixture();
+   const selected = [];
+diff --git a/tests/kernel-lifecycle-behavior.test.mjs b/tests/kernel-lifecycle-behavior.test.mjs
+index 45904bac..2180e236 100644
+--- a/tests/kernel-lifecycle-behavior.test.mjs
++++ b/tests/kernel-lifecycle-behavior.test.mjs
+@@ -111,6 +111,18 @@ test("a failed prepare can be retried", async () => {
+   await Promise.resolve();
+ });
+ 
++test("changing only the source body role invalidates the prepared model", async () => {
++  const calls = [];
++  const engine = fakeEngine(calls, async () => {});
++  installAnimationFrameStubs();
++  const kernel = createHaruki3DKernelRuntime(engine, "/runtime/jp/");
++  await kernel.prepare(recipe());
++  await kernel.prepare({ ...recipe(), bodyRoleId: "3:idol" });
++  await kernel.prepare({ ...recipe(), bodyRoleId: "3:idol" });
++  assert.equal(calls.filter(([kind]) => kind === "load").length, 2);
++  await kernel.destroy();
++});
++
+ test("destroy exposes one promise that settles after engine resources are released", async () => {
+   let finishLoad;
+   const loadGate = new Promise(resolve => {
+diff --git a/tests/render-recipe.test.mjs b/tests/render-recipe.test.mjs
+index 827b725d..ccc32cbf 100644
+--- a/tests/render-recipe.test.mjs
++++ b/tests/render-recipe.test.mjs
+@@ -12,6 +12,7 @@ test("render recipe normalizes optional sources without changing exact part ids"
+     hairCostume3dId: 205,
+   }), {
+     roleId: "5:light_sound",
++    bodyRoleId: "5:light_sound",
+     bodyCostume3dId: 797001,
+     headCostume3dId: 105,
+     headPackagePath: "parts/_sources/head/105",
+@@ -21,6 +22,16 @@ test("render recipe normalizes optional sources without changing exact part ids"
+   });
+ });
+ 
++test("body source and display motion can independently differ from the active role", () => {
++  const base = { roleId: "17:school_refusal", bodyCostume3dId: 22, headCostume3dId: 33, hairCostume3dId: 217 };
++  const recipe = normalizeHarukiRenderRecipe({ ...base, bodyRoleId: " 11:street ", motionRoleId: "14:theme_park" });
++  assert.equal(recipe.roleId, "17:school_refusal");
++  assert.equal(recipe.bodyRoleId, "11:street");
++  assert.equal(recipe.motionRoleId, "14:theme_park");
++  assert.equal(normalizeHarukiRenderRecipe({ ...base, bodyRoleId: null }).bodyRoleId, base.roleId);
++  assert.throws(() => normalizeHarukiRenderRecipe({ ...base, bodyRoleId: "../11" }), /bodyRoleId/);
++});
++
+ test("render recipe takes a motion role independent of the character role", () => {
+   const base = { roleId: "21:piapro", bodyCostume3dId: 42, headCostume3dId: 121, hairCostume3dId: 221 };
+   assert.equal(normalizeHarukiRenderRecipe({ ...base, motionRoleId: " 14:theme_park " }).motionRoleId, "14:theme_park");
+diff --git a/tests/runtime-original-motion.test.mjs b/tests/runtime-original-motion.test.mjs
+index cc681ca8..9314bd07 100644
+--- a/tests/runtime-original-motion.test.mjs
++++ b/tests/runtime-original-motion.test.mjs
+@@ -12,6 +12,8 @@ import {
+   UnityAnimatorTarget,
+ } from "../src/engine/unityPlayableAnimator.ts";
+ import { UnityMotionController } from "../src/engine/unityMotionController.ts";
++import { CostumeShopMotion } from "../src/engine/costumeShopMotion.ts";
++import { Haruki3DEngineCore } from "../dist/haruki-3d-engine-internal.js";
+ 
+ const FLT_MAX = 3.4028234663852886e38;
+ 
+@@ -97,6 +99,65 @@ function hierarchy() {
+   return { root, bone, face, mesh, target: new UnityAnimatorTarget(root, (node) => (node === face ? [mesh] : [])) };
+ }
+ 
++test("a zero-time paused frame samples the loaded pose without advancing motion or springs", async () => {
++  const emptyClip = (name) => decodeUnityClip(rawClip({ name, stop: 1, bindings: [] }));
++  const bodyClip = decodeUnityClip(rawClip({
++    name: "motion", stop: 1,
++    dense: { m_CurveCount: 3, m_FrameCount: 2, m_BeginTime: 0, m_SampleRate: 1, m_SampleArray: new Float32Array([3, 0, 0, 6, 0, 0]) },
++    bindings: [transform("Bone", 1)],
++  }));
++  const faceClip = decodeUnityClip(rawClip({
++    name: "face", stop: 1, constants: [80], bindings: [blendShape("Face", "BS_mouth.mouth_a")],
++  }));
++  const bundle = "character/motion/costume_setting/test";
++  const motion = new CostumeShopMotion({
++    clips: async (names) => Object.fromEntries(names.map((name) => [name, name === bundle
++      ? [bodyClip, faceClip]
++      : ["breath_loop", "lipsync_a_01", "lipsync_u_01", "lipsync_e_01", "lipsync_o_01", "lipsync_n_01"].map(emptyClip)])),
++  });
++  await motion.preload([bundle]);
++  const model = hierarchy();
++  motion.setupModel(model.root, (node) => node === model.face ? [model.mesh] : []);
++  motion.playMotion("21:piapro", bundle);
++
++  const springCalls = [];
++  const engine = Object.create(Haruki3DEngineCore.prototype);
++  Object.assign(engine, {
++    costumeShopMotion: motion, costumeShopMotionPaused: false, costumeShopMotionSpeed: 1,
++    syncOfficialModelCombineSetup() {},
++    currentExtraBoneRuntime: { update() {} },
++    isSpringRuntimeEnabled: () => true,
++    currentSpringRuntime: {
++      settleCurrentPose: (...args) => springCalls.push(["settle", ...args]),
++      update: (...args) => springCalls.push(["update", ...args]),
++      resetPose: () => springCalls.push(["reset"]),
++    },
++  });
++  assert.equal(model.bone.position.x, 0, "The un-evaluated bind pose differs from the clip's first pose");
++  const before = motion.snapshot();
++  engine.stepRuntimeFrame(0, { advanceAnimation: false });
++  assert.equal(model.bone.position.x, -3, "The selected body motion is sampled at time zero");
++  assert.ok(Math.abs(model.mesh.morphTargetInfluences[0] - .8) < 1e-6, "The facial layer is sampled too");
++  assert.deepEqual(motion.snapshot(), before, "The static frame does not advance any clip clock");
++  assert.deepEqual(springCalls, [], "Neither spring settling, integration nor resets run for a static frame");
++  engine.stepRuntimeFrame(0, { advanceAnimation: false });
++  assert.equal(model.bone.position.x, -3);
++  assert.deepEqual(motion.snapshot(), before);
++  assert.deepEqual(springCalls, []);
++
++  engine.stepRuntimeFrame(1 / 60, { advanceAnimation: true });
++  assert.ok(motion.snapshot().motionTime > 0);
++  assert.deepEqual(springCalls.map(([kind]) => kind), ["settle", "update"], "The pending settle is retained for playback");
++  const retainedTime = motion.snapshot().motionTime;
++  const replacement = hierarchy();
++  motion.setupModel(replacement.root, (node) => node === replacement.face ? [replacement.mesh] : []);
++  motion.playMotion("21:piapro", bundle);
++  engine.stepRuntimeFrame(0, { advanceAnimation: false });
++  assert.equal(motion.snapshot().motionTime, retainedTime, "Rebinding a costume must not restart its current motion");
++  assert.ok(replacement.bone.position.x < -3, "The rebound model receives the retained pose before playback");
++  assert.equal(springCalls.length, 2);
++});
++
+ // localEulerAnglesRaw groups rotate in the RotationOrder their binding carries in customType (first letter first).
+ function eulerRotation(customType) {
+   const { bone, target } = hierarchy();
+diff --git a/tests/cross-body-registry.test.mjs b/tests/cross-body-registry.test.mjs
+new file mode 100644
+index 00000000..9735e7ef
+--- /dev/null
++++ b/tests/cross-body-registry.test.mjs
+@@ -0,0 +1,59 @@
++import assert from "node:assert/strict";
++import test from "node:test";
++import { readFile } from "node:fs/promises";
++import { brotliCompressSync } from "node:zlib";
++import { encode } from "@msgpack/msgpack";
++import { ensureRolePartRegistry } from "../dist/haruki-3d-engine-internal.js";
++
++test("cross-role catalogs load lazily, retain active entries and reject mixed master versions", async () => {
++  const previousWindow = globalThis.window;
++  const previousFetch = globalThis.fetch;
++  globalThis.window = { location: { href: "https://viewer.test/" } };
++  const requests = [];
++  const activeRole = { characterId: 2, unit: "light_sound" };
++  const activeEntry = { ...activeRole, costume3dId: 100, partType: "body", packagePath: "original/active" };
++  const foreignRole = {
++    roleId: 5, characterId: 5, unit: "idol", bodyCostume3dId: 500,
++    headCostume3dId: 105, hairCostume3dId: 205,
++    roleRuntimePath: "roles/5/idol/role-runtime.msgpack.br",
++  };
++  const foreignEntry = { ...foreignRole, costume3dId: 500, partType: "body", packagePath: "original/foreign", status: "ready" };
++  const partSet = () => ({
++    baseUrl: "https://viewer.test/original-store/", masterVersion: "same-version",
++    roles: [activeRole], registry: [activeEntry], packages: new Map(), roleRuntimes: new Map(), compatibility: null,
++  });
++  globalThis.fetch = async (input) => {
++    const url = new URL(String(input));
++    if (url.pathname.endsWith(".wasm")) {
++      return new Response(await readFile(new URL("../node_modules/brotli-wasm/pkg.web/brotli_wasm_bg.wasm", import.meta.url)), { headers: { "Content-Type": "application/wasm" } });
++    }
++    requests.push(url);
++    const value = url.pathname.endsWith("runtime-role-catalog.msgpack.br")
++      ? { version: 2, masterVersion: "same-version", roles: [foreignRole] }
++      : [foreignEntry];
++    return new Response(brotliCompressSync(encode(value)));
++  };
++  try {
++    const set = partSet();
++    await ensureRolePartRegistry(set, 2, "light_sound");
++    assert.equal(requests.length, 0, "Active-role recipes need no extra catalog request");
++    await ensureRolePartRegistry(set, 5, "idol");
++    assert.equal(requests.length, 2);
++    assert.equal(requests[1].searchParams.get("masterVersion"), "same-version");
++    assert.deepEqual(set.roles, [activeRole, foreignRole]);
++    assert.deepEqual(set.registry, [activeEntry, foreignEntry]);
++    assert.equal(set.packages.size, 0, "Catalog merge must not preload part models");
++    await ensureRolePartRegistry(set, 5, "idol");
++    assert.equal(requests.length, 2, "Merged role catalogs are reused");
++
++    const mismatch = partSet();
++    mismatch.masterVersion = "older-version";
++    await assert.rejects(ensureRolePartRegistry(mismatch, 5, "idol"), /version mismatch/);
++    assert.deepEqual(mismatch.roles, [activeRole]);
++    assert.deepEqual(mismatch.registry, [activeEntry]);
++    assert.equal(requests.length, 3, "A version mismatch stops before fetching the foreign registry");
++  } finally {
++    globalThis.fetch = previousFetch;
++    globalThis.window = previousWindow;
++  }
++});
+diff --git a/tests/public-framing-browser.mjs b/tests/public-framing-browser.mjs
+new file mode 100644
+index 00000000..01f5759f
+--- /dev/null
++++ b/tests/public-framing-browser.mjs
+@@ -0,0 +1,72 @@
++import assert from "node:assert/strict";
++import { chromium } from "playwright";
++import { createServer } from "vite";
++
++const server = await createServer({
++  configFile: false,
++  server: { host: "127.0.0.1", port: 0, hmr: false, watch: null },
++  plugins: [{ name: "public-framing-harness", configureServer(server) {
++    server.middlewares.use("/__framing", (_request, response) => {
++      response.setHeader("Content-Type", "text/html");
++      response.end('<!doctype html><body><canvas id="canvas" width="640" height="640" style="width:640px;height:640px"></canvas></body>');
++    });
++  } }],
++});
++await server.listen();
++const browser = await chromium.launch({
++  executablePath: process.env.CHROMIUM_PATH ?? "/usr/bin/chromium",
++  args: ["--no-sandbox", "--enable-unsafe-swiftshader"],
++});
++const page = await browser.newPage();
++const errors = [];
++page.on("pageerror", error => errors.push(error.message));
++try {
++  await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/__framing`);
++  const snapshots = await page.evaluate(async () => {
++    const { createHaruki3DKernel } = await import("/dist/haruki-3d-engine.js");
++    const { Haruki3DEngineCore } = await import("/dist/haruki-3d-engine-internal.js");
++    // Observe the actual engine created by the public factory, without adding
++    // an inspection method to the production kernel API.
++    const resize = Haruki3DEngineCore.prototype.setViewportSize;
++    let currentEngine;
++    Haruki3DEngineCore.prototype.setViewportSize = function (...args) {
++      currentEngine = this;
++      return resize.apply(this, args);
++    };
++    const result = {};
++    for (const framing of [undefined, "default", "upper-body"]) {
++      const kernel = createHaruki3DKernel({
++        canvas: document.querySelector("canvas"), assetBaseUrl: "/unused-store/",
++        ...(framing ? { framing } : {}),
++      });
++      kernel.resize(640, 640);
++      const initial = currentEngine.getCameraDebugSnapshot();
++      kernel.resize(320, 240);
++      kernel.setViewYawDegrees(45);
++      const resizedAndRotated = currentEngine.getCameraDebugSnapshot();
++      result[framing ?? "omitted"] = { initial, resizedAndRotated };
++      await kernel.destroy();
++    }
++    Haruki3DEngineCore.prototype.setViewportSize = resize;
++    return result;
++  });
++  assert.deepEqual(snapshots.default, snapshots.omitted, "Explicit default must preserve the existing factory camera");
++  assert.equal(snapshots.omitted.initial.preset, "default");
++  assert.equal(snapshots.omitted.initial.profile, null);
++  assert.equal(snapshots.omitted.initial.fovDegrees, 35);
++  const upper = snapshots["upper-body"];
++  assert.equal(upper.initial.preset, "capture", "Use the direct camera, not the full CostumeShop screen composite");
++  assert.equal(upper.initial.profile, "official-default");
++  assert.deepEqual(upper.initial.position, { x: 0, y: 1.25, z: 2.3 });
++  assert.deepEqual(upper.initial.target, { x: 0, y: 1.25, z: 0 });
++  assert.equal(upper.initial.fovDegrees, 25);
++  assert.equal(upper.resizedAndRotated.profile, "official-default", "Resizing and view rotation preserve the selected framing");
++  assert.equal(upper.resizedAndRotated.aspect, 1.3333);
++  assert.equal(upper.resizedAndRotated.fovDegrees, 25);
++  assert.equal(upper.resizedAndRotated.characterRootYawDegrees, 0, "View framing does not rotate the character or disturb physics");
++  assert.deepEqual(errors, []);
++  console.log("PASS: public default framing unchanged; upper-body uses the existing close camera and survives resize/view rotation");
++} finally {
++  await browser.close();
++  await server.close();
++}
