@@ -124,6 +124,7 @@ interface MusicAssetVariant {
 
 type PreviewPayload = {
   sus: string
+  collaboration?: string
   bgm?: string
   cover?: string
   offset?: number
@@ -776,6 +777,7 @@ function buildPreviewUrl(previewBase: string, payload: PreviewPayload) {
   if (payload.composer) cfg.co = payload.composer
   if (payload.arranger) cfg.ar = payload.arranger
   if (payload.vocal) cfg.v = payload.vocal
+  if (payload.collaboration?.trim()) cfg.cl = payload.collaboration.trim().slice(0, 120)
   if (payload.difficulty !== undefined && payload.difficulty !== null && String(payload.difficulty).trim() !== '') {
     cfg.d = payload.difficulty
   }
@@ -819,6 +821,7 @@ function openChartPreview(difficulty: string) {
     composer: music.value.composer,
     arranger: music.value.arranger,
     vocal: vocal || undefined,
+    collaboration: musicCollaborationLabel.value || undefined,
     difficulty: difficultyIndex >= 0 ? difficultyIndex : (difficultyLabels[difficulty] || difficulty.toUpperCase()),
   })
 

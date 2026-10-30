@@ -92,6 +92,12 @@ interface MusicMaster {
   pronunciation?: string
   fillerSec?: number
   filterSec?: number
+  musicCollaborationId?: number
+}
+
+interface MusicCollaboration {
+  id: number
+  label: string
 }
 
 interface CardMaster {
@@ -219,6 +225,7 @@ const officialCreators = ref<OfficialCreator[]>([])
 const officialProfiles = ref<OfficialCreatorProfile[]>([])
 const tags = ref<CustomMusicScoreTag[]>([])
 const musics = ref<MusicMaster[]>([])
+const musicCollaborations = ref<MusicCollaboration[]>([])
 const cards = ref<CardMaster[]>([])
 const vocals = ref<MusicVocal[]>([])
 const characters = ref<Character[]>([])
@@ -465,7 +472,7 @@ async function loadMasterData() {
   isMasterLoading.value = true
   try {
     masterStore.getTranslations().catch((reason) => console.error('加载翻译失败:', reason))
-    const [creatorData, profileData, tagData, musicData, cardData, vocalData, characterData, outsideCharacterData] = await Promise.all([
+    const [creatorData, profileData, tagData, musicData, cardData, vocalData, characterData, outsideCharacterData, collaborationData] = await Promise.all([
       masterStore.getMaster<OfficialCreator>('customMusicScoreOfficialCreators'),
       masterStore.getMaster<OfficialCreatorProfile>('customMusicScoreOfficialCreatorProfiles'),
       masterStore.getMaster<CustomMusicScoreTag>('customMusicScoreTags'),
@@ -474,6 +481,7 @@ async function loadMasterData() {
       masterStore.getMaster<MusicVocal>('musicVocals'),
       masterStore.getMaster<Character>('gameCharacters'),
       masterStore.getMaster<OutsideCharacter>('outsideCharacters'),
+      masterStore.getMaster<MusicCollaboration>('musicCollaborations'),
     ])
     officialCreators.value = creatorData
     officialProfiles.value = profileData
@@ -483,6 +491,7 @@ async function loadMasterData() {
     vocals.value = vocalData
     characters.value = characterData
     outsideCharacters.value = outsideCharacterData
+    musicCollaborations.value = collaborationData
   } catch (reason) {
     console.error('加载自制谱游戏资料失败', reason)
     error.value = '游戏资料加载失败，请稍后重试'
@@ -783,6 +792,7 @@ async function openFlatPreview(score: DisplayScore) {
 
 function buildChartPreviewPayload(score: DisplayScore, scoreJson: unknown) {
   const music = musicById.value.get(score.musicId)
+  const collaboration = musicCollaborations.value.find(item => item.id === music?.musicCollaborationId)?.label.trim().slice(0, 120)
   const vocal = selectDefaultVocalForMusic(score.musicId)
   const offsetSec = Number(music?.filterSec || music?.fillerSec || 0)
   const vocalText = vocal ? getVocalSingers(vocal, ', ') : ''
@@ -795,6 +805,7 @@ function buildChartPreviewPayload(score: DisplayScore, scoreJson: unknown) {
     requestId,
     customScoreJson: scoreJson,
     title: music?.title || score.musicTitle,
+    collaboration: collaboration || null,
     difficulty: score.musicDifficultyType.toUpperCase(),
     bgm: vocal ? `${assetsHost.value}/ondemand/music/long/${vocal.assetbundleName}/${vocal.assetbundleName}.mp3` : null,
     cover: score.jacketAssetbundleName ? getJacketUrl(score) : null,
