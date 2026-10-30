@@ -17,6 +17,7 @@ export interface StoryScenario {
 export interface StoryFrame {
   key: string
   talkIndex: number
+  snippetIndex: number
   talk: StoryTalk
   background: string
   location: string
@@ -39,13 +40,13 @@ export function buildStoryFrames(data: StoryScenario): StoryFrame[] {
   let bgm = data.FirstBgm || ''
   let location = ''
   const frames: StoryFrame[] = []
-  const append = (index: number) => {
+  const append = (index: number, snippetIndex: number) => {
     const talk = data.TalkData[index]
     if (!talk?.Body && !talk?.WindowDisplayName) return
-    frames.push({ key: `${frames.length}-${index}`, talkIndex: index, talk, background, bgm, location })
+    frames.push({ key: `${frames.length}-${index}`, talkIndex: index, snippetIndex, talk, background, bgm, location })
   }
-  for (const snippet of data.Snippets || []) {
-    if (snippet.Action === 1) append(snippet.ReferenceIndex)
+  for (const [snippetIndex, snippet] of (data.Snippets || []).entries()) {
+    if (snippet.Action === 1) append(snippet.ReferenceIndex, snippetIndex)
     if (snippet.Action === 6) {
       const effect = data.SpecialEffectData?.[snippet.ReferenceIndex]
       if (effect?.EffectType === 7) {
@@ -59,7 +60,7 @@ export function buildStoryFrames(data: StoryScenario): StoryFrame[] {
       if (sound?.Bgm) bgm = sound.Bgm === 'bgm00000' ? '' : sound.Bgm
     }
   }
-  if (!frames.length) data.TalkData.forEach((_, index) => append(index))
+  if (!frames.length) data.TalkData.forEach((_, index) => append(index, index))
   return frames
 }
 

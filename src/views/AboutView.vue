@@ -322,6 +322,43 @@ SOFTWARE.</pre>
               </p>
             </div>
           </div>
+          <!-- sekai-scenario-player -->
+          <div class="collapse collapse-arrow bg-base-200">
+            <input type="checkbox" />
+            <div class="collapse-title font-medium">
+              sekai-scenario-player（剧情播放）
+            </div>
+            <div class="collapse-content space-y-2">
+              <p class="text-sm text-base-content/70">
+                剧情场景模式由该项目驱动，在浏览器中还原游戏的剧情播放器，
+                负责 Live2D 演出与角色语音的播放。
+              </p>
+              <p class="text-sm text-base-content/70">
+                作者：<strong>Haruki Dev Team</strong> · MIT License
+              </p>
+              <p class="text-sm text-base-content/70">
+                <a
+                  href="https://github.com/Team-Haruki/sekai-scenario-player"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="link link-primary inline-flex items-center gap-1"
+                >
+                  GitHub 项目地址
+                  <ExternalLink class="w-3 h-3" />
+                </a>
+                ·
+                <a
+                  href="https://github.com/Team-Haruki/sekai-scenario-player/blob/main/LICENSE"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="link link-primary inline-flex items-center gap-1"
+                >
+                  MIT License
+                  <ExternalLink class="w-3 h-3" />
+                </a>
+              </p>
+            </div>
+          </div>
           <!-- sekai-calculator -->
           <div class="collapse collapse-arrow bg-base-200">
             <input type="checkbox" />

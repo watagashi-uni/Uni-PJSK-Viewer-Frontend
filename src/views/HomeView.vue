@@ -8,6 +8,7 @@ import {
   CalendarDays, Zap, BookOpen,
 } from 'lucide-vue-next'
 import AssetImage from '@/components/AssetImage.vue'
+import StoryPlayerPromo from '@/components/StoryPlayerPromo.vue'
 import type { EventData, MusicData } from '@/types/master'
 
 const masterStore = useMasterStore()
@@ -366,6 +367,8 @@ onMounted(async () => {
         {{ entry.label }}
       </RouterLink>
     </nav>
+
+    <StoryPlayerPromo />
 
     <div class="grid gap-6 lg:grid-cols-3">
       <div class="min-w-0 space-y-6 lg:col-span-2">
