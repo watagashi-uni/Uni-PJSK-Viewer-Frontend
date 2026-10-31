@@ -133,8 +133,51 @@ export default defineConfig({
             },
           },
           {
-            // 外部图片资源 (assets.unipjsk.com) - 不通过 SW 缓存，交给浏览器 HTTP 缓存处理
-            // 避免 opaque response 导致 404 被缓存的问题
+            // 国内源与海外源的图片路径一致、画面等价（只是 PNG 压缩不同），共用一份缓存，
+            // 切换源不必重新下载。音频走 Range 请求，谱面等非图片资源不走这条，仍由下方 NetworkOnly 处理。
+            urlPattern: /^https:\/\/assets(?:-direct)?\.unipjsk\.com\/[^?#]*\.(?:png|jpe?g|webp)$/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'pjsk-shared-images',
+              // cors：<img> 默认是 no-cors，只能拿到读不出状态码的 opaque 响应，404 会混进缓存。
+              // no-cache：海外源的 404 带 max-age=14400 且没有校验器，不能信任 HTTP 缓存里的结果；
+              // 已有的 200 带 ETag，重新验证只会得到 304，不会重新下载。
+              fetchOptions: {
+                mode: 'cors',
+                credentials: 'omit',
+                cache: 'no-cache',
+              },
+              // 缓存键已统一，两个源不同的 Vary 头不应影响命中。
+              matchOptions: {
+                ignoreVary: true,
+              },
+              expiration: {
+                maxEntries: 5000,
+                maxAgeSeconds: 60 * 60 * 24 * 30,
+                purgeOnQuotaError: true,
+              },
+              plugins: [
+                {
+                  // 这里的函数会被序列化进 sw.js，不能引用外部变量。
+                  cacheKeyWillBeUsed: async ({ request }) => {
+                    const url = new URL(request.url)
+                    url.hostname = 'assets.unipjsk.com'
+                    return url.href
+                  },
+                  // 只缓存真实图片：不写入 404 等错误，也不写入被当作 200 返回的 HTML 错误页。
+                  cacheWillUpdate: async ({ response }) => {
+                    if (response.status !== 200) return null
+                    const contentType = response.headers.get('content-type')?.toLowerCase() ?? ''
+                    return contentType.startsWith('image/') ? response : null
+                  },
+                  // 国内源有 Referer 白名单，白名单外会 302 到海外源，而该 302 不带 CORS 头。
+                  // CORS 拉取失败时退回页面的原始请求，保持未接入缓存时的表现（不写入缓存）。
+                  handlerDidError: async ({ request }) => fetch(request),
+                },
+              ],
+            },
+          },
+          {
             urlPattern: /^https:\/\/assets\.unipjsk\.com\/.*/i,
             handler: 'NetworkOnly',
           },
