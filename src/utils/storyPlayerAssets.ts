@@ -16,11 +16,13 @@ export interface StoryPlayerIndex {
   bgm: Record<string, string>
   se: Record<string, string>
   movies: Record<string, string>
+  specialScenarios: string[]
 }
 
-export async function loadStoryPlayerIndex(signal: AbortSignal): Promise<StoryPlayerIndex> {
+export async function loadStoryPlayerIndex(signal?: AbortSignal): Promise<StoryPlayerIndex> {
+  const timeout = AbortSignal.timeout(25000)
   const response = await fetch(storyAssetUrl('story-player/index.json'), {
-    signal: AbortSignal.any([signal, AbortSignal.timeout(25000)]), cache: 'no-cache',
+    signal: signal ? AbortSignal.any([signal, timeout]) : timeout, cache: 'no-cache',
   })
   if (!response.ok) throw new Error('场景资源目录暂不可用，可切换到文本阅读')
   const index = await response.json() as StoryPlayerIndex

@@ -6,7 +6,8 @@ import AssetImage from '@/components/AssetImage.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import Pagination from '@/components/Pagination.vue'
 import StoryReader from '@/components/StoryReader.vue'
-import { loadStoryMedia, storyAssetHost } from '@/utils/storyPlayback'
+import { specialScenarioPath, storyAssetHost } from '@/utils/storyPlayback'
+import { loadStoryPlayerIndex } from '@/utils/storyPlayerAssets'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
 import type { EventData } from '@/types/master'
@@ -21,6 +22,7 @@ interface StoryEpisode {
   assetbundleName: string
   scenarioId: string
   unitStoryEpisodeGroupId?: number
+  scenarioPath?: string
 }
 
 interface EventStory {
@@ -191,7 +193,7 @@ const scenarioUrls = computed(() => {
     return [`${host}/startapp/scenario/unitstory/${story.assetbundleName}/${episode.scenarioId}.json`]
   }
   if (story.kind === 'card') return [`${host}/startapp/character/member/${story.assetbundleName}/${episode.scenarioId}.json`]
-  if (story.kind === 'special') return [`${host}/startapp/scenario/special/${story.assetbundleName}/${episode.scenarioId}.json`]
+  if (story.kind === 'special' && episode.scenarioPath) return [`${host}/${episode.scenarioPath}`]
   return []
 })
 
@@ -243,9 +245,15 @@ async function loadExtra() {
         const [cards, episodes] = await Promise.all([masterStore.getMaster<StoryCard>('cards'), masterStore.getMaster<CardEpisode>('cardEpisodes')])
         storyCards.value = cards; cardEpisodes.value = episodes
       } else {
-        const [stories, media] = await Promise.all([masterStore.getMaster<SpecialStory>('specialStories'), loadStoryMedia()])
-        const available = new Set(media.specialScenarios || [])
-        specialStories.value = stories.map(story => ({ ...story, episodes: story.episodes.filter(episode => available.has(`startapp/scenario/special/${story.assetbundleName}/${episode.scenarioId}.json`)) })).filter(story => story.episodes.length)
+        const [stories, index] = await Promise.all([masterStore.getMaster<SpecialStory>('specialStories'), loadStoryPlayerIndex()])
+        const available = new Set(index.specialScenarios)
+        specialStories.value = stories.map(story => ({
+          ...story,
+          episodes: story.episodes.flatMap(episode => {
+            const scenarioPath = specialScenarioPath(story.assetbundleName, episode, available)
+            return scenarioPath ? [{ ...episode, scenarioPath }] : []
+          }),
+        })).filter(story => story.episodes.length)
       }
     } catch { extraError.value = '目录加载失败，请重试' }
     finally { extraLoading.value = false; extraRequest = null }

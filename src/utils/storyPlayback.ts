@@ -23,12 +23,6 @@ export interface StoryFrame {
   location: string
   bgm: string
 }
-export interface StoryMediaIndex {
-  backgrounds: Record<string, string>
-  bgm: Record<string, string>
-  comics: string[]
-  specialScenarios?: string[]
-}
 
 // Story media lives on the global origin; the mainland mirror has a smaller scope.
 export const storyAssetHost = 'https://assets.unipjsk.com'
@@ -72,20 +66,14 @@ export function voicePaths(scenarioId: string, voiceId: string): string[] {
   return directories.map(directory => `${directory}/${scenarioId}/${voiceId}.mp3`)
 }
 
-let mediaPromise: Promise<StoryMediaIndex> | undefined
-export function loadStoryMedia(): Promise<StoryMediaIndex> {
-  return mediaPromise ||= fetch('/data/story-media-index.json').then(async response => {
-    if (!response.ok) throw new Error('场景资源目录加载失败')
-    return response.json() as Promise<StoryMediaIndex>
-  }).catch(error => { mediaPromise = undefined; throw error })
-}
-
-export function backgroundPath(id: string, media: StoryMediaIndex): string {
-  if (!id || !/^[\w-]+$/.test(id)) return ''
-  return media.backgrounds[id] || `ondemand/scenario/background/${id}/${id}.png`
-}
-
-export function bgmPath(id: string, media: StoryMediaIndex): string {
-  if (!id || id === 'bgm00000' || !/^[\w-]+$/.test(id)) return ''
-  return media.bgm[id] || `ondemand/sound/scenario/bgm/${id}/${id}.mp3`
+// The game loads special stories from the episode's bundle. The opening's op_01 is the
+// exception: it only exists in the parent's special-story bundle.
+export function specialScenarioPath(
+  storyBundle: string,
+  episode: { assetbundleName: string; scenarioId: string },
+  available: ReadonlySet<string>,
+): string | undefined {
+  return [episode.assetbundleName, storyBundle]
+    .map(bundle => `startapp/scenario/special/${bundle}/${episode.scenarioId}.json`)
+    .find(path => available.has(path))
 }
