@@ -7,7 +7,7 @@ import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
 import { useAccountStore } from '@/stores/account'
 import { 
-  Calendar, Clock, Trophy, Music, CreditCard, 
+  Calendar, Clock, Trophy, Music, CreditCard, BookOpen,
   Sparkles, ChevronLeft, ChevronRight, BarChart3, ShoppingBasket, Minus, Plus, RotateCcw, Swords
 } from 'lucide-vue-next'
 import SekaiCard from '@/components/SekaiCard.vue'
@@ -67,6 +67,11 @@ interface CardInfo {
   supportUnit: string
   releaseAt: number
   prefix?: string
+}
+
+interface EventStorySummary {
+  id: number
+  eventId: number
 }
 
 interface MusicVocal {
@@ -180,6 +185,7 @@ const eventItems = ref<EventItemInfo[]>([])
 const mysekaiMaterials = ref<MysekaiMaterialInfo[]>([])
 const cheerfulCarnivalSummaries = ref<CheerfulCarnivalSummary[]>([])
 const cheerfulCarnivalTeams = ref<CheerfulCarnivalTeam[]>([])
+const eventStories = ref<EventStorySummary[]>([])
 const missingCheerfulTeamImages = ref<Set<number>>(new Set())
 const exchangeQuantities = ref<Record<number, number>>({})
 const manualBadgeCount = ref(0)
@@ -199,6 +205,14 @@ const boostItemMap = computed(() => new Map(boostItems.value.map(item => [item.i
 const eventItemMap = computed(() => new Map(eventItems.value.map(item => [item.id, item])))
 const mysekaiMaterialMap = computed(() => new Map(mysekaiMaterials.value.map(item => [item.id, item])))
 const cardMap = computed(() => new Map(cards.value.map(card => [card.id, card])))
+
+// 未开始的活动沿用剧情页的剧透设置
+const eventStoryLink = computed(() => {
+  if (!event.value) return ''
+  if (!settingsStore.showSpoilers && event.value.startAt > currentTime.value) return ''
+  const story = eventStories.value.find(item => item.eventId === event.value?.id)
+  return story ? `/stories?story=${story.id}` : ''
+})
 
 const exchangeSummary = computed(() => eventExchangeSummaries.value.find(summary => summary.eventId === event.value?.id))
 const eventExchangeBoxMap = computed(() => new Map(resourceBoxes.value
@@ -581,7 +595,7 @@ async function loadData() {
     const [eventsData, eventMusicsData, eventCardsData, eventBonusesData,
            gameCharUnitsData, musicsData, cardsData, musicVocalsData, resourceBoxesData,
            exchangeData, materialData, practiceData, skillPracticeData, boostData, eventItemData,
-           mysekaiMaterialData, cheerfulSummaryData, cheerfulTeamData] = await Promise.all([
+           mysekaiMaterialData, cheerfulSummaryData, cheerfulTeamData, eventStoryData] = await Promise.all([
       masterStore.getMaster<EventData>('events'),
       masterStore.getMaster<EventMusic>('eventMusics'),
       masterStore.getMaster<EventCard>('eventCards'),
@@ -600,6 +614,7 @@ async function loadData() {
       masterStore.getMaster<MysekaiMaterialInfo>('mysekaiMaterials'),
       masterStore.getMaster<CheerfulCarnivalSummary>('cheerfulCarnivalSummaries'),
       masterStore.getMaster<CheerfulCarnivalTeam>('cheerfulCarnivalTeams'),
+      masterStore.getMaster<EventStorySummary>('eventStories'),
     ])
 
     event.value = eventsData.find(e => e.id === eventId) || null
@@ -620,6 +635,7 @@ async function loadData() {
     mysekaiMaterials.value = mysekaiMaterialData
     cheerfulCarnivalSummaries.value = cheerfulSummaryData
     cheerfulCarnivalTeams.value = cheerfulTeamData
+    eventStories.value = eventStoryData
     missingCheerfulTeamImages.value = new Set()
     resetExchangePlan()
     manualBadgeCount.value = 0
@@ -725,15 +741,22 @@ watch(() => route.params.id, loadData)
               </span>
             </div>
             
-            <!-- 榜线按钮 (仅正在进行时显示) -->
-            <RouterLink 
-              v-if="eventStatus.status === 'ongoing'"
-              to="/ranking"
-              class="btn btn-sm btn-primary gap-2"
-            >
-              <BarChart3 class="w-4 h-4" />
-              查看榜线
-            </RouterLink>
+            <div class="flex flex-wrap items-center gap-2">
+              <RouterLink v-if="eventStoryLink" :to="eventStoryLink" class="btn btn-sm btn-outline gap-2">
+                <BookOpen class="w-4 h-4" />
+                查看剧情
+              </RouterLink>
+
+              <!-- 榜线按钮 (仅正在进行时显示) -->
+              <RouterLink 
+                v-if="eventStatus.status === 'ongoing'"
+                to="/ranking"
+                class="btn btn-sm btn-primary gap-2"
+              >
+                <BarChart3 class="w-4 h-4" />
+                查看榜线
+              </RouterLink>
+            </div>
           </div>
           
           <h1 class="text-2xl font-bold mb-4">{{ event.name }}</h1>
