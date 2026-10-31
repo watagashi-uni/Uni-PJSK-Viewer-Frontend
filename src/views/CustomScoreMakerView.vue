@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, toRef, watch } from 'vue'
-import { BarChart3, Copy, Eye, Heart, Music2, Play, PlayCircle, RefreshCw, Search, Sparkles, User, X } from 'lucide-vue-next'
+import { BarChart3, Copy, Download, Eye, Heart, Music2, Play, PlayCircle, RefreshCw, Search, Sparkles, User, X } from 'lucide-vue-next'
 import { renderCustomScoreJsonToSvg, revokeSus2ImgResult, type Sus2ImgFrontendResult } from '@/vendor/sekai-sus2img'
 import AssetImage from '@/components/AssetImage.vue'
 import SekaiProfileHonor from '@/components/SekaiProfileHonor.vue'
@@ -790,6 +790,27 @@ async function openFlatPreview(score: DisplayScore) {
   replacePreviewTab(previewTab, selectedPreviewUrl.value)
 }
 
+async function downloadScoreJson(score: DisplayScore) {
+  isFetchingScore.value = true
+  scoreError.value = ''
+  previewInfo.value = ''
+  try {
+    const jsonText = await ensureScoreJsonText(score)
+    JSON.parse(jsonText)
+    const url = URL.createObjectURL(new Blob([jsonText], { type: 'application/json' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `custom_score_${score.customMusicScoreId}.json`
+    link.click()
+    URL.revokeObjectURL(url)
+  } catch (reason) {
+    scoreError.value = reason instanceof Error ? reason.message : '谱面下载失败'
+  } finally {
+    isFetchingScore.value = false
+    scoreTaskLabel.value = ''
+  }
+}
+
 function buildChartPreviewPayload(score: DisplayScore, scoreJson: unknown) {
   const music = musicById.value.get(score.musicId)
   const collaboration = musicCollaborations.value.find(item => item.id === music?.musicCollaborationId)?.label.trim().slice(0, 120)
@@ -1368,7 +1389,11 @@ function selectTab(tab: FeedTab) {
 
             <div class="flex items-center justify-between mt-2 pt-3 border-t border-base-200/60">
               <div class="text-[10px] text-base-content/40 font-medium">{{ formatDate(score.publishedAt) }}</div>
-              <div class="flex gap-2">
+              <div class="flex flex-wrap justify-end gap-2">
+                <button v-if="score.isDerivativeAllowed === true" class="btn btn-sm btn-outline hover:btn-primary gap-1.5 rounded-lg border-base-300" :disabled="isFetchingScore" title="作者允许二次创作" @click="downloadScoreJson(score)">
+                  <Download class="w-3.5 h-3.5" />
+                  下载 JSON
+                </button>
                 <button class="btn btn-sm btn-outline hover:btn-primary gap-1.5 rounded-lg border-base-300" :disabled="isFetchingScore" @click="openFlatPreview(score)">
                   <Eye class="w-3.5 h-3.5" />
                   平面预览
@@ -1519,7 +1544,11 @@ function selectTab(tab: FeedTab) {
 
                 <div class="mt-3 flex items-center justify-between border-t border-base-200/70 pt-3">
                   <div class="text-[10px] font-medium text-base-content/40">{{ formatDate(score.publishedAt) }}</div>
-                  <div class="flex gap-2">
+                  <div class="flex flex-wrap justify-end gap-2">
+                    <button v-if="score.isDerivativeAllowed === true" class="btn btn-xs btn-outline gap-1.5 rounded-lg" :disabled="isFetchingScore" title="作者允许二次创作" @click="downloadScoreJson(score)">
+                      <Download class="h-3.5 w-3.5" />
+                      下载 JSON
+                    </button>
                     <button class="btn btn-xs btn-outline gap-1.5 rounded-lg" :disabled="isFetchingScore" @click="openFlatPreview(score)">
                       <Eye class="h-3.5 w-3.5" />
                       平面预览
