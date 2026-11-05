@@ -300,6 +300,7 @@ export const useMasterStore = defineStore('master', () => {
         isReady,
         // 方法
         initialize,
+        syncVersion,
         checkVersionInBackground,
         getMaster,
         getMasters,

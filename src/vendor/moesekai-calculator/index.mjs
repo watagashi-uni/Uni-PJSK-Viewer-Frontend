@@ -1,7 +1,7 @@
-function findOrThrow(arr, p) {
+function findOrThrow(arr, p, context) {
     const result = arr.find(p);
     if (result === undefined)
-        throw new Error('object not found');
+        throw new Error(`缺少${context}。请刷新数据后重试；若仍失败，请反馈此错误。`);
     return result;
 }
 function getOrThrow(map, key) {
@@ -102,7 +102,7 @@ class AreaItemService {
     }
     async getAreaItemLevel(areaItemId, level) {
         const areaItemLevels = await this.dataProvider.getMasterData('areaItemLevels');
-        return findOrThrow(areaItemLevels, it => it.areaItemId === areaItemId && it.level === level);
+        return findOrThrow(areaItemLevels, it => it.areaItemId === areaItemId && it.level === level, `区域道具等级数据（areaItemId=${areaItemId}, level=${level}）`);
     }
     async getAreaItemNextLevel(areaItem, areaItemLevel) {
         const level = areaItemLevel === undefined ? 1 : (areaItemLevel.level === 15 ? 15 : areaItemLevel.level + 1);
@@ -114,7 +114,7 @@ class AreaItemService {
             ? (1000 + (areaItemLevel.areaItemId - 1) * 10)
             : (1550 - 10 + (areaItemLevel.areaItemId - 1) * 5);
         const id = idOffset + areaItemLevel.level;
-        return findOrThrow(shopItems, it => it.id === id);
+        return findOrThrow(shopItems, it => it.id === id, `商店道具数据（id=${id}）`);
     }
 }
 
@@ -128,14 +128,14 @@ class CardService {
         const units = [];
         if (card.supportUnit !== 'none')
             units.push(card.supportUnit);
-        units.push(findOrThrow(gameCharacters, it => it.id === card.characterId).unit);
+        units.push(findOrThrow(gameCharacters, it => it.id === card.characterId, `角色数据（characterId=${card.characterId}, cardId=${card.id}）`).unit);
         return units;
     }
     async applyCardConfig(userCard, card, { rankMax = false, episodeRead = false, masterMax = false, skillMax = false } = {}) {
         if (!rankMax && !episodeRead && !masterMax && !skillMax)
             return userCard;
         const cardRarities = await this.dataProvider.getMasterData('cardRarities');
-        const cardRarity = findOrThrow(cardRarities, it => it.cardRarityType === card.cardRarityType);
+        const cardRarity = findOrThrow(cardRarities, it => it.cardRarityType === card.cardRarityType, `卡牌稀有度数据（cardId=${card.id}, rarity=${card.cardRarityType}）`);
         const ret = JSON.parse(JSON.stringify(userCard));
         if (rankMax) {
             if (cardRarity.trainingMaxLevel !== undefined) {
@@ -168,11 +168,11 @@ class DeckService {
     }
     async getUserCard(cardId) {
         const userCards = await this.dataProvider.getUserData('userCards');
-        return findOrThrow(userCards, it => it.cardId === cardId);
+        return findOrThrow(userCards, it => it.cardId === cardId, `玩家卡牌数据（cardId=${cardId}）`);
     }
     async getDeck(deckId) {
         const userDecks = await this.dataProvider.getUserData('userDecks');
-        return findOrThrow(userDecks, it => it.deckId === deckId);
+        return findOrThrow(userDecks, it => it.deckId === deckId, `玩家队伍数据（deckId=${deckId}）`);
     }
     async getDeckCards(userDeck) {
         const cardIds = [userDeck.member1, userDeck.member2, userDeck.member3, userDeck.member4, userDeck.member5];
@@ -196,7 +196,7 @@ class DeckService {
     }
     async getChallengeLiveSoloDeck(characterId) {
         const userChallengeLiveSoloDecks = await this.dataProvider.getUserData('userChallengeLiveSoloDecks');
-        return findOrThrow(userChallengeLiveSoloDecks, it => it.characterId === characterId);
+        return findOrThrow(userChallengeLiveSoloDecks, it => it.characterId === characterId, `挑战队伍数据（characterId=${characterId}）`);
     }
     async getChallengeLiveSoloDeckCards(deck) {
         const cardIds = [deck.leader, deck.support1, deck.support2, deck.support3, deck.support4];
@@ -259,7 +259,7 @@ class EventService {
     }
     async getEventType(eventId) {
         const events = await this.dataProvider.getMasterData('events');
-        const event = findOrThrow(events, it => it.id === eventId);
+        const event = findOrThrow(events, it => it.id === eventId, `活动数据（eventId=${eventId}）`);
         switch (event.eventType) {
             case 'marathon':
                 return EventType.MARATHON;
@@ -299,10 +299,10 @@ class EventService {
         const gameCharacters = await this.dataProvider.getMasterData('gameCharacters');
         const bonuses = eventDeckBonuses
             .filter(it => it.eventId === eventId && it.gameCharacterUnitId !== undefined)
-            .map(it => findOrThrow(gameCharacterUnits, a => a.id === it.gameCharacterUnitId));
+            .map(it => findOrThrow(gameCharacterUnits, a => a.id === it.gameCharacterUnitId, `活动角色组合数据（eventId=${eventId}, gameCharacterUnitId=${it.gameCharacterUnitId}）`));
         const map = new Map();
         bonuses.forEach(gcu => {
-            const gameCharacter = findOrThrow(gameCharacters, it => it.id === gcu.gameCharacterId);
+            const gameCharacter = findOrThrow(gameCharacters, it => it.id === gcu.gameCharacterId, `活动角色数据（eventId=${eventId}, characterId=${gcu.gameCharacterId}）`);
             map.set(gameCharacter.unit, (map.get(gameCharacter.unit) ?? 0) + 1);
             if (gameCharacter.unit !== gcu.unit) {
                 map.set(gcu.unit, (map.get(gcu.unit) ?? 0) + 1);
@@ -349,7 +349,7 @@ class EventService {
             return undefined;
         }
         const gameCharacters = await this.dataProvider.getMasterData('gameCharacters');
-        const gameCharacter = findOrThrow(gameCharacters, it => it.id === specialCharacterId);
+        const gameCharacter = findOrThrow(gameCharacters, it => it.id === specialCharacterId, `支援角色数据（characterId=${specialCharacterId}）`);
         return gameCharacter.unit;
     }
     static isWorldBloomFinale(worldBloomType) {
@@ -464,7 +464,7 @@ class CardPowerCalculator {
             .filter(it => it.cardLevel === userCard.level);
         const params = ['param1', 'param2', 'param3'];
         params.forEach((param, i) => {
-            ret[i] = findOrThrow(cardParameters, it => it.cardParameterType === param).power;
+            ret[i] = findOrThrow(cardParameters, it => it.cardParameterType === param, `卡牌综合力数据（cardId=${card.id}, level=${userCard.level}, parameter=${param}）`).power;
         });
         if (userCard.specialTrainingStatus === 'done') {
             ret[0] += card.specialTrainingPower1BonusFixed;
@@ -474,7 +474,7 @@ class CardPowerCalculator {
         const episodes = userCard.episodes === undefined
             ? []
             : userCard.episodes.filter(it => it.scenarioStatus === 'already_read')
-                .map(it => findOrThrow(cardEpisodes, e => e.id === it.cardEpisodeId));
+                .map(it => findOrThrow(cardEpisodes, e => e.id === it.cardEpisodeId, `卡牌剧情数据（cardId=${card.id}, episodeId=${it.cardEpisodeId}）`));
         for (const episode of episodes) {
             ret[0] += episode.power1BonusFixed;
             ret[1] += episode.power2BonusFixed;
@@ -489,7 +489,7 @@ class CardPowerCalculator {
         }
         if (hasMysekaiCanvas) {
             const cardMysekaiCanvasBonuses = await this.dataProvider.getMasterData('cardMysekaiCanvasBonuses');
-            const canvasBonus = findOrThrow(cardMysekaiCanvasBonuses, it => it.cardRarityType === card.cardRarityType);
+            const canvasBonus = findOrThrow(cardMysekaiCanvasBonuses, it => it.cardRarityType === card.cardRarityType, `画布加成数据（cardId=${card.id}, rarity=${card.cardRarityType}）`);
             ret[0] += canvasBonus.power1BonusFixed;
             ret[1] += canvasBonus.power2BonusFixed;
             ret[2] += canvasBonus.power3BonusFixed;
@@ -519,9 +519,9 @@ class CardPowerCalculator {
     async getCharacterBonusPower(basePower, characterId) {
         const characterRanks = await this.dataProvider.getMasterData('characterRanks');
         const userCharacters = await this.dataProvider.getUserData('userCharacters');
-        const userCharacter = findOrThrow(userCharacters, it => it.characterId === characterId);
+        const userCharacter = findOrThrow(userCharacters, it => it.characterId === characterId, `玩家角色等级数据（characterId=${characterId}）`);
         const characterRank = findOrThrow(characterRanks, it => it.characterId === userCharacter.characterId &&
-            it.characterRank === userCharacter.characterRank);
+            it.characterRank === userCharacter.characterRank, `角色等级加成数据（characterId=${characterId}, rank=${userCharacter.characterRank}）`);
         const rates = [
             characterRank.power1BonusRate,
             characterRank.power2BonusRate,
@@ -673,7 +673,7 @@ class CardSkillCalculator {
             lifeRecovery: 0
         };
         for (const skillEffect of skill.skillEffects) {
-            const skillEffectDetail = findOrThrow(skillEffect.skillEffectDetails, it => it.level === userCard.skillLevel);
+            const skillEffectDetail = findOrThrow(skillEffect.skillEffectDetails, it => it.level === userCard.skillLevel, `技能等级数据（cardId=${card.id}, skillId=${skill.id}, level=${userCard.skillLevel}）`);
             if (skillEffect.skillEffectType === 'score_up' ||
                 skillEffect.skillEffectType === 'score_up_condition_life' ||
                 skillEffect.skillEffectType === 'score_up_keep') {
@@ -719,11 +719,11 @@ class CardSkillCalculator {
             skillId = card.specialTrainingSkillId;
         }
         const skills = await this.dataProvider.getMasterData('skills');
-        return findOrThrow(skills, it => it.id === skillId);
+        return findOrThrow(skills, it => it.id === skillId, `技能数据（cardId=${card.id}, skillId=${skillId}）`);
     }
     async getCharacterRank(characterId) {
         const userCharacters = await this.dataProvider.getUserData('userCharacters');
-        const userCharacter = findOrThrow(userCharacters, it => it.characterId === characterId);
+        const userCharacter = findOrThrow(userCharacters, it => it.characterId === characterId, `玩家角色等级数据（characterId=${characterId}）`);
         return userCharacter.characterRank;
     }
 }
@@ -763,7 +763,7 @@ class CardEventCalculator {
             .reduce((v, eventDeckBonus) => {
             if (eventDeckBonus.gameCharacterUnitId === undefined)
                 return Math.max(v, eventDeckBonus.bonusRate);
-            const gameCharacterUnit = findOrThrow(gameCharacterUnits, unit => unit.id === eventDeckBonus.gameCharacterUnitId);
+            const gameCharacterUnit = findOrThrow(gameCharacterUnits, unit => unit.id === eventDeckBonus.gameCharacterUnitId, `活动角色组合数据（eventId=${eventId}, gameCharacterUnitId=${eventDeckBonus.gameCharacterUnitId}）`);
             if (gameCharacterUnit.gameCharacterId !== card.characterId)
                 return v;
             if (card.characterId < 21 || card.supportUnit === gameCharacterUnit.unit || card.supportUnit === 'none') {
@@ -776,9 +776,9 @@ class CardEventCalculator {
         const cards = await this.dataProvider.getMasterData('cards');
         const eventCards = await this.dataProvider.getMasterData('eventCards');
         const eventRarityBonusRates = await this.dataProvider.getMasterData('eventRarityBonusRates');
-        const card = findOrThrow(cards, it => it.id === userCard.cardId);
+        const card = findOrThrow(cards, it => it.id === userCard.cardId, `卡牌数据（cardId=${userCard.cardId}）`);
         let fixedBonus = await this.getEventDeckBonus(eventId, card);
-        const masterRankBonus = findOrThrow(eventRarityBonusRates, it => it.cardRarityType === card.cardRarityType && it.masterRank === userCard.masterRank);
+        const masterRankBonus = findOrThrow(eventRarityBonusRates, it => it.cardRarityType === card.cardRarityType && it.masterRank === userCard.masterRank, `活动突破加成数据（cardId=${card.id}, rarity=${card.cardRarityType}, masterRank=${userCard.masterRank}）`);
         fixedBonus += masterRankBonus.bonusRate;
         const cardBonus0 = eventCards
             .find((it) => it.eventId === eventId && it.cardId === card.id);
@@ -828,12 +828,12 @@ class CardBloomEventCalculator {
             worldBloomSupportDeckBonuses =
                 await this.dataProvider.getMasterData('worldBloomSupportDeckBonuses');
         }
-        const bonus = findOrThrow(worldBloomSupportDeckBonuses, it => it.cardRarityType === card.cardRarityType);
+        const bonus = findOrThrow(worldBloomSupportDeckBonuses, it => it.cardRarityType === card.cardRarityType, `WL支援稀有度加成数据（eventId=${eventId}, rarity=${card.cardRarityType}）`);
         let total = 0;
         const type = specialCharacterId > 0 && card.characterId === specialCharacterId ? 'specific' : 'others';
-        total += findOrThrow(bonus.worldBloomSupportDeckCharacterBonuses, it => it.worldBloomSupportDeckCharacterType === type).bonusRate;
-        total += findOrThrow(bonus.worldBloomSupportDeckMasterRankBonuses, it => it.masterRank === userCard.masterRank).bonusRate;
-        total += findOrThrow(bonus.worldBloomSupportDeckSkillLevelBonuses, it => it.skillLevel === userCard.skillLevel).bonusRate;
+        total += findOrThrow(bonus.worldBloomSupportDeckCharacterBonuses, it => it.worldBloomSupportDeckCharacterType === type, `WL支援角色加成数据（eventId=${eventId}, type=${type}）`).bonusRate;
+        total += findOrThrow(bonus.worldBloomSupportDeckMasterRankBonuses, it => it.masterRank === userCard.masterRank, `WL支援突破加成数据（cardId=${card.id}, masterRank=${userCard.masterRank}）`).bonusRate;
+        total += findOrThrow(bonus.worldBloomSupportDeckSkillLevelBonuses, it => it.skillLevel === userCard.skillLevel, `WL支援技能加成数据（cardId=${card.id}, skillLevel=${userCard.skillLevel}）`).bonusRate;
         const worldBloomSupportDeckUnitEventLimitedBonuses = await this.dataProvider.getMasterData('worldBloomSupportDeckUnitEventLimitedBonuses');
         const cardBonus = worldBloomSupportDeckUnitEventLimitedBonuses
             .find(it => it.eventId === eventId && it.gameCharacterId === specialCharacterId && it.cardId === card.id);
@@ -873,8 +873,8 @@ class MysekaiService {
         const mysekaiGates = await this.dataProvider.getMasterData('mysekaiGates');
         const mysekaiGateLevels = await this.dataProvider.getMasterData('mysekaiGateLevels');
         return userMysekaiGates.map(it => {
-            const gate = findOrThrow(mysekaiGates, g => g.id === it.mysekaiGateId);
-            const level = findOrThrow(mysekaiGateLevels, l => l.mysekaiGateId === it.mysekaiGateId && l.level === it.mysekaiGateLevel);
+            const gate = findOrThrow(mysekaiGates, g => g.id === it.mysekaiGateId, `MYSEKAI大门数据（gateId=${it.mysekaiGateId}）`);
+            const level = findOrThrow(mysekaiGateLevels, l => l.mysekaiGateId === it.mysekaiGateId && l.level === it.mysekaiGateLevel, `MYSEKAI大门等级数据（gateId=${it.mysekaiGateId}, level=${it.mysekaiGateLevel}）`);
             return {
                 unit: gate.unit,
                 powerBonusRate: level.powerBonusRate
@@ -1019,7 +1019,7 @@ class CardCalculator {
     async getCardDetail(userCard, userAreaItemLevels, config = {}, eventConfig = {}, hasCanvasBonus, userGateBonuses, singleCardConfig = {}) {
         const { eventId = 0 } = eventConfig;
         const cards = await this.dataProvider.getMasterData('cards');
-        const card = findOrThrow(cards, it => it.id === userCard.cardId);
+        const card = findOrThrow(cards, it => it.id === userCard.cardId, `卡牌数据（cardId=${userCard.cardId}）`);
         let cfg;
         if (singleCardConfig[card.id] !== undefined) {
             cfg = singleCardConfig[card.id];
@@ -1090,7 +1090,7 @@ class LiveCalculator {
     }
     async getMusicMeta(musicId, musicDiff) {
         const musicMetas = await this.dataProvider.getMusicMeta();
-        return findOrThrow(musicMetas, it => it.music_id === musicId && it.difficulty === musicDiff);
+        return findOrThrow(musicMetas, it => it.music_id === musicId && it.difficulty === musicDiff, `歌曲计算数据（musicId=${musicId}, difficulty=${musicDiff}）`);
     }
     static getBaseScore(musicMeta, liveType) {
         switch (liveType) {
@@ -1180,7 +1180,7 @@ class LiveCalculator {
     static getSoloLiveSkill(liveSkills, skillDetails) {
         if (liveSkills === undefined)
             return undefined;
-        const skills = liveSkills.map(liveSkill => findOrThrow(skillDetails, it => it.cardId === liveSkill.cardId).skill);
+        const skills = liveSkills.map(liveSkill => findOrThrow(skillDetails, it => it.cardId === liveSkill.cardId, `队伍技能数据（cardId=${liveSkill.cardId}）`).skill);
         const ret = [];
         for (let i = 0; i < 6; ++i) {
             ret.push({
@@ -1235,7 +1235,7 @@ class EventCalculator {
         const masterCards = await this.dataProvider.getMasterData('cards');
         const cardDetails = await Promise.all(deckCards
             .map(async (userCard) => {
-            const card = findOrThrow(masterCards, it => it.id === userCard.cardId);
+            const card = findOrThrow(masterCards, it => it.id === userCard.cardId, `卡牌数据（cardId=${userCard.cardId}）`);
             const eventBonus = await this.cardEventCalculator.getCardEventBonus(userCard, eventId);
             return {
                 attr: card.attr,
@@ -1293,7 +1293,7 @@ class EventCalculator {
             return bonus;
         const set = new Set();
         deckCards.forEach(it => set.add(it.attr));
-        return bonus + findOrThrow(worldBloomDifferentAttributeBonuses, it => it.attributeCount === set.size).bonusRate;
+        return bonus + findOrThrow(worldBloomDifferentAttributeBonuses, it => it.attributeCount === set.size, `WL属性数量加成数据（attributeCount=${set.size}）`).bonusRate;
     }
     static getSupportDeckBonus(deckCards, allCards, supportDeckCount = 20) {
         const deckCardIds = new Set(deckCards.map(it => it.cardId));
@@ -1349,8 +1349,8 @@ class DeckCalculator {
         const userHonors = await this.dataProvider.getUserData('userHonors');
         return userHonors
             .map(userHonor => {
-            const honor = findOrThrow(honors, it => it.id === userHonor.honorId);
-            return findOrThrow(honor.levels, it => it.level === userHonor.level);
+            const honor = findOrThrow(honors, it => it.id === userHonor.honorId, `称号数据（honorId=${userHonor.honorId}）`);
+            return findOrThrow(honor.levels, it => it.level === userHonor.level, `称号等级数据（honorId=${userHonor.honorId}, level=${userHonor.level}）`);
         })
             .reduce((v, it) => v + it.bonus, 0);
     }
@@ -1610,13 +1610,13 @@ class LiveExactCalculator {
         }
         const ingameNodes = await this.dataProvider.getMasterData('ingameNodes');
         const noteCoefficients = musicScore.notes
-            .map(note => findOrThrow(ingameNodes, it => it.id === note.type).scoreCoefficient);
+            .map(note => findOrThrow(ingameNodes, it => it.id === note.type, `音符计分数据（type=${note.type}）`).scoreCoefficient);
         const coefficientTotal = noteCoefficients.reduce((total, it) => total + it, 0);
         const ingameCombos = await this.dataProvider.getMasterData('ingameCombos');
         const notes = musicScore.notes.map((note, i) => {
             const noteCoefficient = noteCoefficients[i];
             const combo = i + 1;
-            const comboCoefficient = findOrThrow(ingameCombos, it => it.fromCount <= combo && combo <= it.toCount).scoreCoefficient;
+            const comboCoefficient = findOrThrow(ingameCombos, it => it.fromCount <= combo && combo <= it.toCount, `连击计分数据（combo=${combo}）`).scoreCoefficient;
             const judgeCoefficient = 1;
             const effectBonuses = effects
                 .filter(it => it.startTime <= note.time && note.time <= it.endTime)
@@ -1689,7 +1689,7 @@ class AreaItemRecommend {
     }
     async getRecommendAreaItem(areaItem, areaItemLevel, power) {
         const areas = await this.dataProvider.getMasterData('areas');
-        const area = findOrThrow(areas, it => it.id === areaItem.areaId);
+        const area = findOrThrow(areas, it => it.id === areaItem.areaId, `区域数据（areaId=${areaItem.areaId}）`);
         const shopItem = await this.areaItemService.getShopItem(areaItemLevel);
         return {
             area,
@@ -2961,7 +2961,7 @@ class ChallengeLiveDeckRecommend {
         const userCards = await this.dataProvider.getUserData('userCards');
         const cards = await this.dataProvider.getMasterData('cards');
         const characterCards = userCards
-            .filter(userCard => findOrThrow(cards, it => it.id === userCard.cardId).characterId === characterId);
+            .filter(userCard => findOrThrow(cards, it => it.id === userCard.cardId, `卡牌数据（cardId=${userCard.cardId}）`).characterId === characterId);
         return await this.baseRecommend.recommendHighScoreDeck(characterCards, LiveCalculator.getLiveScoreFunction(LiveType.SOLO), config, LiveType.CHALLENGE);
     }
 }

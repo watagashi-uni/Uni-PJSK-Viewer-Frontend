@@ -324,6 +324,8 @@ async function handleCalculate() {
   try {
     const fetchStart = performance.now()
     await accountStore.refreshSuite(uid)
+    // 新玩家数据可能包含刚上线的卡牌或称号，计算前等待 master 版本检查完成。
+    await masterStore.syncVersion()
     fetchDuration.value = performance.now() - fetchStart
   } catch (e: any) {
     const msg = String(e?.message || e || '')
@@ -393,9 +395,7 @@ async function handleCalculate() {
 
     // 2. 处理计算结果
     if (data.type === 'error') {
-      const s = String(data.error)
-      if (s.includes('404')) errorMsg.value = '玩家数据未上传到指定地点'
-      else errorMsg.value = s
+      errorMsg.value = String(data.error)
       recommend.value = null
       calculating.value = false
     } else if (data.type === 'result') {
