@@ -1,12 +1,30 @@
 import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
-import { getVersion, isCnAssetsEnabled } from '@/api/version'
+import { DEFAULT_CN_ASSETS_HOST, getVersion, isCnAssetsEnabled, normalizeCnAssetsHost } from '@/api/version'
 import { detectIsChina } from '@/utils/location'
 
+export type AssetsSource = 'cn' | 'global'
+
+// 旧版本保存的是域名（settings_assetsHost），海外源以外都视为选了国内源
+function readSavedAssetsSource(): AssetsSource | null {
+    const saved = localStorage.getItem('settings_assetsSource')
+    if (saved === 'cn' || saved === 'global') {
+        return saved
+    }
+
+    const legacyHost = localStorage.getItem('settings_assetsHost')
+    if (!legacyHost) {
+        return null
+    }
+
+    const source: AssetsSource = legacyHost === 'https://assets.unipjsk.com' ? 'global' : 'cn'
+    localStorage.setItem('settings_assetsSource', source)
+    localStorage.removeItem('settings_assetsHost')
+    return source
+}
+
 export const useSettingsStore = defineStore('settings', () => {
-    const ASSETS_HOST_CN = 'https://assets-direct.unipjsk.com'
     const ASSETS_HOST_GLOBAL = 'https://assets.unipjsk.com'
-    const allowedAssetsHosts = new Set([ASSETS_HOST_CN, ASSETS_HOST_GLOBAL])
 
     // 状态
     const showSpoilers = ref(false)
@@ -15,18 +33,16 @@ export const useSettingsStore = defineStore('settings', () => {
 
     // 默认 vocal 设置: 'sekai' | 'virtual_singer'
     const defaultVocal = ref<string>('sekai')
-    const preferredAssetsHost = ref<string>(ASSETS_HOST_GLOBAL)
+    // 用户选的是"国内/海外"，国内源的具体域名由 /api/version 的 cnAssetsHost 下发
+    const assetsSource = ref<AssetsSource>('global')
+    const cnAssetsHost = ref<string>(DEFAULT_CN_ASSETS_HOST)
     const cnAssetsAllowed = ref(false)
     const cnAssetsPolicyLoaded = ref(false)
-    const assetsHost = computed(() => {
-        if (preferredAssetsHost.value === ASSETS_HOST_CN && !cnAssetsAllowed.value) {
-            return ASSETS_HOST_GLOBAL
-        }
-
-        return allowedAssetsHosts.has(preferredAssetsHost.value)
-            ? preferredAssetsHost.value
-            : ASSETS_HOST_GLOBAL
-    })
+    const ASSETS_HOST_CN = computed(() => cnAssetsHost.value)
+    const assetsHost = computed(() => (
+        assetsSource.value === 'cn' && cnAssetsAllowed.value ? cnAssetsHost.value : ASSETS_HOST_GLOBAL
+    ))
+    const preferredAssetsHost = computed(() => (assetsSource.value === 'cn' ? cnAssetsHost.value : ASSETS_HOST_GLOBAL))
 
     let cnAssetsPolicyPromise: Promise<void> | null = null
 
@@ -57,19 +73,12 @@ export const useSettingsStore = defineStore('settings', () => {
         defaultVocal.value = vocal
     }
 
-    function normalizeAssetsHost(host: string, fallback = ASSETS_HOST_GLOBAL): string {
-        return allowedAssetsHosts.has(host) ? host : fallback
+    function setAssetsSource(source: AssetsSource) {
+        assetsSource.value = source === 'cn' && cnAssetsAllowed.value ? 'cn' : 'global'
     }
 
     function setAssetsHost(host: string) {
-        const normalizedHost = normalizeAssetsHost(host)
-
-        if (normalizedHost === ASSETS_HOST_CN && !cnAssetsAllowed.value) {
-            preferredAssetsHost.value = ASSETS_HOST_GLOBAL
-            return
-        }
-
-        preferredAssetsHost.value = normalizedHost
+        setAssetsSource(host === ASSETS_HOST_GLOBAL ? 'global' : 'cn')
     }
 
     function syncCnAssetsPolicy(): Promise<void> {
@@ -82,6 +91,8 @@ export const useSettingsStore = defineStore('settings', () => {
                 const versionInfo = await getVersion()
                 cnAssetsAllowed.value = isCnAssetsEnabled(versionInfo)
                 localStorage.setItem('settings_cnAssetsAllowed', cnAssetsAllowed.value ? '1' : '0')
+                cnAssetsHost.value = normalizeCnAssetsHost(versionInfo.cnAssetsHost) ?? DEFAULT_CN_ASSETS_HOST
+                localStorage.setItem('settings_cnAssetsHost', cnAssetsHost.value)
             } catch (error) {
                 console.error('Failed to load asset source policy:', error)
                 // 失败（如离线）时保留本地快照，避免把国内源用户踢回海外源导致缓存全部失配
@@ -122,28 +133,28 @@ export const useSettingsStore = defineStore('settings', () => {
         if (savedCnAssetsAllowed !== null) {
             cnAssetsAllowed.value = savedCnAssetsAllowed === '1'
         }
+        cnAssetsHost.value = normalizeCnAssetsHost(localStorage.getItem('settings_cnAssetsHost')) ?? DEFAULT_CN_ASSETS_HOST
 
         // 检测是否为爬虫
         const isCrawler = /bot|googlebot|crawler|spider|robot|crawling|bingbot|yandex|duckduckbot|slurp|baiduspider/i.test(navigator.userAgent || '');
 
         if (isCrawler) {
             console.log('Crawler detected, forcing global asset host.');
-            preferredAssetsHost.value = ASSETS_HOST_GLOBAL;
+            assetsSource.value = 'global';
         } else {
-            const savedAssetsHost = localStorage.getItem('settings_assetsHost')
-            if (savedAssetsHost && allowedAssetsHosts.has(savedAssetsHost)) {
-                preferredAssetsHost.value = savedAssetsHost
+            const savedSource = readSavedAssetsSource()
+            if (savedSource) {
+                assetsSource.value = savedSource
             } else {
-                preferredAssetsHost.value = ASSETS_HOST_GLOBAL
+                assetsSource.value = 'global'
                 // 失败时 detectIsChina 返回 false，等价于原先 catch 分支写入海外源
                 void detectIsChina().then((isChina) => {
-                    if (localStorage.getItem('settings_assetsHost')) {
+                    if (readSavedAssetsSource()) {
                         return
                     }
 
-                    const hostToSet = isChina ? ASSETS_HOST_CN : ASSETS_HOST_GLOBAL
-                    preferredAssetsHost.value = hostToSet
-                    localStorage.setItem('settings_assetsHost', hostToSet)
+                    assetsSource.value = isChina ? 'cn' : 'global'
+                    localStorage.setItem('settings_assetsSource', assetsSource.value)
                 })
             }
         }
@@ -176,8 +187,8 @@ export const useSettingsStore = defineStore('settings', () => {
         localStorage.setItem('settings_defaultVocal', value)
     })
 
-    watch(preferredAssetsHost, (value) => {
-        localStorage.setItem('settings_assetsHost', value)
+    watch(assetsSource, (value) => {
+        localStorage.setItem('settings_assetsSource', value)
     })
 
     return {
@@ -187,7 +198,9 @@ export const useSettingsStore = defineStore('settings', () => {
         theme,
         defaultVocal,
         preferredAssetsHost,
+        assetsSource,
         assetsHost,
+        cnAssetsHost,
         cnAssetsAllowed,
         cnAssetsPolicyLoaded,
         initialize,
@@ -195,6 +208,7 @@ export const useSettingsStore = defineStore('settings', () => {
         setTheme,
         setDefaultVocal,
         setAssetsHost,
+        setAssetsSource,
         syncCnAssetsPolicy,
     }
 })

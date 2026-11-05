@@ -7,6 +7,20 @@ export interface VersionInfo extends ApiEndpointPayload {
     appVersion: string
     updatedAt: string
     enableCnAssets?: boolean
+    cnAssetsHost?: string
+}
+
+export const DEFAULT_CN_ASSETS_HOST = 'https://assets-esa.unipjsk.com'
+// 只接受 assets-*.unipjsk.com，Service Worker 按同一规则把各源图片合并到一份缓存
+const CN_ASSETS_HOST_PATTERN = /^https:\/\/assets-[a-z0-9-]+\.unipjsk\.com$/
+
+export function normalizeCnAssetsHost(value: unknown): string | null {
+    if (typeof value !== 'string') {
+        return null
+    }
+
+    const host = value.trim().replace(/\/+$/, '').toLowerCase()
+    return CN_ASSETS_HOST_PATTERN.test(host) ? host : null
 }
 
 let inflightVersion: Promise<VersionInfo> | null = null

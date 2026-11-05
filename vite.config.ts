@@ -133,9 +133,10 @@ export default defineConfig({
             },
           },
           {
-            // 国内源与海外源的图片路径一致、画面等价（只是 PNG 压缩不同），共用一份缓存，
+            // 国内源（域名由 /api/version 下发，限 assets-*.unipjsk.com）与海外源的图片路径一致、
+            // 画面等价（只是 PNG 压缩不同），共用一份缓存，
             // 切换源不必重新下载。音频走 Range 请求，谱面等非图片资源不走这条，仍由下方 NetworkOnly 处理。
-            urlPattern: /^https:\/\/assets(?:-direct)?\.unipjsk\.com\/[^?#]*\.(?:png|jpe?g|webp)$/i,
+            urlPattern: /^https:\/\/assets(?:-[a-z0-9-]+)?\.unipjsk\.com\/[^?#]*\.(?:png|jpe?g|webp)$/i,
             handler: 'CacheFirst',
             options: {
               cacheName: 'pjsk-shared-images',
@@ -182,7 +183,7 @@ export default defineConfig({
             handler: 'NetworkOnly',
           },
           {
-            urlPattern: /^https:\/\/assets-direct\.unipjsk\.com\/.*/i,
+            urlPattern: /^https:\/\/assets-[a-z0-9-]+\.unipjsk\.com\/.*/i,
             handler: 'NetworkOnly',
           },
           {

@@ -28,6 +28,8 @@ Configuration flow:
 2. Fill values based on your API deployment.
 3. Run `npm run dev`.
 
+Production builds read these variables from the hosting platform's build environment; the repository has no `.env.production`. For a local production build, put them in `.env.production.local` (git-ignored).
+
 Example:
 ```env
 VITE_API_BASE_URL=https://viewer-api.unipjsk.com
@@ -43,6 +45,7 @@ Variable notes:
 - `VITE_CHART_PREVIEW_URL`: chart preview service URL used in music detail page
 - `VITE_TOOLBOX_OAUTH_BASE_URL`: Haruki toolbox OAuth server base URL
 - `VITE_TOOLBOX_OAUTH_CLIENT_ID`: OAuth client id for toolbox game-data read access; the server-side client should allow both `game-data:read` and `offline_access` so the browser can keep a refresh token
+- `VITE_PROFILE_API_BASE_URL`, `VITE_SUITE_API_BASE_URL`: user profile and suite data API base URLs
 
 If you want to deploy your own backend, you can refer to [API_README.md](API_README.md).
 

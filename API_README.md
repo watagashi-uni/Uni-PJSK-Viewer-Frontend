@@ -24,6 +24,20 @@ Return a dedicated `apiEndpoint` key to override their base URL:
 
 If `apiEndpoint` is missing or invalid, the frontend falls back to `VITE_API_BASE_URL`.
 
+## Domestic asset source
+
+`GET /api/version` also controls the mainland China asset source:
+
+```json
+{
+  "enableCnAssets": true,
+  "cnAssetsHost": "https://assets-esa.unipjsk.com"
+}
+```
+
+- `enableCnAssets`: only `true` offers the domestic source. Otherwise every user loads from `https://assets.unipjsk.com` and the source setting is hidden.
+- `cnAssetsHost`: the domestic origin. Only `https://assets-*.unipjsk.com` origins are accepted; anything else falls back to `https://assets-esa.unipjsk.com`. Images from all these origins share one service worker cache, so changing the host does not re-download cached images.
+
 ## CORS
 
 `https://viewer-api.unipjsk.com` currently allows CORS for local frontend development origin:

@@ -76,10 +76,10 @@ const vocalOptions = [
   { value: 'virtual_singer', label: 'Virtual Singer 版' },
 ]
 
-const assetsHostOptions = [
-  { value: settingsStore.ASSETS_HOST_CN, label: '国内源', desc: 'https://assets-direct.unipjsk.com/' },
-  { value: settingsStore.ASSETS_HOST_GLOBAL, label: '海外源', desc: 'https://assets.unipjsk.com/' },
-]
+const assetsSourceOptions = [
+  { value: 'cn', label: '国内源' },
+  { value: 'global', label: '海外源' },
+] as const
 
 async function handleClearCache() {
   if (!confirm('确定要清空本地缓存吗？这将删除所有已缓存的数据，下次访问时需要重新下载。')) {
@@ -198,11 +198,11 @@ async function handleClearTranslationCache() {
 
           <div class="flex flex-wrap gap-2">
             <button
-              v-for="option in assetsHostOptions"
+              v-for="option in assetsSourceOptions"
               :key="option.value"
               class="btn btn-sm"
-              :class="settingsStore.assetsHost === option.value ? 'btn-primary' : 'btn-ghost'"
-              @click="settingsStore.setAssetsHost(option.value)"
+              :class="settingsStore.assetsSource === option.value ? 'btn-primary' : 'btn-ghost'"
+              @click="settingsStore.setAssetsSource(option.value)"
             >
               {{ option.label }}
             </button>
