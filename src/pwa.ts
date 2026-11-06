@@ -32,53 +32,21 @@ const updateServiceWorker = registerSW({
   },
 })
 
-function waitForWorkerState(
-  worker: ServiceWorker,
-  targetStates: ReadonlySet<ServiceWorkerState>,
-): Promise<boolean> {
-  if (targetStates.has(worker.state) || worker.state === 'redundant') {
-    return Promise.resolve(targetStates.has(worker.state))
-  }
-
-  return new Promise((resolve) => {
-    const finish = (result: boolean) => {
-      window.clearTimeout(timeout)
-      worker.removeEventListener('statechange', handleStateChange)
-      resolve(result)
-    }
-    const handleStateChange = () => {
-      if (targetStates.has(worker.state) || worker.state === 'redundant') {
-        finish(targetStates.has(worker.state))
-      }
-    }
-    const timeout = window.setTimeout(() => finish(false), 20_000)
-    worker.addEventListener('statechange', handleStateChange)
-  })
-}
-
 /**
- * Ask the browser to check for a complete new app shell. This never clears
- * user data or runtime data caches; it is only used by startup recovery.
+ * Ask the browser whether a newer build has been deployed. When it has, the
+ * forced update flow in push-sw.js reloads this page once the new worker is
+ * active, so callers only need to wait.
  */
-export async function checkForPwaUpdate(): Promise<boolean> {
-  if (!('serviceWorker' in navigator)) return true
+export async function checkForNewBuild(): Promise<boolean> {
+  if (!('serviceWorker' in navigator)) return false
 
-  const currentRegistration = registration ?? await navigator.serviceWorker.getRegistration()
-  if (!currentRegistration) return true
-
-  registration = await currentRegistration.update()
-  const installingWorker = registration.installing
-  if (installingWorker) {
-    const installed = await waitForWorkerState(installingWorker, new Set(['installed', 'activated']))
-    if (!installed) return false
+  try {
+    const currentRegistration = registration ?? await navigator.serviceWorker.getRegistration()
+    if (!currentRegistration) return false
+    await currentRegistration.update()
+    return Boolean(currentRegistration.installing ?? currentRegistration.waiting)
+  } catch (error) {
+    console.error('PWA: Update check failed', error)
+    return false
   }
-
-  const waitingWorker = registration.waiting
-    ?? (installingWorker?.state === 'installed' ? installingWorker : undefined)
-  if (waitingWorker) {
-    waitingWorker.postMessage({ type: 'SKIP_WAITING' })
-    return waitForWorkerState(waitingWorker, new Set(['activated']))
-  }
-
-  return !registration.installing
 }

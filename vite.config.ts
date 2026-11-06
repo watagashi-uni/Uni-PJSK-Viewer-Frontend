@@ -34,12 +34,12 @@ export default defineConfig({
         // 运行时缓存策略
         runtimeCaching: [
           {
-            // 本地应用代码按需缓存。EdgeOne 可能为缺失资源返回 200 HTML，必须同时校验
+            // 本地应用代码按需缓存。EdgeOne 可能为缺失资源返回 200 HTML，写入前必须同时校验
             // 状态码和 MIME；错误响应仍会触发页面恢复逻辑，但绝不会写入 SW 缓存。
             urlPattern: /\.(?:js|css|wasm)$/i,
             handler: 'StaleWhileRevalidate',
             options: {
-              // 使用新缓存名，避免继续读取旧版本可能已经污染的条目。
+              // v2 起所有写入都经过校验；换名是为了丢掉 v1 里可能已被污染的条目。
               cacheName: 'assets-runtime-cache-v2',
               expiration: {
                 maxEntries: 200,
@@ -47,23 +47,6 @@ export default defineConfig({
               },
               plugins: [
                 {
-                  cachedResponseWillBeUsed: async ({ request, cachedResponse }) => {
-                    if (!cachedResponse || cachedResponse.status !== 200) return null
-
-                    const pathname = new URL(request.url).pathname.toLowerCase()
-                    const contentType = cachedResponse.headers.get('content-type')?.toLowerCase() ?? ''
-
-                    if (pathname.endsWith('.css')) {
-                      return contentType.includes('text/css') ? cachedResponse : null
-                    }
-                    if (pathname.endsWith('.wasm')) {
-                      return contentType.includes('application/wasm') ? cachedResponse : null
-                    }
-                    if (pathname.endsWith('.js')) {
-                      return /(?:java|ecma)script/.test(contentType) ? cachedResponse : null
-                    }
-                    return null
-                  },
                   cacheWillUpdate: async ({ request, response }) => {
                     if (response.status !== 200) return null
 

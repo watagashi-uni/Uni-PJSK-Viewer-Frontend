@@ -1,71 +1,4 @@
 /* global clients */
-// Permanent compatibility bridge for clients that can only load an older
-// cached index.html. The migration runs once per browser profile, even if the
-// user skips several releases; later updates use the forced reload below.
-const lifecycleMigrationCache = 'pwa-lifecycle-migration-v1';
-const lifecycleMigrationPending = '/__pwa_lifecycle_migration_pending__';
-const lifecycleMigrationComplete = '/__pwa_lifecycle_migration_complete__';
-
-self.addEventListener('install', function (e) {
-    e.waitUntil(
-        caches.open(lifecycleMigrationCache).then(async function (cache) {
-            if (await cache.match(lifecycleMigrationComplete)) {
-                return;
-            }
-
-            // Only migrated updates need to force-navigate existing windows.
-            // A first-ever install has no active worker and should stay quiet.
-            const migrationType = self.registration.active ? 'update' : 'initial';
-            await cache.put(lifecycleMigrationPending, new Response(migrationType));
-            await self.skipWaiting();
-        })
-    );
-});
-
-// Resolves true when the migration navigated the open windows itself.
-let lifecycleMigrationNavigated = Promise.resolve(false);
-
-self.addEventListener('activate', function (e) {
-    lifecycleMigrationNavigated = caches.open(lifecycleMigrationCache).then(async function (cache) {
-        if (await cache.match(lifecycleMigrationComplete)) {
-            return false;
-        }
-
-        const pendingMigration = await cache.match(lifecycleMigrationPending);
-        const migrationType = pendingMigration ? await pendingMigration.text() : 'update';
-
-        // Persist completion before navigating so a reload can never repeat
-        // the migration or enter a controller-change loop.
-        await cache.put(lifecycleMigrationComplete, new Response('complete'));
-        await cache.delete(lifecycleMigrationPending);
-        await clients.claim();
-
-        if (migrationType !== 'update') {
-            return false;
-        }
-
-        const windowClients = await clients.matchAll({
-            type: 'window',
-            includeUncontrolled: true
-        });
-        await Promise.all(windowClients.map(function (client) {
-            if (
-                new URL(client.url).origin === self.location.origin &&
-                'navigate' in client
-            ) {
-                return client.navigate(client.url).catch(function () {
-                    return null;
-                });
-            }
-            return null;
-        }));
-        return true;
-    }).catch(function () {
-        return false;
-    });
-    e.waitUntil(lifecycleMigrationNavigated);
-});
-
 // Updates are forced and do not wait for the user: workbox skips waiting and
 // claims clients, then every open window reloads into the new build. Pages
 // from this build onwards acknowledge the message and reload themselves;
@@ -74,10 +7,23 @@ const reloadMessage = 'PWA_RELOAD';
 const reloadAckMessage = 'PWA_RELOAD_ACK';
 const reloadAckTimeoutMs = 3000;
 const pendingReloadAcks = new Map();
-let replacingPreviousWorker = false;
 
-self.addEventListener('install', function () {
-    replacingPreviousWorker = Boolean(self.registration.active);
+// Whether this worker replaces an older one is decided at install time but
+// needed at activation; the browser may stop the worker in between, so the
+// flag lives in Cache Storage rather than in memory. A first-ever install has
+// no active worker and must not reload the page.
+const updateStateCache = 'pwa-update-state-v1';
+const replacingMarker = '/__pwa_replacing_previous_worker__';
+// Left behind by the removed one-time lifecycle migration.
+const obsoleteCaches = ['pwa-lifecycle-migration-v1'];
+
+self.addEventListener('install', function (e) {
+    if (!self.registration.active) {
+        return;
+    }
+    e.waitUntil(caches.open(updateStateCache).then(function (cache) {
+        return cache.put(replacingMarker, new Response('1'));
+    }));
 });
 
 self.addEventListener('message', function (e) {
@@ -105,14 +51,20 @@ async function reloadOpenPages() {
     }));
 }
 
-self.addEventListener('activate', function () {
-    if (!replacingPreviousWorker) {
-        return;
-    }
+async function takeReplacingMarker() {
+    const cache = await caches.open(updateStateCache);
+    return cache.delete(replacingMarker);
+}
+
+self.addEventListener('activate', function (e) {
+    e.waitUntil(Promise.all(obsoleteCaches.map(function (name) {
+        return caches.delete(name);
+    })));
     // Not inside waitUntil: a page navigated here would wait for activation.
-    // The one-time migration above may already have navigated every window.
-    void lifecycleMigrationNavigated.then(function (navigated) {
-        return navigated ? null : clients.claim().then(reloadOpenPages);
+    void takeReplacingMarker().then(function (replacing) {
+        return replacing ? clients.claim().then(reloadOpenPages) : null;
+    }).catch(function () {
+        return null;
     });
 });
 
