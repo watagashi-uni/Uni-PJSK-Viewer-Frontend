@@ -23,6 +23,7 @@ import {
   type ConflictDiagnostic,
 } from '@/vendor/sekai-sus2img'
 import PageHeader from '@/components/PageHeader.vue'
+import { trackEvent } from '@/utils/analytics'
 
 const FORM_STORAGE_KEY = 'sus2img-form-data'
 
@@ -449,8 +450,10 @@ async function handleConvertFormat() {
       conversionOutput.value = { kind: 'json', text: jsonText }
       conversionMessage.value = 'SUS 转 JSON 完成。'
     }
+    trackEvent('sus2img-convert', { direction: form.value.inputType, status: 'done' })
   } catch (convertReason) {
     conversionError.value = convertReason instanceof Error ? convertReason.message : '格式转换失败'
+    trackEvent('sus2img-convert', { direction: form.value.inputType, status: 'failed' })
   } finally {
     isConverting.value = false
   }
@@ -465,6 +468,7 @@ function downloadConversionOutput() {
   const mime = output.kind === 'json' ? 'application/json;charset=utf-8' : 'text/plain;charset=utf-8'
   const blob = new Blob([output.text], { type: mime })
   triggerBlobDownload(blob, `${resultBaseFileName.value}.${output.kind}`)
+  trackEvent('sus2img-download', { format: output.kind })
 }
 
 async function copyConversionOutput() {
@@ -523,6 +527,7 @@ async function handleAnalyze() {
   try {
     const chartText = await getChartText()
     await runAudit(chartText)
+    trackEvent('sus-audit', { result: auditError.value ? 'failed' : diagnostics.value.length ? 'conflicts' : 'clean' })
     if (diagnostics.value.length) {
       await ensureSvgPreview(chartText, diagnostics.value)
       if (selectedConflictId.value) {
@@ -705,6 +710,7 @@ async function downloadSvgResult() {
       : await fetchResultBlob()
     triggerBlobDownload(blob, `${resultBaseFileName.value}.svg`)
     downloadMessage.value = 'SVG 下载已开始'
+    trackEvent('sus2img-download', { format: 'svg' })
   } catch (downloadReason) {
     downloadError.value = downloadReason instanceof Error ? downloadReason.message : 'SVG 下载失败'
   }
@@ -724,6 +730,7 @@ async function downloadPngResult() {
 
     triggerBlobDownload(blob, `${resultBaseFileName.value}.png`)
     downloadMessage.value = 'PNG 下载已开始'
+    trackEvent('sus2img-download', { format: 'png' })
   } catch (downloadReason) {
     downloadError.value = downloadReason instanceof Error ? downloadReason.message : 'PNG 下载失败'
   } finally {
@@ -807,6 +814,7 @@ async function handleSubmit() {
 
     const frontend = await renderViaFrontend(chartText)
     setResult(frontend, form.value.engine)
+    trackEvent('sus2img-render', { input: form.value.inputType, format: form.value.format, skin: form.value.skin, status: 'done' })
     renderedChartText.value = chartText
     renderedRebaseText.value = form.value.rebase
     if (previewTab && !previewTab.closed) {
@@ -819,6 +827,7 @@ async function handleSubmit() {
       previewTab.close()
     }
     error.value = e instanceof Error ? e.message : '转换失败'
+    trackEvent('sus2img-render', { input: form.value.inputType, format: form.value.format, skin: form.value.skin, status: 'failed' })
   } finally {
     isSubmitting.value = false
   }

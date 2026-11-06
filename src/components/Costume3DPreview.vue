@@ -30,6 +30,7 @@ import {
   runtimePartSlot,
 } from '@/utils/haruki3dRegistry'
 import type { CostumePart, CostumeColorVariant } from '@/types/costume'
+import { trackEvent } from '@/utils/analytics'
 
 interface Character {
   id: number
@@ -364,6 +365,9 @@ async function releaseViewer() {
   else activeEngine?.destroy()
 }
 
+// Custom combinations pass a selection; costume detail pages pass fixed parts.
+const previewSource = props.selection ? 'custom' : 'detail'
+
 async function start() {
   if (initializing || kernel || disposed) return
   initializing = true
@@ -523,9 +527,12 @@ async function start() {
     document.addEventListener('keydown', handleFullscreenKeydown)
 
     await applyRecipe()
+    // applyRecipe reports its own failures through errorMsg instead of throwing.
+    if (!disposed) trackEvent('costume-3d', { from: previewSource, status: errorMsg.value ? 'failed' : 'done' })
   } catch (error) {
     await releaseViewer()
     if (disposed) return
+    trackEvent('costume-3d', { from: previewSource, status: isWebGL2Supported() ? 'failed' : 'unsupported' })
     console.error('3D 预览初始化失败:', error)
     errorMsg.value = error instanceof Error ? error.message : String(error)
     isBusy.value = false

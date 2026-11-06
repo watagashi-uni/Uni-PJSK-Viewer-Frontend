@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
 import { shallowRef } from 'vue'
+import { trackPageview } from '@/utils/analytics'
 
 const ROUTE_LOADING_DELAY_MS = 150
 
@@ -315,8 +316,10 @@ router.beforeEach((to, _from, next) => {
     next()
 })
 
-router.afterEach((to) => {
+router.afterEach((to, _from, failure) => {
     finishRouteLoading(to)
+    // Fullscreen routes are popups and callbacks (OAuth, chart previews), not pages people browse.
+    if (!failure && !to.meta.fullscreen) trackPageview(to.path)
 })
 
 router.onError((_error, to) => {

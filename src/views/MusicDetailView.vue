@@ -21,6 +21,7 @@ import type { EventData } from '@/types/master'
 import { renderSusToSvg, type Sus2ImgFrontendResult } from '@/vendor/sekai-sus2img'
 import ChartJudgmentPreview from '@/components/ChartJudgmentPreview.vue'
 import { DIFFICULTY_LABELS, difficultyBackground } from '@/utils/difficulty'
+import { trackEvent } from '@/utils/analytics'
 
 interface Music {
   id: number
@@ -323,8 +324,14 @@ function togglePlay() {
 }
 
 // 音频事件处理
+// Only the first play of each song counts; pausing and resuming is not a new listen.
+let playTrackedMusicId = 0
 function onPlay() {
   isPlaying.value = true
+  if (playTrackedMusicId !== musicId.value) {
+    playTrackedMusicId = musicId.value
+    trackEvent('music-play', { vocalType: currentVocal.value?.musicVocalType })
+  }
 }
 
 function onPause() {
@@ -524,6 +531,7 @@ async function downloadAudio() {
     console.error('下载失败:', error)
     window.open(url, '_blank')
   }
+  trackEvent('music-audio-download', { vocalType: currentVocal.value?.musicVocalType, trimmed: false })
 }
 
 function convertFloat32ToInt16(input: Float32Array): Int16Array {
@@ -603,6 +611,7 @@ async function downloadTrimmedAudio() {
     link.click()
     document.body.removeChild(link)
     URL.revokeObjectURL(blobUrl)
+    trackEvent('music-audio-download', { vocalType: currentVocal.value?.musicVocalType, trimmed: true })
   } catch (error) {
     console.error('裁切下载失败:', error)
     alert('去头部静音音频下载失败，请稍后重试。')
@@ -705,6 +714,7 @@ async function forceDownload(difficulty: string) {
     // 失败时直接打开链接
     window.open(url, '_blank')
   }
+  trackEvent('chart-download', { format: 'sus', difficulty })
 }
 
 // ===== BPM 展示（点击后拉取谱面解析） =====
@@ -826,11 +836,13 @@ function openChartPreview(difficulty: string) {
   })
 
   window.open(previewUrl, '_blank')
+  trackEvent('chart-preview', { type: '3d', difficulty })
 }
 
 // ===== 谱面 SVG 预览（前端 sus2img 生成） =====
 async function openChartSvgPreview(diff: MusicDifficulty) {
   if (!music.value) return
+  trackEvent('chart-preview', { type: 'image', difficulty: diff.musicDifficulty })
 
   // 清理上一次的结果
   if (chartSvgPreviewResult) {
@@ -945,6 +957,7 @@ async function downloadPreviewPng() {
     link.click()
     document.body.removeChild(link)
     URL.revokeObjectURL(url)
+    trackEvent('chart-download', { format: 'png', difficulty: previewDifficultyData.value?.musicDifficulty })
   } catch (e) {
     console.error('PNG 下载失败:', e)
     alert('PNG 下载失败，请稍后重试')

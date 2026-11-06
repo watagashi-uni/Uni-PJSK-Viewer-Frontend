@@ -9,7 +9,7 @@ const props = withDefaults(defineProps<{
   title: string; episodeLabel?: string; scenarioId: string; scenarioUrls: string[]
   hasPrevious?: boolean; hasNext?: boolean
 }>(), { episodeLabel: '', hasPrevious: false, hasNext: false })
-const emit = defineEmits<{ close: []; previous: []; next: [] }>()
+const emit = defineEmits<{ close: []; previous: []; next: []; play: [] }>()
 const scenario = shallowRef<ScenarioSceneData>()
 const frames = computed(() => scenario.value ? buildStoryFrames(scenario.value) : [])
 const stage = ref<HTMLElement>()
@@ -82,6 +82,7 @@ async function mountPlayer() {
     const resumeAt = snippet.value
     instance.on('play', () => {
       started.value = true
+      emit('play')
       // The library installs its seek handler immediately after emitting play.
       queueMicrotask(() => { if (player === instance && resumeAt > 0) void instance.jumpTo(resumeAt) })
     })

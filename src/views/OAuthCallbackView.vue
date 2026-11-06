@@ -2,6 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useOAuthStore } from '@/stores/oauth'
+import { trackEvent } from '@/utils/analytics'
 
 const route = useRoute()
 const router = useRouter()
@@ -26,6 +27,7 @@ onMounted(async () => {
       error,
       errorDescription,
     })
+    trackEvent('oauth-login', { status: 'done' })
     successMsg.value = '授权成功，正在返回页面...'
     loading.value = false
     window.setTimeout(() => {
@@ -33,6 +35,8 @@ onMounted(async () => {
     }, 900)
     return
   } catch (e: any) {
+    // `denied` means the user cancelled on the authorization page.
+    trackEvent('oauth-login', { status: error === 'access_denied' ? 'denied' : 'failed' })
     errorMsg.value = e?.message || 'OAuth 回调处理失败'
   } finally {
     loading.value = false

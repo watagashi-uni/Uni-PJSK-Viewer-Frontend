@@ -10,6 +10,7 @@ import { toRomaji } from '@/utils/kanaToRomaji'
 import PageHeader from '@/components/PageHeader.vue'
 import { difficultyStyle } from '@/utils/difficulty'
 import { cardImageVariant } from '@/utils/card'
+import { trackEvent } from '@/utils/analytics'
 
 type FeedTab = 'ranking' | 'new' | 'search' | 'official_all'
 type RankingMode = 'daily' | 'total'
@@ -788,6 +789,7 @@ async function openFlatPreview(score: DisplayScore) {
     return
   }
   replacePreviewTab(previewTab, selectedPreviewUrl.value)
+  trackEvent('custom-score-preview', { type: 'flat', source: score.source, difficulty: score.musicDifficultyType })
 }
 
 async function downloadScoreJson(score: DisplayScore) {
@@ -803,6 +805,7 @@ async function downloadScoreJson(score: DisplayScore) {
     link.download = `custom_score_${score.customMusicScoreId}.json`
     link.click()
     URL.revokeObjectURL(url)
+    trackEvent('custom-score-download', { source: score.source, difficulty: score.musicDifficultyType })
   } catch (reason) {
     scoreError.value = reason instanceof Error ? reason.message : '谱面下载失败'
   } finally {
@@ -926,6 +929,7 @@ async function open3dPreview(score: DisplayScore) {
     const scoreJsonText = await ensureScoreJsonText(score)
     scoreTaskLabel.value = '生成 3D 预览链接中'
     postChartPreviewPayload(previewTab, buildChartPreviewPayload(score, scoreJsonText))
+    trackEvent('custom-score-preview', { type: '3d', source: score.source, difficulty: score.musicDifficultyType })
   } catch (reason) {
     if (previewTab && !previewTab.closed) previewTab.close()
     scoreError.value = reason instanceof Error ? reason.message : '3D 预览链接生成失败'

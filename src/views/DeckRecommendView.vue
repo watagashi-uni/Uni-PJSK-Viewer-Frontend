@@ -23,6 +23,7 @@ const assetsHost = computed(() => settingsStore.assetsHost)
 import type { EventData, MusicData, CardData } from '@/types/master'
 import PageHeader from '@/components/PageHeader.vue'
 import { difficultyStyle } from '@/utils/difficulty'
+import { trackEvent } from '@/utils/analytics'
 
 interface MusicDiffData {
   id: number
@@ -339,6 +340,13 @@ async function handleCalculate() {
     return
   }
 
+  const stats = {
+    mode: mode.value === '1' ? 'challenge' : 'event',
+    eventType: mode.value === '2' ? selectedEvent.value?.eventType : undefined,
+    liveType: mode.value === '2' ? selectedLiveType.value : undefined,
+    difficulty: selectedDifficulty.value,
+    engine: calculatorEngine.value,
+  }
   workerRef = new Worker(
     new URL('../utils/deckRecommendWorker.ts', import.meta.url),
     { type: 'module' }
@@ -398,7 +406,9 @@ async function handleCalculate() {
       errorMsg.value = String(data.error)
       recommend.value = null
       calculating.value = false
+      trackEvent('deck-recommend', { ...stats, status: 'failed' })
     } else if (data.type === 'result') {
+      trackEvent('deck-recommend', { ...stats, status: 'done' })
       recommend.value = data.result.result
       if (data.result.challengeHighScore) challengeHighScore.value = data.result.challengeHighScore
       if (data.result.dataFetchDuration > 0) fetchDuration.value += data.result.dataFetchDuration
@@ -410,6 +420,7 @@ async function handleCalculate() {
   workerRef.onerror = (e) => {
     errorMsg.value = e.message || '计算出错'
     calculating.value = false
+    trackEvent('deck-recommend', { ...stats, status: 'failed' })
   }
 
   const args: Record<string, unknown> = {

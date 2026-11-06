@@ -13,6 +13,7 @@ import { useSettingsStore } from '@/stores/settings'
 import type { EventData } from '@/types/master'
 import { readQueryPage, readQueryString, replaceListQuery } from '@/utils/routeQuery'
 import { isTrainedOnlyCard } from '@/utils/card'
+import { trackEvent } from '@/utils/analytics'
 
 interface StoryEpisode {
   id: number
@@ -114,6 +115,9 @@ function handleEventPageChange(page: number) {
 const selectedStory = ref<SelectedStory | null>(null)
 const selectedEpisode = ref<StoryEpisode | null>(null)
 const storyDialog = ref<HTMLDialogElement | null>(null)
+watch(selectedEpisode, (episode, previous) => {
+  if (episode && episode !== previous && selectedStory.value) trackEvent('story-open', { kind: selectedStory.value.kind })
+})
 watch(selectedStory, story => {
   if (story && !storyDialog.value?.open) storyDialog.value?.showModal()
   if (!story && storyDialog.value?.open) storyDialog.value.close()
@@ -480,6 +484,7 @@ onMounted(async () => {
           @close="selectedEpisode = null"
           @previous="navigateEpisode(-1)"
           @next="navigateEpisode(1)"
+          @play="trackEvent('story-play', { kind: selectedStory.kind })"
         />
         <template v-else>
           <div v-if="selectedStoryBannerUrl" class="relative aspect-[122/36] max-h-48 overflow-hidden bg-base-200"><AssetImage :src="selectedStoryBannerUrl" :alt="selectedStory.title" class="w-full h-full object-cover" /><div class="absolute inset-0 bg-gradient-to-t from-base-100 via-transparent to-transparent"></div></div>
