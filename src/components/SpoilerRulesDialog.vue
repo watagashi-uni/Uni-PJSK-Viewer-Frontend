@@ -132,7 +132,7 @@ onBeforeUnmount(() => clearTimeout(noticeTimer))
       <div class="flex items-start gap-3">
         <span class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-warning/15 text-warning"><ShieldAlert class="h-5 w-5" /></span>
         <h3 class="flex-1 pt-1.5 text-lg font-bold leading-snug">{{ text.title }}</h3>
-        <select v-model="lang" class="select select-ghost select-xs w-auto shrink-0" aria-label="Language">
+        <select v-model="lang" class="rules-lang select select-bordered select-xs w-auto shrink-0 bg-base-100" aria-label="Language">
           <option v-for="code in LANGS" :key="code" :value="code">{{ TEXTS[code].label }}</option>
         </select>
       </div>
@@ -168,6 +168,10 @@ onBeforeUnmount(() => clearTimeout(noticeTimer))
 </template>
 
 <style scoped>
+/* 语言选择：ghost 样式背景透明，支持自定义下拉面板的浏览器里弹出的选项列表也会透明 */
+.rules-lang, .rules-lang option { background-color: var(--color-base-100); color: var(--color-base-content); }
+.rules-lang::picker(select) { background-color: var(--color-base-100); color: var(--color-base-content); border: 1px solid var(--color-base-300); border-radius: var(--radius-field, .5rem); box-shadow: 0 8px 24px rgb(0 0 0 / .18); }
+
 .rules li { display: grid; grid-template-columns: 1.5rem 1fr; gap: 0.5rem; }
 .rule-no { display: grid; place-items: center; width: 1.5rem; height: 1.5rem; border-radius: 999px; font-size: 0.75rem; font-weight: 700; color: var(--color-primary); background: color-mix(in oklab, var(--color-primary) 12%, transparent); }
 .spoiler-notice-enter-active, .spoiler-notice-leave-active { transition: opacity 0.2s, transform 0.2s; }
