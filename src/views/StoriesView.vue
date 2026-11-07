@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { BookOpen, ChevronRight, Library, Play, Search, Sparkles, X } from 'lucide-vue-next'
+import { BookOpen, ChevronDown, ChevronRight, Library, Play, Search, Sparkles, X } from 'lucide-vue-next'
 import AssetImage from '@/components/AssetImage.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import Pagination from '@/components/Pagination.vue'
@@ -557,10 +557,16 @@ onMounted(async () => {
                 <span class="min-w-0 flex-1"><span class="text-[11px] text-base-content/45"><ZhText v-if="episode.episodeNoLabel" :text="episode.episodeNoLabel" table="unitStories" path="chapters.episodes.episodeNoLabel" layout="inline" /><template v-else>第 {{ episode.episodeNo }} 话</template> · {{ episode.scenarioId }}</span><span class="font-medium block truncate"><ZhText :text="episode.title" v-bind="EPISODE_TITLE_ZH[selectedStory.kind]" sub-class="text-xs" /></span></span>
                 <ChevronRight class="w-4 h-4 shrink-0 opacity-40 group-hover:translate-x-0.5 transition-transform" />
               </button>
-              <!-- 每话梗概：显示总结后才出现，默认两行，点击展开 -->
-              <button v-if="summaries.revealed && episodeSynopsis(episode)" type="button" class="episode-synopsis" :class="{ expanded: expandedSynopses.has(episode.scenarioId) }" :aria-expanded="expandedSynopses.has(episode.scenarioId)" lang="zh-CN" @click="toggleSynopsis(episode.scenarioId)">
-                <span class="synopsis-text">{{ episodeSynopsis(episode) }}</span>
-              </button>
+              <!-- 每话梗概：默认隐藏（防剧透），每一话单独点开，点开后显示全文 -->
+              <template v-if="episodeSynopsis(episode)">
+                <button v-if="expandedSynopses.has(episode.scenarioId)" type="button" class="episode-synopsis expanded" aria-expanded="true" lang="zh-CN" @click="toggleSynopsis(episode.scenarioId)">
+                  <span class="synopsis-text">{{ episodeSynopsis(episode) }}</span>
+                  <span class="synopsis-toggle">收起<ChevronDown class="h-3 w-3 rotate-180" /></span>
+                </button>
+                <button v-else type="button" class="episode-synopsis-reveal" :aria-expanded="false" @click="toggleSynopsis(episode.scenarioId)">
+                  <BookOpen class="h-3.5 w-3.5" />本话梗概<span class="badge badge-ghost badge-xs font-normal">AI</span><ChevronDown class="ml-auto h-3.5 w-3.5" />
+                </button>
+              </template>
             </div>
             <div v-if="selectedStoryEpisodes.length === 0" class="py-16 text-center text-sm text-base-content/45">没有匹配的章节</div>
           </div>
@@ -585,6 +591,14 @@ onMounted(async () => {
 .synopsis-text { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
 .episode-synopsis:hover { color:color-mix(in oklab, var(--color-base-content) 85%, transparent); }
 .episode-synopsis.expanded .synopsis-text { display:block; -webkit-line-clamp:unset; }
+.synopsis-toggle { display:inline-flex; align-items:center; gap:.2rem; margin-top:.2rem; font-size:.72rem; color:var(--color-primary); opacity:.85; }
+.episode-synopsis-reveal {
+  display:flex; align-items:center; gap:.35rem; width:calc(100% - 1.25rem); margin:-.25rem .625rem .625rem; padding:.4rem .75rem;
+  border-radius:.625rem; font-size:.78rem; text-align:left;
+  color:color-mix(in oklab, var(--color-base-content) 60%, transparent);
+  background:color-mix(in oklab, var(--color-base-200) 55%, transparent);
+}
+.episode-synopsis-reveal:hover { color:var(--color-primary); background:color-mix(in oklab, var(--color-primary) 8%, transparent); }
 @media (max-width: 640px) {
   .story-modal { align-items:start; }
   .story-modal .modal-box {
