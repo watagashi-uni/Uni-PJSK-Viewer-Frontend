@@ -20,6 +20,7 @@ import {
 import type { Costume3d, CardCostume3d, CostumeGroup } from '@/types/costume'
 import ZhText from '@/components/ZhText.vue'
 import { useCharacterName } from '@/composables/useCharacterName'
+import { useSpoilerWatermark } from '@/composables/useSpoilerWatermark'
 
 interface Character {
   id: number
@@ -60,6 +61,8 @@ const settingsStore = useSettingsStore()
 const assetsHost = computed(() => settingsStore.assetsHost)
 
 const group = ref<CostumeGroup | null>(null)
+// 显示未公开内容时加剧透水印，判断与剧透过滤使用同一个时间
+useSpoilerWatermark(() => !!group.value?.publishedAt && group.value.publishedAt > Date.now())
 const character = ref<Character | null>(null)
 const sourceCard = ref<Card | null>(null)
 const sourceCardCharacter = ref<Character | null>(null)

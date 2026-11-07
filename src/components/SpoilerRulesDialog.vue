@@ -3,11 +3,12 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { ShieldAlert, X } from 'lucide-vue-next'
 import { useModalDialog } from '@/composables/useModalDialog'
 import { useSettingsStore } from '@/stores/settings'
+import { detectSpoilerLang, SPOILER_HTML_LANG, type SpoilerLang } from '@/utils/spoilerLocale'
 
 // 开启剧透前的规则确认。按浏览器语言显示，可在弹窗里切换语言；
 // 必须手动勾选同意后才能开启，取消或关闭都保持关闭。
 
-type RulesLang = 'zh-Hans' | 'zh-Hant' | 'ja' | 'ko' | 'en'
+type RulesLang = SpoilerLang
 interface RulesText {
   label: string
   title: string
@@ -97,20 +98,9 @@ const TEXTS: Record<RulesLang, RulesText> = {
   },
 }
 const LANGS = Object.keys(TEXTS) as RulesLang[]
-const HTML_LANG: Record<RulesLang, string> = { 'zh-Hans': 'zh-CN', 'zh-Hant': 'zh-TW', ja: 'ja', ko: 'ko', en: 'en' }
+const HTML_LANG = SPOILER_HTML_LANG
 
-function detectLang(): RulesLang {
-  const list = typeof navigator === 'undefined' ? [] : (navigator.languages?.length ? navigator.languages : [navigator.language])
-  for (const raw of list) {
-    const tag = (raw || '').toLowerCase()
-    if (/^zh-(hant|tw|hk|mo)\b/.test(tag)) return 'zh-Hant'
-    if (/^zh\b/.test(tag)) return 'zh-Hans'
-    if (/^ja\b/.test(tag)) return 'ja'
-    if (/^ko\b/.test(tag)) return 'ko'
-    if (/^en\b/.test(tag)) return 'en'
-  }
-  return 'en'
-}
+const detectLang = (): RulesLang => detectSpoilerLang()
 
 const settings = useSettingsStore()
 const lang = ref<RulesLang>(detectLang())

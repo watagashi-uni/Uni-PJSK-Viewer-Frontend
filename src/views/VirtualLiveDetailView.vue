@@ -12,6 +12,7 @@ import ZhText from '@/components/ZhText.vue'
 import { useZh } from '@/composables/useZh'
 import { useCharacterName } from '@/composables/useCharacterName'
 import { useResourceZh } from '@/composables/useResourceZh'
+import { useSpoilerWatermark } from '@/composables/useSpoilerWatermark'
 
 interface VirtualLiveSchedule {
   id: number
@@ -184,6 +185,8 @@ function vliveSubtitle(name: string): string {
 }
 
 const vlive = ref<VirtualLive | null>(null)
+// 显示未公开内容时加剧透水印，判断与剧透过滤使用同一个时间
+useSpoilerWatermark(() => !!vlive.value && vlive.value.startAt > Date.now())
 const gameCharacterUnits = ref<GameCharacterUnit[]>([])
 const gameCharacters = ref<GameCharacter[]>([])
 const character3ds = ref<Character3d[]>([])

@@ -19,6 +19,7 @@ import { cardImageVariant } from '@/utils/card'
 import ZhText from '@/components/ZhText.vue'
 import { useResourceZh } from '@/composables/useResourceZh'
 import StorySummaryPanel from '@/components/StorySummaryPanel.vue'
+import { useSpoilerWatermark } from '@/composables/useSpoilerWatermark'
 
 const route = useRoute()
 // 上一页是列表时后退以保留筛选与页码，否则打开列表
@@ -173,6 +174,8 @@ interface ExchangeView {
 }
 
 const event = ref<EventData | null>(null)
+// 显示未公开内容时加剧透水印，判断与剧透过滤使用同一个时间
+useSpoilerWatermark(() => !!event.value && event.value.startAt > Date.now())
 const eventMusics = ref<EventMusic[]>([])
 const eventCards = ref<EventCard[]>([])
 const eventBonuses = ref<EventDeckBonus[]>([])

@@ -13,6 +13,7 @@ import ZhText from '@/components/ZhText.vue'
 import { useCharacterName } from '@/composables/useCharacterName'
 import { useZh } from '@/composables/useZh'
 import StorySummaryPanel from '@/components/StorySummaryPanel.vue'
+import { useSpoilerWatermark } from '@/composables/useSpoilerWatermark'
 
 interface Card {
   id: number
@@ -120,6 +121,8 @@ const zhSkills = useZh('skills')
 
 const cardId = computed(() => Number(route.params.id))
 const card = ref<Card | null>(null)
+// 显示未公开内容时加剧透水印，判断与剧透过滤使用同一个时间
+useSpoilerWatermark(() => !!card.value && card.value.releaseAt > Date.now())
 const character = ref<Character | null>(null)
 const skill = ref<Skill | null>(null)
 const trainedSkill = ref<Skill | null>(null)

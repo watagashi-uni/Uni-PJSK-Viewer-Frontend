@@ -25,6 +25,7 @@ import { DIFFICULTY_LABELS, difficultyBackground } from '@/utils/difficulty'
 import { trackEvent } from '@/utils/analytics'
 import { useCharacterName } from '@/composables/useCharacterName'
 import ZhText from '@/components/ZhText.vue'
+import { useSpoilerWatermark } from '@/composables/useSpoilerWatermark'
 
 interface Music {
   id: number
@@ -149,6 +150,8 @@ const accountStore = useAccountStore()
 
 const musicId = computed(() => Number(route.params.id))
 const music = ref<Music | null>(null)
+// 显示未公开内容时加剧透水印，判断与剧透过滤使用同一个时间
+useSpoilerWatermark(() => !!music.value && music.value.publishedAt > Date.now())
 const musicCategories = ref<string[]>([])
 const difficulties = ref<MusicDifficulty[]>([])
 const vocals = ref<MusicVocal[]>([])

@@ -17,6 +17,7 @@ import type {
 } from '@/types/gacha'
 import ZhText from '@/components/ZhText.vue'
 import { useZh } from '@/composables/useZh'
+import { useSpoilerWatermark } from '@/composables/useSpoilerWatermark'
 
 const route = useRoute()
 // 上一页是列表时后退以保留筛选与页码，否则打开列表
@@ -29,6 +30,8 @@ const settingsStore = useSettingsStore()
 const zhGachas = useZh('gachas')
 
 const gacha = ref<Gacha | null>(null)
+// 显示未公开内容时加剧透水印，判断与剧透过滤使用同一个时间
+useSpoilerWatermark(() => !!gacha.value && gacha.value.startAt > Date.now())
 const cards = ref<Card[]>([])
 const isLoading = ref(true)
 type BgType = 'chr' | 'normal_n' | 'normal_single' | 'none'
