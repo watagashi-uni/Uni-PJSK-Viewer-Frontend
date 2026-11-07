@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { BookmarkCheck, ChevronRight, Mic, Play, Sparkles } from 'lucide-vue-next'
+import { BookmarkCheck, ChevronRight, Languages, Mic, Play, Sparkles } from 'lucide-vue-next'
 
 const features = [
   { icon: Sparkles, label: 'Live2D 演出', detail: '动作与表情实时呈现' },
   { icon: Mic, label: '角色语音', detail: '台词配音同步播放' },
+  { icon: Languages, label: '中文翻译', detail: '日中双语字幕，优先官方译文' },
   { icon: BookmarkCheck, label: '进度保存', detail: '下次从上次的台词继续' },
 ]
 </script>
@@ -132,10 +133,10 @@ const features = [
   transform: scale(1.02);
 }
 
-/* 主栏够宽时三个卖点横排，避免文字区留白 */
+/* 主栏够宽时四个卖点横排，避免文字区留白 */
 @container (min-width: 60rem) {
   .promo-features {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 1rem;
     margin-top: 1rem;
   }

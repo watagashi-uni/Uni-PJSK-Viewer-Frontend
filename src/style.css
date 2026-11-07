@@ -611,12 +611,18 @@ html {
     font-weight: 500;
     opacity: 0.68;
   }
+  /* 不用上标：上标会超出行框，被 line-clamp / overflow:hidden 的父元素裁掉 */
   .zh-ai {
-    margin-left: 0.2em;
-    font-size: 0.62em;
+    display: inline-block;
+    margin-left: 0.25em;
+    padding: 0 0.22em;
+    border: 1px solid currentColor;
+    border-radius: 0.25em;
+    font-size: 0.6em;
     font-weight: 600;
+    line-height: 1.15;
     letter-spacing: 0.02em;
-    opacity: 0.55;
-    vertical-align: super;
+    opacity: 0.5;
+    vertical-align: 0.12em;
   }
 }
