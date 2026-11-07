@@ -15,6 +15,8 @@ import type {
   Gacha, GachaBehavior, GachaCardRarityRate, 
   Card, SimulationResult, SimulationStats 
 } from '@/types/gacha'
+import ZhText from '@/components/ZhText.vue'
+import { useZh } from '@/composables/useZh'
 
 const route = useRoute()
 // 上一页是列表时后退以保留筛选与页码，否则打开列表
@@ -22,6 +24,7 @@ const goBack = useBackToList('/gachas')
 const infoModal = ref<HTMLDialogElement | null>(null)
 const masterStore = useMasterStore()
 const settingsStore = useSettingsStore()
+const zhGachas = useZh('gachas')
 
 const gacha = ref<Gacha | null>(null)
 const cards = ref<Card[]>([])
@@ -526,13 +529,13 @@ watch(() => route.params.id, loadData)
           </div>
           
           <div class="flex items-start justify-between mb-4">
-            <h1 class="text-2xl font-bold">{{ gacha.name }}</h1>
+            <h1 class="text-2xl font-bold"><ZhText :text="gacha.name" table="gachas" path="name" sub-class="text-lg mt-1" /></h1>
             <button 
               v-if="gacha.gachaInformation?.summary || gacha.gachaInformation?.description"
               class="btn btn-outline btn-sm font-normal"
               @click="infoModal?.showModal()"
             >
-              卡池介绍（日文）
+              {{ zhGachas.t('gachaInformation.summary', gacha.gachaInformation?.summary) || zhGachas.t('gachaInformation.description', gacha.gachaInformation?.description) ? '卡池介绍' : '卡池介绍（日文）' }}
             </button>
           </div>
 
@@ -818,11 +821,11 @@ watch(() => route.params.id, loadData)
         <h3 class="font-bold text-lg mb-4">卡池详情</h3>
         <div class="space-y-4 text-sm whitespace-pre-wrap leading-relaxed">
           <div v-if="gacha.gachaInformation.summary">
-            {{ gacha.gachaInformation.summary }}
+            <ZhText :text="gacha.gachaInformation.summary" table="gachas" path="gachaInformation.summary" sub-class="mt-3" />
           </div>
           <div v-if="gacha.gachaInformation.summary && gacha.gachaInformation.description" class="divider my-1"></div>
           <div v-if="gacha.gachaInformation.description">
-            {{ gacha.gachaInformation.description }}
+            <ZhText :text="gacha.gachaInformation.description" table="gachas" path="gachaInformation.description" sub-class="mt-3" />
           </div>
         </div>
         <div class="modal-action">

@@ -62,12 +62,14 @@ function loadStoredMusicsViewState(): StoredMusicsViewState | null {
 </script>
 
 <script setup lang="ts">
-import { ref, shallowRef, computed, onMounted, watch, toRef, onUnmounted, nextTick } from 'vue'
+import { ref, shallowRef, computed, onMounted, watch, onUnmounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
 import { useAccountStore } from '@/stores/account'
 import { useNotificationStore } from '@/stores/notification'
+import { useTranslationStore } from '@/stores/translations'
+import { useZh } from '@/composables/useZh'
 import { Search, ArrowUpDown, Languages, Trophy, List, LayoutGrid, RefreshCw, Layers, Github, Camera, Loader2, Bell, BellRing, FilterX, SlidersHorizontal, ChevronDown, ListFilter } from 'lucide-vue-next'
 import { toPng } from 'html-to-image'
 import MusicCard from '@/components/MusicCard.vue'
@@ -207,7 +209,10 @@ const releaseConditions = ref<ReleaseCondition[]>([])
 const musicAchievements = ref<MusicAchievement[]>([])
 const pjskb30Map = ref<Map<string, number>>(new Map())
 const usePjskb30 = ref(true)
-const translations = toRef(masterStore, 'translations')
+const zhMusics = useZh('musics')
+const translationStore = useTranslationStore()
+// 搜索不受显示设置影响：表已加载就同时匹配中文名
+const musicZhTitle = (music: Music) => translationStore.lookup('musics', 'title', music.title)?.text
 const isLoading = ref(true)
 
 const assetsHost = computed(() => settingsStore.assetsHost)
@@ -863,12 +868,12 @@ const musicSearchIndex = computed(() => {
     index.set(music.id, {
       directFields: [
         getSearchVariants(music.title),
-        getSearchVariants(translations.value[music.id]),
+        getSearchVariants(musicZhTitle(music)),
         getSearchVariants(music.composer),
       ],
       fuzzyFields: [
         getSearchVariants(music.title),
-        getSearchVariants(translations.value[music.id]),
+        getSearchVariants(musicZhTitle(music)),
       ],
       pronunciation: normalizeSearchValue(music.pronunciation),
       romaji: normalizeSearchValue(toRomaji(music.pronunciation)),
@@ -1089,8 +1094,6 @@ async function loadData() {
     releaseConditions.value = releaseConditionData
     musicAchievements.value = achievementData
     
-    // 背景加载翻译，不阻塞主列表渲染
-    masterStore.getTranslations().catch(e => console.error('加载翻译失败:', e))
   } catch (error) {
     console.error('加载歌曲数据失败:', error)
   } finally {
@@ -1132,8 +1135,14 @@ function isLeak(music: Music): boolean {
   return limited ? limited.startAt > Date.now() : false
 }
 
-function getTranslation(id: number): string {
-  return translations.value[id] || ''
+// 中文优先时把译名放在主标题位置，原名移到副标题
+function musicMainTitle(music: Music): string {
+  return zhMusics.label('title', music.title)
+}
+function getTranslation(music: Music): string {
+  const zh = zhMusics.t('title', music.title)
+  if (!zh) return ''
+  return settingsStore.translationMode === 'zh-first' ? music.title : zh
 }
 
 function getMusicTitle(musicId: number): string {
@@ -1850,8 +1859,8 @@ watch(totalPages, (pages) => {
                 </td>
                 <td class="p-2">
                   <RouterLink :to="`/musics/${music.id}`" class="hover:text-primary">
-                    <div class="font-medium truncate max-w-[200px] lg:max-w-[400px]">{{ music.title }}</div>
-                    <div v-if="getTranslation(music.id)" class="text-xs text-base-content/50 truncate max-w-[200px] lg:max-w-[400px]">{{ getTranslation(music.id) }}</div>
+                    <div class="font-medium truncate max-w-[200px] lg:max-w-[400px]">{{ musicMainTitle(music) }}</div>
+                    <div v-if="getTranslation(music)" class="text-xs text-base-content/50 truncate max-w-[200px] lg:max-w-[400px]">{{ getTranslation(music) }}</div>
                   </RouterLink>
                   <div class="flex items-center gap-1 mt-1">
                     <button
@@ -1916,8 +1925,8 @@ watch(totalPages, (pages) => {
             />
             <div class="flex-1 min-w-0 flex flex-col gap-1">
               <RouterLink :to="`/musics/${music.id}`" class="hover:text-primary">
-                <div class="font-medium truncate text-sm leading-tight">{{ music.title }}</div>
-                <div v-if="getTranslation(music.id)" class="text-xs text-base-content/50 truncate leading-tight">{{ getTranslation(music.id) }}</div>
+                <div class="font-medium truncate text-sm leading-tight">{{ musicMainTitle(music) }}</div>
+                <div v-if="getTranslation(music)" class="text-xs text-base-content/50 truncate leading-tight">{{ getTranslation(music) }}</div>
               </RouterLink>
               
               <div class="flex items-center gap-1 mt-0.5 mb-1">
@@ -1992,8 +2001,8 @@ watch(totalPages, (pages) => {
             v-for="music in paginatedMusics"
             :id="music.id"
             :key="music.id"
-            :title="music.title"
-            :translation="getTranslation(music.id)"
+            :title="musicMainTitle(music)"
+            :translation="getTranslation(music)"
             :composer="music.composer"
             :assetbundle-name="music.assetbundleName"
             :difficulties="musicDifficultiesMap[music.id] || EMPTY_OBJ"

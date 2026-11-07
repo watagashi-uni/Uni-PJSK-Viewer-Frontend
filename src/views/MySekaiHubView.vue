@@ -20,6 +20,8 @@ import type {
   TalkCharacterOption, TalkUnitOption, FixtureTalkStat
 } from '@/types/mysekai'
 import PageHeader from '@/components/PageHeader.vue'
+import ZhText from '@/components/ZhText.vue'
+import { useZh } from '@/composables/useZh'
 
 const route = useRoute()
 const router = useRouter()
@@ -208,6 +210,12 @@ const activeTab = computed<TabKey>({
     router.replace({ query: { ...route.query, tab: value } })
   },
 })
+// 译文按标签页下载：家具表用于家具和画布，卡牌表只在画布页需要
+const zhFixtures = useZh('mysekaiFixtures', () => activeTab.value === 'furniture' || activeTab.value === 'canvas')
+const zhMainGenres = useZh('mysekaiFixtureMainGenres', () => activeTab.value === 'furniture')
+const zhSubGenres = useZh('mysekaiFixtureSubGenres', () => activeTab.value === 'furniture')
+const zhFixtureTags = useZh('mysekaiFixtureTags', () => selectedFixtureId.value !== null)
+const zhCards = useZh('cards', () => activeTab.value === 'canvas')
 
 const selectedUserId = computed({
   get: () => accountStore.currentUserId || '',
@@ -563,7 +571,7 @@ const filteredFurniture = computed(() => {
     }
 
     if (!keyword) return true
-    const nameMatched = row.name.toLowerCase().includes(keyword)
+    const nameMatched = zhFixtures.searchText('name', row.name).toLowerCase().includes(keyword)
     const idMatched = String(row.id).includes(keyword)
     return nameMatched || idMatched
   })
@@ -713,7 +721,7 @@ const filteredCanvasItems = computed(() => {
     if (selectedCanvasTraining.value === 'trained' && !item.isSpecialTraining) return false
     if (!query) return true
     const character = gameCharacterNameMap.value.get(item.card.characterId) || ''
-    return [item.cardId, item.card.prefix, character, item.fixture?.name]
+    return [item.cardId, zhCards.searchText('prefix', item.card.prefix), character, zhFixtures.searchText('name', item.fixture?.name)]
       .some(value => String(value || '').toLocaleLowerCase().includes(query))
   })
   rows.sort((a, b) => {
@@ -1696,7 +1704,7 @@ function closeFixtureDetail() {
 
               <select v-model.number="selectedMainGenre" class="select select-sm select-bordered w-full max-w-xs">
                 <option :value="0">全部分类</option>
-                <option v-for="genre in mainGenreOptions" :key="genre.id" :value="genre.id">{{ genre.name }}</option>
+                <option v-for="genre in mainGenreOptions" :key="genre.id" :value="genre.id">{{ zhMainGenres.inline('name', genre.name) }}</option>
               </select>
 
               <label class="label cursor-pointer gap-2 p-0" :class="{ 'opacity-60': !hasMysekaiBlueprintData }">
@@ -1800,7 +1808,7 @@ function closeFixtureDetail() {
             class="collapse collapse-arrow bg-base-100 border border-base-200"
           >
             <summary class="collapse-title py-3 px-4 flex flex-wrap items-center gap-2">
-              <span class="font-semibold">{{ group.name }}</span>
+              <span class="font-semibold"><ZhText :text="group.name" table="mysekaiFixtureMainGenres" path="name" layout="inline" /></span>
               <span class="badge badge-ghost">{{ group.total }}</span>
               <span v-if="hasMysekaiBlueprintData && group.trackedTotal > 0" class="badge badge-outline">
                 {{ group.owned }} / {{ group.trackedTotal }}
@@ -1812,13 +1820,13 @@ function closeFixtureDetail() {
                 :key="`${group.id}-${subGroup.id}`"
                 class="space-y-2 mb-4 last:mb-0"
               >
-                <div class="text-xs font-medium text-base-content/70">{{ subGroup.name }}</div>
+                <div class="text-xs font-medium text-base-content/70"><ZhText :text="subGroup.name" table="mysekaiFixtureSubGenres" path="name" layout="inline" /></div>
                 <div class="flex flex-wrap gap-2">
                   <div
                     v-for="row in subGroup.items"
                     :key="row.id"
                     class="relative w-[52px]"
-                    :title="`${row.name} (#${row.id})`"
+                    :title="`${zhFixtures.inline('name', row.name)} (#${row.id})`"
                   >
                     <button
                       type="button"
@@ -1907,7 +1915,7 @@ function closeFixtureDetail() {
             <RouterLink v-for="item in filteredCanvasItems" :key="item.key" :to="`/cards/${item.cardId}`" class="group card bg-base-100 border border-base-200 shadow-sm overflow-hidden hover:border-primary/40 hover:shadow-md transition-all">
               <div class="relative"><SekaiCard :card="item.card" :trained="item.isSpecialTraining" class="transition-transform group-hover:scale-[1.02]" /><span class="absolute top-1 right-1 badge badge-xs border-0 bg-base-100/90">{{ getCanvasFixtureLabel(item.mysekaiFixtureId) }}</span><span v-if="item.quantity > 1" class="absolute bottom-1 right-1 badge badge-primary badge-xs">×{{ item.quantity }}</span></div>
               <div class="p-2 space-y-1 min-w-0">
-                <p class="text-xs font-bold truncate" :title="item.card.prefix">{{ item.card.prefix }}</p>
+                <p class="text-xs font-bold truncate" :title="zhCards.inline('prefix', item.card.prefix)">{{ zhCards.label('prefix', item.card.prefix) }}</p>
                 <p class="text-[10px] text-base-content/50 truncate">{{ gameCharacterNameMap.get(item.card.characterId) || `角色 #${item.card.characterId}` }} · #{{ item.cardId }}</p>
                 <div class="flex items-center justify-between gap-1 text-[10px]"><span class="badge badge-xs" :class="item.isSpecialTraining ? 'badge-secondary badge-outline' : 'badge-ghost'">{{ item.isSpecialTraining ? '特训后' : '特训前' }}</span><span v-if="item.bonus" class="text-accent font-medium">各 +{{ item.bonus.power1BonusFixed }}</span></div>
                 <p class="text-[9px] text-base-content/35 truncate" :title="formatCanvasDate(item.lastObtainedAt)">{{ formatCanvasDate(item.lastObtainedAt) }}</p>
@@ -2138,17 +2146,17 @@ function closeFixtureDetail() {
 
             <div class="min-w-[240px] flex-1 space-y-2">
               <div class="flex flex-wrap items-center gap-2">
-                <h3 class="font-bold text-xl">{{ selectedFixture.name }}</h3>
+                <h3 class="font-bold text-xl"><ZhText :text="selectedFixture.name" table="mysekaiFixtures" path="name" sub-class="text-base" /></h3>
                 <span class="badge badge-ghost">#{{ selectedFixture.id }}</span>
                 <span v-if="selectedFixtureStatusVisible" class="badge" :class="selectedFixtureOwned ? 'badge-primary' : 'badge-outline'">
                   {{ selectedFixtureOwned ? '已拥有' : '未拥有' }}
                 </span>
               </div>
-              <p v-if="selectedFixture.flavorText" class="text-sm text-base-content/70">{{ selectedFixture.flavorText }}</p>
+              <p v-if="selectedFixture.flavorText" class="text-sm text-base-content/70"><ZhText :text="selectedFixture.flavorText" table="mysekaiFixtures" path="flavorText" sub-class="mt-1" /></p>
 
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
-                <div>主分类: <span class="font-medium">{{ selectedFixtureMainGenreName }}</span></div>
-                <div>子分类: <span class="font-medium">{{ selectedFixtureSubGenreName }}</span></div>
+                <div>主分类: <span class="font-medium">{{ zhMainGenres.inline('name', selectedFixtureMainGenreName) }}</span></div>
+                <div>子分类: <span class="font-medium">{{ zhSubGenres.inline('name', selectedFixtureSubGenreName) }}</span></div>
                 <div>尺寸: <span class="font-medium">{{ selectedFixture.gridWidth }} x {{ selectedFixture.gridDepth }} x {{ selectedFixture.gridHeight }}</span></div>
                 <div>颜色数: <span class="font-medium">{{ selectedFixture.colorCount }}</span></div>
                 <div>互动: <span class="font-medium">{{ selectedFixture.isGameCharacterAction ? '角色互动' : '无' }} {{ selectedFixture.playerActionType !== 'no_action' ? `(${selectedFixture.playerActionType})` : '' }}</span></div>
@@ -2159,7 +2167,7 @@ function closeFixtureDetail() {
           <div v-if="selectedFixtureTagNames.length > 0">
             <h4 class="font-semibold mb-2">标签</h4>
             <div class="flex flex-wrap gap-1.5">
-              <span v-for="name in selectedFixtureTagNames" :key="name" class="badge badge-outline">{{ name }}</span>
+              <span v-for="name in selectedFixtureTagNames" :key="name" class="badge badge-outline">{{ zhFixtureTags.inline('name', name) }}</span>
             </div>
           </div>
 

@@ -8,11 +8,14 @@ import { Calendar, Radio, PlayCircle, Clock, Bell, BellRing, Search } from 'luci
 import AssetImage from '@/components/AssetImage.vue'
 import Pagination from '@/components/Pagination.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import ZhText from '@/components/ZhText.vue'
+import { useZh } from '@/composables/useZh'
 
 const route = useRoute()
 const router = useRouter()
 const masterStore = useMasterStore()
 const settingsStore = useSettingsStore()
+const zhVirtualLives = useZh('virtualLives')
 const notificationStore = useNotificationStore()
 
 const isVliveSubscribed = computed(() => notificationStore.hasSubscription('vlive'))
@@ -84,7 +87,7 @@ const filteredVlives = computed(() => {
   if (searchQuery.value) {
     const query = searchQuery.value.toLowerCase()
     result = result.filter((v: any) => 
-      v.name.toLowerCase().includes(query) ||
+      zhVirtualLives.searchText('name', v.name).toLowerCase().includes(query) ||
       v.id.toString().includes(query)
     )
   }
@@ -265,7 +268,7 @@ onMounted(async () => {
         </figure>
         
         <div class="space-y-2.5 p-3">
-          <h2 class="line-clamp-2 min-h-10 text-[15px] font-bold leading-5 transition-colors group-hover:text-primary">{{ vlive.name }}</h2>
+          <h2 class="line-clamp-2 min-h-10 text-[15px] font-bold leading-5 transition-colors group-hover:text-primary"><ZhText :text="vlive.name" table="virtualLives" path="name" sub-class="text-xs font-normal" /></h2>
           
           <div class="flex items-start gap-2 text-xs leading-4 text-base-content/60">
             <Calendar class="w-3.5 h-3.5 flex-shrink-0" />

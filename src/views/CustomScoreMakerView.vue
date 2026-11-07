@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, toRef, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { BarChart3, Copy, Download, Eye, Heart, Music2, Play, PlayCircle, RefreshCw, Search, Sparkles, User, X } from 'lucide-vue-next'
 import { renderCustomScoreJsonToSvg, revokeSus2ImgResult, type Sus2ImgFrontendResult } from '@/vendor/sekai-sus2img'
 import AssetImage from '@/components/AssetImage.vue'
 import SekaiProfileHonor from '@/components/SekaiProfileHonor.vue'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
+import { useTranslationStore } from '@/stores/translations'
+import { useZh } from '@/composables/useZh'
 import { toRomaji } from '@/utils/kanaToRomaji'
 import PageHeader from '@/components/PageHeader.vue'
 import { difficultyStyle } from '@/utils/difficulty'
@@ -246,7 +248,8 @@ let copyMessageTimer: number | null = null
 const previewBridgeCleanups = new Set<() => void>()
 
 const assetsHost = computed(() => settingsStore.assetsHost.replace(/\/+$/, ''))
-const translations = toRef(masterStore, 'translations')
+const translationStore = useTranslationStore()
+useZh('musics')
 
 const officialCreatorByScoreId = computed(() => {
   const map = new Map<string, OfficialCreator>()
@@ -393,7 +396,7 @@ function searchMusic() {
   const query = musicSearchQuery.value.toLowerCase()
   const matched = musics.value.filter((music) => {
     const titleMatch = music.title.toLowerCase().includes(query)
-    const translationMatch = translations.value[music.id]?.toLowerCase().includes(query)
+    const translationMatch = translationStore.lookup('musics', 'title', music.title)?.text.toLowerCase().includes(query)
     const pronunciationMatch = music.pronunciation?.includes(query)
     const romajiMatch = toRomaji(music.pronunciation || '').toLowerCase().includes(query)
     const idMatch = String(music.id) === query
@@ -472,7 +475,6 @@ async function parseGameApiJson(response: Response) {
 async function loadMasterData() {
   isMasterLoading.value = true
   try {
-    masterStore.getTranslations().catch((reason) => console.error('加载翻译失败:', reason))
     const [creatorData, profileData, tagData, musicData, cardData, vocalData, characterData, outsideCharacterData, collaborationData] = await Promise.all([
       masterStore.getMaster<OfficialCreator>('customMusicScoreOfficialCreators'),
       masterStore.getMaster<OfficialCreatorProfile>('customMusicScoreOfficialCreatorProfiles'),

@@ -27,6 +27,7 @@ import type {
   CostumePart,
 } from '@/types/costume'
 import PageHeader from '@/components/PageHeader.vue'
+import { useZh } from '@/composables/useZh'
 
 interface Character {
   id: number
@@ -54,6 +55,7 @@ interface PickerItem {
 
 const masterStore = useMasterStore()
 const settingsStore = useSettingsStore()
+const zhCostumes = useZh('costume3ds')
 
 const characters = ref<Character[]>([])
 const characterRoles = ref<Character3dRole[]>([])
@@ -259,7 +261,7 @@ function buildOrderedItems(partType: PickerPart): PickerItem[] {
   let items = baseItems.value[partType]
   if (query) {
     items = items.filter(item =>
-      item.group.name.toLowerCase().includes(query)
+      zhCostumes.searchText('name', item.group.name).toLowerCase().includes(query)
       || item.part.variants.some(variant =>
         variant.colorName.toLowerCase().includes(query)
         || String(variant.costume3dId).includes(query)
@@ -671,8 +673,8 @@ onBeforeUnmount(() => {
                       :alt="item.group.name"
                       class="w-full aspect-square bg-base-200 rounded-md p-0.5"
                     />
-                    <p class="text-[10px] sm:text-xs font-medium truncate mt-1" :title="item.group.name">
-                      {{ item.group.name }}
+                    <p class="text-[10px] sm:text-xs font-medium truncate mt-1" :title="zhCostumes.inline('name', item.group.name)">
+                      {{ zhCostumes.label('name', item.group.name) }}
                     </p>
                     <p class="text-[9px] sm:text-[10px] text-base-content/45 truncate">
                       {{ item.part.variants.length }} 色
@@ -700,7 +702,7 @@ onBeforeUnmount(() => {
                 >
                   <div class="flex items-center justify-between gap-2 mb-2">
                     <div class="min-w-0">
-                      <p class="text-sm font-semibold truncate">{{ activeColorSelection.group.name }}</p>
+                      <p class="text-sm font-semibold truncate" :title="zhCostumes.inline('name', activeColorSelection.group.name)">{{ zhCostumes.label('name', activeColorSelection.group.name) }}</p>
                       <p class="text-[10px] text-base-content/50">选择配色</p>
                     </div>
                     <span class="badge badge-primary badge-sm">{{ activeColorSelection.part.variants.length }} 色</span>
@@ -720,7 +722,7 @@ onBeforeUnmount(() => {
                         :alt="`${activeColorSelection.group.name} ${variant.colorName}`"
                         class="w-full aspect-square rounded-md bg-base-200 p-0.5"
                       />
-                      <p class="text-[9px] sm:text-[10px] truncate mt-1">{{ variant.colorName }}</p>
+                      <p class="text-[9px] sm:text-[10px] truncate mt-1">{{ zhCostumes.label('colorName', variant.colorName) }}</p>
                     </button>
                   </div>
                 </div>

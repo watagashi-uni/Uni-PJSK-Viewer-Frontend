@@ -9,6 +9,8 @@ import { useAccountStore } from '@/stores/account'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
 import type { GameCharacterData } from '@/types/master'
+import ZhText from '@/components/ZhText.vue'
+import { useZh } from '@/composables/useZh'
 
 interface AreaData {
   id: number
@@ -74,6 +76,9 @@ interface UpgradeCost {
 
 const masterStore = useMasterStore()
 const settingsStore = useSettingsStore()
+const zhAreaItems = useZh('areaItems')
+const zhAreas = useZh('areas')
+const zhAreaLevels = useZh('areaItemLevels')
 const accountStore = useAccountStore()
 
 const areas = ref<AreaData[]>([])
@@ -158,7 +163,7 @@ const filteredItems = computed(() => {
     .filter(item => !selectedTargetType.value || getTargetType(item) === selectedTargetType.value)
     .filter(item => {
       if (!query) return true
-      return [item.id, item.name, areaMap.value.get(item.areaId)?.name, getTargetLabel(item)]
+      return [item.id, zhAreaItems.searchText('name', item.name), zhAreas.searchText('name', areaMap.value.get(item.areaId)?.name), getTargetLabel(item)]
         .some(value => String(value || '').toLocaleLowerCase().includes(query))
     })
     .sort((a, b) => a.areaId - b.areaId || a.id - b.id)
@@ -289,7 +294,7 @@ onMounted(async () => {
       <div class="card-body p-4 gap-4">
         <div class="grid md:grid-cols-2 xl:grid-cols-[minmax(220px,1fr)_210px_180px_220px] gap-3">
           <label class="input input-bordered flex items-center gap-2"><Search class="w-4 h-4 opacity-50" /><input v-model="searchQuery" class="grow min-w-0" placeholder="搜索道具、区域或加成对象…" /><button v-if="searchQuery" class="btn btn-xs btn-circle btn-ghost" aria-label="清空" @click="searchQuery = ''"><X class="w-3 h-3" /></button></label>
-          <select v-model.number="selectedAreaId" class="select select-bordered w-full"><option :value="0">全部区域</option><option v-for="area in areaOptions" :key="area.id" :value="area.id">{{ area.name }}</option></select>
+          <select v-model.number="selectedAreaId" class="select select-bordered w-full"><option :value="0">全部区域</option><option v-for="area in areaOptions" :key="area.id" :value="area.id">{{ zhAreas.inline('name', area.name) }}</option></select>
           <select v-model="selectedTargetType" class="select select-bordered w-full"><option value="">全部加成类型</option><option value="character">角色</option><option value="unit">组合</option><option value="attr">属性</option></select>
           <AccountSelector v-if="accountStore.accounts.length" v-model="selectedUserId" />
         </div>
@@ -303,7 +308,7 @@ onMounted(async () => {
     <div v-else class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6 gap-3">
       <button v-for="item in filteredItems" :key="item.id" class="group card bg-base-100 border border-base-200 hover:border-primary/30 hover:shadow-md transition-all overflow-hidden text-left" @click="openItem(item)">
         <figure class="relative h-28 sm:h-32 bg-gradient-to-br from-base-200 to-base-100 p-2.5"><AssetImage :src="itemImage(item)" :alt="item.name" class="w-full h-full object-contain transition-transform" /><span v-if="currentLevelMap.has(item.id)" class="absolute top-2 right-2 badge badge-primary badge-sm shadow-sm">Lv.{{ currentLevelMap.get(item.id) }}</span></figure>
-        <div class="card-body p-3 gap-1"><span class="text-[10px] text-base-content/45 truncate">{{ areaMap.get(item.areaId)?.name || `区域 #${item.areaId}` }}</span><h2 class="font-bold text-sm line-clamp-2 min-h-10 leading-5">{{ item.name }}</h2><div class="flex items-center justify-between gap-1 mt-1"><span class="badge badge-xs badge-outline max-w-[70%] truncate">{{ getTargetLabel(item) }}</span><span class="text-[10px] font-semibold text-primary whitespace-nowrap">+{{ getLevel(item, 20)?.power1BonusRate || 0 }}%</span></div></div>
+        <div class="card-body p-3 gap-1"><span class="text-[10px] text-base-content/45 truncate">{{ areaMap.get(item.areaId)?.name ? zhAreas.label('name', areaMap.get(item.areaId)?.name) : `区域 #${item.areaId}` }}</span><h2 class="font-bold text-sm line-clamp-3 min-h-10 leading-5"><ZhText :text="item.name" table="areaItems" path="name" sub-class="text-xs font-normal" /></h2><div class="flex items-center justify-between gap-1 mt-1"><span class="badge badge-xs badge-outline max-w-[70%] truncate">{{ getTargetLabel(item) }}</span><span class="text-[10px] font-semibold text-primary whitespace-nowrap">+{{ getLevel(item, 20)?.power1BonusRate || 0 }}%</span></div></div>
       </button>
     </div>
 
@@ -312,14 +317,14 @@ onMounted(async () => {
         <button class="btn btn-sm btn-circle btn-ghost absolute! right-3 top-3 z-20 bg-base-100/85" aria-label="关闭" @click="selectedItem = null"><X class="w-4 h-4" /></button>
         <div class="min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]">
           <div class="grid md:grid-cols-[190px_1fr]">
-            <div class="bg-gradient-to-br from-base-200 to-base-100 p-5 flex flex-col items-center justify-center"><AssetImage :src="itemImage(selectedItem)" :alt="selectedItem.name" class="w-36 h-36 object-contain" /><span class="badge badge-outline badge-sm mt-3">{{ areaMap.get(selectedItem.areaId)?.name }}</span></div>
+            <div class="bg-gradient-to-br from-base-200 to-base-100 p-5 flex flex-col items-center justify-center"><AssetImage :src="itemImage(selectedItem)" :alt="selectedItem.name" class="w-36 h-36 object-contain" /><span class="badge badge-outline badge-sm mt-3">{{ zhAreas.inline('name', areaMap.get(selectedItem.areaId)?.name) }}</span></div>
             <div class="p-6 space-y-5">
-              <div><p class="text-xs text-base-content/45">区域道具 #{{ selectedItem.id }}</p><h2 class="font-bold text-2xl">{{ selectedItem.name }}</h2><p class="text-sm text-base-content/60 mt-1">加成对象：{{ getTargetLabel(selectedItem) }}</p></div>
+              <div><p class="text-xs text-base-content/45">区域道具 #{{ selectedItem.id }}</p><h2 class="font-bold text-2xl"><ZhText :text="selectedItem.name" table="areaItems" path="name" sub-class="text-base mt-1" /></h2><p class="text-sm text-base-content/60 mt-1">加成对象：{{ getTargetLabel(selectedItem) }}</p></div>
               <div class="grid grid-cols-2 gap-3">
                 <label class="form-control"><span class="label-text mb-2">当前等级</span><select v-model.number="currentLevel" class="select select-bordered"><option :value="0">未购买</option><option v-for="level in selectedLevels" :key="level.level" :value="level.level">Lv.{{ level.level }}</option></select></label>
                 <label class="form-control"><span class="label-text mb-2">目标等级</span><select v-model.number="targetLevel" class="select select-bordered"><option v-for="level in selectedLevels.filter(level => level.level >= currentLevel)" :key="level.level" :value="level.level">Lv.{{ level.level }}</option></select></label>
               </div>
-              <div class="bg-base-200 rounded-xl p-4 text-sm"><p class="text-base-content/50 text-xs mb-1">加成变化</p><p v-if="targetBonus" class="leading-6">{{ currentBonus ? `${currentBonus.power1BonusRate}%` : '0%' }} → <strong class="text-primary">{{ targetBonus.power1BonusRate }}%</strong></p><p class="text-xs text-base-content/60 mt-1">{{ cleanSentence(targetBonus?.sentence) }}</p></div>
+              <div class="bg-base-200 rounded-xl p-4 text-sm"><p class="text-base-content/50 text-xs mb-1">加成变化</p><p v-if="targetBonus" class="leading-6">{{ currentBonus ? `${currentBonus.power1BonusRate}%` : '0%' }} → <strong class="text-primary">{{ targetBonus.power1BonusRate }}%</strong></p><p class="text-xs text-base-content/60 mt-1"><ZhText :text="cleanSentence(targetBonus?.sentence)" :zh="zhAreaLevels.t('sentence', targetBonus?.sentence) ? cleanSentence(zhAreaLevels.t('sentence', targetBonus?.sentence)) : null" :ai="zhAreaLevels.entry('sentence', targetBonus?.sentence)?.ai" /></p></div>
               <div><h3 class="font-bold mb-3">升级成本</h3><div v-if="upgradeCosts.length" class="grid sm:grid-cols-2 gap-2"><div v-for="cost in upgradeCosts" :key="`${cost.resourceType}_${cost.resourceId}`" class="flex items-center gap-3 bg-base-200/70 rounded-lg p-3"><AssetImage v-if="cost.resourceType === 'material'" :src="materialImage(cost.resourceId)" :alt="materialMap.get(cost.resourceId)?.name" class="w-10 h-10 object-contain shrink-0" /><div v-else class="w-10 h-10 rounded-full bg-warning/20 grid place-items-center shrink-0"><Coins class="w-6 h-6 text-warning" /></div><div class="min-w-0"><p class="text-xs text-base-content/55 truncate">{{ cost.resourceType === 'material' ? (materialMap.get(cost.resourceId)?.name || `素材 #${cost.resourceId}`) : '金币' }}</p><p class="font-bold">× {{ formatNumber(cost.quantity) }}</p></div></div></div><p v-else class="text-sm text-base-content/50">目标等级与当前等级相同，无需额外素材。</p></div>
             </div>
           </div>

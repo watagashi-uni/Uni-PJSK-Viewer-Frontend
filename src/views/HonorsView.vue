@@ -12,6 +12,8 @@ import { useMasterStore } from '@/stores/master'
 import { useAccountStore } from '@/stores/account'
 import type { GameCharacterData } from '@/types/master'
 import { readQueryPage, readQueryString, replaceListQuery } from '@/utils/routeQuery'
+import ZhText from '@/components/ZhText.vue'
+import { useZh } from '@/composables/useZh'
 
 interface HonorLevel {
   level: number
@@ -127,6 +129,10 @@ const rarityOptions = [
 ]
 
 const activeTab = computed<HonorTab>(() => route.query.tab === 'bonds' ? 'bonds' : 'normal')
+const zhHonors = useZh('honors', () => activeTab.value === 'normal')
+const zhHonorGroups = useZh('honorGroups', () => activeTab.value === 'normal')
+const zhBonds = useZh('bondsHonors', () => activeTab.value === 'bonds')
+const zhBondsWords = useZh('bondsHonorWords', () => activeTab.value === 'bonds')
 const selectedUserId = computed({
   get: () => accountStore.currentUserId || '',
   set: value => { void accountStore.selectAccount(value) },
@@ -196,7 +202,7 @@ const filteredHonors = computed(() => {
       if (selectedRarity.value && honor.honorRarity !== selectedRarity.value) return false
       if (selectedHonorGroup.value && honor.groupId !== selectedHonorGroup.value) return false
       if (!query) return true
-      return [honor.id, honor.name, group?.name, group?.pronunciation, ...honor.levels.map(level => level.description)]
+      return [honor.id, zhHonors.searchText('name', honor.name), group && zhHonorGroups.searchText('name', group.name), group?.pronunciation, ...honor.levels.map(level => zhHonors.searchText('levels.description', level.description))]
         .some(value => String(value || '').toLocaleLowerCase().includes(query))
     })
     .sort((a, b) => b.seq - a.seq || b.id - a.id)
@@ -223,7 +229,7 @@ const filteredBondsHonors = computed(() => {
       if (selectedBondsRarity.value && honor.honorRarity !== selectedBondsRarity.value) return false
       if (!query) return true
       const words = wordsByBondsGroup.value.get(honor.bondsGroupId) || []
-      return [honor.id, honor.name, honor.pronunciation, honor.description, ...words.map(word => word.name)]
+      return [honor.id, honor.name, honor.pronunciation, honor.description, ...honor.levels.map(level => zhBonds.searchText('levels.description', level.description)), ...words.map(word => zhBondsWords.searchText('name', word.name))]
         .some(value => String(value || '').toLocaleLowerCase().includes(query))
     })
     .sort((a, b) => b.seq - a.seq || b.id - a.id)
@@ -280,6 +286,12 @@ function getTypeLabel(type?: string): string {
 
 function getRarityLabel(rarity?: string): string {
   return rarityOptions.find(option => option.value === rarity)?.label || rarity || '未知'
+}
+
+// 称号名优先用称号组名，组名和称号名的译文分属两张表
+function honorTitle(honor: { groupId: number; name: string }) {
+  const group = honorGroupMap.value.get(honor.groupId)
+  return group?.name ? { text: group.name, table: 'honorGroups', path: 'name' } : { text: honor.name, table: 'honors', path: 'name' }
 }
 
 function maxLevel(levels: Array<{ level: number }>): number {
@@ -385,7 +397,7 @@ onMounted(async () => {
             </select>
             <select v-model.number="selectedHonorGroup" class="select select-bordered w-full min-w-0 max-w-full" :disabled="!selectedHonorType">
               <option :value="0">{{ selectedHonorType ? '全部大组' : '请先选择类型' }}</option>
-              <option v-for="group in honorGroupOptions" :key="group.id" :value="group.id">{{ group.name }}（{{ honorGroupCountMap.get(group.id) || 0 }}）</option>
+              <option v-for="group in honorGroupOptions" :key="group.id" :value="group.id">{{ zhHonorGroups.inline('name', group.name) }}（{{ honorGroupCountMap.get(group.id) || 0 }}）</option>
             </select>
           </div>
           <div class="flex flex-wrap items-center gap-4">
@@ -411,8 +423,8 @@ onMounted(async () => {
                 <span class="badge badge-sm badge-outline">{{ getTypeLabel(honorGroupMap.get(honor.groupId)?.honorType) }}</span>
                 <span class="badge badge-sm badge-outline">{{ getRarityLabel(honor.honorRarity) }}</span>
               </div>
-              <h2 class="font-bold truncate">{{ honorGroupMap.get(honor.groupId)?.name || honor.name }}</h2>
-              <p class="text-xs text-base-content/55 truncate mt-1">{{ lastDescription(honor.levels) }}</p>
+              <h2 class="font-bold truncate"><ZhText v-bind="honorTitle(honor)" sub-class="text-xs font-normal" /></h2>
+              <p class="text-xs text-base-content/55 truncate mt-1">{{ zhHonors.label('levels.description', lastDescription(honor.levels)) }}</p>
             </div>
           </div>
         </button>
@@ -477,7 +489,7 @@ onMounted(async () => {
                 <span class="badge badge-sm badge-outline">{{ wordsByBondsGroup.get(honor.bondsGroupId)?.length || 0 }} 种文字</span>
               </div>
               <h2 class="truncate font-bold">{{ getCharacterNameByUnitId(honor.gameCharacterUnitId1) }} × {{ getCharacterNameByUnitId(honor.gameCharacterUnitId2) }}</h2>
-              <p class="text-xs text-base-content/55 truncate mt-1">{{ lastDescription(honor.levels) }}</p>
+              <p class="text-xs text-base-content/55 truncate mt-1">{{ zhBonds.label('levels.description', lastDescription(honor.levels)) }}</p>
             </div>
           </div>
         </button>
@@ -496,7 +508,7 @@ onMounted(async () => {
     <dialog ref="honorDialog" class="modal" @close="onHonorDialogClose">
       <div v-if="selectedHonor" class="modal-box max-w-2xl overflow-x-hidden">
         <button class="btn btn-sm btn-circle btn-ghost absolute! right-3 top-3 z-20" aria-label="关闭" @click="selectedHonor = null"><X class="w-4 h-4" /></button>
-        <h2 class="font-bold text-xl pr-10">{{ honorGroupMap.get(selectedHonor.groupId)?.name || selectedHonor.name }}</h2>
+        <h2 class="font-bold text-xl pr-10"><ZhText v-bind="honorTitle(selectedHonor)" sub-class="text-base mt-1" /></h2>
         <p class="text-sm text-base-content/55 mt-1">称号 #{{ selectedHonor.id }} · {{ getTypeLabel(honorGroupMap.get(selectedHonor.groupId)?.honorType) }}<span v-if="normalOwnedMap.has(selectedHonor.id)" class="text-success font-medium"> · 已拥有 Lv.{{ normalOwnedMap.get(selectedHonor.id) }}</span></p>
         <div class="bg-base-200 rounded-xl p-4 my-5"><div class="mx-auto w-full min-w-0 max-w-[340px]"><SekaiHonor :honor-id="selectedHonor.id" :honor-level="selectedHonorLevel" /></div></div>
         <label class="form-control w-full">
@@ -504,7 +516,7 @@ onMounted(async () => {
           <select v-model.number="selectedHonorLevel" class="select select-bordered w-full min-w-0 max-w-full">
             <option v-for="level in selectedHonor.levels" :key="level.level" :value="level.level">Lv.{{ level.level }}</option>
           </select>
-          <span v-if="levelDescription(selectedHonor.levels, selectedHonorLevel)" class="mt-2 rounded-lg bg-base-200/70 px-3 py-2 text-xs leading-5 text-base-content/65 whitespace-normal break-words">{{ levelDescription(selectedHonor.levels, selectedHonorLevel) }}</span>
+          <span v-if="levelDescription(selectedHonor.levels, selectedHonorLevel)" class="mt-2 rounded-lg bg-base-200/70 px-3 py-2 text-xs leading-5 text-base-content/65 whitespace-normal break-words"><ZhText :text="levelDescription(selectedHonor.levels, selectedHonorLevel)" table="honors" path="levels.description" /></span>
         </label>
       </div>
       <form method="dialog" class="modal-backdrop"><button @click="selectedHonor = null">关闭</button></form>
@@ -531,12 +543,12 @@ onMounted(async () => {
             <select v-model.number="selectedBondsLevel" class="select select-bordered w-full min-w-0 max-w-full">
               <option v-for="level in selectedBondsHonor.levels" :key="level.level" :value="level.level">Lv.{{ level.level }}</option>
             </select>
-            <span v-if="levelDescription(selectedBondsHonor.levels, selectedBondsLevel)" class="mt-2 rounded-lg bg-base-200/70 px-3 py-2 text-xs leading-5 text-base-content/65 whitespace-normal break-words">{{ levelDescription(selectedBondsHonor.levels, selectedBondsLevel) }}</span>
+            <span v-if="levelDescription(selectedBondsHonor.levels, selectedBondsLevel)" class="mt-2 rounded-lg bg-base-200/70 px-3 py-2 text-xs leading-5 text-base-content/65 whitespace-normal break-words"><ZhText :text="levelDescription(selectedBondsHonor.levels, selectedBondsLevel)" table="bondsHonors" path="levels.description" /></span>
           </label>
           <label class="form-control min-w-0">
             <span class="label-text mb-2">称号文字</span>
             <select v-model.number="selectedBondsWordId" class="select select-bordered w-full min-w-0 max-w-full">
-              <option v-for="word in selectedBondsWords" :key="word.id" :value="word.id">{{ word.name }}</option>
+              <option v-for="word in selectedBondsWords" :key="word.id" :value="word.id">{{ zhBondsWords.inline('name', word.name) }}</option>
             </select>
           </label>
         </div>

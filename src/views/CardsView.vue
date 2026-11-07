@@ -15,6 +15,7 @@ import { useAccountStore } from '@/stores/account'
 import Pagination from '@/components/Pagination.vue'
 import SekaiCard from '@/components/SekaiCard.vue'
 import AccountSelector from '@/components/AccountSelector.vue'
+import ZhText from '@/components/ZhText.vue'
 
 interface Card {
   id: number
@@ -637,7 +638,7 @@ onMounted(() => {
           </div>
 
           <!-- 卡片名称 -->
-          <h3 class="font-semibold text-sm mt-2 line-clamp-2">{{ card.prefix }}</h3>
+          <h3 class="font-semibold text-sm mt-2 line-clamp-3"><ZhText :text="card.prefix" table="cards" path="prefix" sub-class="font-normal text-xs" /></h3>
           <p class="text-xs text-base-content/60">{{ getCharaName(card.characterId) }}</p>
         </div>
       </RouterLink>

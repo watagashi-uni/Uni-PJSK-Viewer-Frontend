@@ -1,14 +1,20 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
-import { BookOpen, ChevronLeft, ChevronRight, Copy, Film, Music2, Play, Search, Volume2, VolumeX, X } from 'lucide-vue-next'
+import { BookOpen, ChevronLeft, ChevronRight, Copy, Film, Languages, Music2, Play, Search, Volume2, VolumeX, X } from 'lucide-vue-next'
 import type { PjskPlayer, ScenarioSceneData } from 'pjsk-scenario-player'
 import { buildStoryFrames } from '@/utils/storyPlayback'
 import { loadStoryPlayerIndex, parsePlayerScenario, storyPlayerResolver } from '@/utils/storyPlayerAssets'
+import { attachStoryZhOverlay, trimFullStop, type StoryZhOverlay } from '@/utils/storyZhOverlay'
+import { loadZhStory, type ZhStory, type ZhStorySource } from '@/api/translations'
+import { useSettingsStore } from '@/stores/settings'
+import ZhText from '@/components/ZhText.vue'
 
 const props = withDefaults(defineProps<{
   title: string; episodeLabel?: string; scenarioId: string; scenarioUrls: string[]
   hasPrevious?: boolean; hasNext?: boolean
-}>(), { episodeLabel: '', hasPrevious: false, hasNext: false })
+  /** 标题译名，随资料译名设置显示 */
+  titleZh?: string
+}>(), { episodeLabel: '', hasPrevious: false, hasNext: false, titleZh: '' })
 const emit = defineEmits<{ close: []; previous: []; next: []; play: [] }>()
 const scenario = shallowRef<ScenarioSceneData>()
 const frames = computed(() => scenario.value ? buildStoryFrames(scenario.value) : [])
@@ -27,6 +33,39 @@ const bgmEnabled = ref(true)
 const volume = ref(0.8)
 const playerReady = ref(false)
 const started = ref(false)
+const settings = useSettingsStore()
+// 中文台词：按 TalkData 下标对齐，人名和地点字幕另有对照表
+const zhStory = shallowRef<ZhStory | null>(null)
+const zhState = ref<'idle' | 'loading' | 'ready' | 'none'>('idle')
+const showZh = computed(() => settings.storyTranslation)
+const zhActive = computed(() => showZh.value && !!zhStory.value)
+const zhFirst = computed(() => zhActive.value && settings.translationMode === 'zh-first')
+const ZH_SOURCES: Record<ZhStorySource, { label: string; title: string }> = {
+  official: { label: '官方中文', title: '国服官方汉化文本' },
+  'auto-story': { label: 'AI 翻译 · 审校版', title: '机器翻译并经过审校，与剧情字幕视频的译文一致' },
+  toolbox: { label: 'AI 翻译', title: '机器翻译，仅供参考' },
+  ai: { label: 'AI 翻译', title: '机器翻译，仅供参考' },
+}
+const zhSource = computed(() => zhStory.value ? ZH_SOURCES[zhStory.value.src] ?? ZH_SOURCES.ai : undefined)
+function zhLine(talkIndex: number): string {
+  const text = zhActive.value ? zhStory.value!.lines[talkIndex] : ''
+  return text ? trimFullStop(text) : ''
+}
+function zhName(name?: string): string {
+  const zh = zhActive.value && name ? zhStory.value!.names[name] : ''
+  return zh && zh !== name ? zh : ''
+}
+let zhRequest = ''
+async function loadZh() {
+  if (!showZh.value || zhRequest === props.scenarioId) return
+  const scenarioId = zhRequest = props.scenarioId
+  zhState.value = 'loading'
+  const story = await loadZhStory(scenarioId).catch(() => null)
+  if (disposed || scenarioId !== props.scenarioId) return
+  zhStory.value = story
+  zhState.value = story ? 'ready' : 'none'
+  if (!story) zhRequest = ''
+}
 const index = computed(() => {
   for (let i = frames.value.length - 1; i >= 0; i--) {
     if (frames.value[i]!.snippetIndex <= snippet.value) return i
@@ -34,8 +73,9 @@ const index = computed(() => {
   return 0
 })
 const matches = computed(() => frames.value.map((frame, i) => ({ ...frame, index: i }))
-  .filter(frame => !search.value.trim() || `${frame.talk.WindowDisplayName} ${frame.talk.Body}`.toLocaleLowerCase().includes(search.value.trim().toLocaleLowerCase())))
+  .filter(frame => !search.value.trim() || `${frame.talk.WindowDisplayName} ${frame.talk.Body} ${zhName(frame.talk.WindowDisplayName)} ${zhLine(frame.talkIndex)}`.toLocaleLowerCase().includes(search.value.trim().toLocaleLowerCase())))
 let player: PjskPlayer | undefined
+let overlay: StoryZhOverlay | undefined
 let playerAbort: AbortController | undefined
 let requestAbort: AbortController | undefined
 let generation = 0
@@ -48,14 +88,17 @@ function savePosition() {
 function restorePosition() {
   try {
     const stored = localStorage.getItem(`story-snippet:v1:${props.scenarioId}`)
-    const oldLine = Number(localStorage.getItem(`story-position:v1:${props.scenarioId}`)) || 0
-    const value = stored === null ? (frames.value[oldLine]?.snippetIndex || 0) : Number(stored)
+    // 旧版按台词行保存；都没有时从头播放，保留开场的字幕卡和全屏旁白
+    const oldLine = localStorage.getItem(`story-position:v1:${props.scenarioId}`)
+    const value = stored !== null ? Number(stored) : oldLine !== null ? (frames.value[Number(oldLine) || 0]?.snippetIndex || 0) : 0
     snippet.value = Number.isFinite(value) ? Math.max(0, Math.min((scenario.value?.Snippets.length || 1) - 1, Math.floor(value))) : 0
   } catch { snippet.value = 0 }
 }
 function destroyPlayer() {
   generation++
   playerAbort?.abort()
+  overlay?.destroy()
+  overlay = undefined
   player?.destroy()
   player = undefined
   playerReady.value = started.value = stageLoading.value = false
@@ -79,6 +122,7 @@ async function mountPlayer() {
       menu: ['fullscreen', 'auto', 'fast', 'hide', 'log'],
     })
     player = instance
+    overlay = attachStoryZhOverlay(instance.root, scenario.value, zhActive.value ? zhStory.value : null)
     const resumeAt = snippet.value
     instance.on('play', () => {
       started.value = true
@@ -86,7 +130,7 @@ async function mountPlayer() {
       // The library installs its seek handler immediately after emitting play.
       queueMicrotask(() => { if (player === instance && resumeAt > 0) void instance.jumpTo(resumeAt) })
     })
-    instance.on('progress', value => { snippet.value = value.index; savePosition() })
+    instance.on('progress', value => { snippet.value = value.index; savePosition(); overlay?.snippet(value.index) })
     instance.on('mode', value => { auto.value = value.auto; voiceEnabled.value = value.voice })
     instance.on('log', () => { void setMode('script') })
     instance.on('end', () => { notice.value = '本话播放完毕'; instance.setAuto(false) })
@@ -108,6 +152,9 @@ async function load() {
   loading.value = true
   error.value = notice.value = stageError.value = ''
   scenario.value = undefined
+  if (zhRequest !== props.scenarioId) { zhStory.value = null; zhState.value = 'idle'; zhRequest = '' }
+  // 译文与剧本并行加载，互不阻塞
+  void loadZh()
   try {
     for (const url of new Set(props.scenarioUrls)) {
       try {
@@ -178,11 +225,18 @@ function visibility() {
 }
 async function copyScript() {
   try {
-    await navigator.clipboard.writeText(frames.value.map(frame => `${frame.talk.WindowDisplayName || '旁白'}：${frame.talk.Body || ''}`).join('\n\n'))
+    await navigator.clipboard.writeText(frames.value.map(frame => {
+      const zh = zhLine(frame.talkIndex)
+      const name = zhName(frame.talk.WindowDisplayName)
+      return `${frame.talk.WindowDisplayName || '旁白'}${name ? `（${name}）` : ''}：${frame.talk.Body || ''}${zh ? `\n${zh}` : ''}`
+    }).join('\n\n'))
     notice.value = '剧本文本已复制'
   } catch { notice.value = '当前浏览器无法复制，可在文本模式中选择台词' }
 }
 watch([volume, bgmEnabled], syncVolume)
+watch(showZh, () => { void loadZh() })
+watch(zhActive, () => { overlay?.setStory(zhActive.value ? zhStory.value : null) })
+watch(zhStory, () => { if (zhActive.value) overlay?.setStory(zhStory.value) })
 watch(() => [props.scenarioId, ...props.scenarioUrls], () => { void load() })
 onMounted(() => { void load(); window.addEventListener('keydown', keydown); document.addEventListener('visibilitychange', visibility) })
 onBeforeUnmount(() => {
@@ -194,7 +248,8 @@ onBeforeUnmount(() => {
 <template>
   <div class="story-reader">
     <header class="reader-heading">
-      <div class="min-w-0 flex-1"><p class="text-xs text-primary font-bold tracking-wider">{{ episodeLabel || 'STORY THEATER' }}</p><h2 class="text-lg font-bold truncate">{{ title }}</h2></div>
+      <div class="min-w-0 flex-1"><p class="text-xs text-primary font-bold tracking-wider">{{ episodeLabel || 'STORY THEATER' }}<span v-if="zhActive && zhSource" class="zh-source" :title="zhSource.title">{{ zhSource.label }}</span></p><h2 class="text-lg font-bold truncate"><ZhText :text="title" :zh="titleZh || null" layout="inline" sub-class="text-sm" /></h2></div>
+      <button class="btn btn-sm btn-ghost gap-1 px-2" :class="{ 'text-primary': showZh }" :aria-pressed="showZh" :title="zhState === 'none' && showZh ? '这一话暂无中文译文' : showZh ? '隐藏中文' : '显示中文'" @click="settings.storyTranslation = !showZh"><Languages class="w-4 h-4" /><span class="text-xs">{{ showZh && zhState === 'loading' ? '…' : showZh && zhState === 'none' ? '无译文' : '中文' }}</span></button>
       <div class="join"><button aria-label="场景模式" class="btn btn-sm join-item" :class="mode === 'stage' ? 'btn-primary' : 'btn-ghost'" @click="setMode('stage')"><Film class="w-4 h-4" /><span class="hidden sm:inline">场景</span></button><button aria-label="文本模式" class="btn btn-sm join-item" :class="mode === 'script' ? 'btn-primary' : 'btn-ghost'" @click="setMode('script')"><BookOpen class="w-4 h-4" /><span class="hidden sm:inline">文本</span></button></div>
       <button class="btn btn-sm btn-circle btn-ghost" aria-label="关闭阅读器" @click="emit('close')"><X class="w-5 h-5" /></button>
     </header>
@@ -212,7 +267,7 @@ onBeforeUnmount(() => {
       <section v-if="mode === 'script'" class="script-panel">
         <div class="script-search"><label class="input input-sm w-full"><Search class="w-4 h-4" /><input v-model="search" placeholder="搜索台词或人物…" /></label><button class="btn btn-sm btn-ghost" aria-label="复制全文" @click="copyScript"><Copy class="w-4 h-4" /></button></div>
         <div v-if="!matches.length" class="text-center p-10 opacity-50">没有匹配的台词</div>
-        <button v-for="item in matches" :key="item.key" class="script-line" :class="{ 'current-line': item.index === index }" @click="jump(item.index)"><span class="text-xs opacity-40">{{ item.index + 1 }}</span><span><strong class="text-primary text-sm">{{ item.talk.WindowDisplayName || '旁白' }}</strong><span class="block whitespace-pre-line leading-7 mt-1">{{ item.talk.Body }}</span></span><Play class="w-4 h-4 opacity-40" /></button>
+        <button v-for="item in matches" :key="item.key" class="script-line" :class="{ 'current-line': item.index === index }" @click="jump(item.index)"><span class="text-xs opacity-40">{{ item.index + 1 }}</span><span><strong class="text-primary text-sm">{{ item.talk.WindowDisplayName || '旁白' }}<span v-if="zhName(item.talk.WindowDisplayName)" class="zh-speaker" lang="zh-CN">{{ zhName(item.talk.WindowDisplayName) }}</span></strong><template v-if="zhFirst && zhLine(item.talkIndex)"><span class="block whitespace-pre-line leading-7 mt-1" lang="zh-CN">{{ zhLine(item.talkIndex) }}</span><span class="zh-script-sub" lang="ja">{{ item.talk.Body }}</span></template><template v-else><span class="block whitespace-pre-line leading-7 mt-1">{{ item.talk.Body }}</span><span v-if="zhLine(item.talkIndex)" class="zh-script-sub" lang="zh-CN">{{ zhLine(item.talkIndex) }}</span></template></span><Play class="w-4 h-4 opacity-40" /></button>
       </section>
       <div class="reader-controls">
         <input v-if="frames.length" class="range range-primary range-xs w-full" aria-label="台词进度" type="range" min="0" :max="frames.length - 1" :value="index" :disabled="mode === 'stage' && !playerReady" @change="jump(Number(($event.target as HTMLInputElement).value))" />
@@ -250,6 +305,9 @@ onBeforeUnmount(() => {
 .script-search { position:sticky; top:0; z-index:1; display:flex; gap:.5rem; padding:.75rem 0; background:var(--color-base-200); }
 .script-line { display:grid; grid-template-columns:2rem 1fr 1rem; gap:.6rem; width:100%; text-align:left; padding:1rem; margin:.5rem 0; border-radius:12px; background:var(--color-base-100); border:1px solid transparent; }
 .script-line:hover,.current-line { border-color:var(--color-primary); }
+.zh-source { margin-left:.5rem; padding:.05rem .4rem; border-radius:999px; font-weight:500; letter-spacing:0; color:var(--color-base-content); background:var(--color-base-200); opacity:.75; }
+.zh-speaker { margin-left:.45rem; font-weight:500; opacity:.7; }
+.zh-script-sub { display:block; margin-top:.2rem; white-space:pre-line; line-height:1.6; font-size:.92em; color:color-mix(in oklab, var(--color-base-content) 68%, transparent); }
 @media(max-width:640px) { .reader-heading {padding:.7rem .75rem;gap:.5rem;} .story-reader {height:92dvh;} }
 @media(prefers-reduced-motion:reduce) { .player-host :deep(.pjsk-start) {animation:none;} }
 </style>

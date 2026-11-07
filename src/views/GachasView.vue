@@ -10,9 +10,12 @@ import AssetImage from '@/components/AssetImage.vue'
 
 import type { Gacha } from '@/types/gacha'
 import PageHeader from '@/components/PageHeader.vue'
+import ZhText from '@/components/ZhText.vue'
+import { useZh } from '@/composables/useZh'
 
 const masterStore = useMasterStore()
 const settingsStore = useSettingsStore()
+const zhGachas = useZh('gachas')
 const allGachas = ref<Gacha[]>([])
 const isLoading = ref(true)
 const loadError = ref(false)
@@ -32,7 +35,7 @@ const filteredGachas = computed(() => {
   
   if (searchQuery.value) {
     const query = searchQuery.value.toLowerCase()
-    result = result.filter(g => g.name.toLowerCase().includes(query))
+    result = result.filter(g => zhGachas.searchText('name', g.name).toLowerCase().includes(query))
   }
 
   // 剧透过滤
@@ -201,7 +204,7 @@ onMounted(loadData)
             </div>
           </figure>
           <div class="card-body p-3">
-            <h2 class="font-medium text-sm line-clamp-1">{{ gacha.name }}</h2>
+            <h2 class="font-medium text-sm line-clamp-2"><ZhText :text="gacha.name" table="gachas" path="name" sub-class="text-xs font-normal" /></h2>
             <div class="text-xs text-base-content/60 flex items-center gap-1">
               <Calendar class="w-3 h-3" />
               {{ formatDate(gacha.startAt) }} ~ {{ formatDate(gacha.endAt) }}

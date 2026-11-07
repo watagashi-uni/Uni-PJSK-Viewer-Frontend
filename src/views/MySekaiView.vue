@@ -11,6 +11,7 @@ import type {
   ResourceRenderCall, ResourceStat
 } from '@/types/mysekai'
 import PageHeader from '@/components/PageHeader.vue'
+import { useZh } from '@/composables/useZh'
 
 const SITE_SCENES: SceneConfig[] = [
   {
@@ -97,6 +98,16 @@ const RARE_RES_KEYS: Record<1 | 2, string[]> = {
 const accountStore = useAccountStore()
 const settingsStore = useSettingsStore()
 const masterStore = useMasterStore()
+const zhResources: Record<string, ReturnType<typeof useZh>> = {
+  mysekai_material: useZh('mysekaiMaterials'),
+  mysekai_fixture: useZh('mysekaiFixtures'),
+}
+// 资源提示文字带上中文名
+function resourceLabel(id: string): string {
+  const name = resourceDisplayNames.value[id]
+  if (!name) return id
+  return zhResources[id.split(':')[0] || '']?.inline('name', name) || name
+}
 
 const accounts = computed(() => accountStore.accounts)
 const assetsHost = computed(() => String(settingsStore.assetsHost || '').replace(/\/+$/, ''))
@@ -961,8 +972,8 @@ onBeforeUnmount(() => {
                 ? (item.rarity === 2 ? 'resource-chip-super' : item.rarity === 1 ? 'resource-chip-rare' : 'resource-chip-normal')
                 : (isFilterActive ? 'resource-chip-muted' : 'resource-chip-normal')
             ]"
-            :title="`${resourceDisplayNames[item.id] || item.id} ×${item.count}`"
-            :aria-label="`${resourceDisplayNames[item.id] || item.id} ×${item.count}`"
+            :title="`${resourceLabel(item.id)} ×${item.count}`"
+            :aria-label="`${resourceLabel(item.id)} ×${item.count}`"
             @click="toggleResource(item.id)"
           >
             <img :src="item.texture" :alt="resourceDisplayNames[item.id] || ''" class="w-4 h-4 object-contain" />

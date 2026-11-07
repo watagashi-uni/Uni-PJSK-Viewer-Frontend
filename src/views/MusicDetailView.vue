@@ -7,6 +7,7 @@ import { useBackToList } from '@/composables/useBackToList'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
 import { useAccountStore } from '@/stores/account'
+import { useZh } from '@/composables/useZh'
 import { Mp3Encoder } from '@breezystack/lamejs'
 import {
   Play, Pause, BarChart2, Eye, Download, ChevronLeft, ChevronDown,
@@ -148,7 +149,9 @@ const music = ref<Music | null>(null)
 const musicCategories = ref<string[]>([])
 const difficulties = ref<MusicDifficulty[]>([])
 const vocals = ref<MusicVocal[]>([])
-const translation = computed(() => masterStore.translations[musicId.value] || '')
+const zhMusics = useZh('musics')
+const zhMusicEnabled = zhMusics.enabled
+const translation = computed(() => zhMusics.t('title', music.value?.title) || '')
 const relatedEvent = ref<EventData | null>(null)
 const characters = ref<Character[]>([])
 const outsideCharacters = ref<OutsideCharacter[]>([])
@@ -970,9 +973,6 @@ async function downloadPreviewPng() {
 async function loadData() {
   isLoading.value = true
   try {
-    // 异步拉取翻译数据，不阻塞主数据渲染
-    masterStore.getTranslations().catch(e => console.error('加载翻译失败:', e))
-
     const [
       musicsData,
       musicCategoryData,
@@ -1293,7 +1293,7 @@ const isExpired = computed(() => {
             <!-- 翻译 -->
             <p v-if="translation" class="text-base-content/70 mt-2 select-all">{{ translation }}</p>
             <a 
-              v-else
+              v-else-if="zhMusicEnabled"
               href="https://paratranz.cn/projects/18073" 
               target="_blank" 
               rel="noopener noreferrer"

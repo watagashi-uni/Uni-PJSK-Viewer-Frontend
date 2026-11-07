@@ -24,6 +24,7 @@ let nowTimer: ReturnType<typeof setInterval> | undefined
 
 import type { Gacha } from '@/types/gacha'
 import { cardImageVariant } from '@/utils/card'
+import ZhText from '@/components/ZhText.vue'
 
 const events = ref<EventData[]>([])
 const musics = ref<MusicData[]>([])
@@ -396,7 +397,7 @@ onMounted(async () => {
                 <span class="text-base-content/55">{{ formatDate(currentEvent.startAt) }} – {{ formatDate(currentEvent.aggregateAt) }}</span>
               </div>
               <RouterLink :to="`/events/${currentEvent.id}`" class="block text-lg font-bold leading-snug hover:text-primary">
-                {{ currentEvent.name }}
+                <ZhText :text="currentEvent.name" table="events" path="name" sub-class="text-sm font-medium" />
               </RouterLink>
 
               <div v-if="currentEvent.status === 'ongoing'">
@@ -512,7 +513,7 @@ onMounted(async () => {
                   class="h-11 w-11 shrink-0 rounded-md object-cover"
                 />
                 <span class="min-w-0 flex-1">
-                  <span class="block truncate text-sm font-medium group-hover:text-primary">{{ music.title }}</span>
+                  <span class="block truncate text-sm font-medium group-hover:text-primary"><ZhText :text="music.title" table="musics" path="title" layout="inline" /></span>
                   <span class="block truncate text-xs text-base-content/50">{{ music.composer }}</span>
                 </span>
                 <span class="shrink-0 text-xs text-base-content/45">{{ scheduleDay(music.publishedAt) }}</span>

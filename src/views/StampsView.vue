@@ -9,11 +9,14 @@ import Pagination from '@/components/Pagination.vue'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
 import type { GameCharacterData, StampData } from '@/types/master'
+import ZhText from '@/components/ZhText.vue'
+import { useZh } from '@/composables/useZh'
 
 const route = useRoute()
 const router = useRouter()
 const masterStore = useMasterStore()
 const settingsStore = useSettingsStore()
+const zhStamps = useZh('stamps')
 
 const stamps = ref<StampData[]>([])
 const characters = ref<GameCharacterData[]>([])
@@ -71,7 +74,7 @@ const filteredStamps = computed(() => {
       if (!query) return true
       const character = stamp.characterId1 ? characterMap.value.get(stamp.characterId1) : undefined
       const characterName = character ? `${character.firstName || ''}${character.givenName}` : ''
-      return [stamp.id, stamp.name, stamp.description, stamp.assetbundleName, characterName]
+      return [stamp.id, zhStamps.searchText('name', stamp.name), zhStamps.searchText('description', stamp.description), stamp.assetbundleName, characterName]
         .some(value => String(value || '').toLocaleLowerCase().includes(query))
     })
     .sort((a, b) => b.archivePublishedAt - a.archivePublishedAt || b.id - a.id)
@@ -108,6 +111,12 @@ function getStampUrl(stamp: StampData): string {
 
 function cleanName(name: string): string {
   return name.replace(/^\[スタンプ\]/, '').trim()
+}
+
+// 译文同样带“[表情]”前缀，去掉后再显示
+function zhName(stamp: StampData): string | null {
+  const zh = zhStamps.entry('name', stamp.name)
+  return zh ? zh.text.replace(/^\[[^\]]*\]/, '').trim() : null
 }
 
 function getCharacterName(stamp: StampData): string {
@@ -229,7 +238,7 @@ onMounted(async () => {
           <div class="absolute top-2 right-2 badge badge-sm bg-base-100/80 border-0">#{{ stamp.id }}</div>
         </figure>
         <div class="card-body p-3 gap-1 min-w-0">
-          <h2 class="font-bold text-sm truncate" :title="cleanName(stamp.name)">{{ cleanName(stamp.name) }}</h2>
+          <h2 class="font-bold text-sm truncate" :title="cleanName(stamp.name)"><ZhText :text="cleanName(stamp.name)" :zh="zhName(stamp)" :ai="zhStamps.entry('name', stamp.name)?.ai" sub-class="text-xs font-normal" /></h2>
           <p class="text-xs text-base-content/50 truncate">{{ getCharacterName(stamp) }}</p>
         </div>
       </button>
@@ -258,7 +267,7 @@ onMounted(async () => {
                 <span class="badge badge-primary badge-outline">#{{ selectedStamp.id }}</span>
                 <span class="badge badge-ghost">{{ getTypeLabel(selectedStamp.stampType) }}</span>
               </div>
-              <h2 class="text-xl font-bold">{{ cleanName(selectedStamp.name) }}</h2>
+              <h2 class="text-xl font-bold"><ZhText :text="cleanName(selectedStamp.name)" :zh="zhName(selectedStamp)" :ai="zhStamps.entry('name', selectedStamp.name)?.ai" sub-class="text-base mt-1" /></h2>
               <p class="text-sm text-base-content/60 mt-1">{{ getCharacterName(selectedStamp) }}</p>
             </div>
 
@@ -269,7 +278,7 @@ onMounted(async () => {
               <dd class="font-mono text-xs break-all">{{ selectedStamp.assetbundleName }}</dd>
               <template v-if="selectedStamp.description">
                 <dt class="text-base-content/50">获得方式</dt>
-                <dd class="whitespace-pre-line">{{ selectedStamp.description }}</dd>
+                <dd class="whitespace-pre-line"><ZhText :text="selectedStamp.description" table="stamps" path="description" sub-class="mt-1" /></dd>
               </template>
             </dl>
 

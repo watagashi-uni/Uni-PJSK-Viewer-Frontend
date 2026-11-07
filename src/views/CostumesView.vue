@@ -17,6 +17,8 @@ import Pagination from '@/components/Pagination.vue'
 import CostumeThumb from '@/components/CostumeThumb.vue'
 import { buildCostumeGroups, COSTUME_PART_LABELS } from '@/utils/costume'
 import type { Costume3d, CardCostume3d, CostumePart } from '@/types/costume'
+import ZhText from '@/components/ZhText.vue'
+import { useZh } from '@/composables/useZh'
 
 interface Character {
   id: number
@@ -35,6 +37,7 @@ const route = useRoute()
 const router = useRouter()
 const masterStore = useMasterStore()
 const settingsStore = useSettingsStore()
+const zhCostumes = useZh('costume3ds')
 
 const characters = ref<Character[]>([])
 const costumeGroups = ref<CostumeGroup[]>([])
@@ -122,7 +125,7 @@ const filteredItems = computed(() => {
     if (selectedSource.value === 'own' && group.cardLinkType !== 'own') continue
     if (selectedSource.value === 'distributed' && group.cardLinkType !== 'distributed') continue
     if (selectedSource.value === 'none' && group.cardId !== undefined) continue
-    if (query && !group.name.toLowerCase().includes(query)) continue
+    if (query && !zhCostumes.searchText('name', group.name).toLowerCase().includes(query)) continue
     const part = group.parts.find(p => p.partType === selectedPart.value)
     if (part) {
       items.push({ key: `${group.key}:${part.partType}`, group, part })
@@ -361,7 +364,7 @@ onMounted(() => {
             </div>
 
             <!-- 名称与信息 -->
-            <h3 class="font-semibold text-sm mt-2 line-clamp-2 flex-1">{{ item.group.name }}</h3>
+            <h3 class="font-semibold text-sm mt-2 line-clamp-3 flex-1"><ZhText :text="item.group.name" table="costume3ds" path="name" sub-class="text-xs font-normal" /></h3>
             <p class="text-[11px] text-base-content/60 mt-1">
               {{ itemSummary(item) }}
             </p>

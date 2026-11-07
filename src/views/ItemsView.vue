@@ -9,6 +9,8 @@ import Pagination from '@/components/Pagination.vue'
 import { useAccountStore } from '@/stores/account'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
+import ZhText from '@/components/ZhText.vue'
+import { useTranslationStore } from '@/stores/translations'
 
 type ItemCategory = 'material' | 'boost' | 'practice' | 'skill' | 'gacha'
 
@@ -102,6 +104,12 @@ const inventoryIdKeys: Record<ItemCategory, string[]> = {
 
 const masterStore = useMasterStore()
 const settingsStore = useSettingsStore()
+// 各类道具的译文所在的 master 表
+const ITEM_ZH_TABLE: Record<ItemCategory, string> = {
+  material: 'materials', boost: 'boostItems', practice: 'practiceTickets', skill: 'skillPracticeTickets', gacha: 'gachaCeilItems',
+}
+const zhStore = useTranslationStore()
+const itemZh = (item: DisplayItem, path: string, jp: string) => zhStore.lookup(ITEM_ZH_TABLE[item.category], path, jp)?.text || ''
 const accountStore = useAccountStore()
 
 const materials = ref<MaterialRow[]>([])
@@ -218,7 +226,7 @@ const filteredItems = computed(() => {
   return allItems.value
     .filter(item => !selectedCategory.value || item.category === selectedCategory.value)
     .filter(item => !ownedOnly.value || getOwned(item) > 0)
-    .filter(item => !query || [item.id, item.name, item.description, item.detail]
+    .filter(item => !query || [item.id, item.name, itemZh(item, 'name', item.name), item.description, itemZh(item, 'flavorText', item.description), item.detail]
       .some(value => String(value || '').toLocaleLowerCase().includes(query)))
     .sort((a, b) => categoryOrder.indexOf(a.category) - categoryOrder.indexOf(b.category) || a.sort - b.sort || a.id - b.id)
 })
@@ -296,7 +304,7 @@ onMounted(async () => {
       <div v-if="paginatedItems.length" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
         <button v-for="item in paginatedItems" :key="item.key" class="group card bg-base-100 border border-base-200 hover:border-primary/30 hover:shadow-md transition-all overflow-hidden text-left" @click="selectedItem = item">
           <figure class="relative h-28 sm:h-32 bg-gradient-to-br from-base-200 to-base-100 p-2.5"><AssetImage :src="item.icon" :alt="item.name" class="w-full h-full object-contain transition-transform" /><span class="absolute top-2 left-2 badge badge-xs badge-neutral">{{ categoryMeta[item.category].shortLabel }}</span><span v-if="hasInventory(item.category)" class="absolute top-2 right-2 badge badge-xs badge-primary shadow-sm">×{{ formatNumber(getOwned(item)) }}</span></figure>
-          <div class="card-body p-3 gap-1"><span class="text-[10px] text-base-content/45">#{{ item.id }} · {{ item.detail }}</span><h2 class="font-bold text-sm line-clamp-2 min-h-10">{{ item.name }}</h2><p class="text-[11px] text-base-content/55 line-clamp-2 min-h-8">{{ item.description || '暂无说明' }}</p></div>
+          <div class="card-body p-3 gap-1"><span class="text-[10px] text-base-content/45">#{{ item.id }} · {{ item.detail }}</span><h2 class="font-bold text-sm line-clamp-3 min-h-10"><ZhText :text="item.name" :table="ITEM_ZH_TABLE[item.category]" path="name" sub-class="text-xs font-normal" /></h2><p class="text-[11px] text-base-content/55 line-clamp-2 min-h-8">{{ item.description ? (settingsStore.translationMode === 'zh-first' && itemZh(item, 'flavorText', item.description)) || item.description : '暂无说明' }}</p></div>
         </button>
       </div>
       <div v-else class="card bg-base-100 border border-base-200"><div class="card-body items-center py-16 text-base-content/55"><Boxes class="w-12 h-12 opacity-30" /><p>没有匹配的物品</p></div></div>
@@ -308,7 +316,7 @@ onMounted(async () => {
         <button class="btn btn-sm btn-circle btn-ghost absolute! right-3 top-3 z-20" aria-label="关闭" @click="selectedItem = null"><X class="w-4 h-4" /></button>
         <div class="flex flex-col sm:flex-row gap-6">
           <div class="w-32 h-32 bg-base-200 rounded-2xl p-3 shrink-0 self-center"><AssetImage :src="selectedItem.icon" :alt="selectedItem.name" class="w-full h-full object-contain" /></div>
-          <div class="min-w-0 space-y-3"><div><span class="badge badge-outline">{{ categoryMeta[selectedItem.category].label }}</span><p class="text-xs text-base-content/45 mt-2">#{{ selectedItem.id }}</p><h2 class="font-bold text-2xl">{{ selectedItem.name }}</h2></div><p class="text-sm text-primary font-medium">{{ selectedItem.detail }}</p><p class="text-sm leading-6 text-base-content/70">{{ selectedItem.description || '暂无说明' }}</p><div v-if="hasInventory(selectedItem.category)" class="stat bg-base-200 rounded-xl p-3"><div class="stat-title text-xs">账号持有</div><div class="stat-value text-2xl text-primary">{{ formatNumber(getOwned(selectedItem)) }}</div></div><div v-if="selectedItem.convertStartAt" class="flex items-center gap-2 text-xs text-base-content/55"><CalendarClock class="w-4 h-4" />{{ formatDate(selectedItem.convertStartAt) }} 开始转换</div></div>
+          <div class="min-w-0 space-y-3"><div><span class="badge badge-outline">{{ categoryMeta[selectedItem.category].label }}</span><p class="text-xs text-base-content/45 mt-2">#{{ selectedItem.id }}</p><h2 class="font-bold text-2xl"><ZhText :text="selectedItem.name" :table="ITEM_ZH_TABLE[selectedItem.category]" path="name" sub-class="text-base mt-1" /></h2></div><p class="text-sm text-primary font-medium">{{ selectedItem.detail }}</p><p class="text-sm leading-6 text-base-content/70"><ZhText v-if="selectedItem.description" :text="selectedItem.description" :table="ITEM_ZH_TABLE[selectedItem.category]" path="flavorText" sub-class="mt-1" /><template v-else>暂无说明</template></p><div v-if="hasInventory(selectedItem.category)" class="stat bg-base-200 rounded-xl p-3"><div class="stat-title text-xs">账号持有</div><div class="stat-value text-2xl text-primary">{{ formatNumber(getOwned(selectedItem)) }}</div></div><div v-if="selectedItem.convertStartAt" class="flex items-center gap-2 text-xs text-base-content/55"><CalendarClock class="w-4 h-4" />{{ formatDate(selectedItem.convertStartAt) }} 开始转换</div></div>
         </div>
       </div>
       <form method="dialog" class="modal-backdrop"><button @click="selectedItem = null">关闭</button></form>

@@ -18,6 +18,7 @@ import {
   COSTUME_RARITY_LABELS,
 } from '@/utils/costume'
 import type { Costume3d, CardCostume3d, CostumeGroup } from '@/types/costume'
+import ZhText from '@/components/ZhText.vue'
 
 interface Character {
   id: number
@@ -260,8 +261,8 @@ onMounted(loadData)
           <!-- 标题区域 -->
           <div class="text-center pb-4 mb-2 border-b border-base-200">
             <h1 class="text-2xl font-bold flex items-center justify-center gap-3">
-              <Shirt class="w-7 h-7 text-primary" />
-              {{ group.name }}
+              <Shirt class="w-7 h-7 text-primary shrink-0" />
+              <span class="min-w-0"><ZhText :text="group.name" table="costume3ds" path="name" sub-class="text-base mt-1" /></span>
             </h1>
             <RouterLink
               :to="`/costumes?charaId=${group.characterId}`"
@@ -289,7 +290,7 @@ onMounted(loadData)
             </h3>
             <!-- 部件单独的获取条件（如专属发型需要 Master Rank） -->
             <p v-if="part.howToObtain && part.howToObtain !== group.howToObtain" class="text-xs text-base-content/60 -mt-1 mb-3">
-              {{ part.howToObtain }}
+              <ZhText :text="part.howToObtain" table="costume3ds" path="howToObtain" />
             </p>
             <div class="flex flex-wrap gap-2 sm:gap-3">
               <div
@@ -304,7 +305,7 @@ onMounted(loadData)
                     class="w-full h-full p-1"
                   />
                 </div>
-                <span class="text-xs text-base-content/70 max-w-16 sm:max-w-20 truncate">{{ variant.colorName }}</span>
+                <span class="text-xs text-base-content/70 max-w-16 sm:max-w-20 truncate"><ZhText :text="variant.colorName" table="costume3ds" path="colorName" /></span>
               </div>
             </div>
           </div>
@@ -322,7 +323,7 @@ onMounted(loadData)
             <div class="space-y-2 text-sm">
               <p>
                 <span class="font-medium">获取方式：</span>
-                <span v-if="group.howToObtain">{{ group.howToObtain }}</span>
+                <span v-if="group.howToObtain"><ZhText :text="group.howToObtain" table="costume3ds" path="howToObtain" layout="inline" /></span>
                 <span v-else-if="group.cardId !== undefined">获得对应卡片后解锁</span>
                 <span v-else>-</span>
               </p>
@@ -355,7 +356,7 @@ onMounted(loadData)
                 </div>
               </div>
               <div class="flex-1 min-w-[180px]">
-                <p class="font-semibold">{{ sourceCard.prefix }}</p>
+                <p class="font-semibold"><ZhText :text="sourceCard.prefix" table="cards" path="prefix" sub-class="text-xs font-normal" /></p>
                 <p class="text-sm text-base-content/60 mt-0.5">{{ getSourceCardCharaName() }}</p>
                 <p class="text-xs text-base-content/60 mt-1">实装时间：{{ formatDate(sourceCard.releaseAt) }}</p>
                 <p v-if="isDistributedCostume" class="text-xs text-info mt-1">

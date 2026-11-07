@@ -4,6 +4,9 @@ import { DEFAULT_CN_ASSETS_HOST, getVersion, isCnAssetsEnabled, normalizeCnAsset
 import { detectIsChina } from '@/utils/location'
 
 export type AssetsSource = 'cn' | 'global'
+/** 资料译名显示方式：不显示 / 日文为主附中文 / 中文为主附日文 */
+export type TranslationMode = 'off' | 'both' | 'zh-first'
+const TRANSLATION_MODES: readonly TranslationMode[] = ['off', 'both', 'zh-first']
 
 // 旧版本保存的是域名（settings_assetsHost），海外源以外都视为选了国内源
 function readSavedAssetsSource(): AssetsSource | null {
@@ -30,6 +33,10 @@ export const useSettingsStore = defineStore('settings', () => {
     const showSpoilers = ref(false)
     // 主题状态: 'light' | 'dark' | 'auto' | 'moe' | 'jirai'
     const theme = ref<string>('auto')
+
+    const translationMode = ref<TranslationMode>('both')
+    // 剧情阅读器里的中文台词，阅读器内也可以切换
+    const storyTranslation = ref(true)
 
     // 默认 vocal 设置: 'sekai' | 'virtual_singer'
     const defaultVocal = ref<string>('sekai')
@@ -122,6 +129,12 @@ export const useSettingsStore = defineStore('settings', () => {
             applyTheme('auto')
         }
 
+        const savedTranslationMode = localStorage.getItem('settings_translationMode') as TranslationMode | null
+        if (savedTranslationMode && TRANSLATION_MODES.includes(savedTranslationMode)) {
+            translationMode.value = savedTranslationMode
+        }
+        storyTranslation.value = localStorage.getItem('settings_storyTranslation') !== '0'
+
         const savedDefaultVocal = localStorage.getItem('settings_defaultVocal')
         if (savedDefaultVocal) {
             defaultVocal.value = savedDefaultVocal
@@ -183,6 +196,14 @@ export const useSettingsStore = defineStore('settings', () => {
         localStorage.setItem('settings_theme', value)
     })
 
+    watch(translationMode, (value) => {
+        localStorage.setItem('settings_translationMode', value)
+    })
+
+    watch(storyTranslation, (value) => {
+        localStorage.setItem('settings_storyTranslation', value ? '1' : '0')
+    })
+
     watch(defaultVocal, (value) => {
         localStorage.setItem('settings_defaultVocal', value)
     })
@@ -197,6 +218,8 @@ export const useSettingsStore = defineStore('settings', () => {
         showSpoilers,
         theme,
         defaultVocal,
+        translationMode,
+        storyTranslation,
         preferredAssetsHost,
         assetsSource,
         assetsHost,

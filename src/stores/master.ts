@@ -1,16 +1,13 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { getVersion } from '@/api/version'
-import { getMasterData, getMusicTranslations, type MasterDataName } from '@/api/master'
+import { getMasterData, type MasterDataName } from '@/api/master'
 import {
     getStoredVersion,
     setStoredVersion,
     getCachedData,
     setCachedData,
     clearAllCache,
-    clearTranslationCache,
-    getTranslationTimestamp,
-    setTranslationTimestamp,
 } from '@/utils/masterDB'
 
 export const useMasterStore = defineStore('master', () => {
@@ -19,7 +16,6 @@ export const useMasterStore = defineStore('master', () => {
     const isLoading = ref(false)
     const loadingFile = ref('')
     const cache = ref<Record<string, any[]>>({})
-    const translations = ref<Record<number, string>>({})
     const assetVersion = ref<string | null>(null)
     const cacheRevision = ref(0)
 
@@ -199,66 +195,6 @@ export const useMasterStore = defineStore('master', () => {
     }
 
     /**
-     * 获取歌曲翻译数据（带 1 天 TTL 缓存）
-     */
-    async function getTranslations(): Promise<Record<number, string>> {
-        const ONE_DAY_MS = 24 * 60 * 60 * 1000
-
-        // 1. 检查内存缓存是否有效
-        if (Object.keys(translations.value).length > 0) {
-            // 检查时间戳
-            const timestamp = await getTranslationTimestamp()
-            if (timestamp && Date.now() - timestamp < ONE_DAY_MS) {
-                return translations.value
-            }
-        }
-
-        // 2. 检查 IndexedDB 缓存是否有效
-        const timestamp = await getTranslationTimestamp()
-        if (timestamp && Date.now() - timestamp < ONE_DAY_MS) {
-            const cachedData = await getCachedData<Record<number, string>>('translations')
-            if (cachedData && typeof cachedData === 'object' && !Array.isArray(cachedData)) {
-                translations.value = cachedData as Record<number, string>
-                return translations.value
-            }
-        }
-
-        // 3. 缓存过期或不存在，从服务器重新获取
-        try {
-            console.log('翻译缓存已过期或不存在，重新获取...')
-            const data = await getMusicTranslations()
-            translations.value = data
-            await setCachedData('translations', data as any)
-            await setTranslationTimestamp(Date.now())
-            return data
-        } catch (error) {
-            console.error('获取翻译数据失败:', error)
-            return {}
-        }
-    }
-
-    /**
-     * 强制刷新翻译（跳过所有缓存）
-     */
-    async function refreshTranslations(): Promise<Record<number, string>> {
-        // 清除所有缓存
-        await clearTranslationCache()
-        translations.value = {}
-
-        // 直接从服务器获取
-        try {
-            const data = await getMusicTranslations()
-            translations.value = data
-            await setCachedData('translations', data as any)
-            await setTranslationTimestamp(Date.now())
-            return data
-        } catch (error) {
-            console.error('刷新翻译数据失败:', error)
-            return {}
-        }
-    }
-
-    /**
      * 批量获取多个 master 数据
      */
     async function getMasters(names: MasterDataName[]): Promise<void> {
@@ -281,7 +217,6 @@ export const useMasterStore = defineStore('master', () => {
     async function refresh(): Promise<void> {
         await clearAllCache()
         invalidateMasterCache()
-        translations.value = {}
         assetVersion.value = null
         version.value = null
         await initialize()
@@ -293,7 +228,6 @@ export const useMasterStore = defineStore('master', () => {
         isLoading,
         loadingFile,
         cache,
-        translations,
         assetVersion,
         cacheRevision,
         // 计算属性
@@ -304,8 +238,6 @@ export const useMasterStore = defineStore('master', () => {
         checkVersionInBackground,
         getMaster,
         getMasters,
-        getTranslations,
-        refreshTranslations,
         refresh,
     }
 })

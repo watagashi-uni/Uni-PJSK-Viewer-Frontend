@@ -593,3 +593,30 @@ html {
   color: var(--color-primary);
   font-weight: 600;
 }
+
+/* 中文译名（ZhText）：附在原文下方或同一行，字号略小、颜色较淡。
+   放在 components 层，sub-class 里的工具类可以覆盖这里的默认值 */
+@layer components {
+  .zh-sub {
+    display: block;
+    margin-top: 0.1em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 0.85em;
+    font-weight: 500;
+    line-height: 1.4;
+    opacity: 0.68;
+  }
+  .zh-inline {
+    font-weight: 500;
+    opacity: 0.68;
+  }
+  .zh-ai {
+    margin-left: 0.2em;
+    font-size: 0.62em;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    opacity: 0.55;
+    vertical-align: super;
+  }
+}

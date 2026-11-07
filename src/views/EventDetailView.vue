@@ -16,6 +16,7 @@ import SekaiHonor from '@/components/SekaiHonor.vue'
 import AccountSelector from '@/components/AccountSelector.vue'
 import type { EventData } from '@/types/master'
 import { cardImageVariant } from '@/utils/card'
+import ZhText from '@/components/ZhText.vue'
 
 const route = useRoute()
 // 上一页是列表时后退以保留筛选与页码，否则打开列表
@@ -72,6 +73,7 @@ interface CardInfo {
 interface EventStorySummary {
   id: number
   eventId: number
+  outline?: string
 }
 
 interface MusicVocal {
@@ -213,6 +215,7 @@ const eventStoryLink = computed(() => {
   const story = eventStories.value.find(item => item.eventId === event.value?.id)
   return story ? `/stories?story=${story.id}` : ''
 })
+const eventOutline = computed(() => eventStoryLink.value ? eventStories.value.find(item => item.eventId === event.value?.id)?.outline || '' : '')
 
 const exchangeSummary = computed(() => eventExchangeSummaries.value.find(summary => summary.eventId === event.value?.id))
 const eventExchangeBoxMap = computed(() => new Map(resourceBoxes.value
@@ -759,7 +762,8 @@ watch(() => route.params.id, loadData)
             </div>
           </div>
           
-          <h1 class="text-2xl font-bold mb-4">{{ event.name }}</h1>
+          <h1 class="text-2xl font-bold mb-4"><ZhText :text="event.name" table="events" path="name" sub-class="text-lg mt-1" /></h1>
+          <p v-if="eventOutline" class="text-sm leading-6 text-base-content/70 mb-4 whitespace-pre-line text-left"><ZhText :text="eventOutline" table="eventStories" path="outline" sub-class="mt-2" /></p>
           
           <!-- 活动状态进度条 -->
           <div class="mb-4">
@@ -1011,7 +1015,7 @@ watch(() => route.params.id, loadData)
               />
               <!-- 歌曲信息 -->
               <div class="flex-1 min-w-0">
-                <p class="font-medium truncate">{{ music?.title }}</p>
+                <p class="font-medium truncate"><ZhText :text="music?.title" table="musics" path="title" sub-class="text-xs font-normal" /></p>
                 <p class="text-sm text-base-content/60 truncate">
                   作曲: {{ music?.composer }}
                   <span v-if="music?.lyricist"> / 作词: {{ music?.lyricist }}</span>

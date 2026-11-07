@@ -9,6 +9,7 @@ import AssetImage from '@/components/AssetImage.vue'
 import SekaiCard from '@/components/SekaiCard.vue'
 import { ChevronLeft, ScrollText, Zap, Link2, Shirt, Calendar, Gift } from 'lucide-vue-next'
 import { isTrainedOnlyCard } from '@/utils/card'
+import ZhText from '@/components/ZhText.vue'
 
 interface Card {
   id: number
@@ -22,6 +23,7 @@ interface Card {
   skillId: number
   specialTrainingSkillId?: number
   cardSkillName: string
+  gachaPhrase?: string
   specialTrainingSkillName?: string
   cardParameters: any
   specialTrainingPower1BonusFixed: number
@@ -634,7 +636,7 @@ onMounted(loadData)
                 class="w-9 h-9"
                 @error="($event.target as HTMLImageElement).style.display = 'none'"
               />
-              {{ card.prefix }}
+              <span class="min-w-0"><ZhText :text="card.prefix" table="cards" path="prefix" sub-class="text-base mt-1" /></span>
             </h1>
             <p class="text-lg text-base-content/70 mt-1 mb-4 border-b border-base-200 pb-4">
               {{ character ? (character.firstName || '') + character.givenName : '' }}
@@ -682,7 +684,7 @@ onMounted(loadData)
 
               <!-- 普通技能 -->
               <div class="space-y-2 text-sm border-t border-base-300 pt-4 mt-4">
-                <p><span class="font-medium">技能名{{ !!card?.specialTrainingSkillId ? ' (特训前)' : '' }}：</span>{{ card?.cardSkillName || '-' }}</p>
+                <p><span class="font-medium">技能名{{ !!card?.specialTrainingSkillId ? ' (特训前)' : '' }}：</span><ZhText v-if="card?.cardSkillName" :text="card.cardSkillName" table="cards" path="cardSkillName" layout="inline" /><template v-else>-</template></p>
                 <div class="flex mt-1">
                   <span class="font-medium whitespace-nowrap">技能效果{{ !!card?.specialTrainingSkillId ? ' (特训前)' : '' }}：</span>
                   <span>{{ parsedDescription }}</span>
@@ -691,7 +693,7 @@ onMounted(loadData)
 
               <!-- 特训技能 -->
               <div v-if="!!card?.specialTrainingSkillId" class="space-y-2 text-sm border-t border-base-300 pt-4 mt-4">
-                <p><span class="font-medium">技能名 (特训后)：</span>{{ card?.specialTrainingSkillName || '-' }}</p>
+                <p><span class="font-medium">技能名 (特训后)：</span><ZhText v-if="card?.specialTrainingSkillName" :text="card.specialTrainingSkillName" table="cards" path="specialTrainingSkillName" layout="inline" /><template v-else>-</template></p>
                 <div class="flex mt-1">
                   <span class="font-medium whitespace-nowrap">技能效果 (特训后)：</span>
                   <span>{{ parsedTrainedDescription }}</span>
@@ -700,6 +702,7 @@ onMounted(loadData)
 
               <!-- 卡片类型 & 实装时间 -->
               <div class="space-y-2 text-sm border-t border-base-300 pt-4 mt-4 text-base-content/80">
+                <p v-if="card?.gachaPhrase && card.gachaPhrase !== '-'"><span class="font-medium text-base-content">招募台词：</span><ZhText :text="card.gachaPhrase" table="cards" path="gachaPhrase" /></p>
                 <p><span class="font-medium text-base-content">卡片类型：</span>{{ cardTypeLabel }}</p>
                 <p v-if="trainedOnly"><span class="font-medium text-base-content">特训：</span>获得时即为特训后，没有特训前形态</p>
                 <p><span class="font-medium text-base-content">实装时间：</span>{{ card?.releaseAt ? formatDate(card.releaseAt) : '-' }}</p>

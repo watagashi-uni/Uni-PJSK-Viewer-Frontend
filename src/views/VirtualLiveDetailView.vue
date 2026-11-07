@@ -8,6 +8,8 @@ import PageHeader from '@/components/PageHeader.vue'
 import SekaiHonor from '@/components/SekaiHonor.vue'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
+import ZhText from '@/components/ZhText.vue'
+import { useZh } from '@/composables/useZh'
 
 interface VirtualLiveSchedule {
   id: number
@@ -168,6 +170,13 @@ const route = useRoute()
 const goBack = useBackToList('/vlives')
 const masterStore = useMasterStore()
 const settingsStore = useSettingsStore()
+const zhVirtualLives = useZh('virtualLives')
+// 页头只能放纯文本：中文优先时标题用译名，另一种文字放到说明里
+function vliveSubtitle(name: string): string {
+  const zh = zhVirtualLives.t('name', name)
+  if (!zh) return ''
+  return `${settingsStore.translationMode === 'zh-first' ? name : zh} · `
+}
 
 const vlive = ref<VirtualLive | null>(null)
 const gameCharacterUnits = ref<GameCharacterUnit[]>([])
@@ -458,7 +467,7 @@ const informationText = computed(() => {
     <div v-else-if="!vlive" class="rounded-xl border border-base-200 bg-base-100 py-20 text-center"><p class="text-xl text-base-content/60">Virtual Live 不存在</p><RouterLink to="/vlives" class="btn btn-primary mt-4">返回列表</RouterLink></div>
 
     <template v-else>
-      <PageHeader :title="vlive.name" :description="`#${vlive.id} · ${typeMap[vlive.virtualLiveType]?.label || vlive.virtualLiveType} · ${vlive.virtualLivePlatform.toUpperCase()}`">
+      <PageHeader :title="zhVirtualLives.label('name', vlive.name)" :description="`${vliveSubtitle(vlive.name)}#${vlive.id} · ${typeMap[vlive.virtualLiveType]?.label || vlive.virtualLiveType} · ${vlive.virtualLivePlatform.toUpperCase()}`">
         <template #icon><Radio class="h-8 w-8 text-primary" /></template>
         <template #actions><button type="button" class="btn btn-sm btn-ghost" @click="goBack"><ChevronLeft class="h-4 w-4" />返回列表</button></template>
       </PageHeader>
@@ -484,7 +493,7 @@ const informationText = computed(() => {
             <div v-if="musicSetlists.length" class="grid gap-2 sm:grid-cols-2">
               <RouterLink v-for="row in musicSetlists" :key="row.id" :to="`/musics/${row.musicId}`" class="group flex min-w-0 gap-3 rounded-xl border border-base-200 p-2.5 transition hover:border-primary/40 hover:bg-base-200/35">
                 <AssetImage v-if="musicMap.get(row.musicId || 0)" :src="`${assetsHost}/startapp/music/jacket/${musicMap.get(row.musicId || 0)?.assetbundleName}/${musicMap.get(row.musicId || 0)?.assetbundleName}.png`" :alt="musicMap.get(row.musicId || 0)?.title || ''" class="h-16 w-16 shrink-0 rounded-lg object-cover" />
-                <div class="min-w-0 flex-1"><div class="flex items-center gap-1.5 text-[10px] text-base-content/40"><span>#{{ row.seq }}</span><span>Stage {{ row.virtualLiveStageId }}</span></div><h3 class="mt-0.5 truncate font-bold group-hover:text-primary">{{ musicMap.get(row.musicId || 0)?.title || `歌曲 #${row.musicId}` }}</h3><p v-if="row.musicVocalId" class="truncate text-xs text-base-content/55">{{ musicVocalMap.get(row.musicVocalId)?.caption || `Vocal #${row.musicVocalId}` }}</p><p v-if="setlistPerformers(row).length" class="mt-1 line-clamp-2 text-[10px] text-base-content/45">出演：{{ setlistPerformers(row).join('、') }}</p></div>
+                <div class="min-w-0 flex-1"><div class="flex items-center gap-1.5 text-[10px] text-base-content/40"><span>#{{ row.seq }}</span><span>Stage {{ row.virtualLiveStageId }}</span></div><h3 class="mt-0.5 truncate font-bold group-hover:text-primary"><ZhText v-if="musicMap.get(row.musicId || 0)?.title" :text="musicMap.get(row.musicId || 0)?.title" table="musics" path="title" layout="inline" /><template v-else>歌曲 #{{ row.musicId }}</template></h3><p v-if="row.musicVocalId" class="truncate text-xs text-base-content/55">{{ musicVocalMap.get(row.musicVocalId)?.caption || `Vocal #${row.musicVocalId}` }}</p><p v-if="setlistPerformers(row).length" class="mt-1 line-clamp-2 text-[10px] text-base-content/45">出演：{{ setlistPerformers(row).join('、') }}</p></div>
               </RouterLink>
             </div>
             <p v-else class="rounded-lg bg-base-200/50 py-6 text-center text-sm text-base-content/45">该节目流程没有歌曲段落</p>
@@ -524,11 +533,11 @@ const informationText = computed(() => {
           </section>
 
           <section v-if="relatedTickets.length" class="rounded-xl border border-base-200 bg-base-100 p-4 shadow-sm">
-            <h2 class="mb-3 flex items-center gap-2 font-bold"><Ticket class="h-5 w-5 text-primary" />入场票券</h2><div class="space-y-2"><div v-for="item in relatedTickets" :key="item.id" class="rounded-xl bg-base-200/45 p-3"><div class="flex items-start justify-between gap-2"><strong class="text-sm">{{ item.name }}</strong><span class="badge badge-sm">{{ item.virtualLiveTicketType }}</span></div><p class="mt-1 text-xs text-base-content/55">{{ item.flavorText }}</p><p class="mt-2 text-[10px] text-primary">{{ ticketScheduleLabel(item) }}</p></div></div>
+            <h2 class="mb-3 flex items-center gap-2 font-bold"><Ticket class="h-5 w-5 text-primary" />入场票券</h2><div class="space-y-2"><div v-for="item in relatedTickets" :key="item.id" class="rounded-xl bg-base-200/45 p-3"><div class="flex items-start justify-between gap-2"><strong class="text-sm"><ZhText :text="item.name" table="virtualLiveTickets" path="name" sub-class="text-xs font-normal" /></strong><span class="badge badge-sm">{{ item.virtualLiveTicketType }}</span></div><p class="mt-1 text-xs text-base-content/55"><ZhText :text="item.flavorText" table="virtualLiveTickets" path="flavorText" /></p><p class="mt-2 text-[10px] text-primary">{{ ticketScheduleLabel(item) }}</p></div></div>
           </section>
 
           <section v-if="relatedPamphlets.length" class="rounded-xl border border-base-200 bg-base-100 p-4 shadow-sm">
-            <h2 class="mb-3 flex items-center gap-2 font-bold"><FileText class="h-5 w-5 text-primary" />场刊</h2><div class="space-y-2"><div v-for="item in relatedPamphlets" :key="item.id" class="rounded-xl bg-base-200/45 p-3"><strong class="text-sm">{{ item.name }}</strong><p class="mt-1 text-xs text-base-content/55">{{ item.flavorText }}</p></div></div>
+            <h2 class="mb-3 flex items-center gap-2 font-bold"><FileText class="h-5 w-5 text-primary" />场刊</h2><div class="space-y-2"><div v-for="item in relatedPamphlets" :key="item.id" class="rounded-xl bg-base-200/45 p-3"><strong class="text-sm"><ZhText :text="item.name" table="virtualLivePamphlets" path="name" sub-class="text-xs font-normal" /></strong><p class="mt-1 text-xs text-base-content/55"><ZhText :text="item.flavorText" table="virtualLivePamphlets" path="flavorText" /></p></div></div>
           </section>
         </aside>
       </div>

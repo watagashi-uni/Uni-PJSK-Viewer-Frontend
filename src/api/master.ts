@@ -1,4 +1,3 @@
-import apiClient from './client'
 import { masterApiClient } from './masterClient'
 
 // 允许获取的 master 数据类型 (不再限制，允许任意字符串)
@@ -11,13 +10,5 @@ export type MasterDataName = string
  */
 export async function getMasterData<T = any>(name: MasterDataName, version: string): Promise<T[]> {
     const response = await masterApiClient.get<T[]>(`/api/master/${encodeURIComponent(version)}/${encodeURIComponent(name)}`)
-    return response.data
-}
-
-/**
- * 获取歌曲翻译数据
- */
-export async function getMusicTranslations(): Promise<Record<number, string>> {
-    const response = await apiClient.get<Record<number, string>>('/api/translations/musics')
     return response.data
 }

@@ -54,23 +54,6 @@ export async function setStoredVersion(version: string): Promise<void> {
 }
 
 /**
- * 获取翻译数据的时间戳
- */
-export async function getTranslationTimestamp(): Promise<number | undefined> {
-    const db = await getMasterDB()
-    const ts = await db.get('meta', 'translationTimestamp')
-    return ts ? Number(ts) : undefined
-}
-
-/**
- * 保存翻译数据的时间戳
- */
-export async function setTranslationTimestamp(timestamp: number): Promise<void> {
-    const db = await getMasterDB()
-    await db.put('meta', String(timestamp), 'translationTimestamp')
-}
-
-/**
  * 获取缓存的 master 数据
  */
 export async function getCachedData<T = any>(name: string): Promise<T[] | undefined> {
@@ -87,35 +70,18 @@ export async function setCachedData<T = any>(name: string, data: T[]): Promise<v
 }
 
 /**
- * 清空所有缓存数据
+ * 清空所有缓存数据（中文译文在单独的 viewer-translations 库里，不受影响）
  */
 export async function clearAllCache(): Promise<void> {
     const db = await getMasterDB()
-    // 清除除 translations 和 translationTimestamp 外的所有数据
     const tx = db.transaction(['data', 'meta'], 'readwrite')
-    const dataStore = tx.objectStore('data')
-    const metaStore = tx.objectStore('meta')
-
-    // 获取所有 data key 并删除非 translations 的
-    const dataKeys = await dataStore.getAllKeys()
-    for (const key of dataKeys) {
-        if (key !== 'translations') {
-            await dataStore.delete(key)
-        }
-    }
-
-    // 只删除 version，保留 translationTimestamp
-    await metaStore.delete('version')
-    await tx.done
-}
-
-/**
- * 清除翻译缓存
- */
-export async function clearTranslationCache(): Promise<void> {
-    const db = await getMasterDB()
-    await db.delete('data', 'translations')
-    await db.delete('meta', 'translationTimestamp')
+    await Promise.all([
+        tx.objectStore('data').clear(),
+        // 旧版歌曲译名的时间戳，已改用 viewer-translations
+        tx.objectStore('meta').delete('translationTimestamp'),
+        tx.objectStore('meta').delete('version'),
+        tx.done,
+    ])
 }
 
 /**

@@ -175,19 +175,9 @@ export default defineConfig({
             handler: 'NetworkOnly',
           },
           {
-            // 翻译 API - 使用 NetworkFirst，确保刷新时拿到最新数据
-            urlPattern: /^https:\/\/viewer-api\.unipjsk\.com\/api\/translations\/.*/i,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'translations-cache',
-              expiration: {
-                maxEntries: 5,
-                maxAgeSeconds: 60 * 60 * 24, // 1 天
-              },
-              cacheableResponse: {
-                statuses: [0, 200],
-              },
-            },
+            // 中文译文由页面存进 IndexedDB 并按哈希更新，Service Worker 不再另存一份
+            urlPattern: /^https:\/\/jp-master\.unipjsk\.com\/translations\//i,
+            handler: 'NetworkOnly',
           },
           {
             // 其他 API 请求 (master data 等)

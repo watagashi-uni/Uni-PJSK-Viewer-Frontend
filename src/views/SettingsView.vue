@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue'
 import { useSettingsStore } from '@/stores/settings'
 import { useMasterStore } from '@/stores/master'
 import { useNotificationStore } from '@/stores/notification'
+import { useTranslationStore } from '@/stores/translations'
 import { Settings, Trash2, Database, Eye, Palette, RefreshCw, Languages, Mic, Bell, AlertTriangle, MonitorSmartphone, Send } from 'lucide-vue-next'
 import { clearAllCache } from '@/utils/masterDB'
 import PageHeader from '@/components/PageHeader.vue'
@@ -10,6 +11,7 @@ import PageHeader from '@/components/PageHeader.vue'
 const settingsStore = useSettingsStore()
 const masterStore = useMasterStore()
 const notificationStore = useNotificationStore()
+const translationStore = useTranslationStore()
 
 onMounted(() => {
   notificationStore.initialize()
@@ -71,6 +73,12 @@ const themes = [
   { value: 'auto', label: '跟随系统' },
 ]
 
+const translationModeOptions = [
+  { value: 'both', label: '日文 + 中文' },
+  { value: 'zh-first', label: '中文优先' },
+  { value: 'off', label: '仅日文' },
+] as const
+
 const vocalOptions = [
   { value: 'sekai', label: 'Sekai 版' },
   { value: 'virtual_singer', label: 'Virtual Singer 版' },
@@ -104,8 +112,8 @@ async function handleClearCache() {
 async function handleClearTranslationCache() {
   isClearingTranslation.value = true
   try {
-    await masterStore.refreshTranslations()
-    alert('翻译已刷新！')
+    await translationStore.clear()
+    alert('译文缓存已清空，打开页面时会重新下载。')
   } catch (e) {
     alert('刷新翻译失败：' + (e instanceof Error ? e.message : '未知错误'))
   } finally {
@@ -139,6 +147,53 @@ async function handleClearTranslationCache() {
               <p class="text-sm text-base-content/60">开启后直接显示尚未发布的歌曲、卡片、活动与日程</p>
             </div>
           </label>
+        </div>
+      </div>
+
+      <!-- 中文译名 -->
+      <div class="card bg-base-100 shadow-lg">
+        <div class="card-body">
+          <h2 class="card-title text-lg mb-4">
+            <Languages class="w-5 h-5" />
+            中文译名
+          </h2>
+
+          <p class="font-medium text-sm mb-2">卡牌、活动、歌曲等名称与说明</p>
+          <div class="flex flex-wrap gap-2">
+            <button
+              v-for="option in translationModeOptions"
+              :key="option.value"
+              class="btn btn-sm"
+              :class="settingsStore.translationMode === option.value ? 'btn-primary' : 'btn-ghost'"
+              @click="settingsStore.translationMode = option.value"
+            >
+              {{ option.label }}
+            </button>
+          </div>
+          <p class="text-xs text-base-content/50 mt-2">
+            优先使用国服官方译名，其次是人工翻译；标有 <span class="font-semibold">AI</span> 的为机器翻译，仅供参考。没有译文时显示日文原文。
+          </p>
+
+          <label class="label cursor-pointer justify-start gap-4 whitespace-normal mt-4">
+            <input v-model="settingsStore.storyTranslation" type="checkbox" class="toggle toggle-primary shrink-0" />
+            <div>
+              <span class="font-medium text-base-content">剧情中文字幕</span>
+              <p class="text-sm text-base-content/60">在剧情阅读器的台词、人名和地点下方显示中文，阅读器内也可以切换</p>
+            </div>
+          </label>
+
+          <div class="divider my-2"></div>
+          <p class="text-sm text-base-content/60 mb-3">
+            译文按需下载并缓存在当前设备，内容更新后会自动替换。显示异常时可清空译文缓存。
+          </p>
+          <button
+            class="btn btn-sm w-fit"
+            :disabled="isClearingTranslation"
+            @click="handleClearTranslationCache"
+          >
+            <RefreshCw class="w-4 h-4" :class="{ 'animate-spin': isClearingTranslation }" />
+            {{ isClearingTranslation ? '清空中...' : '清空译文缓存' }}
+          </button>
         </div>
       </div>
 
@@ -312,29 +367,6 @@ async function handleClearTranslationCache() {
               </button>
             </div>
           </template>
-        </div>
-      </div>
-
-      <!-- 翻译缓存 -->
-      <div class="card bg-base-100 shadow-lg">
-        <div class="card-body">
-          <h2 class="card-title text-lg mb-4">
-            <Languages class="w-5 h-5" />
-            翻译缓存
-          </h2>
-          
-          <p class="text-sm text-base-content/60 mb-4">
-            翻译数据会缓存1天。如果翻译数据有更新，可手动清空缓存以获取最新内容。
-          </p>
-          
-          <button 
-            class="btn"
-            :disabled="isClearingTranslation"
-            @click="handleClearTranslationCache"
-          >
-            <RefreshCw class="w-4 h-4" :class="{ 'animate-spin': isClearingTranslation }" />
-            {{ isClearingTranslation ? '刷新中...' : '刷新翻译' }}
-          </button>
         </div>
       </div>
 

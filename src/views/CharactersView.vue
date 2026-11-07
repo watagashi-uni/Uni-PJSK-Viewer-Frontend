@@ -17,6 +17,8 @@ import type {
   StampData,
   UnitProfileData,
 } from '@/types/master'
+import ZhText from '@/components/ZhText.vue'
+import { useZh } from '@/composables/useZh'
 
 interface UserCharacter {
   characterId?: number
@@ -55,6 +57,7 @@ const route = useRoute()
 const router = useRouter()
 const masterStore = useMasterStore()
 const settingsStore = useSettingsStore()
+const zhProfiles = useZh('characterProfiles')
 const accountStore = useAccountStore()
 
 const characters = ref<GameCharacterData[]>([])
@@ -267,6 +270,12 @@ function cleanText(value?: string): string {
   return (value || '').replace(/\n/g, '')
 }
 
+// 译文按带换行的原文查找，显示时同样去掉换行
+function profileText(field: string, value?: string) {
+  const zh = zhProfiles.entry(field, value)
+  return { text: cleanText(value), zh: zh ? cleanText(zh.text) : null, ai: zh?.ai }
+}
+
 function getUserCharacterRank(row: UserCharacter): number {
   return Number(row.characterRank ?? row.character_rank ?? 0)
 }
@@ -400,7 +409,7 @@ onMounted(async () => {
             </header>
 
             <p v-if="selectedProfile?.introduction" class="leading-7 text-base-content/80 whitespace-pre-line">
-              {{ selectedProfile.introduction }}
+              <ZhText :text="selectedProfile.introduction" table="characterProfiles" path="introduction" sub-class="mt-3" />
             </p>
 
             <div
@@ -464,19 +473,19 @@ onMounted(async () => {
                 <dt class="text-base-content/50 text-xs">学校 / 年级</dt><dd class="font-medium mt-1">{{ selectedProfile.school }} {{ selectedProfile.schoolYear }}</dd>
               </div>
               <div v-if="selectedProfile.hobby" class="bg-base-200/70 rounded-lg p-3">
-                <dt class="text-base-content/50 text-xs">兴趣</dt><dd class="font-medium mt-1">{{ cleanText(selectedProfile.hobby) }}</dd>
+                <dt class="text-base-content/50 text-xs">兴趣</dt><dd class="font-medium mt-1"><ZhText v-bind="profileText('hobby', selectedProfile.hobby)" /></dd>
               </div>
               <div v-if="selectedProfile.specialSkill" class="bg-base-200/70 rounded-lg p-3">
-                <dt class="text-base-content/50 text-xs">特长</dt><dd class="font-medium mt-1">{{ cleanText(selectedProfile.specialSkill) }}</dd>
+                <dt class="text-base-content/50 text-xs">特长</dt><dd class="font-medium mt-1"><ZhText v-bind="profileText('specialSkill', selectedProfile.specialSkill)" /></dd>
               </div>
               <div v-if="selectedProfile.favoriteFood" class="bg-base-200/70 rounded-lg p-3">
-                <dt class="text-base-content/50 text-xs">喜欢的食物</dt><dd class="font-medium mt-1">{{ cleanText(selectedProfile.favoriteFood) }}</dd>
+                <dt class="text-base-content/50 text-xs">喜欢的食物</dt><dd class="font-medium mt-1"><ZhText v-bind="profileText('favoriteFood', selectedProfile.favoriteFood)" /></dd>
               </div>
               <div v-if="selectedProfile.hatedFood" class="bg-base-200/70 rounded-lg p-3">
-                <dt class="text-base-content/50 text-xs">不喜欢的食物</dt><dd class="font-medium mt-1">{{ cleanText(selectedProfile.hatedFood) }}</dd>
+                <dt class="text-base-content/50 text-xs">不喜欢的食物</dt><dd class="font-medium mt-1"><ZhText v-bind="profileText('hatedFood', selectedProfile.hatedFood)" /></dd>
               </div>
               <div v-if="selectedProfile.weak" class="bg-base-200/70 rounded-lg p-3">
-                <dt class="text-base-content/50 text-xs">不擅长</dt><dd class="font-medium mt-1">{{ cleanText(selectedProfile.weak) }}</dd>
+                <dt class="text-base-content/50 text-xs">不擅长</dt><dd class="font-medium mt-1"><ZhText v-bind="profileText('weak', selectedProfile.weak)" /></dd>
               </div>
             </dl>
 
@@ -493,8 +502,8 @@ onMounted(async () => {
 
         <section v-if="selectedUnitProfile?.profileSentence" class="card bg-base-100 border border-base-200 lg:col-span-2">
           <div class="card-body p-5">
-            <h2 class="font-bold flex items-center gap-2"><Users class="w-5 h-5" /> {{ selectedUnitProfile.unitName }}</h2>
-            <p class="text-sm leading-6 text-base-content/70">{{ selectedUnitProfile.profileSentence }}</p>
+            <h2 class="font-bold flex items-center gap-2"><Users class="w-5 h-5" /> <ZhText :text="selectedUnitProfile.unitName" table="unitProfiles" path="unitName" layout="inline" /></h2>
+            <p class="text-sm leading-6 text-base-content/70 whitespace-pre-line"><ZhText :text="selectedUnitProfile.profileSentence" table="unitProfiles" path="profileSentence" sub-class="mt-2" /></p>
           </div>
         </section>
       </div>

@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { BookOpen, ChevronRight, Library, Play, Search, Sparkles, X } from 'lucide-vue-next'
 import AssetImage from '@/components/AssetImage.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import Pagination from '@/components/Pagination.vue'
 import StoryReader from '@/components/StoryReader.vue'
+import ZhText from '@/components/ZhText.vue'
+import { useTranslationStore } from '@/stores/translations'
 import { specialScenarioPath, storyAssetHost } from '@/utils/storyPlayback'
 import { loadStoryPlayerIndex } from '@/utils/storyPlayerAssets'
 import { useMasterStore } from '@/stores/master'
@@ -94,6 +96,24 @@ const router = useRouter()
 const masterStore = useMasterStore()
 const settingsStore = useSettingsStore()
 
+// 中文译名：各类剧情的标题、简介分属不同的 master 表
+type ZhSource = { table: string; path: string }
+const zhStore = useTranslationStore()
+const STORY_TITLE_ZH: Record<StoryKind, ZhSource> = {
+  event: { table: 'events', path: 'name' }, unit: { table: 'unitStories', path: 'chapters.title' },
+  card: { table: 'cards', path: 'prefix' }, special: { table: 'specialStories', path: 'title' },
+}
+const EPISODE_TITLE_ZH: Record<StoryKind, ZhSource> = {
+  event: { table: 'eventStories', path: 'eventStoryEpisodes.title' }, unit: { table: 'unitStories', path: 'chapters.episodes.title' },
+  card: { table: 'cardEpisodes', path: 'title' }, special: { table: 'specialStories', path: 'episodes.title' },
+}
+const OUTLINE_ZH: Partial<Record<StoryKind, ZhSource>> = {
+  event: { table: 'eventStories', path: 'outline' }, unit: { table: 'unitStoryEpisodeGroups', path: 'outline' },
+}
+const zhOf = (source: ZhSource | undefined, jp?: string) => source && jp ? zhStore.lookup(source.table, source.path, jp)?.text : undefined
+// 搜索时原文和译文都能匹配
+const withZh = (source: ZhSource | undefined, jp?: string) => [jp, zhOf(source, jp)]
+
 const events = ref<EventData[]>([])
 const eventStories = ref<EventStory[]>([])
 const eventStoryUnits = ref<EventStoryUnit[]>([])
@@ -139,6 +159,12 @@ const activeTab = computed<StoryTab>(() => {
   if (['unit', 'card', 'special'].includes(String(route.query.tab))) return route.query.tab as StoryTab
   return 'event'
 })
+watchEffect(() => {
+  if (settingsStore.translationMode === 'off') return
+  zhStore.ensureAll(['events', 'eventStories', 'unitStories', 'unitStoryEpisodeGroups'])
+  if (activeTab.value === 'card') zhStore.ensureAll(['cards', 'cardEpisodes'])
+  if (activeTab.value === 'special') zhStore.ensure('specialStories')
+})
 const eventMap = computed(() => new Map(events.value.map(event => [event.id, event])))
 const unitEpisodeGroupMap = computed(() => new Map(unitEpisodeGroups.value.map(group => [group.id, group])))
 
@@ -165,7 +191,7 @@ const filteredEventStories = computed(() => {
     .filter(story => {
       if (!query) return true
       const event = eventMap.value.get(story.eventId)
-      return [story.id, event?.name, story.outline, ...story.eventStoryEpisodes.map(episode => episode.title)]
+      return [story.id, ...withZh(STORY_TITLE_ZH.event, event?.name), ...withZh(OUTLINE_ZH.event, story.outline), ...story.eventStoryEpisodes.flatMap(episode => withZh(EPISODE_TITLE_ZH.event, episode.title))]
         .some(value => String(value || '').toLocaleLowerCase().includes(query))
     })
     .sort((a, b) => b.eventId - a.eventId)
@@ -180,7 +206,7 @@ const flattenedUnitChapters = computed(() => unitStories.value
   .filter(chapter => {
     const query = searchQuery.value.trim().toLocaleLowerCase()
     if (!query) return true
-    return [chapter.title, getUnitLabel(chapter.unit), ...chapter.episodes.map(episode => episode.title)]
+    return [...withZh(STORY_TITLE_ZH.unit, chapter.title), getUnitLabel(chapter.unit), ...chapter.episodes.flatMap(episode => withZh(EPISODE_TITLE_ZH.unit, episode.title))]
       .some(value => String(value || '').toLocaleLowerCase().includes(query))
   })
   .sort((a, b) => unitOrder(a.unit) - unitOrder(b.unit) || a.chapterNo - b.chapterNo))
@@ -212,7 +238,7 @@ const selectedStoryEpisodes = computed(() => {
   return selectedStory.value.episodes.filter(episode => [
     episode.episodeNo,
     episode.episodeNoLabel,
-    episode.title,
+    ...withZh(EPISODE_TITLE_ZH[selectedStory.value!.kind], episode.title),
     episode.scenarioId,
   ].some(value => String(value || '').toLocaleLowerCase().includes(query)))
 })
@@ -234,7 +260,7 @@ const extraStories = computed<SelectedStory[]>(() => {
     }))
     : specialStories.value.filter(story => settingsStore.showSpoilers || story.startAt <= now).map(story => ({ ...story, kind: 'special' as const }))
   const query = searchQuery.value.trim().toLocaleLowerCase()
-  return items.filter(story => story.episodes.length && (!query || `${story.id} ${story.title} ${story.episodes.map(e => e.title).join(' ')}`.toLocaleLowerCase().includes(query))).reverse()
+  return items.filter(story => story.episodes.length && (!query || [story.id, ...withZh(STORY_TITLE_ZH[story.kind], story.title), ...story.episodes.flatMap(e => withZh(EPISODE_TITLE_ZH[story.kind], e.title))].join(' ').toLocaleLowerCase().includes(query))).reverse()
 })
 let extraRequest: Promise<void> | null = null
 async function loadExtra() {
@@ -431,8 +457,8 @@ onMounted(async () => {
           <figure class="relative aspect-[122/52] bg-base-200 overflow-hidden"><AssetImage :src="eventBanner(story)" :alt="eventMap.get(story.eventId)?.name" class="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-300" /></figure>
           <div class="card-body p-4 gap-2.5">
             <div class="flex items-center justify-between gap-2"><img v-if="getUnitLogo(mainUnitByEventStory.get(story.id))" :src="getUnitLogo(mainUnitByEventStory.get(story.id))" class="h-5 max-w-24 object-contain object-left" /><span class="text-[11px] text-base-content/45">{{ formatDate(eventMap.get(story.eventId)?.startAt) }}</span></div>
-            <h2 class="font-bold line-clamp-2 leading-5">{{ eventMap.get(story.eventId)?.name || `活动故事 #${story.id}` }}</h2>
-            <p class="text-xs leading-5 text-base-content/55 line-clamp-2 min-h-10">{{ story.outline }}</p>
+            <h2 class="font-bold leading-5"><ZhText v-if="eventMap.get(story.eventId)?.name" :text="eventMap.get(story.eventId)?.name" v-bind="STORY_TITLE_ZH.event" sub-class="font-medium text-xs line-clamp-1" /><template v-else>活动故事 #{{ story.id }}</template></h2>
+            <p class="text-xs leading-5 text-base-content/55 line-clamp-2 min-h-10">{{ settingsStore.translationMode === 'zh-first' ? zhOf(OUTLINE_ZH.event, story.outline) || story.outline : story.outline }}</p>
             <p class="text-[11px] text-base-content/40 pt-1">共 {{ story.eventStoryEpisodes.length }} 话</p>
           </div>
         </button>
@@ -446,8 +472,8 @@ onMounted(async () => {
         <button v-for="chapter in flattenedUnitChapters" :key="chapter.id" class="group card bg-base-100 border border-base-200 hover:border-primary/30 hover:shadow-lg transition-all text-left overflow-hidden" @click="openUnitChapter(chapter)">
           <div class="h-1.5 bg-primary/70"></div><div class="card-body p-5 gap-3">
             <div class="flex items-center justify-between gap-3"><img :src="getUnitLogo(chapter.unit)" :alt="getUnitLabel(chapter.unit)" class="h-8 max-w-40 object-contain object-left" /><span class="badge badge-sm badge-ghost">Chapter {{ chapter.chapterNo }}</span></div>
-            <h2 class="font-bold leading-5">{{ chapter.title }}</h2>
-            <p class="text-xs leading-5 text-base-content/55 line-clamp-3 min-h-[3.75rem]">{{ unitChapterOutline(chapter) || `${getUnitLabel(chapter.unit)} 的组合主线故事。` }}</p>
+            <h2 class="font-bold leading-5"><ZhText :text="chapter.title" v-bind="STORY_TITLE_ZH.unit" sub-class="font-medium text-xs" /></h2>
+            <p class="text-xs leading-5 text-base-content/55 line-clamp-3 min-h-[3.75rem]">{{ (settingsStore.translationMode === 'zh-first' && zhOf(OUTLINE_ZH.unit, unitChapterOutline(chapter))) || unitChapterOutline(chapter) || `${getUnitLabel(chapter.unit)} 的组合主线故事。` }}</p>
             <div class="flex items-center gap-2 text-[11px] text-base-content/40"><span class="flex-1">共 {{ chapter.episodes.length }} 话</span><ChevronRight class="w-4 h-4 opacity-40 group-hover:translate-x-0.5 transition-transform" /></div>
           </div>
         </button>
@@ -462,7 +488,7 @@ onMounted(async () => {
         <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <button v-for="story in extraStories.slice((extraPage - 1) * 12, extraPage * 12)" :key="story.id" class="card bg-base-100 border border-base-200 hover:border-primary text-left overflow-hidden" @click="selectedStory = story">
             <AssetImage v-if="story.kind === 'card'" :src="`${assetsHost}/startapp/character/member/${story.assetbundleName}/card_${trainedOnlyStoryCardIds.has(Number(story.id)) ? 'after_training' : 'normal'}.jpg`" :alt="story.title" class="w-full aspect-video object-cover" />
-            <div class="p-5 space-y-2"><span class="text-xs text-primary">{{ extraLabels[activeTab] }} / {{ story.id }}</span><h2 class="font-bold">{{ story.title }}</h2><p class="text-xs opacity-50">{{ story.episodes.length }} 话 · 点击选集</p></div>
+            <div class="p-5 space-y-2"><span class="text-xs text-primary">{{ extraLabels[activeTab] }} / {{ story.id }}</span><h2 class="font-bold"><ZhText :text="story.title" v-bind="STORY_TITLE_ZH[story.kind]" sub-class="font-medium text-xs" /></h2><p class="text-xs opacity-50">{{ story.episodes.length }} 话 · 点击选集</p></div>
           </button>
         </div>
         <div v-if="!extraStories.length" class="py-12 text-center opacity-50">没有匹配的故事</div>
@@ -476,6 +502,7 @@ onMounted(async () => {
           v-if="selectedEpisode"
           :key="selectedEpisode.scenarioId"
           :title="selectedEpisode.title"
+          :title-zh="zhOf(EPISODE_TITLE_ZH[selectedStory.kind], selectedEpisode.title)"
           :episode-label="selectedEpisode.episodeNoLabel || `第 ${selectedEpisode.episodeNo} 话`"
           :scenario-id="selectedEpisode.scenarioId"
           :scenario-urls="scenarioUrls"
@@ -494,8 +521,8 @@ onMounted(async () => {
                 <span class="badge badge-primary">{{ selectedStory.kind === 'event' ? '活动故事' : selectedStory.kind === 'unit' ? '组合主线' : extraLabels[selectedStory.kind] }}</span>
                 <span v-if="selectedStory.unit" class="badge badge-ghost">{{ getUnitLabel(selectedStory.unit) }}</span>
               </div>
-              <h2 class="font-bold text-xl">{{ selectedStory.title }}</h2>
-              <p v-if="selectedStory.outline" class="text-sm leading-6 text-base-content/65 mt-2 whitespace-pre-line">{{ selectedStory.outline }}</p>
+              <h2 class="font-bold text-xl"><ZhText :text="selectedStory.title" v-bind="STORY_TITLE_ZH[selectedStory.kind]" sub-class="text-base" /></h2>
+              <p v-if="selectedStory.outline" class="text-sm leading-6 text-base-content/65 mt-2 whitespace-pre-line"><ZhText :text="selectedStory.outline" v-bind="OUTLINE_ZH[selectedStory.kind] || {}" sub-class="mt-2 text-[0.95em]" /></p>
             </div>
             <button class="btn btn-sm btn-circle btn-ghost" aria-label="关闭" @click="closeStory"><X class="w-4 h-4" /></button>
           </header>
@@ -504,7 +531,7 @@ onMounted(async () => {
             <button v-for="episode in selectedStoryEpisodes" :key="episode.id" class="group w-full flex items-center gap-3 bg-base-100 border border-base-200 rounded-xl p-2.5 text-left hover:border-primary/50 hover:shadow-sm transition-all" @click="openEpisode(episode)">
               <span v-if="selectedStory.kind === 'event'" class="relative aspect-[35/18] w-24 shrink-0 overflow-hidden rounded-lg bg-base-200 sm:w-32"><AssetImage :src="episodeImage(episode)" :alt="episode.title" class="h-full w-full object-cover transition-transform group-hover:scale-[1.03]" /><span class="absolute inset-0 grid place-items-center bg-black/10 opacity-0 transition-opacity group-hover:opacity-100"><span class="grid h-8 w-8 place-items-center rounded-full bg-base-100/90 text-primary shadow"><Play class="h-3.5 w-3.5" /></span></span></span>
               <span v-else class="grid w-10 h-10 place-items-center rounded-lg shrink-0 bg-primary/10 text-primary"><Play class="w-4 h-4" /></span>
-              <span class="min-w-0 flex-1"><span class="text-[11px] text-base-content/45">{{ episode.episodeNoLabel || `第 ${episode.episodeNo} 话` }} · {{ episode.scenarioId }}</span><span class="font-medium block truncate">{{ episode.title }}</span></span>
+              <span class="min-w-0 flex-1"><span class="text-[11px] text-base-content/45">{{ episode.episodeNoLabel || `第 ${episode.episodeNo} 话` }} · {{ episode.scenarioId }}</span><span class="font-medium block truncate"><ZhText :text="episode.title" v-bind="EPISODE_TITLE_ZH[selectedStory.kind]" sub-class="text-xs" /></span></span>
               <ChevronRight class="w-4 h-4 shrink-0 opacity-40 group-hover:translate-x-0.5 transition-transform" />
             </button>
             <div v-if="selectedStoryEpisodes.length === 0" class="py-16 text-center text-sm text-base-content/45">没有匹配的章节</div>

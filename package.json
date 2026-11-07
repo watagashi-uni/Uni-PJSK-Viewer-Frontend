@@ -14,7 +14,8 @@
     "test:costume-preview:browser": "node tests/costume-preview-browser.mjs",
     "test:costume-preview:legacy": "node tests/costume-preview-legacy-browser.mjs",
     "test:story": "node --test tests/storyPlayback.test.mjs tests/storyPlayerAssets.test.mjs",
-    "test:story:browser": "node tests/story-player-browser.mjs"
+    "test:story:browser": "node tests/story-player-browser.mjs",
+    "test:translations": "node --test tests/translations.test.mjs"
   },
   "dependencies": {
     "@breezystack/lamejs": "^1.2.7",

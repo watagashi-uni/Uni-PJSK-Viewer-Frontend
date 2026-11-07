@@ -9,9 +9,12 @@ import type { EventData } from '@/types/master'
 import { pushListPage, readQueryPage, readQueryString, replaceListQuery } from '@/utils/routeQuery'
 import PageHeader from '@/components/PageHeader.vue'
 import Pagination from '@/components/Pagination.vue'
+import ZhText from '@/components/ZhText.vue'
+import { useZh } from '@/composables/useZh'
 
 const masterStore = useMasterStore()
 const settingsStore = useSettingsStore()
+const zhEvents = useZh('events')
 
 const events = ref<EventData[]>([])
 const route = useRoute()
@@ -49,7 +52,7 @@ const filteredEvents = computed(() => {
   if (searchQuery.value) {
     const query = searchQuery.value.toLowerCase()
     result = result.filter(e => 
-      e.name.toLowerCase().includes(query) ||
+      zhEvents.searchText('name', e.name).toLowerCase().includes(query) ||
       e.id.toString().includes(query)
     )
   }
@@ -216,7 +219,7 @@ onMounted(loadData)
         </figure>
         
         <div class="card-body p-4">
-          <h2 class="card-title text-sm line-clamp-2">{{ event.name }}</h2>
+          <h2 class="card-title text-sm block"><ZhText :text="event.name" table="events" path="name" sub-class="font-normal text-xs" /></h2>
           <p class="text-xs text-base-content/60">
             {{ formatDate(event.startAt) }} ~ {{ formatDate(event.aggregateAt) }}
           </p>
