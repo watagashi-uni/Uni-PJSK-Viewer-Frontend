@@ -8,6 +8,8 @@ export interface VersionInfo extends ApiEndpointPayload {
     updatedAt: string
     enableCnAssets?: boolean
     cnAssetsHost?: string
+    /** 语言 → 当前译文版本哈希，对应 translations/<语言>/version.<哈希>.json */
+    translations?: Record<string, string>
 }
 
 export const DEFAULT_CN_ASSETS_HOST = 'https://assets-esa.unipjsk.com'
@@ -24,6 +26,8 @@ export function normalizeCnAssetsHost(value: unknown): string | null {
 }
 
 let inflightVersion: Promise<VersionInfo> | null = null
+// 本次会话最近一次成功取到的版本信息，供译文加载器复用，不再单独请求
+let latestVersion: Promise<VersionInfo | null> | null = null
 
 /**
  * 获取当前 master 数据版本号。
@@ -46,7 +50,14 @@ export function getVersion(): Promise<VersionInfo> {
     })()
 
     inflightVersion = promise
+    const previous = latestVersion
+    latestVersion = promise.catch(() => previous ?? null)
     return promise
+}
+
+/** 本次会话的版本信息；还没有请求过时发起一次（与其他并发请求合并） */
+export function getSessionVersionInfo(): Promise<VersionInfo | null> {
+    return latestVersion ?? getVersion().catch(() => null)
 }
 
 export function isCnAssetsEnabled(versionInfo: VersionInfo): boolean {

@@ -24,6 +24,7 @@ import ChartJudgmentPreview from '@/components/ChartJudgmentPreview.vue'
 import { DIFFICULTY_LABELS, difficultyBackground } from '@/utils/difficulty'
 import { trackEvent } from '@/utils/analytics'
 import { useCharacterName } from '@/composables/useCharacterName'
+import ZhText from '@/components/ZhText.vue'
 
 interface Music {
   id: number
@@ -152,6 +153,7 @@ const musicCategories = ref<string[]>([])
 const difficulties = ref<MusicDifficulty[]>([])
 const vocals = ref<MusicVocal[]>([])
 const zhMusics = useZh('musics')
+const zhOutside = useZh('outsideCharacters')
 const zhMusicEnabled = zhMusics.enabled
 const translation = computed(() => zhMusics.t('title', music.value?.title) || '')
 const relatedEvent = ref<EventData | null>(null)
@@ -646,7 +648,8 @@ function getVocalSingers(vocal: MusicVocal, separator = '・'): string {
     } else if (c.characterType === 'outside_character') {
       const outsideChar = outsideCharacters.value.find(ch => ch.id === c.characterId)
       if (outsideChar) {
-        return outsideChar.name
+        // 与角色名一致：有译名时直接用中文名
+        return zhOutside.t('name', outsideChar.name) || outsideChar.name
       }
     }
     return ''
@@ -1303,7 +1306,7 @@ const isExpired = computed(() => {
             >
               贡献翻译 →
             </a>
-            <div v-if="musicCollaborationLabel" class="badge badge-secondary badge-outline mt-3 max-w-full h-auto py-1 text-center whitespace-normal">{{ musicCollaborationLabel }}</div>
+            <div v-if="musicCollaborationLabel" class="badge badge-secondary badge-outline mt-3 max-w-full h-auto py-1 text-center whitespace-normal"><ZhText :text="musicCollaborationLabel" table="musicCollaborations" path="label" layout="inline" /></div>
           </div>
           
           <div class="mt-6 w-full space-y-3 px-4">
@@ -1369,7 +1372,7 @@ const isExpired = computed(() => {
             </div>
             <div class="flex justify-between items-center gap-3 text-sm border-b border-base-200 pb-2">
               <span class="text-base-content/60 shrink-0">乐曲获取方式</span>
-              <span class="font-medium text-right select-all">{{ musicReleaseConditionText }}</span>
+              <span class="font-medium text-right select-all"><ZhText :text="musicReleaseConditionText" table="releaseConditions" path="sentence" /></span>
             </div>
             <div v-if="musicOriginalLink" class="flex justify-between items-center gap-3 text-sm border-b border-base-200 pb-2">
               <span class="text-base-content/60 shrink-0">原曲链接</span>
@@ -1425,7 +1428,7 @@ const isExpired = computed(() => {
               <div class="card-body p-3">
                 <p class="text-sm font-medium">
                   <span class="badge badge-sm badge-ghost mr-2">#{{ relatedEvent.id }}</span>
-                  {{ relatedEvent.name }}
+                  <ZhText :text="relatedEvent.name" table="events" path="name" layout="inline" />
                 </p>
               </div>
             </RouterLink>
@@ -1497,7 +1500,7 @@ const isExpired = computed(() => {
               <!-- 当前播放版本信息 -->
               <div class="mb-4 p-3 bg-base-200/30 rounded-xl">
                 <div class="flex flex-wrap items-center gap-2">
-                  <p class="font-semibold text-base-content">{{ currentVocal?.caption || '加载中...' }}</p>
+                  <p class="font-semibold text-base-content"><ZhText v-if="currentVocal?.caption" :text="currentVocal.caption" table="musicVocals" path="caption" layout="inline" /><template v-else>加载中...</template></p>
                   <span v-if="currentVocal && getVocalAccountStatus(currentVocal)" class="badge badge-sm gap-1" :class="isVocalAvailable(currentVocal) ? 'badge-success' : 'badge-ghost'">
                     <CheckCircle2 v-if="isVocalAvailable(currentVocal)" class="w-3 h-3" />
                     <LockKeyhole v-else class="w-3 h-3" />
@@ -1625,7 +1628,7 @@ const isExpired = computed(() => {
                     <!-- 版本信息 -->
                     <div class="flex-1 min-w-0">
                       <p class="font-medium text-sm" :class="currentVocalIndex === index ? 'text-primary' : 'text-base-content'">
-                        {{ vocal.caption }}
+                        <ZhText :text="vocal.caption" table="musicVocals" path="caption" layout="inline" />
                       </p>
                       <p v-if="getVocalSingers(vocal)" class="text-xs text-base-content/50 mt-0.5 truncate">
                         {{ getVocalSingers(vocal) }}
@@ -1732,7 +1735,7 @@ const isExpired = computed(() => {
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-3 py-2 sm:px-6 sm:py-4 border-b border-base-200 shrink-0">
           <!-- 左侧：标题 + 难度 -->
           <div class="min-w-0 flex items-center gap-2 sm:gap-3">
-            <h3 class="text-sm sm:text-lg font-bold truncate">{{ music?.title }}</h3>
+            <h3 class="text-sm sm:text-lg font-bold truncate"><ZhText :text="music?.title" table="musics" path="title" layout="inline" /></h3>
             <span
               v-if="previewDifficultyData"
               class="badge text-white font-bold border-none px-2 py-1 sm:px-3 sm:py-2 text-xs"

@@ -15,7 +15,9 @@ const props = withDefaults(defineProps<{
   /** stack：译文另起一行；inline：同一行用 / 分隔 */
   layout?: 'stack' | 'inline'
   subClass?: string
-}>(), { text: '', table: '', path: '', zh: undefined, ai: false, layout: 'stack', subClass: '' })
+  /** 原文所在行的类名（stack 时原文变成块元素，便于两段分别截断） */
+  mainClass?: string
+}>(), { text: '', table: '', path: '', zh: undefined, ai: false, layout: 'stack', subClass: '', mainClass: '' })
 
 const settings = useSettingsStore()
 const store = useTranslationStore()
@@ -35,7 +37,8 @@ const sub = computed(() => translated.value ? (zhFirst.value ? props.text || '' 
 </script>
 
 <template>
-  <template v-if="!sub">{{ main }}</template>
+  <span v-if="!sub && mainClass" :class="mainClass" class="block">{{ main }}</span>
+  <template v-else-if="!sub">{{ main }}</template>
   <template v-else-if="layout === 'inline'"><span :lang="zhFirst ? 'zh-CN' : undefined">{{ main }}<span v-if="aiMark && zhFirst" class="zh-ai" title="机器翻译">AI</span></span><span class="zh-inline" :class="subClass" :lang="zhFirst ? 'ja' : 'zh-CN'"> / {{ sub }}<span v-if="aiMark && !zhFirst" class="zh-ai" title="机器翻译">AI</span></span></template>
-  <template v-else><span :lang="zhFirst ? 'zh-CN' : undefined">{{ main }}<span v-if="aiMark && zhFirst" class="zh-ai" title="机器翻译">AI</span></span><span class="zh-sub" :class="subClass" :lang="zhFirst ? 'ja' : 'zh-CN'">{{ sub }}<span v-if="aiMark && !zhFirst" class="zh-ai" title="机器翻译">AI</span></span></template>
+  <template v-else><span :class="mainClass ? [mainClass, 'block'] : undefined" :lang="zhFirst ? 'zh-CN' : undefined">{{ main }}<span v-if="aiMark && zhFirst" class="zh-ai" title="机器翻译">AI</span></span><span class="zh-sub" :class="subClass" :lang="zhFirst ? 'ja' : 'zh-CN'">{{ sub }}<span v-if="aiMark && !zhFirst" class="zh-ai" title="机器翻译">AI</span></span></template>
 </template>

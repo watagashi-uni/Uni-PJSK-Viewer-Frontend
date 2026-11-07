@@ -174,6 +174,14 @@ async function handleClearTranslationCache() {
             优先使用国服官方译名，其次是人工翻译；标有 <span class="font-semibold">AI</span> 的为机器翻译，仅供参考。没有译文时显示日文原文。
           </p>
 
+          <label class="label cursor-pointer justify-start gap-4 whitespace-normal mt-3">
+            <input v-model="settingsStore.hideAiTranslation" type="checkbox" class="toggle toggle-primary shrink-0" />
+            <div>
+              <span class="font-medium text-base-content">仅关闭 AI 译文</span>
+              <p class="text-sm text-base-content/60">只显示官方和人工译文；只有机器翻译的名称、说明和剧情改为显示日文</p>
+            </div>
+          </label>
+
           <label class="label cursor-pointer justify-start gap-4 whitespace-normal mt-4">
             <input v-model="settingsStore.storyTranslation" type="checkbox" class="toggle toggle-primary shrink-0" />
             <div>

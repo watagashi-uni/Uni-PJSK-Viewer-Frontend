@@ -37,7 +37,7 @@ function memoryDB() {
   return db
 }
 
-function load(db, files, requests) {
+function load(db, files, requests, versionInfo = null) {
   globalThis.fetch = async (url) => {
     requests.push(url.replace(`${BASE}/`, ''))
     if (files.offline) throw new TypeError('Failed to fetch')
@@ -45,7 +45,11 @@ function load(db, files, requests) {
     return { ok: body !== undefined, status: body === undefined ? 404 : 200, json: async () => structuredClone(body) }
   }
   const module = { exports: {} }
-  const deps = { idb: { openDB: async () => db }, './masterClient': { masterApiBaseUrl: 'https://master.example' } }
+  const deps = {
+    idb: { openDB: async () => db },
+    './masterClient': { masterApiBaseUrl: 'https://master.example' },
+    './version': { getSessionVersionInfo: async () => versionInfo },
+  }
   new Function('require', 'module', 'exports', compiled)(name => deps[name], module, module.exports)
   return module.exports
 }
@@ -127,6 +131,42 @@ test('stories use the index on demand and drop replaced files', async () => {
   assert.deepEqual(requests, ['version.json', 's/index.s2.json', 's/event_1_01.a2.json'])
 })
 
+test('the hash from /api/version replaces version.json and avoids repeat requests', async () => {
+  const db = memoryDB()
+  const files = {
+    'version.abc123.json': { v: 2, d: { musics: 'm1' }, s: 's1' },
+    'version.def456.json': { v: 2, d: { musics: 'm2' }, s: 's1' },
+    'd/musics.m1.json': { o: { title: { '曲': '旧译名' } }, a: {} },
+    'd/musics.m2.json': { o: { title: { '曲': '新译名' } }, a: {} },
+  }
+  let requests = []
+  let api = load(db, files, requests, { translations: { 'zh-Hans': 'abc123' } })
+  assert.equal((await api.loadZhTable('musics')).o.title['曲'], '旧译名')
+  assert.deepEqual(requests, ['version.abc123.json', 'd/musics.m1.json'])
+
+  // Same hash in a later session: no request at all, however old the copy is.
+  const stored = db.stores.meta.get('version')
+  db.stores.meta.set('version', { ...stored, fetchedAt: 0 })
+  requests = []
+  api = load(db, files, requests, { translations: { 'zh-Hans': 'abc123' } })
+  assert.equal((await api.loadZhTable('musics')).o.title['曲'], '旧译名')
+  assert.deepEqual(requests, [])
+
+  // A new hash (e.g. a reviewed song title): only the immutable version file and the changed table.
+  requests = []
+  api = load(db, files, requests, { translations: { 'zh-Hans': 'def456' } })
+  assert.equal((await api.loadZhTable('musics')).o.title['曲'], '新译名')
+  assert.deepEqual(requests, ['version.def456.json', 'd/musics.m2.json'])
+
+  // An invalid hash falls back to version.json.
+  files['version.json'] = files['version.def456.json']
+  db.stores.meta.set('version', { ...db.stores.meta.get('version'), hash: undefined, fetchedAt: 0 })
+  requests = []
+  api = load(db, files, requests, { translations: { 'zh-Hans': '../x' } })
+  await api.loadZhTable('musics')
+  assert.deepEqual(requests, ['version.json'])
+})
+
 test('the store loads split field files only for the fields that are looked up', async () => {
   const { createRequire } = await import('node:module')
   const require = createRequire(import.meta.url)
@@ -134,6 +174,7 @@ test('the store loads split field files only for the fields that are looked up',
   const storeSource = readFileSync(new URL('../src/stores/translations.ts', import.meta.url), 'utf8')
   const storeCode = ts.transpileModule(storeSource, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText
   const loaded = []
+  const settings = { hideAiTranslation: false }
   const files = {
     gachas: { o: { name: { 'ガチャ': '招募' } }, a: {} },
     'gachas~gachaInformation.summary': { o: {}, a: { 'gachaInformation.summary': { '説明': '说明' } } },
@@ -144,6 +185,7 @@ test('the store loads split field files only for the fields that are looked up',
       loadZhTable: async name => { loaded.push(name); return files[name] ?? null },
       clearZhCache: async () => {},
     },
+    '@/stores/settings': { useSettingsStore: () => settings },
   }
   const module = { exports: {} }
   new Function('require', 'module', 'exports', storeCode)(name => deps[name] ?? require(name), module, module.exports)
@@ -158,4 +200,7 @@ test('the store loads split field files only for the fields that are looked up',
   await settle()
   assert.deepEqual(store.lookup('gachas', 'gachaInformation.summary', '説明'), { text: '说明', ai: true })
   assert.deepEqual(loaded, ['gachas', 'gachas~gachaInformation.summary'])
+  settings.hideAiTranslation = true
+  assert.equal(store.lookup('gachas', 'gachaInformation.summary', '説明'), undefined, 'machine translations can be hidden')
+  assert.deepEqual(store.lookup('gachas', 'name', 'ガチャ'), { text: '招募', ai: false })
 })

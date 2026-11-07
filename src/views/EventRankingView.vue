@@ -7,6 +7,7 @@ import { RefreshCw } from 'lucide-vue-next'
 import { request } from '@/utils/request'
 import type { EventData, CardData } from '@/types/master'
 import { useCharacterName } from '@/composables/useCharacterName'
+import ZhText from '@/components/ZhText.vue'
 
 const { characterName } = useCharacterName()
 const masterStore = useMasterStore()
@@ -272,7 +273,7 @@ function getHonor(honors: any[], seq: number) {
       <div class="flex flex-col items-center justify-center text-center gap-1">
         <h1 class="text-2xl font-bold flex items-center justify-center gap-2">
           <template v-if="eventId">
-            <span class="text-primary">#{{ eventId }}</span> {{ eventName }}
+            <span class="text-primary">#{{ eventId }}</span> <ZhText :text="eventName" table="events" path="name" layout="inline" />
           </template>
           <template v-else>{{ isLoading ? '加载中...' : '实时榜况' }}</template>
         </h1>

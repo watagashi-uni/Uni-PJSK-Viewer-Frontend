@@ -11,6 +11,7 @@ import { useSettingsStore } from '@/stores/settings'
 import ZhText from '@/components/ZhText.vue'
 import { useZh } from '@/composables/useZh'
 import { useCharacterName } from '@/composables/useCharacterName'
+import { useResourceZh } from '@/composables/useResourceZh'
 
 interface VirtualLiveSchedule {
   id: number
@@ -173,6 +174,8 @@ const goBack = useBackToList('/vlives')
 const masterStore = useMasterStore()
 const settingsStore = useSettingsStore()
 const zhVirtualLives = useZh('virtualLives')
+const { resourceDisplayZh } = useResourceZh()
+const zhSubCharacters = useZh('subGameCharacters')
 // 页头只能放纯文本：中文优先时标题用译名，另一种文字放到说明里
 function vliveSubtitle(name: string): string {
   const zh = zhVirtualLives.t('name', name)
@@ -355,7 +358,7 @@ const cast = computed(() => [...(vlive.value?.virtualLiveCharacters || [])]
     }
     const character2d = row.subGameCharacter2dId ? character2dMap.value.get(row.subGameCharacter2dId) : null
     const subCharacter = character2d?.characterType === 'sub_game_character' ? subGameCharacterMap.value.get(character2d.characterId) : null
-    return { ...row, name: subCharacter?.name || `特别出演 #${row.subGameCharacter2dId || row.id}`, icon: '' }
+    return { ...row, name: (zhSubCharacters.t('name', subCharacter?.name) || subCharacter?.name) || `特别出演 #${row.subGameCharacter2dId || row.id}`, icon: '' }
   })
 )
 
@@ -374,7 +377,7 @@ function setlistPerformers(row: VirtualLiveSetlist): string[] {
     const character3d = character3dMap.value.get(id)
     if (!character3d) return [`3D角色 #${id}`]
     if (character3d.characterType === 'game_character') return [characterName(character3d.characterId)]
-    if (character3d.characterType === 'sub_game_character') return [subGameCharacterMap.value.get(character3d.characterId)?.name || `特别出演 #${character3d.characterId}`]
+    if (character3d.characterType === 'sub_game_character') return [(zhSubCharacters.t('name', subGameCharacterMap.value.get(character3d.characterId)?.name) || subGameCharacterMap.value.get(character3d.characterId)?.name) || `特别出演 #${character3d.characterId}`]
     return [`3D角色 #${id}`]
   })
   return [...new Set(names)]
@@ -450,8 +453,13 @@ function ticketScheduleLabel(ticket: VirtualLiveTicket): string {
   return `${dateLabel(schedule.startAt)} ${timeLabel(schedule.startAt)}`
 }
 
-const informationText = computed(() => {
-  const description = vlive.value?.virtualLiveInformation?.description || ''
+// 说明带 HTML 标签：先按原文查译文，再对两者做同样的清理
+const informationText = computed(() => cleanInformation(vlive.value?.virtualLiveInformation?.description || ''))
+const informationZh = computed(() => {
+  const zh = zhVirtualLives.t('virtualLiveInformation.description', vlive.value?.virtualLiveInformation?.description)
+  return zh ? cleanInformation(zh) : null
+})
+function cleanInformation(description: string): string {
   return description
     .replace(/<br\s*\/?\s*>/gi, '\n')
     .replace(/<[^>]+>/g, '')
@@ -459,7 +467,7 @@ const informationText = computed(() => {
     .replace(/&amp;/g, '&')
     .replace(/\n{3,}/g, '\n\n')
     .trim()
-})
+}
 </script>
 
 <template>
@@ -495,7 +503,7 @@ const informationText = computed(() => {
             <div v-if="musicSetlists.length" class="grid gap-2 sm:grid-cols-2">
               <RouterLink v-for="row in musicSetlists" :key="row.id" :to="`/musics/${row.musicId}`" class="group flex min-w-0 gap-3 rounded-xl border border-base-200 p-2.5 transition hover:border-primary/40 hover:bg-base-200/35">
                 <AssetImage v-if="musicMap.get(row.musicId || 0)" :src="`${assetsHost}/startapp/music/jacket/${musicMap.get(row.musicId || 0)?.assetbundleName}/${musicMap.get(row.musicId || 0)?.assetbundleName}.png`" :alt="musicMap.get(row.musicId || 0)?.title || ''" class="h-16 w-16 shrink-0 rounded-lg object-cover" />
-                <div class="min-w-0 flex-1"><div class="flex items-center gap-1.5 text-[10px] text-base-content/40"><span>#{{ row.seq }}</span><span>Stage {{ row.virtualLiveStageId }}</span></div><h3 class="mt-0.5 truncate font-bold group-hover:text-primary"><ZhText v-if="musicMap.get(row.musicId || 0)?.title" :text="musicMap.get(row.musicId || 0)?.title" table="musics" path="title" layout="inline" /><template v-else>歌曲 #{{ row.musicId }}</template></h3><p v-if="row.musicVocalId" class="truncate text-xs text-base-content/55">{{ musicVocalMap.get(row.musicVocalId)?.caption || `Vocal #${row.musicVocalId}` }}</p><p v-if="setlistPerformers(row).length" class="mt-1 line-clamp-2 text-[10px] text-base-content/45">出演：{{ setlistPerformers(row).join('、') }}</p></div>
+                <div class="min-w-0 flex-1"><div class="flex items-center gap-1.5 text-[10px] text-base-content/40"><span>#{{ row.seq }}</span><span>Stage {{ row.virtualLiveStageId }}</span></div><h3 class="mt-0.5 truncate font-bold group-hover:text-primary"><ZhText v-if="musicMap.get(row.musicId || 0)?.title" :text="musicMap.get(row.musicId || 0)?.title" table="musics" path="title" layout="inline" /><template v-else>歌曲 #{{ row.musicId }}</template></h3><p v-if="row.musicVocalId" class="truncate text-xs text-base-content/55"><ZhText v-if="musicVocalMap.get(row.musicVocalId)?.caption" :text="musicVocalMap.get(row.musicVocalId)?.caption" table="musicVocals" path="caption" layout="inline" /><template v-else>Vocal #{{ row.musicVocalId }}</template></p><p v-if="setlistPerformers(row).length" class="mt-1 line-clamp-2 text-[10px] text-base-content/45">出演：{{ setlistPerformers(row).join('、') }}</p></div>
               </RouterLink>
             </div>
             <p v-else class="rounded-lg bg-base-200/50 py-6 text-center text-sm text-base-content/45">该节目流程没有歌曲段落</p>
@@ -511,7 +519,7 @@ const informationText = computed(() => {
 
           <details v-if="informationText" class="collapse collapse-arrow border border-base-200 bg-base-100 shadow-sm">
             <summary class="collapse-title flex min-h-0 items-center gap-2 py-4 text-lg font-bold"><FileText class="h-5 w-5 text-primary" />官方说明</summary>
-            <div class="collapse-content"><p class="max-h-[34rem] overflow-y-auto whitespace-pre-wrap rounded-xl bg-base-200/45 p-4 text-sm leading-7">{{ informationText }}</p></div>
+            <div class="collapse-content"><p class="max-h-[34rem] overflow-y-auto whitespace-pre-wrap rounded-xl bg-base-200/45 p-4 text-sm leading-7"><ZhText :text="informationText" :zh="informationZh" sub-class="mt-4" /></p></div>
           </details>
         </main>
 
@@ -530,7 +538,7 @@ const informationText = computed(() => {
           <section v-if="rewardGroups.length" class="rounded-xl border border-base-200 bg-base-100 p-4 shadow-sm">
             <div class="mb-3 flex items-center justify-between"><h2 class="flex items-center gap-2 font-bold"><Gift class="h-5 w-5 text-primary" />参加奖励</h2><span class="badge badge-sm badge-ghost">{{ rewardGroups.length }} 组</span></div>
             <div class="space-y-3">
-              <div v-for="group in rewardGroups" :key="group.id" class="rounded-xl bg-base-200/45 p-3"><div class="mb-2 flex items-center justify-between"><strong class="text-sm">{{ rewardTypeLabels[group.virtualLiveType] || group.virtualLiveType }}</strong><span class="text-[9px] text-base-content/35">Box #{{ group.resourceBoxId }}</span></div><div v-if="group.details.length" class="space-y-2"><div v-for="reward in group.details" :key="`${reward.seq}-${reward.resourceType}-${reward.resourceId || 0}`" class="flex items-center gap-2"><SekaiHonor v-if="reward.resourceType === 'honor' && reward.resourceId" :honor-id="reward.resourceId" :honor-level="reward.resourceLevel || 1" sub class="w-24 shrink-0" /><AssetImage v-else-if="resourceIcon(reward)" :src="resourceIcon(reward)" :alt="resourceName(reward)" class="h-9 w-9 shrink-0 object-contain" /><div v-else class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary/10"><Gift class="h-4 w-4 text-primary" /></div><div class="min-w-0 flex-1"><p class="truncate text-xs" :title="resourceName(reward)">{{ resourceName(reward) }}</p><p class="text-sm font-bold">× {{ formatNumber(reward.resourceQuantity) }}</p></div></div></div><p v-else class="text-xs text-base-content/40">奖励箱数据缺失</p></div>
+              <div v-for="group in rewardGroups" :key="group.id" class="rounded-xl bg-base-200/45 p-3"><div class="mb-2 flex items-center justify-between"><strong class="text-sm">{{ rewardTypeLabels[group.virtualLiveType] || group.virtualLiveType }}</strong><span class="text-[9px] text-base-content/35">Box #{{ group.resourceBoxId }}</span></div><div v-if="group.details.length" class="space-y-2"><div v-for="reward in group.details" :key="`${reward.seq}-${reward.resourceType}-${reward.resourceId || 0}`" class="flex items-center gap-2"><SekaiHonor v-if="reward.resourceType === 'honor' && reward.resourceId" :honor-id="reward.resourceId" :honor-level="reward.resourceLevel || 1" sub class="w-24 shrink-0" /><AssetImage v-else-if="resourceIcon(reward)" :src="resourceIcon(reward)" :alt="resourceName(reward)" class="h-9 w-9 shrink-0 object-contain" /><div v-else class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary/10"><Gift class="h-4 w-4 text-primary" /></div><div class="min-w-0 flex-1"><p class="truncate text-xs" :title="resourceName(reward)"><ZhText :text="resourceName(reward)" :zh="resourceDisplayZh(reward.resourceType, resourceName(reward)) ?? null" layout="inline" /></p><p class="text-sm font-bold">× {{ formatNumber(reward.resourceQuantity) }}</p></div></div></div><p v-else class="text-xs text-base-content/40">奖励箱数据缺失</p></div>
             </div>
           </section>
 

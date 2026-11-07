@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { markRaw, shallowReactive, shallowRef } from 'vue'
+import { useSettingsStore } from '@/stores/settings'
 import { clearZhCache, loadZhTable, loadZhVersion, type ZhTable, type ZhVersion } from '@/api/translations'
 
 export interface ZhEntry {
@@ -9,6 +10,7 @@ export interface ZhEntry {
 }
 
 export const useTranslationStore = defineStore('translations', () => {
+  const settings = useSettingsStore()
   // 文件数据很大且只读，只让“某个文件已加载”这件事成为响应式依赖
   const files = shallowReactive(new Map<string, ZhTable | null>())
   const pending = new Set<string>()
@@ -66,6 +68,8 @@ export const useTranslationStore = defineStore('translations', () => {
     if (!data) return undefined
     const official = data.o[path]?.[jp]
     if (official) return official === jp ? undefined : { text: official, ai: false }
+    // 设置为只看官方、人工译文时忽略机翻
+    if (settings.hideAiTranslation) return undefined
     const ai = data.a[path]?.[jp]
     return ai && ai !== jp ? { text: ai, ai: true } : undefined
   }

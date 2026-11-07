@@ -1,5 +1,6 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb'
 import { masterApiBaseUrl } from './masterClient'
+import { getSessionVersionInfo } from './version'
 
 // 简体中文译名数据：version.json 指向按内容哈希命名的表和剧情文件，
 // 哈希不变就一直用本地副本，只有变化的文件才重新下载。
@@ -20,6 +21,19 @@ export interface ZhStory {
   /** SpecialEffectData 下标 → 地点、字幕卡、全屏旁白的中文 */
   effects: Record<string, string>
 }
+/**
+ * 剧情索引的值：哈希，或 [哈希, 来源]。带来源时不用下载文件就能知道是不是机翻，
+ * 关闭 AI 译文时可以省掉下载。
+ */
+export type ZhStoryIndexEntry = string | [hash: string, src: ZhStorySource]
+export type ZhStoryIndex = Record<string, ZhStoryIndexEntry>
+export function storyIndexHash(entry: ZhStoryIndexEntry | undefined): string | undefined {
+  return Array.isArray(entry) ? entry[0] : entry
+}
+export function storyIndexSource(entry: ZhStoryIndexEntry | undefined): ZhStorySource | undefined {
+  return Array.isArray(entry) ? entry[1] : undefined
+}
+
 export interface ZhVersion {
   v: number
   lang: string
@@ -29,16 +43,19 @@ export interface ZhVersion {
 }
 
 interface Stored<T> { hash: string; data: T }
-interface StoredVersion { fetchedAt: number; data: ZhVersion }
+/** hash：经 /api/version 下发的译文版本哈希；走 version.json 时为空 */
+interface StoredVersion { fetchedAt: number; data: ZhVersion; hash?: string }
 
 interface ZhDBSchema extends DBSchema {
-  meta: { key: string; value: StoredVersion | Stored<Record<string, string>> }
+  meta: { key: string; value: StoredVersion | Stored<ZhStoryIndex> }
   tables: { key: string; value: Stored<ZhTable> }
   stories: { key: string; value: Stored<ZhStory> }
 }
 
 const DB_NAME = 'viewer-translations'
-// 10 分钟内重新打开页面直接用本地的 version.json，不发请求
+const LANG = 'zh-Hans'
+const VERSION_HASH = /^[0-9a-f]{6,64}$/
+// 后备路径：/api/version 没给哈希时，10 分钟内重新打开页面直接用本地的 version.json，不发请求
 const VERSION_REUSE_MS = 10 * 60 * 1000
 
 let dbPromise: Promise<IDBPDatabase<ZhDBSchema> | null> | null = null
@@ -103,12 +120,20 @@ export function loadZhVersion(): Promise<ZhVersion | null> {
     // 旧版歌曲译名在 Service Worker 里的缓存，已不再使用
     void globalThis.caches?.delete('translations-cache').catch(() => false)
     versionPromise = (async () => {
-      const stored = await dbGet('meta', 'version') as StoredVersion | undefined
-      if (stored?.data && Date.now() - stored.fetchedAt < VERSION_REUSE_MS && Date.now() >= stored.fetchedAt) return stored.data
+      const [stored, info] = await Promise.all([
+        dbGet('meta', 'version') as Promise<StoredVersion | undefined>,
+        getSessionVersionInfo().catch(() => null),
+      ])
+      // 主路径：master 的 /api/version 本来每次会话都会请求，里面带了译文版本哈希。
+      // 与本地一致就不发请求；不同就下载按哈希命名、可长期缓存的 version.<哈希>.json
+      const hash = info?.translations?.[LANG]
+      const validHash = typeof hash === 'string' && VERSION_HASH.test(hash) ? hash : undefined
+      if (validHash && stored?.data && stored.hash === validHash) return stored.data
+      if (!validHash && stored?.data && Date.now() - stored.fetchedAt < VERSION_REUSE_MS && Date.now() >= stored.fetchedAt) return stored.data
       try {
-        const data = await fetchJson<ZhVersion>('version.json')
+        const data = await fetchJson<ZhVersion>(validHash ? `version.${validHash}.json` : 'version.json')
         if (!data || typeof data.d !== 'object') throw new Error('version.json 格式不支持')
-        await dbPut('meta', 'version', { fetchedAt: Date.now(), data })
+        await dbPut('meta', 'version', { fetchedAt: Date.now(), data, hash: validHash })
         return data
       } catch (error) {
         console.warn('获取翻译版本失败:', error)
@@ -144,17 +169,17 @@ export function loadZhTable(name: string): Promise<ZhTable | null> {
   })
 }
 
-let storyIndexPromise: Promise<Record<string, string> | null> | null = null
+let storyIndexPromise: Promise<ZhStoryIndex | null> | null = null
 
 /** 剧情索引只在打开剧情阅读器时读取。 */
-export function loadZhStoryIndex(): Promise<Record<string, string> | null> {
+export function loadZhStoryIndex(): Promise<ZhStoryIndex | null> {
   if (!storyIndexPromise) {
     storyIndexPromise = (async () => {
-      const [version, stored] = await Promise.all([loadZhVersion(), dbGet('meta', 'storyIndex') as Promise<Stored<Record<string, string>> | undefined>])
+      const [version, stored] = await Promise.all([loadZhVersion(), dbGet('meta', 'storyIndex') as Promise<Stored<ZhStoryIndex> | undefined>])
       if (!version?.s) return stored?.data ?? null
       if (stored?.hash === version.s) return stored.data
       try {
-        const data = await fetchJson<Record<string, string>>(`s/index.${version.s}.json`)
+        const data = await fetchJson<ZhStoryIndex>(`s/index.${version.s}.json`)
         await dbPut('meta', 'storyIndex', { hash: version.s, data })
         void pruneStories(data)
         return data
@@ -169,23 +194,37 @@ export function loadZhStoryIndex(): Promise<Record<string, string> | null> {
 }
 
 // 索引更新后删掉已被替换或下架的剧情译文
-async function pruneStories(index: Record<string, string>): Promise<void> {
+async function pruneStories(index: ZhStoryIndex): Promise<void> {
   try {
     const db = await getDB()
     if (!db) return
     const tx = db.transaction('stories', 'readwrite')
     for (let cursor = await tx.store.openCursor(); cursor; cursor = await cursor.continue()) {
-      if (index[cursor.key] !== cursor.value.hash) await cursor.delete()
+      if (storyIndexHash(index[cursor.key]) !== cursor.value.hash) await cursor.delete()
     }
     await tx.done
   } catch { /* 清理失败不影响使用 */ }
+}
+
+/**
+ * 不下载剧情文件就能得知的译文来源：索引里带了来源，或本地已有同一版本的文件。
+ * 没有译文时返回 null，无法得知时返回 undefined。
+ */
+export async function peekZhStorySource(scenarioId: string): Promise<ZhStorySource | null | undefined> {
+  const [index, stored] = await Promise.all([loadZhStoryIndex(), dbGet('stories', scenarioId)])
+  const entry = index?.[scenarioId]
+  if (index && !entry) return null
+  const src = storyIndexSource(entry)
+  if (src) return src
+  if (stored && (!index || stored.hash === storyIndexHash(entry))) return stored.data.src
+  return undefined
 }
 
 /** 读取一话剧情的译文，没有译文时返回 null。 */
 export function loadZhStory(scenarioId: string): Promise<ZhStory | null> {
   return once(`s:${scenarioId}`, async () => {
     const [index, stored] = await Promise.all([loadZhStoryIndex(), dbGet('stories', scenarioId)])
-    const hash = index?.[scenarioId]
+    const hash = storyIndexHash(index?.[scenarioId])
     if (!index) return stored?.data ?? null
     if (!hash) return null
     if (stored?.hash === hash) return stored.data

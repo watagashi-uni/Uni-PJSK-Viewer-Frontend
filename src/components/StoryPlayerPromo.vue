@@ -4,7 +4,7 @@ import { BookmarkCheck, ChevronRight, Languages, Mic, Play, Sparkles } from 'luc
 const features = [
   { icon: Sparkles, label: 'Live2D 演出', detail: '动作与表情实时呈现' },
   { icon: Mic, label: '角色语音', detail: '台词配音同步播放' },
-  { icon: Languages, label: '中文翻译', detail: '日中双语字幕，优先官方译文' },
+  { icon: Languages, label: '中文翻译', detail: '日中双语字幕，优先官方译文', isNew: true },
   { icon: BookmarkCheck, label: '进度保存', detail: '下次从上次的台词继续' },
 ]
 </script>
@@ -20,7 +20,7 @@ const features = [
       <ul class="promo-features">
         <li v-for="feature in features" :key="feature.label">
           <component :is="feature.icon" class="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-          <span class="text-xs font-semibold sm:text-sm">{{ feature.label }}</span>
+          <span class="text-xs font-semibold sm:text-sm">{{ feature.label }}<span v-if="feature.isNew" class="badge badge-xs badge-primary ml-1 align-middle font-semibold">NEW</span></span>
           <span class="promo-detail text-xs text-base-content/55">{{ feature.detail }}</span>
         </li>
       </ul>

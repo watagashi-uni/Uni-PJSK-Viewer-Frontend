@@ -8,6 +8,8 @@ import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
 import { cardImageVariant } from '@/utils/card'
 import { useCharacterName } from '@/composables/useCharacterName'
+import { SCHEDULE_ZH, useResourceZh } from '@/composables/useResourceZh'
+import ZhText from '@/components/ZhText.vue'
 
 type CalendarCategory = 'event' | 'gacha' | 'music' | 'virtual_live' | 'login_bonus' | 'birthday'
 
@@ -123,6 +125,7 @@ interface CalendarDay {
 const { characterName: formatCharacterName } = useCharacterName()
 const masterStore = useMasterStore()
 const settingsStore = useSettingsStore()
+const { resourceDisplayZh } = useResourceZh()
 const today = new Date()
 const currentMonth = ref(new Date(today.getFullYear(), today.getMonth(), 1))
 const selectedDateKey = ref(toDateKey(today))
@@ -491,7 +494,7 @@ onMounted(async () => {
             <button v-for="day in calendarDays" :key="day.key" class="min-h-32 overflow-hidden border-r border-b border-base-200 p-2 text-left align-top transition-colors xl:min-h-0" :class="[day.currentMonth ? 'bg-base-100 hover:bg-base-200/45' : 'bg-base-200/35 text-base-content/30', selectedDateKey === day.key ? 'ring-2 ring-inset ring-primary' : '']" @click="selectDay(day)">
               <span class="inline-grid place-items-center w-6 h-6 rounded-full text-xs font-bold" :class="day.today ? 'bg-primary text-primary-content' : ''">{{ day.day }}</span>
               <div class="mt-1 space-y-1">
-                <div v-for="entry in day.entries.slice(0, 3)" :key="entry.key" class="flex items-center gap-1 min-w-0 text-[10px] leading-4"><span class="w-1.5 h-1.5 rounded-full shrink-0" :class="categoryMeta[entry.category].dot"></span><span class="truncate">{{ entry.title }}</span></div>
+                <div v-for="entry in day.entries.slice(0, 3)" :key="entry.key" class="flex items-center gap-1 min-w-0 text-[10px] leading-4"><span class="w-1.5 h-1.5 rounded-full shrink-0" :class="categoryMeta[entry.category].dot"></span><span class="truncate"><ZhText :text="entry.title" v-bind="SCHEDULE_ZH[entry.category] || {}" layout="inline" /></span></div>
                 <p v-if="day.entries.length > 3" class="text-[10px] text-primary font-bold">+{{ day.entries.length - 3 }} 条</p>
               </div>
             </button>
@@ -531,11 +534,11 @@ onMounted(async () => {
                 <RouterLink v-if="entry.route" :to="entry.route" class="group flex gap-3 py-3">
                   <img v-if="entry.characterId" :src="characterIcon(entry.characterId)" :alt="entry.title" class="h-10 w-10 shrink-0 rounded-full bg-base-200" />
                   <div v-else class="grid h-10 w-10 shrink-0 place-items-center rounded-lg" :class="categoryMeta[entry.category].dot"><Music2 v-if="entry.category === 'music'" class="h-4 w-4" :class="categoryMeta[entry.category].content" /><span v-else class="text-[10px] font-bold" :class="categoryMeta[entry.category].content">{{ timeLabel(entry) }}</span></div>
-                  <div class="min-w-0"><div class="flex items-center gap-2"><span class="badge badge-xs" :class="categoryMeta[entry.category].badge">{{ entry.subtitle }}</span><span class="text-[10px] text-base-content/40">{{ timeLabel(entry) }}</span></div><p class="mt-1 line-clamp-2 text-sm font-medium group-hover:text-primary">{{ entry.title }}</p></div>
+                  <div class="min-w-0"><div class="flex items-center gap-2"><span class="badge badge-xs" :class="categoryMeta[entry.category].badge">{{ entry.subtitle }}</span><span class="text-[10px] text-base-content/40">{{ timeLabel(entry) }}</span></div><p class="mt-1 line-clamp-3 text-sm font-medium group-hover:text-primary"><ZhText :text="entry.title" v-bind="SCHEDULE_ZH[entry.category] || {}" sub-class="text-xs font-normal" /></p></div>
                 </RouterLink>
                 <button v-else class="group flex w-full gap-3 py-3 text-left" @click="openLoginBonus(entry.loginBonusId)">
                   <div class="grid h-10 w-10 shrink-0 place-items-center rounded-lg" :class="categoryMeta[entry.category].dot"><Gift class="h-4 w-4" :class="categoryMeta[entry.category].content" /></div>
-                  <div class="min-w-0"><div class="flex items-center gap-2"><span class="badge badge-xs" :class="categoryMeta[entry.category].badge">{{ entry.subtitle }}</span><span class="text-[10px] text-base-content/40">{{ timeLabel(entry) }}</span></div><p class="mt-1 line-clamp-2 text-sm font-medium group-hover:text-primary">{{ entry.title }}</p><p class="mt-0.5 text-[10px] text-base-content/40">点击查看每日奖励</p></div>
+                  <div class="min-w-0"><div class="flex items-center gap-2"><span class="badge badge-xs" :class="categoryMeta[entry.category].badge">{{ entry.subtitle }}</span><span class="text-[10px] text-base-content/40">{{ timeLabel(entry) }}</span></div><p class="mt-1 line-clamp-3 text-sm font-medium group-hover:text-primary"><ZhText :text="entry.title" v-bind="SCHEDULE_ZH[entry.category] || {}" sub-class="text-xs font-normal" /></p><p class="mt-0.5 text-[10px] text-base-content/40">点击查看每日奖励</p></div>
                 </button>
               </template>
             </div>
@@ -553,7 +556,7 @@ onMounted(async () => {
         </div>
         <header class="relative -mt-5 space-y-2 border-b border-base-200 px-5 pb-4">
           <div class="flex flex-wrap items-center gap-2"><span class="badge badge-accent">登录活动</span><span class="badge badge-ghost">#{{ selectedLoginBonus.id }}</span><span class="badge badge-ghost">{{ selectedLoginBonus.limitedLoginBonusDetails?.length || 0 }} 天</span></div>
-          <h2 class="text-lg font-bold md:text-xl">{{ selectedLoginBonus.name }}</h2>
+          <h2 class="text-lg font-bold md:text-xl"><ZhText :text="selectedLoginBonus.name" table="limitedLoginBonuses" path="name" sub-class="text-sm font-normal" /></h2>
           <p class="text-xs text-base-content/55">{{ formatDate(selectedLoginBonus.startAt) }} — {{ formatDate(selectedLoginBonus.endAt) }}</p>
         </header>
         <div class="max-h-[58vh] overflow-y-auto bg-base-200/40 p-4">
@@ -566,7 +569,7 @@ onMounted(async () => {
                 <div v-for="reward in day.rewards" :key="`${reward.seq}-${reward.resourceType}-${reward.resourceId || 0}`" class="flex items-center gap-2">
                   <AssetImage v-if="resourceIcon(reward)" :src="resourceIcon(reward)" :alt="resourceName(reward)" class="h-9 w-9 shrink-0 object-contain" />
                   <div v-else class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary/10"><Gift class="h-4 w-4 text-primary" /></div>
-                  <div class="min-w-0 flex-1"><p class="truncate text-xs" :title="resourceName(reward)">{{ resourceName(reward) }}</p><p class="font-bold">× {{ formatNumber(reward.resourceQuantity) }}</p></div>
+                  <div class="min-w-0 flex-1"><p class="truncate text-xs" :title="resourceName(reward)"><ZhText :text="resourceName(reward)" :zh="resourceDisplayZh(reward.resourceType, resourceName(reward)) ?? null" layout="inline" /></p><p class="font-bold">× {{ formatNumber(reward.resourceQuantity) }}</p></div>
                 </div>
               </div>
               <p v-else class="text-xs text-base-content/40">奖励箱数据缺失</p>

@@ -29,6 +29,7 @@ import type {
 import PageHeader from '@/components/PageHeader.vue'
 import { useZh } from '@/composables/useZh'
 import { useCharacterName } from '@/composables/useCharacterName'
+import ZhText from '@/components/ZhText.vue'
 
 interface Character {
   id: number
@@ -676,7 +677,7 @@ onBeforeUnmount(() => {
                       class="w-full aspect-square bg-base-200 rounded-md p-0.5"
                     />
                     <p class="text-[10px] sm:text-xs font-medium truncate mt-1" :title="zhCostumes.inline('name', item.group.name)">
-                      {{ zhCostumes.label('name', item.group.name) }}
+                      <ZhText :text="item.group.name" table="costume3ds" path="name" sub-class="font-normal" />
                     </p>
                     <p class="text-[9px] sm:text-[10px] text-base-content/45 truncate">
                       {{ item.part.variants.length }} 色
@@ -704,7 +705,7 @@ onBeforeUnmount(() => {
                 >
                   <div class="flex items-center justify-between gap-2 mb-2">
                     <div class="min-w-0">
-                      <p class="text-sm font-semibold truncate" :title="zhCostumes.inline('name', activeColorSelection.group.name)">{{ zhCostumes.label('name', activeColorSelection.group.name) }}</p>
+                      <p class="text-sm font-semibold truncate" :title="zhCostumes.inline('name', activeColorSelection.group.name)"><ZhText :text="activeColorSelection.group.name" table="costume3ds" path="name" sub-class="font-normal text-xs" /></p>
                       <p class="text-[10px] text-base-content/50">选择配色</p>
                     </div>
                     <span class="badge badge-primary badge-sm">{{ activeColorSelection.part.variants.length }} 色</span>
@@ -724,7 +725,7 @@ onBeforeUnmount(() => {
                         :alt="`${activeColorSelection.group.name} ${variant.colorName}`"
                         class="w-full aspect-square rounded-md bg-base-200 p-0.5"
                       />
-                      <p class="text-[9px] sm:text-[10px] truncate mt-1">{{ zhCostumes.label('colorName', variant.colorName) }}</p>
+                      <p class="text-[9px] sm:text-[10px] truncate mt-1"><ZhText :text="variant.colorName" table="costume3ds" path="colorName" /></p>
                     </button>
                   </div>
                 </div>

@@ -17,12 +17,14 @@ import AccountSelector from '@/components/AccountSelector.vue'
 import type { EventData } from '@/types/master'
 import { cardImageVariant } from '@/utils/card'
 import ZhText from '@/components/ZhText.vue'
+import { useResourceZh } from '@/composables/useResourceZh'
 
 const route = useRoute()
 // 上一页是列表时后退以保留筛选与页码，否则打开列表
 const goBack = useBackToList('/events')
 const masterStore = useMasterStore()
 const settingsStore = useSettingsStore()
+const { resourceDisplayZh } = useResourceZh()
 const accountStore = useAccountStore()
 
 const assetsHost = computed(() => settingsStore.assetsHost)
@@ -827,7 +829,7 @@ watch(() => route.params.id, loadData)
                 Cheerful Carnival
               </h3>
               <p class="mt-1 text-sm text-base-content/60">对战主题</p>
-              <p class="font-semibold leading-snug">{{ cheerfulSummary.theme }}</p>
+              <p class="font-semibold leading-snug"><ZhText :text="cheerfulSummary.theme" table="cheerfulCarnivalSummaries" path="theme" layout="inline" /></p>
             </div>
             <div class="flex flex-wrap gap-2 text-xs text-base-content/60">
               <span v-if="cheerfulSummary.midtermAnnounce1At" class="badge badge-ghost gap-1">
@@ -856,7 +858,7 @@ watch(() => route.params.id, loadData)
                 </div>
                 <div class="min-w-0 text-center sm:text-left">
                   <span class="text-[11px] uppercase tracking-wide text-base-content/45">Team {{ team.seq }}</span>
-                  <p class="font-bold text-sm sm:text-base break-words">{{ team.teamName }}</p>
+                  <p class="font-bold text-sm sm:text-base break-words"><ZhText :text="team.teamName" table="cheerfulCarnivalTeams" path="teamName" sub-class="text-xs font-normal" /></p>
                 </div>
               </div>
               <div v-if="index === 0" class="flex items-center justify-center" aria-hidden="true">
@@ -1076,7 +1078,7 @@ watch(() => route.params.id, loadData)
               <RouterLink v-if="row.reward.resourceType === 'card'" :to="`/cards/${row.reward.resourceId}`" class="w-16 h-16 rounded-lg overflow-hidden bg-base-200 shrink-0 transition-transform"><AssetImage :src="resourceIcon(row.reward)" :alt="resourceName(row.reward)" class="w-full h-full object-cover" /></RouterLink>
               <div v-else class="w-16 h-16 rounded-lg bg-base-200 p-2 shrink-0"><AssetImage :src="resourceIcon(row.reward)" :alt="resourceName(row.reward)" class="w-full h-full object-contain" /></div>
               <div class="min-w-0 flex-1">
-                <p class="font-medium text-sm truncate">{{ resourceName(row.reward) }}</p>
+                <p class="font-medium text-sm truncate"><ZhText :text="resourceName(row.reward)" :zh="resourceDisplayZh(row.reward.resourceType, resourceName(row.reward)) ?? null" layout="inline" /></p>
                 <p class="text-xs text-base-content/55">每次 ×{{ formatNumber(row.reward.resourceQuantity || 1) }} · 单价 {{ formatNumber(row.cost.resourceQuantity) }}</p>
                 <p class="text-[11px] text-base-content/45">{{ row.exchangeLimit ? `限兑 ${row.exchangeLimit} 次` : '无限兑换' }}</p>
               </div>

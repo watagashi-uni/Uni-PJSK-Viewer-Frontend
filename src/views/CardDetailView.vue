@@ -11,6 +11,7 @@ import { ChevronLeft, ScrollText, Zap, Link2, Shirt, Calendar, Gift } from 'luci
 import { isTrainedOnlyCard } from '@/utils/card'
 import ZhText from '@/components/ZhText.vue'
 import { useCharacterName } from '@/composables/useCharacterName'
+import { useZh } from '@/composables/useZh'
 
 interface Card {
   id: number
@@ -114,6 +115,7 @@ const { characterName } = useCharacterName()
 const route = useRoute()
 const masterStore = useMasterStore()
 const settingsStore = useSettingsStore()
+const zhSkills = useZh('skills')
 
 const cardId = computed(() => Number(route.params.id))
 const card = ref<Card | null>(null)
@@ -262,10 +264,11 @@ const totalPower = computed(() => {
 })
 
 // Unified parse skill function to avoid mutating reactive vars in computed
-const parseSkill = (skillObj: Skill | null, isTrained: boolean) => {
+// 译文保留了 {{n;v}} 占位符，传入译文就能套用同样的数值
+const parseSkill = (skillObj: Skill | null, isTrained: boolean, text?: string) => {
   if (!skillObj) return '-'
   
-  const skillInfo = skillObj.description
+  const skillInfo = text ?? skillObj.description
   const singleRegExp = /\{\{(\d+);(\w+)\}\}/g
   const doubleRegExp = /\{\{(\d+),(\d+);(\w+)\}\}/g
 
@@ -403,6 +406,14 @@ const parseSkill = (skillObj: Skill | null, isTrained: boolean) => {
 
 const parsedDescription = computed(() => parseSkill(skill.value, false))
 const parsedTrainedDescription = computed(() => parseSkill(trainedSkill.value, true))
+const parsedDescriptionZh = computed(() => {
+  const zh = zhSkills.t('description', skill.value?.description)
+  return zh ? parseSkill(skill.value, false, zh) : null
+})
+const parsedTrainedDescriptionZh = computed(() => {
+  const zh = zhSkills.t('description', trainedSkill.value?.description)
+  return zh ? parseSkill(trainedSkill.value, true, zh) : null
+})
 
 // Show sliders if normal OR trained skill needs it
 const showCharaRankSlider = computed(() => charaRankNecessaryNormal.value || charaRankNecessaryTrained.value)
@@ -689,7 +700,7 @@ onMounted(loadData)
                 <p><span class="font-medium">技能名{{ !!card?.specialTrainingSkillId ? ' (特训前)' : '' }}：</span><ZhText v-if="card?.cardSkillName" :text="card.cardSkillName" table="cards" path="cardSkillName" layout="inline" /><template v-else>-</template></p>
                 <div class="flex mt-1">
                   <span class="font-medium whitespace-nowrap">技能效果{{ !!card?.specialTrainingSkillId ? ' (特训前)' : '' }}：</span>
-                  <span>{{ parsedDescription }}</span>
+                  <span><ZhText :text="parsedDescription" :zh="parsedDescriptionZh" /></span>
                 </div>
               </div>
 
@@ -698,7 +709,7 @@ onMounted(loadData)
                 <p><span class="font-medium">技能名 (特训后)：</span><ZhText v-if="card?.specialTrainingSkillName" :text="card.specialTrainingSkillName" table="cards" path="specialTrainingSkillName" layout="inline" /><template v-else>-</template></p>
                 <div class="flex mt-1">
                   <span class="font-medium whitespace-nowrap">技能效果 (特训后)：</span>
-                  <span>{{ parsedTrainedDescription }}</span>
+                  <span><ZhText :text="parsedTrainedDescription" :zh="parsedTrainedDescriptionZh" /></span>
                 </div>
               </div>
 
@@ -783,7 +794,7 @@ onMounted(loadData)
                     class="h-12 rounded object-contain shrink-0 group-hover:scale-[1.02] transition-transform"
                   />
                   <div class="min-w-0">
-                    <p class="text-sm font-medium truncate">{{ event.name }}</p>
+                    <p class="text-sm font-medium truncate"><ZhText :text="event.name" table="events" path="name" layout="inline" /></p>
                     <p class="text-xs text-base-content/60">
                       {{ formatDateShort(event.startAt) }} ~ {{ formatDateShort(event.aggregateAt) }}
                     </p>
@@ -816,7 +827,7 @@ onMounted(loadData)
                     <Gift class="w-5 h-5 text-base-content/20" />
                   </div>
                   <div class="min-w-0 flex-1">
-                    <p class="text-sm font-medium truncate">{{ gacha.name }}</p>
+                    <p class="text-sm font-medium truncate"><ZhText :text="gacha.name" table="gachas" path="name" layout="inline" /></p>
                     <p class="text-xs text-base-content/60">
                       {{ formatDateShort(gacha.startAt) }} ~ {{ formatDateShort(gacha.endAt) }}
                     </p>

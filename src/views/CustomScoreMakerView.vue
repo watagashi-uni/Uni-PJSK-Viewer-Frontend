@@ -14,6 +14,7 @@ import { difficultyStyle } from '@/utils/difficulty'
 import { cardImageVariant } from '@/utils/card'
 import { trackEvent } from '@/utils/analytics'
 import { useCharacterName } from '@/composables/useCharacterName'
+import ZhText from '@/components/ZhText.vue'
 
 type FeedTab = 'ranking' | 'new' | 'search' | 'official_all'
 type RankingMode = 'daily' | 'total'
@@ -252,6 +253,7 @@ const previewBridgeCleanups = new Set<() => void>()
 const assetsHost = computed(() => settingsStore.assetsHost.replace(/\/+$/, ''))
 const translationStore = useTranslationStore()
 useZh('musics')
+const zhTags = useZh('customMusicScoreTags')
 
 const officialCreatorByScoreId = computed(() => {
   const map = new Map<string, OfficialCreator>()
@@ -372,7 +374,7 @@ function formatDate(timestamp?: number) {
 
 function getTagNames(score: DisplayScore) {
   return score.tagIds
-    .map((id) => tagById.value.get(id)?.name)
+    .map((id) => zhTags.inline('name', tagById.value.get(id)?.name))
     .filter((name): name is string => Boolean(name))
 }
 
@@ -1228,7 +1230,7 @@ function selectTab(tab: FeedTab) {
                       class="w-10 h-10 rounded-md shrink-0 object-cover shadow-sm"
                     />
                     <div class="flex flex-col flex-1 min-w-0">
-                      <span class="truncate font-medium">{{ music.title }}</span>
+                      <span class="truncate font-medium"><ZhText :text="music.title" table="musics" path="title" layout="inline" /></span>
                       <span class="text-xs text-base-content/50 truncate">{{ toRomaji(music.pronunciation || '') }}</span>
                     </div>
                     <span class="badge badge-sm badge-ghost font-mono opacity-50">#{{ music.id }}</span>
@@ -1258,7 +1260,7 @@ function selectTab(tab: FeedTab) {
             <div v-if="selectedSearchMusic" class="bg-base-200/40 border border-base-200 rounded-xl p-3 flex flex-1 items-center gap-3 min-w-0 w-full animate-in fade-in slide-in-from-top-2 duration-300">
               <AssetImage :src="getMusicJacketUrl(selectedSearchMusic)" class="w-14 h-14 rounded-lg shadow-sm object-cover ring-1 ring-base-content/5" />
               <div class="flex-1 min-w-0">
-                <p class="text-sm font-bold truncate text-base-content">{{ selectedSearchMusic.title }}</p>
+                <p class="text-sm font-bold truncate text-base-content"><ZhText :text="selectedSearchMusic.title" table="musics" path="title" layout="inline" /></p>
                 <div class="flex items-center gap-2 mt-1">
                   <span class="text-xs text-base-content/60 font-mono">ID: {{ selectedSearchMusic.id }}</span>
                 </div>
@@ -1354,9 +1356,9 @@ function selectTab(tab: FeedTab) {
                     <Copy class="w-3 h-3" /> 复制ID
                   </button>
                 </div>
-                <h2 class="font-bold text-base leading-tight truncate text-base-content mb-1" :title="score.title">{{ score.title }}</h2>
+                <h2 class="font-bold text-base leading-tight truncate text-base-content mb-1" :title="score.title"><ZhText :text="score.title" :table="score.source === 'official' ? 'customMusicScoreOfficialCreators' : ''" path="title" layout="inline" /></h2>
                 <p class="text-xs text-base-content/60 truncate" :title="score.musicTitle + ' · ' + score.creatorName">
-                  <span class="font-medium text-base-content/80">{{ score.musicTitle }}</span>
+                  <span class="font-medium text-base-content/80"><ZhText :text="score.musicTitle" table="musics" path="title" layout="inline" /></span>
                   <span class="mx-1.5 opacity-40">|</span>
                   <button
                     v-if="score.source === 'user'"
@@ -1366,9 +1368,9 @@ function selectTab(tab: FeedTab) {
                     <User class="h-3 w-3" />
                     {{ score.creatorName }}
                   </button>
-                  <span v-else>{{ score.creatorName }}</span>
+                  <span v-else><ZhText :text="score.creatorName" :table="score.source === 'official' ? 'customMusicScoreOfficialCreatorProfiles' : ''" path="name" layout="inline" /></span>
                 </p>
-                <p v-if="score.description" class="text-base-content/70 line-clamp-2 text-xs mt-2 leading-relaxed bg-base-200/50 p-2 rounded-lg">{{ score.description }}</p>
+                <p v-if="score.description" class="text-base-content/70 text-xs mt-2 leading-relaxed bg-base-200/50 p-2 rounded-lg"><ZhText :text="score.description" :table="score.source === 'official' ? 'customMusicScoreOfficialCreators' : ''" path="description" main-class="line-clamp-2" sub-class="mt-1 line-clamp-2" /></p>
               </div>
             </div>
 
@@ -1531,7 +1533,7 @@ function selectTab(tab: FeedTab) {
                     </div>
                     <h3 class="truncate font-bold" :title="score.title">{{ score.title }}</h3>
                     <p class="truncate text-xs text-base-content/55" :title="score.musicTitle">{{ score.musicTitle }}</p>
-                    <p v-if="score.description" class="mt-2 line-clamp-2 rounded-lg bg-base-200/45 p-2 text-xs text-base-content/70">{{ score.description }}</p>
+                    <p v-if="score.description" class="mt-2 rounded-lg bg-base-200/45 p-2 text-xs text-base-content/70"><ZhText :text="score.description" :table="score.source === 'official' ? 'customMusicScoreOfficialCreators' : ''" path="description" main-class="line-clamp-2" sub-class="mt-1 line-clamp-2" /></p>
                   </div>
                 </div>
 

@@ -25,6 +25,7 @@ let nowTimer: ReturnType<typeof setInterval> | undefined
 import type { Gacha } from '@/types/gacha'
 import { cardImageVariant } from '@/utils/card'
 import ZhText from '@/components/ZhText.vue'
+import { SCHEDULE_ZH } from '@/composables/useResourceZh'
 
 const events = ref<EventData[]>([])
 const musics = ref<MusicData[]>([])
@@ -483,7 +484,7 @@ onMounted(async () => {
                 </span>
                 <span class="h-8 w-0.5 shrink-0 rounded-full" :class="scheduleMeta[item.category].dot"></span>
                 <span class="min-w-0 flex-1">
-                  <span class="block truncate text-sm" :title="item.title">{{ item.title }}</span>
+                  <span class="block truncate text-sm" :title="item.title"><ZhText :text="item.title" v-bind="SCHEDULE_ZH[item.category] || {}" layout="inline" /></span>
                   <span class="block text-xs text-base-content/50">{{ item.subtitle }}</span>
                 </span>
               </RouterLink>

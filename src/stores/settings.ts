@@ -37,6 +37,8 @@ export const useSettingsStore = defineStore('settings', () => {
     const translationMode = ref<TranslationMode>('both')
     // 剧情阅读器里的中文台词，阅读器内也可以切换
     const storyTranslation = ref(true)
+    // 只显示官方、人工译文，忽略机器翻译
+    const hideAiTranslation = ref(false)
 
     // 默认 vocal 设置: 'sekai' | 'virtual_singer'
     const defaultVocal = ref<string>('sekai')
@@ -134,6 +136,7 @@ export const useSettingsStore = defineStore('settings', () => {
             translationMode.value = savedTranslationMode
         }
         storyTranslation.value = localStorage.getItem('settings_storyTranslation') !== '0'
+        hideAiTranslation.value = localStorage.getItem('settings_hideAiTranslation') === '1'
 
         const savedDefaultVocal = localStorage.getItem('settings_defaultVocal')
         if (savedDefaultVocal) {
@@ -200,6 +203,10 @@ export const useSettingsStore = defineStore('settings', () => {
         localStorage.setItem('settings_translationMode', value)
     })
 
+    watch(hideAiTranslation, (value) => {
+        localStorage.setItem('settings_hideAiTranslation', value ? '1' : '0')
+    })
+
     watch(storyTranslation, (value) => {
         localStorage.setItem('settings_storyTranslation', value ? '1' : '0')
     })
@@ -220,6 +227,7 @@ export const useSettingsStore = defineStore('settings', () => {
         defaultVocal,
         translationMode,
         storyTranslation,
+        hideAiTranslation,
         preferredAssetsHost,
         assetsSource,
         assetsHost,

@@ -426,7 +426,7 @@ onMounted(async () => {
                 <span class="badge badge-sm badge-outline">{{ getRarityLabel(honor.honorRarity) }}</span>
               </div>
               <h2 class="font-bold truncate"><ZhText v-bind="honorTitle(honor)" sub-class="text-xs font-normal" /></h2>
-              <p class="text-xs text-base-content/55 truncate mt-1">{{ zhHonors.label('levels.description', lastDescription(honor.levels)) }}</p>
+              <p class="text-xs text-base-content/55 truncate mt-1"><ZhText :text="lastDescription(honor.levels)" table="honors" path="levels.description" /></p>
             </div>
           </div>
         </button>
@@ -491,7 +491,7 @@ onMounted(async () => {
                 <span class="badge badge-sm badge-outline">{{ wordsByBondsGroup.get(honor.bondsGroupId)?.length || 0 }} 种文字</span>
               </div>
               <h2 class="truncate font-bold">{{ getCharacterNameByUnitId(honor.gameCharacterUnitId1) }} × {{ getCharacterNameByUnitId(honor.gameCharacterUnitId2) }}</h2>
-              <p class="text-xs text-base-content/55 truncate mt-1">{{ zhBonds.label('levels.description', lastDescription(honor.levels)) }}</p>
+              <p class="text-xs text-base-content/55 truncate mt-1"><ZhText :text="lastDescription(honor.levels)" table="bondsHonors" path="levels.description" /></p>
             </div>
           </div>
         </button>

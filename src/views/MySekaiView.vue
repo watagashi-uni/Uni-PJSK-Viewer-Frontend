@@ -98,9 +98,11 @@ const RARE_RES_KEYS: Record<1 | 2, string[]> = {
 const accountStore = useAccountStore()
 const settingsStore = useSettingsStore()
 const masterStore = useMasterStore()
+const zhSites = useZh('mysekaiSites')
 const zhResources: Record<string, ReturnType<typeof useZh>> = {
   mysekai_material: useZh('mysekaiMaterials'),
   mysekai_fixture: useZh('mysekaiFixtures'),
+  mysekai_item: useZh('mysekaiItems'),
 }
 // 资源提示文字带上中文名
 function resourceLabel(id: string): string {
@@ -939,7 +941,7 @@ onBeforeUnmount(() => {
             <div class="label"><span class="label-text">站点</span></div>
             <select v-model.number="selectedSiteId" class="select select-bordered select-sm">
               <option v-for="scene in SITE_SCENES" :key="scene.siteId" :value="scene.siteId">
-                {{ scene.name }}
+                {{ zhSites.inline('name', scene.name) }}
               </option>
             </select>
           </label>

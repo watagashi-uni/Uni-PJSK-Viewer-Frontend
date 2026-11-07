@@ -80,6 +80,7 @@ import AccountSelector from '@/components/AccountSelector.vue'
 import { request } from '@/utils/request'
 import { APPEND_GRADIENT, DIFFICULTY_COLORS, difficultyBackground } from '@/utils/difficulty'
 import { useCharacterName } from '@/composables/useCharacterName'
+import ZhText from '@/components/ZhText.vue'
 
 interface Music {
   id: number
@@ -212,6 +213,7 @@ const musicAchievements = ref<MusicAchievement[]>([])
 const pjskb30Map = ref<Map<string, number>>(new Map())
 const usePjskb30 = ref(true)
 const zhMusics = useZh('musics')
+const zhCollaborations = useZh('musicCollaborations')
 const translationStore = useTranslationStore()
 // 搜索不受显示设置影响：表已加载就同时匹配中文名
 const musicZhTitle = (music: Music) => translationStore.lookup('musics', 'title', music.title)?.text
@@ -571,7 +573,8 @@ const musicTagMap = computed(() => {
 })
 
 const musicCollaborationMap = computed(() => new Map(
-  musicCollaborations.value.map(collaboration => [collaboration.id, collaboration.label]),
+  // 合作标签直接显示原名与译名
+  musicCollaborations.value.map(collaboration => [collaboration.id, zhCollaborations.inline('label', collaboration.label)]),
 ))
 
 const musicVocalCharacterMap = computed(() => {
@@ -1708,7 +1711,7 @@ watch(totalPages, (pages) => {
                 class="w-10 h-10 rounded object-cover flex-shrink-0"
               />
               <div class="flex-1 min-w-0">
-                <div class="text-sm font-medium truncate">{{ getMusicTitle(entry.musicId) }}</div>
+                <div class="text-sm font-medium truncate"><ZhText :text="getMusicTitle(entry.musicId)" table="musics" path="title" layout="inline" /></div>
                 <div class="flex items-center gap-2 text-xs">
                   <span 
                     class="px-1.5 py-0.5 rounded text-[10px] font-bold"
@@ -2088,7 +2091,7 @@ watch(totalPages, (pages) => {
           />
           <div class="flex-1 min-w-0 flex flex-col justify-center">
             <div class="text-base font-bold truncate leading-tight mb-1" :title="getMusicTitle(entry.musicId)">
-              {{ getMusicTitle(entry.musicId) }}
+              <ZhText :text="getMusicTitle(entry.musicId)" table="musics" path="title" layout="inline" />
             </div>
             <div class="flex items-center gap-2">
               <span 

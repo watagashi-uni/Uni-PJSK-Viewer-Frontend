@@ -5,7 +5,7 @@ import type { PjskPlayer, ScenarioSceneData } from 'pjsk-scenario-player'
 import { buildStoryFrames } from '@/utils/storyPlayback'
 import { loadStoryPlayerIndex, parsePlayerScenario, storyPlayerResolver } from '@/utils/storyPlayerAssets'
 import { attachStoryZhOverlay, trimFullStop, type StoryZhOverlay } from '@/utils/storyZhOverlay'
-import { loadZhStory, type ZhStory, type ZhStorySource } from '@/api/translations'
+import { loadZhStory, peekZhStorySource, type ZhStory, type ZhStorySource } from '@/api/translations'
 import { useSettingsStore } from '@/stores/settings'
 import ZhText from '@/components/ZhText.vue'
 
@@ -36,9 +36,12 @@ const started = ref(false)
 const settings = useSettingsStore()
 // 中文台词：按 TalkData 下标对齐，人名和地点字幕另有对照表
 const zhStory = shallowRef<ZhStory | null>(null)
-const zhState = ref<'idle' | 'loading' | 'ready' | 'none'>('idle')
+// skipped：设置里关闭了 AI 译文，而这一话只有机翻，没有下载
+const zhState = ref<'idle' | 'loading' | 'ready' | 'none' | 'skipped'>('idle')
+const zhKnownSource = ref<ZhStorySource>()
 const showZh = computed(() => settings.storyTranslation)
-const zhActive = computed(() => showZh.value && !!zhStory.value)
+const zhHidden = computed(() => settings.hideAiTranslation && !!zhKnownSource.value && zhKnownSource.value !== 'official')
+const zhActive = computed(() => showZh.value && !!zhStory.value && !zhHidden.value)
 const zhFirst = computed(() => zhActive.value && settings.translationMode === 'zh-first')
 const ZH_SOURCES: Record<ZhStorySource, { label: string; title: string }> = {
   official: { label: '官方中文', title: '国服官方汉化文本' },
@@ -60,12 +63,31 @@ async function loadZh() {
   if (!showZh.value || zhRequest === props.scenarioId) return
   const scenarioId = zhRequest = props.scenarioId
   zhState.value = 'loading'
+  if (settings.hideAiTranslation && !zhStory.value) {
+    // 能提前知道来源时，只有机翻的剧情不必下载
+    const source = await peekZhStorySource(scenarioId).catch(() => undefined)
+    if (disposed || scenarioId !== props.scenarioId) return
+    if (source === null) { zhState.value = 'none'; zhRequest = ''; return }
+    if (source && source !== 'official') { zhKnownSource.value = source; zhState.value = 'skipped'; zhRequest = ''; return }
+  }
   const story = await loadZhStory(scenarioId).catch(() => null)
   if (disposed || scenarioId !== props.scenarioId) return
   zhStory.value = story
+  zhKnownSource.value = story?.src
   zhState.value = story ? 'ready' : 'none'
   if (!story) zhRequest = ''
 }
+const zhButtonText = computed(() => {
+  if (!showZh.value) return '中文'
+  if (zhState.value === 'loading') return '…'
+  if (zhHidden.value) return 'AI 已隐藏'
+  return zhState.value === 'none' ? '无译文' : '中文'
+})
+const zhButtonTitle = computed(() => {
+  if (!showZh.value) return '显示中文'
+  if (zhHidden.value) return '这一话只有 AI 译文，已在设置中关闭 AI 译文'
+  return zhState.value === 'none' ? '这一话暂无中文译文' : '隐藏中文'
+})
 const index = computed(() => {
   for (let i = frames.value.length - 1; i >= 0; i--) {
     if (frames.value[i]!.snippetIndex <= snippet.value) return i
@@ -235,6 +257,7 @@ async function copyScript() {
 }
 watch([volume, bgmEnabled], syncVolume)
 watch(showZh, () => { void loadZh() })
+watch(() => settings.hideAiTranslation, hide => { if (!hide && zhState.value === 'skipped') void loadZh() })
 watch(zhActive, () => { overlay?.setStory(zhActive.value ? zhStory.value : null) })
 watch(zhStory, () => { if (zhActive.value) overlay?.setStory(zhStory.value) })
 watch(() => [props.scenarioId, ...props.scenarioUrls], () => { void load() })
@@ -248,8 +271,8 @@ onBeforeUnmount(() => {
 <template>
   <div class="story-reader">
     <header class="reader-heading">
-      <div class="min-w-0 flex-1"><p class="text-xs text-primary font-bold tracking-wider">{{ episodeLabel || 'STORY THEATER' }}<span v-if="zhActive && zhSource" class="zh-source" :title="zhSource.title">{{ zhSource.label }}</span></p><h2 class="text-lg font-bold truncate"><ZhText :text="title" :zh="titleZh || null" layout="inline" sub-class="text-sm" /></h2></div>
-      <button class="btn btn-sm btn-ghost gap-1 px-2" :class="{ 'text-primary': showZh }" :aria-pressed="showZh" :title="zhState === 'none' && showZh ? '这一话暂无中文译文' : showZh ? '隐藏中文' : '显示中文'" @click="settings.storyTranslation = !showZh"><Languages class="w-4 h-4" /><span class="text-xs">{{ showZh && zhState === 'loading' ? '…' : showZh && zhState === 'none' ? '无译文' : '中文' }}</span></button>
+      <div class="min-w-0 flex-1"><p class="text-xs text-primary font-bold tracking-wider">{{ episodeLabel || 'STORY THEATER' }}<span v-if="zhActive && zhSource" class="zh-source" :title="zhSource.title">{{ zhSource.label }}</span><span v-else-if="showZh && zhHidden" class="zh-source" title="可在设置的“中文译名”中重新显示 AI 译文">仅有 AI 译文 · 已隐藏</span></p><h2 class="text-lg font-bold truncate"><ZhText :text="title" :zh="titleZh || null" layout="inline" sub-class="text-sm" /></h2></div>
+      <button class="btn btn-sm btn-ghost gap-1 px-2" :class="{ 'text-primary': showZh }" :aria-pressed="showZh" :title="zhButtonTitle" @click="settings.storyTranslation = !showZh"><Languages class="w-4 h-4" /><span class="text-xs">{{ zhButtonText }}</span></button>
       <div class="join"><button aria-label="场景模式" class="btn btn-sm join-item" :class="mode === 'stage' ? 'btn-primary' : 'btn-ghost'" @click="setMode('stage')"><Film class="w-4 h-4" /><span class="hidden sm:inline">场景</span></button><button aria-label="文本模式" class="btn btn-sm join-item" :class="mode === 'script' ? 'btn-primary' : 'btn-ghost'" @click="setMode('script')"><BookOpen class="w-4 h-4" /><span class="hidden sm:inline">文本</span></button></div>
       <button class="btn btn-sm btn-circle btn-ghost" aria-label="关闭阅读器" @click="emit('close')"><X class="w-5 h-5" /></button>
     </header>

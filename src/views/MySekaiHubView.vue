@@ -218,6 +218,7 @@ const zhMainGenres = useZh('mysekaiFixtureMainGenres', () => activeTab.value ===
 const zhSubGenres = useZh('mysekaiFixtureSubGenres', () => activeTab.value === 'furniture')
 const zhFixtureTags = useZh('mysekaiFixtureTags', () => selectedFixtureId.value !== null)
 const zhCards = useZh('cards', () => activeTab.value === 'canvas')
+const zhMaterials = useZh('mysekaiMaterials')
 
 const selectedUserId = computed({
   get: () => accountStore.currentUserId || '',
@@ -654,8 +655,9 @@ const materialIconMap = computed(() => {
 
 const materialNameMap = computed(() => {
   const map = new Map<number, string>()
+  // 材料名直接带上译名（纯文本显示）
   for (const row of mysekaiMaterials.value) {
-    map.set(row.id, row.name)
+    map.set(row.id, zhMaterials.inline('name', row.name))
   }
   return map
 })
@@ -1917,7 +1919,7 @@ function closeFixtureDetail() {
             <RouterLink v-for="item in filteredCanvasItems" :key="item.key" :to="`/cards/${item.cardId}`" class="group card bg-base-100 border border-base-200 shadow-sm overflow-hidden hover:border-primary/40 hover:shadow-md transition-all">
               <div class="relative"><SekaiCard :card="item.card" :trained="item.isSpecialTraining" class="transition-transform group-hover:scale-[1.02]" /><span class="absolute top-1 right-1 badge badge-xs border-0 bg-base-100/90">{{ getCanvasFixtureLabel(item.mysekaiFixtureId) }}</span><span v-if="item.quantity > 1" class="absolute bottom-1 right-1 badge badge-primary badge-xs">×{{ item.quantity }}</span></div>
               <div class="p-2 space-y-1 min-w-0">
-                <p class="text-xs font-bold truncate" :title="zhCards.inline('prefix', item.card.prefix)">{{ zhCards.label('prefix', item.card.prefix) }}</p>
+                <p class="text-xs font-bold truncate" :title="zhCards.inline('prefix', item.card.prefix)"><ZhText :text="item.card.prefix" table="cards" path="prefix" sub-class="font-normal" /></p>
                 <p class="text-[10px] text-base-content/50 truncate">{{ gameCharacterNameMap.get(item.card.characterId) || `角色 #${item.card.characterId}` }} · #{{ item.cardId }}</p>
                 <div class="flex items-center justify-between gap-1 text-[10px]"><span class="badge badge-xs" :class="item.isSpecialTraining ? 'badge-secondary badge-outline' : 'badge-ghost'">{{ item.isSpecialTraining ? '特训后' : '特训前' }}</span><span v-if="item.bonus" class="text-accent font-medium">各 +{{ item.bonus.power1BonusFixed }}</span></div>
                 <p class="text-[9px] text-base-content/35 truncate" :title="formatCanvasDate(item.lastObtainedAt)">{{ formatCanvasDate(item.lastObtainedAt) }}</p>
@@ -2072,7 +2074,7 @@ function closeFixtureDetail() {
                 />
                 <div v-if="hasRecordData && item.owned" class="absolute top-1 right-1 badge badge-success badge-xs">已持有</div>
                 <div class="absolute bottom-0 left-0 right-0 bg-black/55 text-white text-[10px] px-1 py-0.5 truncate" :title="item.title">
-                  {{ item.title }}
+                  <ZhText :text="item.title" table="musics" path="title" layout="inline" />
                 </div>
               </div>
             </div>
@@ -2108,10 +2110,10 @@ function closeFixtureDetail() {
               </div>
               <div class="min-w-0 flex-1">
                 <div class="flex items-start justify-between gap-1.5">
-                  <div class="min-w-0"><h3 class="truncate font-bold">{{ row.name }}</h3><p class="truncate text-[11px] text-base-content/45">{{ row.englishName }}</p></div>
+                  <div class="min-w-0"><h3 class="truncate font-bold"><ZhText :text="row.name" table="mysekaiPhenomenas" path="name" layout="inline" /></h3><p class="truncate text-[11px] text-base-content/45">{{ row.englishName }}</p></div>
                   <span class="shrink-0 text-[10px] text-base-content/35">#{{ row.id }}</span>
                 </div>
-                <p class="mt-1 line-clamp-2 text-xs leading-4 text-base-content/55">{{ row.description }}</p>
+                <p class="mt-1 text-xs leading-4 text-base-content/55"><ZhText :text="row.description" table="mysekaiPhenomenas" path="description" main-class="line-clamp-2" sub-class="line-clamp-2 text-xs" /></p>
               </div>
             </div>
             <div class="mt-2.5 flex flex-wrap items-center gap-1.5">

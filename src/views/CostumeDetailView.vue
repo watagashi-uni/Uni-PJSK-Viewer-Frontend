@@ -330,7 +330,7 @@ onMounted(loadData)
                 <span v-else>-</span>
               </p>
               <p v-if="group.designer && group.designer !== '-'">
-                <span class="font-medium">设计者：</span>{{ group.designer }}
+                <span class="font-medium">设计者：</span><ZhText :text="group.designer" table="costume3ds" path="designer" layout="inline" />
               </p>
               <p>
                 <span class="font-medium">实装时间：</span>
@@ -387,7 +387,7 @@ onMounted(loadData)
                   class="h-12 rounded object-contain shrink-0 group-hover:scale-[1.02] transition-transform"
                 />
                 <div class="min-w-0">
-                  <p class="text-sm font-medium truncate">{{ event.name }}</p>
+                  <p class="text-sm font-medium truncate"><ZhText :text="event.name" table="events" path="name" layout="inline" /></p>
                   <p class="text-xs text-base-content/60">
                     {{ formatDateShort(event.startAt) }} ~ {{ formatDateShort(event.aggregateAt) }}
                   </p>

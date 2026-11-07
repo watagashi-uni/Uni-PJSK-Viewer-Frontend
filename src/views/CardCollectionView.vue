@@ -10,6 +10,7 @@ import { useAccountStore } from '@/stores/account'
 import { useMasterStore } from '@/stores/master'
 import { useZh } from '@/composables/useZh'
 import { useCharacterName } from '@/composables/useCharacterName'
+import ZhText from '@/components/ZhText.vue'
 
 interface Card {
   id: number
@@ -331,7 +332,7 @@ onMounted(async () => {
                     <span v-else-if="isTrained(card)" class="absolute top-1 right-1 badge badge-secondary badge-xs">特训</span>
                   </div>
                   <div class="p-2 space-y-1.5 min-w-0">
-                    <p class="text-xs font-bold truncate" :title="zhCards.inline('prefix', card.prefix)">{{ zhCards.label('prefix', card.prefix) }}</p>
+                    <p class="text-xs font-bold truncate" :title="zhCards.inline('prefix', card.prefix)"><ZhText :text="card.prefix" table="cards" path="prefix" sub-class="font-normal" /></p>
                     <template v-if="userCardsMap.has(card.id)">
                       <div class="flex flex-wrap gap-1 text-[10px]"><span class="badge badge-xs badge-outline">Lv.{{ userCardsMap.get(card.id)?.level }}</span><span class="badge badge-xs badge-outline">突破 {{ userCardsMap.get(card.id)?.masterRank || 0 }}</span><span class="badge badge-xs badge-outline">技能 {{ userCardsMap.get(card.id)?.skillLevel || 1 }}</span></div>
                       <div class="flex items-center justify-between text-[10px]" :class="episodeStats(card.id).read === episodeStats(card.id).total ? 'text-success' : 'text-secondary'"><span class="flex items-center gap-1"><CheckCircle2 class="w-3 h-3" />剧情</span><span>{{ episodeStats(card.id).read }} / {{ episodeStats(card.id).total }}</span></div>

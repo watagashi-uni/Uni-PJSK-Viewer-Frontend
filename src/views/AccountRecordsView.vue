@@ -12,6 +12,8 @@ import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
 import type { GameCharacterData } from '@/types/master'
 import { useCharacterName } from '@/composables/useCharacterName'
+import ZhText from '@/components/ZhText.vue'
+import { useZh } from '@/composables/useZh'
 
 type RecordsTab = 'events' | 'world_bloom' | 'challenge' | 'rank' | 'decks' | 'missions'
 
@@ -202,6 +204,10 @@ const { characterName } = useCharacterName()
 const masterStore = useMasterStore()
 const accountStore = useAccountStore()
 const settingsStore = useSettingsStore()
+const zhEvents = useZh('events')
+const zhMaterials = useZh('materials')
+const zhGrades = useZh('rankMatchGrades')
+const zhClasses = useZh('rankMatchClasses')
 
 const events = ref<EventInfo[]>([])
 const rankMatchSeasons = ref<RankMatchSeason[]>([])
@@ -309,7 +315,7 @@ const filteredEventRows = computed(() => {
   const query = eventSearch.value.trim().toLocaleLowerCase()
   return eventRows.value
     .filter(row => !rankedOnly.value || row.rank > 0)
-    .filter(row => !query || [row.id, row.master?.name].some(value => String(value || '').toLocaleLowerCase().includes(query)))
+    .filter(row => !query || [row.id, zhEvents.searchText('name', row.master?.name)].some(value => String(value || '').toLocaleLowerCase().includes(query)))
 })
 const eventTotalPages = computed(() => Math.max(1, Math.ceil(filteredEventRows.value.length / eventPageSize)))
 const paginatedEventRows = computed(() => filteredEventRows.value.slice(
@@ -443,7 +449,7 @@ function challengeRewardDetails(purpose: 'challenge_live_stage' | 'challenge_liv
 function challengeRewardName(row: ResourceBoxDetail): string {
   if (row.resourceType === 'jewel') return '水晶'
   if (row.resourceType === 'coin') return '金币'
-  if (row.resourceType === 'material' && row.resourceId) return materialMap.value.get(row.resourceId)?.name || `素材 #${row.resourceId}`
+  if (row.resourceType === 'material' && row.resourceId) return zhMaterials.inline('name', materialMap.value.get(row.resourceId)?.name) || `素材 #${row.resourceId}`
   return `${row.resourceType}${row.resourceId ? ` #${row.resourceId}` : ''}`
 }
 
@@ -649,7 +655,7 @@ function challengeDeckCards(deck: UserChallengeDeck) {
 
 function tierLabel(row: typeof rankRows.value[number]): string {
   if (!row.tier) return `段位 #${row.rankMatchTierId}`
-  return `${row.grade?.name || ''} ${row.rankClass?.name || ''}`.trim()
+  return `${zhGrades.inline('name', row.grade?.name)} ${zhClasses.inline('name', row.rankClass?.name)}`.trim()
 }
 
 function getCharacterName(character: GameCharacterData): string {
@@ -773,7 +779,7 @@ onMounted(async () => {
               <RouterLink v-if="row.master" :to="`/events/${row.id}`" class="block bg-base-200 aspect-[122/52] overflow-hidden"><AssetImage v-if="eventBanner(row.master)" :src="eventBanner(row.master)" :alt="row.master.name" class="w-full h-full object-cover hover:scale-[1.02] transition-transform" /></RouterLink>
               <div v-else class="aspect-[122/52] bg-base-200 grid place-items-center text-base-content/30"><CalendarDays class="w-10 h-10" /></div>
               <div class="card-body p-3 gap-2.5">
-                <div class="flex items-start justify-between gap-3"><div class="min-w-0"><p class="text-xs text-base-content/45">活动 #{{ row.id }} · {{ formatDate(row.master?.startAt) }}</p><RouterLink v-if="row.master" :to="`/events/${row.id}`" class="font-bold link link-hover line-clamp-2">{{ row.master.name }}</RouterLink><p v-else class="font-bold">活动 #{{ row.id }}</p></div><span v-if="row.rank" class="badge badge-primary badge-outline shrink-0">#{{ formatNumber(row.rank) }}</span></div>
+                <div class="flex items-start justify-between gap-3"><div class="min-w-0"><p class="text-xs text-base-content/45">活动 #{{ row.id }} · {{ formatDate(row.master?.startAt) }}</p><RouterLink v-if="row.master" :to="`/events/${row.id}`" class="font-bold link link-hover line-clamp-2"><ZhText :text="row.master.name" table="events" path="name" sub-class="text-xs font-normal" /></RouterLink><p v-else class="font-bold">活动 #{{ row.id }}</p></div><span v-if="row.rank" class="badge badge-primary badge-outline shrink-0">#{{ formatNumber(row.rank) }}</span></div>
                 <div class="grid grid-cols-2 gap-1.5 text-xs"><div class="rounded-lg bg-base-200/70 px-2.5 py-2"><p class="text-[10px] text-base-content/45">活动点</p><p class="font-bold text-primary">{{ formatNumber(row.point) }}</p></div><div class="rounded-lg bg-base-200/70 px-2.5 py-2"><p class="text-[10px] text-base-content/45">最终排名</p><p class="font-bold">{{ row.rank ? `#${formatNumber(row.rank)}` : '—' }}</p></div></div>
               </div>
             </article>
@@ -841,7 +847,7 @@ onMounted(async () => {
             <article v-for="group in worldBloomGroups" :key="group.eventId" class="card bg-base-100 border border-base-200 shadow-sm overflow-hidden">
               <RouterLink v-if="group.event" :to="`/events/${group.eventId}`" class="block aspect-[122/52] overflow-hidden bg-base-200"><AssetImage v-if="eventBanner(group.event)" :src="eventBanner(group.event)" :alt="group.event.name" class="h-full w-full object-contain transition-transform hover:scale-[1.02]" /></RouterLink>
               <div class="card-body p-3 gap-2.5">
-                <div class="flex items-start justify-between gap-3"><div class="min-w-0"><p class="text-xs text-base-content/45">World Bloom #{{ group.eventId }} · {{ formatDate(group.event?.startAt) }}</p><RouterLink v-if="group.event" :to="`/events/${group.eventId}`" class="font-bold link link-hover line-clamp-2">{{ group.event.name }}</RouterLink><p v-else class="font-bold">活动 #{{ group.eventId }}</p></div><div class="text-right shrink-0"><p class="font-bold text-primary">{{ formatNumber(group.totalPoint) }}</p><p class="text-[10px] text-base-content/45">Total Chapter Point</p></div></div>
+                <div class="flex items-start justify-between gap-3"><div class="min-w-0"><p class="text-xs text-base-content/45">World Bloom #{{ group.eventId }} · {{ formatDate(group.event?.startAt) }}</p><RouterLink v-if="group.event" :to="`/events/${group.eventId}`" class="font-bold link link-hover line-clamp-2"><ZhText :text="group.event.name" table="events" path="name" layout="inline" /></RouterLink><p v-else class="font-bold">活动 #{{ group.eventId }}</p></div><div class="text-right shrink-0"><p class="font-bold text-primary">{{ formatNumber(group.totalPoint) }}</p><p class="text-[10px] text-base-content/45">Total Chapter Point</p></div></div>
                 <div class="divide-y divide-base-200 rounded-xl border border-base-200 overflow-hidden">
                   <div v-for="row in group.rows" :key="row.characterId" class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 px-2.5 py-2 bg-base-100">
                     <span class="badge badge-secondary badge-outline badge-sm whitespace-nowrap">Chapter {{ row.chapter?.chapterNo || '?' }}</span>

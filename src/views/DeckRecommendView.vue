@@ -25,6 +25,7 @@ import PageHeader from '@/components/PageHeader.vue'
 import { difficultyStyle } from '@/utils/difficulty'
 import { trackEvent } from '@/utils/analytics'
 import { useCharacterName } from '@/composables/useCharacterName'
+import ZhText from '@/components/ZhText.vue'
 
 interface MusicDiffData {
   id: number
@@ -549,7 +550,7 @@ const rarityList = [
                   </div>
                   <div class="flex-1 min-w-0">
                     <div class="text-xs opacity-60 font-medium">ID: {{ selectedEvent.id }}</div>
-                    <div class="font-bold truncate text-sm" :title="selectedEvent.name">{{ selectedEvent.name }}</div>
+                    <div class="font-bold truncate text-sm" :title="selectedEvent.name"><ZhText :text="selectedEvent.name" table="events" path="name" layout="inline" /></div>
                   </div>
                 </template>
                 <template v-else>
@@ -579,7 +580,7 @@ const rarityList = [
                     </div>
                     <div class="flex-1 min-w-0">
                       <div class="text-[11px] font-bold tracking-wider" :class="selectedEventId === e.id ? 'text-primary' : 'opacity-50'">ID: {{ e.id }}</div>
-                      <div class="font-bold truncate text-sm mt-0.5" :class="selectedEventId === e.id ? 'text-primary' : ''" :title="e.name">{{ e.name }}</div>
+                      <div class="font-bold truncate text-sm mt-0.5" :class="selectedEventId === e.id ? 'text-primary' : ''" :title="e.name"><ZhText :text="e.name" table="events" path="name" layout="inline" /></div>
                     </div>
                   </div>
                   <div v-if="filteredEvents.length === 0" class="p-6 text-center text-sm font-medium opacity-60">
@@ -624,7 +625,7 @@ const rarityList = [
                 <input v-model="musicSearchText" type="text" :placeholder="selectedMusic ? `${selectedMusic.id} - ${selectedMusic.title}` : '搜索歌曲...'" class="input input-bordered w-full" @focus="showMusicDropdown = true" />
                 <ul v-if="showMusicDropdown" class="absolute z-50 mt-1 w-full bg-base-100 shadow-xl rounded-box max-h-60 overflow-y-auto border border-base-300">
                   <li v-for="m in filteredMusics" :key="m.id" class="px-4 py-2 hover:bg-base-200 cursor-pointer text-sm" :class="{ 'bg-primary/10': selectedMusicId === m.id }" @mousedown.prevent="selectMusic(m)">
-                    {{ m.id }} - {{ m.title }}
+                    {{ m.id }} - <ZhText :text="m.title" table="musics" path="title" layout="inline" />
                   </li>
                 </ul>
               </div>

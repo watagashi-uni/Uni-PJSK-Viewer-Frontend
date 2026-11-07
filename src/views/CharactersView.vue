@@ -397,7 +397,7 @@ onMounted(async () => {
           />
           <div class="absolute left-5 top-5">
             <span class="badge border" :style="getUnitBadgeStyle(selectedCharacter.unit)">
-              {{ getUnitName(selectedCharacter.unit) }}
+              <ZhText :text="getUnitName(selectedCharacter.unit)" table="unitProfiles" path="unitName" layout="inline" />
             </span>
           </div>
         </section>
@@ -407,7 +407,7 @@ onMounted(async () => {
             <header>
               <p class="text-sm tracking-[0.18em] text-base-content/45 uppercase">{{ getEnglishName(selectedCharacter) }}</p>
               <h1 class="text-3xl md:text-4xl font-bold mt-1">{{ getCharacterName(selectedCharacter) }}<span v-if="jpName(selectedCharacter) !== getCharacterName(selectedCharacter)" class="ml-3 text-lg font-medium text-base-content/55" lang="ja">{{ jpName(selectedCharacter) }}</span></h1>
-              <p v-if="selectedProfile?.characterVoice" class="text-sm text-base-content/60 mt-2">CV：{{ selectedProfile.characterVoice }}</p>
+              <p v-if="selectedProfile?.characterVoice" class="text-sm text-base-content/60 mt-2">CV：<ZhText :text="selectedProfile.characterVoice" table="characterProfiles" path="characterVoice" layout="inline" /></p>
             </header>
 
             <p v-if="selectedProfile?.introduction" class="leading-7 text-base-content/80 whitespace-pre-line">
@@ -472,7 +472,7 @@ onMounted(async () => {
                 <dt class="text-base-content/50 text-xs">身高</dt><dd class="font-medium mt-1">{{ selectedProfile.height }}</dd>
               </div>
               <div v-if="selectedProfile.school" class="bg-base-200/70 rounded-lg p-3">
-                <dt class="text-base-content/50 text-xs">学校 / 年级</dt><dd class="font-medium mt-1">{{ selectedProfile.school }} {{ selectedProfile.schoolYear }}</dd>
+                <dt class="text-base-content/50 text-xs">学校 / 年级</dt><dd class="font-medium mt-1"><ZhText :text="selectedProfile.school" table="characterProfiles" path="school" layout="inline" /> <ZhText :text="selectedProfile.schoolYear" table="characterProfiles" path="schoolYear" layout="inline" /></dd>
               </div>
               <div v-if="selectedProfile.hobby" class="bg-base-200/70 rounded-lg p-3">
                 <dt class="text-base-content/50 text-xs">兴趣</dt><dd class="font-medium mt-1"><ZhText v-bind="profileText('hobby', selectedProfile.hobby)" /></dd>
@@ -547,7 +547,7 @@ onMounted(async () => {
         <div class="flex items-center gap-3">
           <span class="h-7 w-1.5 rounded-full border border-base-300" :style="{ backgroundColor: getUnitColor(group.unit) }"></span>
           <div>
-            <h2 class="text-xl font-bold">{{ group.profile?.unitName || getUnitName(group.unit) }}</h2>
+            <h2 class="text-xl font-bold"><ZhText :text="group.profile?.unitName || getUnitName(group.unit)" table="unitProfiles" path="unitName" layout="inline" /></h2>
             <p class="text-[11px] text-base-content/45">{{ group.items.length }} 名角色</p>
           </div>
         </div>

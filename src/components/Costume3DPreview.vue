@@ -32,6 +32,7 @@ import {
 import type { CostumePart, CostumeColorVariant } from '@/types/costume'
 import { trackEvent } from '@/utils/analytics'
 import { useCharacterName } from '@/composables/useCharacterName'
+import ZhText from '@/components/ZhText.vue'
 
 interface Character {
   id: number
@@ -617,7 +618,7 @@ onBeforeUnmount(() => {
             :disabled="isBusy"
             @click="selectedColorId = color.colorId"
           >
-            {{ color.colorName }}
+            <ZhText :text="color.colorName" table="costume3ds" path="colorName" layout="inline" />
           </button>
         </div>
         <select
