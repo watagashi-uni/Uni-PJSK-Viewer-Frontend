@@ -34,12 +34,23 @@ export function storyIndexSource(entry: ZhStoryIndexEntry | undefined): ZhStoryS
   return Array.isArray(entry) ? entry[1] : undefined
 }
 
+/** 一个故事（活动、主线章节、卡面、特别篇）的 AI 梗概 */
+export interface ZhStorySummary {
+  title: string
+  /** 整个故事的总结，段落以换行分隔；只有一话的故事没有 */
+  summary?: string
+  /** scenarioId → 这一话的梗概 */
+  episodes: Record<string, string>
+}
+
 export interface ZhVersion {
   v: number
   lang: string
   updatedAt: number
   d: Record<string, string>
   s: string
+  /** 剧情梗概索引的哈希 */
+  sum?: string
 }
 
 interface Stored<T> { hash: string; data: T }
@@ -47,9 +58,10 @@ interface Stored<T> { hash: string; data: T }
 interface StoredVersion { fetchedAt: number; data: ZhVersion; hash?: string }
 
 interface ZhDBSchema extends DBSchema {
-  meta: { key: string; value: StoredVersion | Stored<ZhStoryIndex> }
+  meta: { key: string; value: StoredVersion | Stored<ZhStoryIndex> | Stored<Record<string, string>> }
   tables: { key: string; value: Stored<ZhTable> }
   stories: { key: string; value: Stored<ZhStory> }
+  summaries: { key: string; value: Stored<ZhStorySummary> }
 }
 
 const DB_NAME = 'viewer-translations'
@@ -62,11 +74,11 @@ let dbPromise: Promise<IDBPDatabase<ZhDBSchema> | null> | null = null
 
 function getDB(): Promise<IDBPDatabase<ZhDBSchema> | null> {
   if (!dbPromise) {
-    dbPromise = openDB<ZhDBSchema>(DB_NAME, 1, {
+    dbPromise = openDB<ZhDBSchema>(DB_NAME, 2, {
       upgrade(db) {
-        db.createObjectStore('meta')
-        db.createObjectStore('tables')
-        db.createObjectStore('stories')
+        for (const name of ['meta', 'tables', 'stories', 'summaries'] as const) {
+          if (!db.objectStoreNames.contains(name)) db.createObjectStore(name)
+        }
       },
     }).catch((error) => {
       // 隐私模式等环境没有 IndexedDB 时只用内存缓存
@@ -77,7 +89,7 @@ function getDB(): Promise<IDBPDatabase<ZhDBSchema> | null> {
   return dbPromise
 }
 
-async function dbGet<S extends 'meta' | 'tables' | 'stories'>(store: S, key: string): Promise<ZhDBSchema[S]['value'] | undefined> {
+async function dbGet<S extends 'meta' | 'tables' | 'stories' | 'summaries'>(store: S, key: string): Promise<ZhDBSchema[S]['value'] | undefined> {
   try {
     const db = await getDB()
     return (await db?.get(store, key)) as ZhDBSchema[S]['value'] | undefined
@@ -86,7 +98,7 @@ async function dbGet<S extends 'meta' | 'tables' | 'stories'>(store: S, key: str
   }
 }
 
-async function dbPut<S extends 'meta' | 'tables' | 'stories'>(store: S, key: string, value: ZhDBSchema[S]['value']): Promise<void> {
+async function dbPut<S extends 'meta' | 'tables' | 'stories' | 'summaries'>(store: S, key: string, value: ZhDBSchema[S]['value']): Promise<void> {
   try {
     const db = await getDB()
     await db?.put(store, value as never, key)
@@ -244,8 +256,65 @@ export function loadZhStory(scenarioId: string): Promise<ZhStory | null> {
 export async function clearZhCache(): Promise<void> {
   versionPromise = null
   storyIndexPromise = null
+  summaryIndexPromise = null
   const db = await getDB()
   if (!db) return
-  const tx = db.transaction(['meta', 'tables', 'stories'], 'readwrite')
-  await Promise.all([tx.objectStore('meta').clear(), tx.objectStore('tables').clear(), tx.objectStore('stories').clear(), tx.done])
+  const tx = db.transaction(['meta', 'tables', 'stories', 'summaries'], 'readwrite')
+  await Promise.all([tx.objectStore('meta').clear(), tx.objectStore('tables').clear(), tx.objectStore('stories').clear(), tx.objectStore('summaries').clear(), tx.done])
+}
+
+let summaryIndexPromise: Promise<Record<string, string> | null> | null = null
+
+/** 梗概索引：打开剧情目录或详情页的故事区块时才读取，每个会话一次 */
+export function loadZhSummaryIndex(): Promise<Record<string, string> | null> {
+  if (!summaryIndexPromise) {
+    summaryIndexPromise = (async () => {
+      const [version, stored] = await Promise.all([loadZhVersion(), dbGet('meta', 'summaryIndex') as Promise<Stored<Record<string, string>> | undefined>])
+      if (!version?.sum) return version ? null : stored?.data ?? null
+      if (stored?.hash === version.sum) return stored.data
+      try {
+        const data = await fetchJson<Record<string, string>>(`sum/index.${version.sum}.json`)
+        await dbPut('meta', 'summaryIndex', { hash: version.sum, data })
+        void pruneSummaries(data)
+        return data
+      } catch (error) {
+        console.warn('获取剧情梗概索引失败:', error)
+        return stored?.data ?? null
+      }
+    })()
+    void summaryIndexPromise.then((value) => { if (!value) summaryIndexPromise = null })
+  }
+  return summaryIndexPromise
+}
+
+async function pruneSummaries(index: Record<string, string>): Promise<void> {
+  try {
+    const db = await getDB()
+    if (!db) return
+    const tx = db.transaction('summaries', 'readwrite')
+    for (let cursor = await tx.store.openCursor(); cursor; cursor = await cursor.continue()) {
+      if (index[cursor.key] !== cursor.value.hash) await cursor.delete()
+    }
+    await tx.done
+  } catch { /* 清理失败不影响使用 */ }
+}
+
+/** 一个故事的梗概（键如 event_12、unit_3、card_100、special_5），没有时返回 null */
+export function loadZhSummary(storyKey: string): Promise<ZhStorySummary | null> {
+  return once(`sum:${storyKey}`, async () => {
+    const [index, stored] = await Promise.all([loadZhSummaryIndex(), dbGet('summaries', storyKey)])
+    const hash = index?.[storyKey]
+    if (!index) return stored?.data ?? null
+    if (!hash) return null
+    if (stored?.hash === hash) return stored.data
+    try {
+      const data = await fetchJson<ZhStorySummary>(`sum/${encodeURIComponent(storyKey)}.${hash}.json`)
+      const summary: ZhStorySummary = { title: data.title || '', summary: data.summary || undefined, episodes: data.episodes || {} }
+      await dbPut('summaries', storyKey, { hash, data: summary })
+      return summary
+    } catch (error) {
+      console.warn(`获取 ${storyKey} 梗概失败:`, error)
+      return stored?.data ?? null
+    }
+  })
 }

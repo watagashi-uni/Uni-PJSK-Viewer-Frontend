@@ -12,7 +12,7 @@ const BASE = 'https://master.example/translations/zh-Hans'
 
 // IndexedDB stand-in shared across "page loads"
 function memoryDB() {
-  const stores = { meta: new Map(), tables: new Map(), stories: new Map() }
+  const stores = { meta: new Map(), tables: new Map(), stories: new Map(), summaries: new Map() }
   const db = {
     stores,
     get: async (store, key) => structuredClone(stores[store].get(key)),
@@ -129,6 +129,26 @@ test('stories use the index on demand and drop replaced files', async () => {
   assert.equal(db.stores.stories.has('event_1_01'), false, 'a replaced story is evicted')
   assert.deepEqual((await api.loadZhStory('event_1_01')).lines, ['修订'])
   assert.deepEqual(requests, ['version.json', 's/index.s2.json', 's/event_1_01.a2.json'])
+})
+
+test('story summaries load one file per story and are cached by hash', async () => {
+  const db = memoryDB()
+  const files = {
+    'version.json': { v: 2, d: {}, s: 's1', sum: 'x1' },
+    'sum/index.x1.json': { event_1: 'e1', card_2: 'c1' },
+    'sum/event_1.e1.json': { title: 'タイトル', summary: '第一段\n第二段', episodes: { event_1_01: '梗概' } },
+  }
+  let requests = []
+  let api = load(db, files, requests)
+  assert.equal(await api.loadZhSummary('unit_9'), null, 'stories without a summary do not download anything')
+  const summary = await api.loadZhSummary('event_1')
+  assert.equal(summary.summary, '第一段\n第二段')
+  assert.deepEqual(summary.episodes, { event_1_01: '梗概' })
+  assert.deepEqual(requests, ['version.json', 'sum/index.x1.json', 'sum/event_1.e1.json'])
+  requests = []
+  api = load(db, files, requests)
+  await api.loadZhSummary('event_1')
+  assert.deepEqual(requests, [], 'a reload reuses the cached index and file')
 })
 
 test('the hash from /api/version replaces version.json and avoids repeat requests', async () => {

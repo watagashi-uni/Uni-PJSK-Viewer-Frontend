@@ -4,6 +4,18 @@ import { DEFAULT_CN_ASSETS_HOST, getVersion, isCnAssetsEnabled, normalizeCnAsset
 import { detectIsChina } from '@/utils/location'
 
 export type AssetsSource = 'cn' | 'global'
+/** 剧透规则版本：修改规则后加一，所有人都要重新同意 */
+export const SPOILER_RULES_VERSION = 1
+interface SpoilerConsent { rulesVersion: number; acceptedAt: number }
+
+function readSpoilerConsent(): SpoilerConsent | null {
+    try {
+        const value = JSON.parse(localStorage.getItem('settings_spoilerConsent') || 'null') as SpoilerConsent | null
+        return value && value.rulesVersion === SPOILER_RULES_VERSION ? value : null
+    } catch {
+        return null
+    }
+}
 /** 资料译名显示方式：不显示 / 日文为主附中文 / 中文为主附日文 */
 export type TranslationMode = 'off' | 'both' | 'zh-first'
 const TRANSLATION_MODES: readonly TranslationMode[] = ['off', 'both', 'zh-first']
@@ -31,6 +43,13 @@ export const useSettingsStore = defineStore('settings', () => {
 
     // 状态
     const showSpoilers = ref(false)
+    // 剧透需要先同意规则：同意记录只存在本机
+    const spoilerConsent = ref<SpoilerConsent | null>(null)
+    const spoilerRulesOpen = ref(false)
+    /** 打开规则弹窗的原因：开启剧透需要确认，或只是查看 */
+    const spoilerRulesMode = ref<'enable' | 'view'>('enable')
+    /** 旧版本打开了剧透但没有同意记录，这次启动时已关闭，提示一次 */
+    const spoilerResetNotice = ref(false)
     // 主题状态: 'light' | 'dark' | 'auto' | 'moe' | 'jirai'
     const theme = ref<string>('auto')
 
@@ -117,8 +136,14 @@ export const useSettingsStore = defineStore('settings', () => {
     // 初始化：从 localStorage 恢复状态
     function initialize(): void {
         const saved = localStorage.getItem('settings_showSpoilers')
+        spoilerConsent.value = readSpoilerConsent()
         if (saved !== null) {
             showSpoilers.value = saved === '1'
+        }
+        if (showSpoilers.value && !spoilerConsent.value) {
+            showSpoilers.value = false
+            try { localStorage.setItem('settings_showSpoilers', '0') } catch { /* 存储不可用 */ }
+            spoilerResetNotice.value = true
         }
 
         localStorage.removeItem('settings_maskSpoilers')
@@ -185,14 +210,51 @@ export const useSettingsStore = defineStore('settings', () => {
         })
     }
 
-    // 切换剧透显示
+    // 切换剧透显示：开启前没有同意当前版本的规则时，先弹出规则
+    function setSpoilers(value: boolean): void {
+        if (!value) {
+            showSpoilers.value = false
+            return
+        }
+        if (spoilerConsent.value?.rulesVersion === SPOILER_RULES_VERSION) {
+            showSpoilers.value = true
+            return
+        }
+        spoilerRulesMode.value = 'enable'
+        spoilerRulesOpen.value = true
+    }
+
     function toggleSpoilers(): void {
-        showSpoilers.value = !showSpoilers.value
+        setSpoilers(!showSpoilers.value)
+    }
+
+    function openSpoilerRules(): void {
+        spoilerRulesMode.value = 'view'
+        spoilerRulesOpen.value = true
+    }
+
+    function acceptSpoilerRules(): void {
+        spoilerConsent.value = { rulesVersion: SPOILER_RULES_VERSION, acceptedAt: Date.now() }
+        try { localStorage.setItem('settings_spoilerConsent', JSON.stringify(spoilerConsent.value)) } catch { /* 存储不可用 */ }
+        spoilerRulesOpen.value = false
+        spoilerResetNotice.value = false
+        showSpoilers.value = true
+    }
+
+    function closeSpoilerRules(): void {
+        spoilerRulesOpen.value = false
     }
 
     // 监听变化并保存到 localStorage
     watch(showSpoilers, (value) => {
-        localStorage.setItem('settings_showSpoilers', value ? '1' : '0')
+        // 任何地方直接改成开启，只要没有同意记录都撤回
+        if (value && spoilerConsent.value?.rulesVersion !== SPOILER_RULES_VERSION) {
+            showSpoilers.value = false
+            spoilerRulesMode.value = 'enable'
+            spoilerRulesOpen.value = true
+            return
+        }
+        try { localStorage.setItem('settings_showSpoilers', value ? '1' : '0') } catch { /* 存储不可用 */ }
     })
 
     watch(theme, (value) => {
@@ -236,6 +298,14 @@ export const useSettingsStore = defineStore('settings', () => {
         cnAssetsPolicyLoaded,
         initialize,
         toggleSpoilers,
+        setSpoilers,
+        spoilerConsent,
+        spoilerRulesOpen,
+        spoilerRulesMode,
+        spoilerResetNotice,
+        openSpoilerRules,
+        acceptSpoilerRules,
+        closeSpoilerRules,
         setTheme,
         setDefaultVocal,
         setAssetsHost,

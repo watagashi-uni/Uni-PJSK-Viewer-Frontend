@@ -12,6 +12,7 @@ import { isTrainedOnlyCard } from '@/utils/card'
 import ZhText from '@/components/ZhText.vue'
 import { useCharacterName } from '@/composables/useCharacterName'
 import { useZh } from '@/composables/useZh'
+import StorySummaryPanel from '@/components/StorySummaryPanel.vue'
 
 interface Card {
   id: number
@@ -739,6 +740,7 @@ onMounted(loadData)
                     <span class="flex flex-col items-start leading-tight"><ZhText :text="episode.title" table="cardEpisodes" path="title" sub-class="text-[11px]" /></span>
                   </RouterLink>
                 </div>
+                <StorySummaryPanel :story-key="`card_${card.id}`" heading="卡面剧情梗概" :to="`/stories?tab=card&story=${card.id}`" link-text="阅读卡面剧情" class="mt-3" />
               </div>
             </div>
             

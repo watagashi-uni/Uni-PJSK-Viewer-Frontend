@@ -16,6 +16,8 @@ import type { EventData } from '@/types/master'
 import { readQueryPage, readQueryString, replaceListQuery } from '@/utils/routeQuery'
 import { isTrainedOnlyCard } from '@/utils/card'
 import { trackEvent } from '@/utils/analytics'
+import StorySummaryPanel from '@/components/StorySummaryPanel.vue'
+import { useStorySummaryStore } from '@/stores/storySummaries'
 
 interface StoryEpisode {
   id: number
@@ -191,7 +193,7 @@ const filteredEventStories = computed(() => {
     .filter(story => {
       if (!query) return true
       const event = eventMap.value.get(story.eventId)
-      return [story.id, ...withZh(STORY_TITLE_ZH.event, event?.name), ...withZh(OUTLINE_ZH.event, story.outline), ...story.eventStoryEpisodes.flatMap(episode => withZh(EPISODE_TITLE_ZH.event, episode.title))]
+      return [story.id, summaries.searchText(`event_${story.id}`), ...withZh(STORY_TITLE_ZH.event, event?.name), ...withZh(OUTLINE_ZH.event, story.outline), ...story.eventStoryEpisodes.flatMap(episode => withZh(EPISODE_TITLE_ZH.event, episode.title))]
         .some(value => String(value || '').toLocaleLowerCase().includes(query))
     })
     .sort((a, b) => b.eventId - a.eventId)
@@ -206,7 +208,7 @@ const flattenedUnitChapters = computed(() => unitStories.value
   .filter(chapter => {
     const query = searchQuery.value.trim().toLocaleLowerCase()
     if (!query) return true
-    return [...withZh(STORY_TITLE_ZH.unit, chapter.title), getUnitLabel(chapter.unit), ...chapter.episodes.flatMap(episode => withZh(EPISODE_TITLE_ZH.unit, episode.title))]
+    return [summaries.searchText(`unit_${chapter.id}`), ...withZh(STORY_TITLE_ZH.unit, chapter.title), getUnitLabel(chapter.unit), ...chapter.episodes.flatMap(episode => withZh(EPISODE_TITLE_ZH.unit, episode.title))]
       .some(value => String(value || '').toLocaleLowerCase().includes(query))
   })
   .sort((a, b) => unitOrder(a.unit) - unitOrder(b.unit) || a.chapterNo - b.chapterNo))
@@ -239,9 +241,27 @@ const selectedStoryEpisodes = computed(() => {
     episode.episodeNo,
     episode.episodeNoLabel,
     ...withZh(EPISODE_TITLE_ZH[selectedStory.value!.kind], episode.title),
+    episodeSynopsis(episode),
     episode.scenarioId,
   ].some(value => String(value || '').toLocaleLowerCase().includes(query)))
 })
+
+// AI 梗概：打开某个故事时才下载它的文件
+const summaries = useStorySummaryStore()
+const selectedStoryKey = computed(() => selectedStory.value ? `${selectedStory.value.kind}_${selectedStory.value.id}` : '')
+const expandedSynopses = ref(new Set<string>())
+watch(selectedStoryKey, () => { expandedSynopses.value = new Set() })
+/** 单话故事的梗概已经显示在总结里，列表中不再重复；阅读器里总是给出 */
+function episodeSynopsis(episode: StoryEpisode, always = false): string {
+  const item = summaries.get(selectedStoryKey.value)
+  if (!item || (!always && !item.summary && selectedStory.value?.episodes.length === 1)) return ''
+  return item.episodes[episode.scenarioId] || ''
+}
+function toggleSynopsis(scenarioId: string) {
+  const next = new Set(expandedSynopses.value)
+  if (!next.delete(scenarioId)) next.add(scenarioId)
+  expandedSynopses.value = next
+}
 
 const selectedEpisodeIndex = computed(() => {
   if (!selectedStory.value || !selectedEpisode.value) return -1
@@ -260,7 +280,7 @@ const extraStories = computed<SelectedStory[]>(() => {
     }))
     : specialStories.value.filter(story => settingsStore.showSpoilers || story.startAt <= now).map(story => ({ ...story, kind: 'special' as const }))
   const query = searchQuery.value.trim().toLocaleLowerCase()
-  return items.filter(story => story.episodes.length && (!query || [story.id, ...withZh(STORY_TITLE_ZH[story.kind], story.title), ...story.episodes.flatMap(e => withZh(EPISODE_TITLE_ZH[story.kind], e.title))].join(' ').toLocaleLowerCase().includes(query))).reverse()
+  return items.filter(story => story.episodes.length && (!query || [story.id, summaries.searchText(`${story.kind}_${story.id}`), ...withZh(STORY_TITLE_ZH[story.kind], story.title), ...story.episodes.flatMap(e => withZh(EPISODE_TITLE_ZH[story.kind], e.title))].join(' ').toLocaleLowerCase().includes(query))).reverse()
 })
 let extraRequest: Promise<void> | null = null
 async function loadExtra() {
@@ -508,6 +528,7 @@ onMounted(async () => {
           :scenario-urls="scenarioUrls"
           :has-previous="selectedEpisodeIndex > 0"
           :has-next="selectedStory ? selectedEpisodeIndex < selectedStory.episodes.length - 1 : false"
+          :synopsis="episodeSynopsis(selectedEpisode, true)"
           @close="selectedEpisode = null"
           @previous="navigateEpisode(-1)"
           @next="navigateEpisode(1)"
@@ -528,12 +549,17 @@ onMounted(async () => {
           </header>
           <div class="p-4 border-b border-base-200 bg-base-100"><label class="input input-sm input-bordered flex items-center gap-2"><Search class="w-4 h-4 opacity-40" /><input v-model="episodeSearch" class="grow" placeholder="搜索本篇章节标题或剧本 ID…" /><button v-if="episodeSearch" class="btn btn-xs btn-circle btn-ghost" @click="episodeSearch = ''"><X class="w-3 h-3" /></button></label></div>
           <div class="p-3 md:p-4 max-h-[58vh] overflow-y-auto space-y-2 bg-base-200/50">
-            <button v-for="episode in selectedStoryEpisodes" :key="episode.id" class="group w-full flex items-center gap-3 bg-base-100 border border-base-200 rounded-xl p-2.5 text-left hover:border-primary/50 hover:shadow-sm transition-all" @click="openEpisode(episode)">
-              <span v-if="selectedStory.kind === 'event'" class="relative aspect-[35/18] w-24 shrink-0 overflow-hidden rounded-lg bg-base-200 sm:w-32"><AssetImage :src="episodeImage(episode)" :alt="episode.title" class="h-full w-full object-cover transition-transform group-hover:scale-[1.03]" /><span class="absolute inset-0 grid place-items-center bg-black/10 opacity-0 transition-opacity group-hover:opacity-100"><span class="grid h-8 w-8 place-items-center rounded-full bg-base-100/90 text-primary shadow"><Play class="h-3.5 w-3.5" /></span></span></span>
-              <span v-else class="grid w-10 h-10 place-items-center rounded-lg shrink-0 bg-primary/10 text-primary"><Play class="w-4 h-4" /></span>
-              <span class="min-w-0 flex-1"><span class="text-[11px] text-base-content/45"><ZhText v-if="episode.episodeNoLabel" :text="episode.episodeNoLabel" table="unitStories" path="chapters.episodes.episodeNoLabel" layout="inline" /><template v-else>第 {{ episode.episodeNo }} 话</template> · {{ episode.scenarioId }}</span><span class="font-medium block truncate"><ZhText :text="episode.title" v-bind="EPISODE_TITLE_ZH[selectedStory.kind]" sub-class="text-xs" /></span></span>
-              <ChevronRight class="w-4 h-4 shrink-0 opacity-40 group-hover:translate-x-0.5 transition-transform" />
-            </button>
+            <StorySummaryPanel :story-key="selectedStoryKey" :fallback-scenario-id="selectedStory.episodes.length === 1 ? selectedStory.episodes[0]?.scenarioId : ''" class="mb-3" />
+            <div v-for="episode in selectedStoryEpisodes" :key="episode.id" class="episode-card bg-base-100 border border-base-200 rounded-xl hover:border-primary/50 hover:shadow-sm transition-all">
+              <button class="group w-full flex items-center gap-3 p-2.5 text-left" @click="openEpisode(episode)">
+                <span v-if="selectedStory.kind === 'event'" class="relative aspect-[35/18] w-24 shrink-0 overflow-hidden rounded-lg bg-base-200 sm:w-32"><AssetImage :src="episodeImage(episode)" :alt="episode.title" class="h-full w-full object-cover transition-transform group-hover:scale-[1.03]" /><span class="absolute inset-0 grid place-items-center bg-black/10 opacity-0 transition-opacity group-hover:opacity-100"><span class="grid h-8 w-8 place-items-center rounded-full bg-base-100/90 text-primary shadow"><Play class="h-3.5 w-3.5" /></span></span></span>
+                <span v-else class="grid w-10 h-10 place-items-center rounded-lg shrink-0 bg-primary/10 text-primary"><Play class="w-4 h-4" /></span>
+                <span class="min-w-0 flex-1"><span class="text-[11px] text-base-content/45"><ZhText v-if="episode.episodeNoLabel" :text="episode.episodeNoLabel" table="unitStories" path="chapters.episodes.episodeNoLabel" layout="inline" /><template v-else>第 {{ episode.episodeNo }} 话</template> · {{ episode.scenarioId }}</span><span class="font-medium block truncate"><ZhText :text="episode.title" v-bind="EPISODE_TITLE_ZH[selectedStory.kind]" sub-class="text-xs" /></span></span>
+                <ChevronRight class="w-4 h-4 shrink-0 opacity-40 group-hover:translate-x-0.5 transition-transform" />
+              </button>
+              <!-- 每话梗概：显示总结后才出现，默认两行，点击展开 -->
+              <button v-if="summaries.revealed && episodeSynopsis(episode)" type="button" class="episode-synopsis" :class="{ expanded: expandedSynopses.has(episode.scenarioId) }" :aria-expanded="expandedSynopses.has(episode.scenarioId)" lang="zh-CN" @click="toggleSynopsis(episode.scenarioId)">{{ episodeSynopsis(episode) }}</button>
+            </div>
             <div v-if="selectedStoryEpisodes.length === 0" class="py-16 text-center text-sm text-base-content/45">没有匹配的章节</div>
           </div>
         </template>
@@ -547,6 +573,15 @@ onMounted(async () => {
 /* 剧情弹窗：桌面居中；手机贴顶并让出安全区，弹窗比可视区域高时也不会把关闭按钮推到屏幕外
    （底部地址栏的浏览器、不支持 dvh/svh 的内嵌浏览器都会出现这种情况） */
 .story-modal .modal-box { max-height:94vh; max-height:94svh; }
+.episode-synopsis {
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+  width:calc(100% - 1.25rem); margin:-.25rem .625rem .625rem; padding:.5rem .75rem;
+  border-radius:.625rem; text-align:left; font-size:.8rem; line-height:1.65;
+  color:color-mix(in oklab, var(--color-base-content) 68%, transparent);
+  background:color-mix(in oklab, var(--color-base-200) 70%, transparent);
+}
+.episode-synopsis:hover { color:color-mix(in oklab, var(--color-base-content) 85%, transparent); }
+.episode-synopsis.expanded { display:block; -webkit-line-clamp:unset; }
 @media (max-width: 640px) {
   .story-modal { align-items:start; }
   .story-modal .modal-box {

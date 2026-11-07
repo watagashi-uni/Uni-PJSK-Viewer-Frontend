@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
-import { BookOpen, ChevronLeft, ChevronRight, Copy, Film, Languages, Music2, Play, Search, Volume2, VolumeX, X } from 'lucide-vue-next'
+import { BookOpen, ChevronLeft, ChevronRight, Copy, Film, Languages, Music2, Play, ScrollText, Search, Sparkles, Volume2, VolumeX, X } from 'lucide-vue-next'
 import type { PjskPlayer, ScenarioSceneData } from 'pjsk-scenario-player'
 import { buildStoryFrames } from '@/utils/storyPlayback'
 import { loadStoryPlayerIndex, parsePlayerScenario, storyPlayerResolver } from '@/utils/storyPlayerAssets'
@@ -14,7 +14,9 @@ const props = withDefaults(defineProps<{
   hasPrevious?: boolean; hasNext?: boolean
   /** 标题译名，随资料译名设置显示 */
   titleZh?: string
-}>(), { episodeLabel: '', hasPrevious: false, hasNext: false, titleZh: '' })
+  /** 本话梗概（AI 生成），有时在标题栏提供展开按钮 */
+  synopsis?: string
+}>(), { episodeLabel: '', hasPrevious: false, hasNext: false, titleZh: '', synopsis: '' })
 const emit = defineEmits<{ close: []; previous: []; next: []; play: [] }>()
 const scenario = shallowRef<ScenarioSceneData>()
 const frames = computed(() => scenario.value ? buildStoryFrames(scenario.value) : [])
@@ -34,6 +36,8 @@ const volume = ref(0.8)
 const playerReady = ref(false)
 const started = ref(false)
 const settings = useSettingsStore()
+// 梗概默认收起，展开时在标题栏下方滑出，不遮挡舞台
+const synopsisOpen = ref(false)
 // 中文台词：按 TalkData 下标对齐，人名和地点字幕另有对照表
 const zhStory = shallowRef<ZhStory | null>(null)
 // skipped：设置里关闭了 AI 译文，而这一话只有机翻，没有下载
@@ -272,10 +276,17 @@ onBeforeUnmount(() => {
   <div class="story-reader">
     <header class="reader-heading">
       <div class="min-w-0 flex-1"><p class="text-xs text-primary font-bold tracking-wider">{{ episodeLabel || 'STORY THEATER' }}<span v-if="zhActive && zhSource" class="zh-source" :title="zhSource.title">{{ zhSource.label }}</span><span v-else-if="showZh && zhHidden" class="zh-source" title="可在设置的“中文译名”中重新显示 AI 译文">仅有 AI 译文 · 已隐藏</span></p><h2 class="text-lg font-bold truncate"><ZhText :text="title" :zh="titleZh || null" layout="inline" sub-class="text-sm" /></h2></div>
+      <button v-if="synopsis" class="btn btn-sm btn-ghost gap-1 px-2" :class="{ 'text-primary': synopsisOpen }" :aria-expanded="synopsisOpen" aria-controls="reader-synopsis" title="本话梗概（AI 生成，可能剧透）" @click="synopsisOpen = !synopsisOpen"><ScrollText class="w-4 h-4" /><span class="text-xs hidden sm:inline">梗概</span></button>
       <button class="btn btn-sm btn-ghost gap-1 px-2" :class="{ 'text-primary': showZh }" :aria-pressed="showZh" :title="zhButtonTitle" @click="settings.storyTranslation = !showZh"><Languages class="w-4 h-4" /><span class="text-xs">{{ zhButtonText }}</span></button>
       <div class="join"><button aria-label="场景模式" class="btn btn-sm join-item" :class="mode === 'stage' ? 'btn-primary' : 'btn-ghost'" @click="setMode('stage')"><Film class="w-4 h-4" /><span class="hidden sm:inline">场景</span></button><button aria-label="文本模式" class="btn btn-sm join-item" :class="mode === 'script' ? 'btn-primary' : 'btn-ghost'" @click="setMode('script')"><BookOpen class="w-4 h-4" /><span class="hidden sm:inline">文本</span></button></div>
       <button class="btn btn-sm btn-circle btn-ghost" aria-label="关闭阅读器" @click="emit('close')"><X class="w-5 h-5" /></button>
     </header>
+    <Transition name="synopsis">
+      <section v-if="synopsis && synopsisOpen" id="reader-synopsis" class="reader-synopsis" aria-label="本话梗概">
+        <p class="flex items-center gap-2 text-xs font-bold text-primary"><ScrollText class="w-3.5 h-3.5" />本话梗概<span class="synopsis-ai"><Sparkles class="w-3 h-3" />AI 生成</span></p>
+        <p class="mt-1.5 text-sm leading-7 text-base-content/80" lang="zh-CN">{{ synopsis }}</p>
+      </section>
+    </Transition>
     <div v-if="loading" class="flex-1 grid place-items-center min-h-64"><div class="text-center"><span class="loading loading-spinner text-primary"></span><p class="mt-3 text-sm opacity-60">正在加载剧情…</p></div></div>
     <div v-else-if="error" class="flex-1 grid place-items-center p-8"><div class="text-center"><p role="alert">{{ error }}</p><button class="btn btn-primary btn-sm mt-4" @click="load">重新加载</button></div></div>
     <template v-else-if="scenario">
@@ -328,6 +339,11 @@ onBeforeUnmount(() => {
 .script-search { position:sticky; top:0; z-index:1; display:flex; gap:.5rem; padding:.75rem 0; background:var(--color-base-200); }
 .script-line { display:grid; grid-template-columns:2rem 1fr 1rem; gap:.6rem; width:100%; text-align:left; padding:1rem; margin:.5rem 0; border-radius:12px; background:var(--color-base-100); border:1px solid transparent; }
 .script-line:hover,.current-line { border-color:var(--color-primary); }
+.reader-synopsis { flex-shrink:0; max-height:40%; overflow:auto; padding:.75rem 1.25rem .9rem; border-bottom:1px solid var(--color-base-200); background:color-mix(in oklab, var(--color-primary) 5%, var(--color-base-100)); }
+.synopsis-ai { display:inline-flex; align-items:center; gap:.2rem; padding:0 .4rem; border-radius:999px; font-size:.65rem; font-weight:600; color:color-mix(in oklab, var(--color-base-content) 60%, transparent); background:color-mix(in oklab, var(--color-base-content) 7%, transparent); }
+.synopsis-enter-active,.synopsis-leave-active { transition:opacity .18s ease, transform .18s ease; }
+.synopsis-enter-from,.synopsis-leave-to { opacity:0; transform:translateY(-.4rem); }
+@media(prefers-reduced-motion:reduce) { .synopsis-enter-active,.synopsis-leave-active { transition:none; } }
 .zh-source { margin-left:.5rem; padding:.05rem .4rem; border-radius:999px; font-weight:500; letter-spacing:0; color:var(--color-base-content); background:var(--color-base-200); opacity:.75; }
 .zh-speaker { margin-left:.45rem; font-weight:500; opacity:.7; }
 .zh-script-sub { display:block; margin-top:.2rem; white-space:pre-line; line-height:1.6; font-size:.92em; color:color-mix(in oklab, var(--color-base-content) 68%, transparent); }

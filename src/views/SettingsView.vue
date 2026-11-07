@@ -109,6 +109,13 @@ async function handleClearCache() {
   }
 }
 
+function onSpoilerToggle(event: Event) {
+  const input = event.target as HTMLInputElement
+  settingsStore.setSpoilers(input.checked)
+  // 需要先同意规则时保持关闭，同意后由设置驱动
+  input.checked = settingsStore.showSpoilers
+}
+
 async function handleClearTranslationCache() {
   isClearingTranslation.value = true
   try {
@@ -136,17 +143,22 @@ async function handleClearTranslationCache() {
           </h2>
           
           <!-- 剧透开关 -->
-          <label class="label cursor-pointer justify-start gap-4 whitespace-normal">
-            <input 
-              v-model="settingsStore.showSpoilers" 
-              type="checkbox" 
-              class="toggle toggle-primary shrink-0"
-            />
-            <div>
-              <span class="font-medium text-base-content">显示未来内容</span>
-              <p class="text-sm text-base-content/60">开启后直接显示尚未发布的歌曲、卡片、活动与日程</p>
-            </div>
-          </label>
+          <div class="flex items-start gap-4">
+            <label class="label cursor-pointer justify-start gap-4 whitespace-normal flex-1 p-0">
+              <!-- 开启前需要同意剧透规则，开关状态始终跟随设置 -->
+              <input
+                :checked="settingsStore.showSpoilers"
+                type="checkbox"
+                class="toggle toggle-primary shrink-0"
+                @change="onSpoilerToggle"
+              />
+              <div>
+                <span class="font-medium text-base-content">显示未来内容</span>
+                <p class="text-sm text-base-content/60">开启后直接显示尚未发布的歌曲、卡片、活动与日程；开启前需要同意剧透规则</p>
+              </div>
+            </label>
+            <button type="button" class="btn btn-link btn-xs shrink-0 px-0" @click="settingsStore.openSpoilerRules()">查看规则</button>
+          </div>
         </div>
       </div>
 

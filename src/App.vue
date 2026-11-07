@@ -5,6 +5,7 @@ import { RouterView, useRoute } from 'vue-router'
 import { isRouteLoading } from '@/router'
 import AppNavbar from '@/components/AppNavbar.vue'
 import ToastContainer from '@/components/ToastContainer.vue'
+import SpoilerRulesDialog from '@/components/SpoilerRulesDialog.vue'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
 import { useAccountStore } from '@/stores/account'
@@ -92,6 +93,7 @@ watch(
     </div>
     
     <ToastContainer />
+    <SpoilerRulesDialog />
 
     <!-- OAuth 授权确认弹窗 -->
     <dialog ref="oauthConfirmDialog" class="modal" @close="onOAuthConfirmClose">
