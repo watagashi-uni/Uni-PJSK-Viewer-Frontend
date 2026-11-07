@@ -288,7 +288,7 @@ onMounted(async () => {
 
     <section class="card bg-base-100 border border-base-200 shadow-sm">
       <div class="card-body p-4 gap-4">
-        <div class="grid md:grid-cols-2 xl:grid-cols-[minmax(240px,1fr)_210px_180px_220px] gap-3">
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-[minmax(240px,1fr)_210px_180px_220px] gap-3">
           <label class="input input-bordered flex items-center gap-2"><Search class="w-4 h-4 opacity-50" /><input v-model="searchQuery" class="grow min-w-0" placeholder="搜索名称、说明或 ID…" /><button v-if="searchQuery" class="btn btn-xs btn-circle btn-ghost" aria-label="清空" @click="searchQuery = ''"><X class="w-3 h-3" /></button></label>
           <select v-model="selectedCategory" class="select select-bordered w-full"><option value="">全部分类（{{ allItems.length }}）</option><option v-for="(meta, key) in categoryMeta" :key="key" :value="key">{{ meta.label }}（{{ categoryCounts.get(key as ItemCategory) || 0 }}）</option></select>
           <label class="label cursor-pointer justify-start gap-3 rounded-lg border border-base-300 px-4"><input v-model="ownedOnly" type="checkbox" class="checkbox checkbox-primary" :disabled="!selectedUserId || inventory.available.size === 0" /><span class="label-text">仅显示持有</span></label>

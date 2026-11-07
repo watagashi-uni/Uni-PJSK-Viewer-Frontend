@@ -372,7 +372,7 @@ onMounted(async () => {
 
     <StoryPlayerPromo />
 
-    <div class="grid gap-6 lg:grid-cols-3">
+    <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
       <div class="min-w-0 space-y-6 lg:col-span-2">
         <!-- 当前活动 -->
         <section aria-labelledby="home-event-title">

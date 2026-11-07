@@ -1042,7 +1042,7 @@ watch(() => route.params.id, loadData)
             </div>
           </div>
 
-          <div class="grid md:grid-cols-2 xl:grid-cols-4 gap-3">
+          <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
             <div class="stat bg-base-200 rounded-xl p-4">
               <div class="stat-title text-xs">已选兑换次数</div>
               <div class="stat-value text-2xl">{{ formatNumber(selectedRewardCount) }}</div>
@@ -1073,12 +1073,12 @@ watch(() => route.params.id, loadData)
             <div class="ml-auto min-w-52"><AccountSelector v-if="accountStore.accounts.length" v-model="selectedUserId" /></div>
           </div>
 
-          <div class="grid md:grid-cols-2 gap-3">
-            <div v-for="row in exchangeRows" :key="row.id" class="flex items-center gap-3 rounded-xl border border-base-200 bg-base-200/35 p-3">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div v-for="row in exchangeRows" :key="row.id" class="flex min-w-0 items-center gap-3 rounded-xl border border-base-200 bg-base-200/35 p-3">
               <RouterLink v-if="row.reward.resourceType === 'card'" :to="`/cards/${row.reward.resourceId}`" class="w-16 h-16 rounded-lg overflow-hidden bg-base-200 shrink-0 transition-transform"><AssetImage :src="resourceIcon(row.reward)" :alt="resourceName(row.reward)" class="w-full h-full object-cover" /></RouterLink>
               <div v-else class="w-16 h-16 rounded-lg bg-base-200 p-2 shrink-0"><AssetImage :src="resourceIcon(row.reward)" :alt="resourceName(row.reward)" class="w-full h-full object-contain" /></div>
               <div class="min-w-0 flex-1">
-                <p class="font-medium text-sm truncate"><ZhText :text="resourceName(row.reward)" :zh="resourceDisplayZh(row.reward.resourceType, resourceName(row.reward)) ?? null" layout="inline" /></p>
+                <p class="font-medium text-sm truncate"><ZhText :text="resourceName(row.reward)" :zh="resourceDisplayZh(row.reward.resourceType, resourceName(row.reward)) ?? null" main-class="block truncate" sub-class="text-xs" /></p>
                 <p class="text-xs text-base-content/55">每次 ×{{ formatNumber(row.reward.resourceQuantity || 1) }} · 单价 {{ formatNumber(row.cost.resourceQuantity) }}</p>
                 <p class="text-[11px] text-base-content/45">{{ row.exchangeLimit ? `限兑 ${row.exchangeLimit} 次` : '无限兑换' }}</p>
               </div>

@@ -1205,7 +1205,7 @@ function selectTab(tab: FeedTab) {
         </div>
 
         <div v-if="activeTab === 'search'" class="flex flex-col gap-4">
-          <div v-if="searchMode === 'music'" class="grid md:grid-cols-[minmax(0,1fr)_120px_130px] gap-3">
+          <div v-if="searchMode === 'music'" class="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_120px_130px] gap-3">
             <div class="form-control w-full relative">
               <div class="relative group">
                 <input
@@ -1442,7 +1442,7 @@ function selectTab(tab: FeedTab) {
           </div>
 
           <template v-else>
-            <div class="grid items-start gap-4 lg:grid-cols-[360px_minmax(0,1fr)]">
+            <div class="grid grid-cols-1 items-start gap-4 lg:grid-cols-[360px_minmax(0,1fr)]">
               <section class="rounded-xl border border-base-200 bg-base-200/30 p-3">
                 <div class="grid grid-cols-[3.5rem_minmax(0,1fr)] items-start gap-1.5">
                   <div class="h-14 w-14 shrink-0 overflow-hidden rounded-full border-2 border-primary/20 bg-base-200 shadow-sm">

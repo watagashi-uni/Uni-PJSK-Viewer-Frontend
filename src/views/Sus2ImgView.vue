@@ -971,7 +971,7 @@ function clearForm() {
             </div>
           </template>
 
-          <div v-if="!isConvertMode" class="grid md:grid-cols-3 gap-4">
+          <div v-if="!isConvertMode" class="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div class="form-control">
               <label class="label">
                 <span class="label-text font-medium">输出格式</span>
@@ -1056,7 +1056,7 @@ function clearForm() {
                 <p v-if="rebaseGenerationError" class="mt-1 text-xs text-error">{{ rebaseGenerationError }}</p>
               </div>
 
-              <div class="grid md:grid-cols-2 gap-4">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div class="form-control w-full">
                   <label class="label">
                     <span class="label-text font-medium">歌曲标题（可省略）</span>
@@ -1081,7 +1081,7 @@ function clearForm() {
                 </div>
               </div>
 
-              <div class="grid md:grid-cols-2 gap-4">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div class="form-control w-full">
                   <label class="label">
                     <span class="label-text font-medium">谱面作者（可省略）</span>
@@ -1106,7 +1106,7 @@ function clearForm() {
                 </div>
               </div>
 
-              <div class="grid md:grid-cols-2 gap-4">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div class="form-control w-full">
                   <label class="label">
                     <span class="label-text font-medium">定数（可省略）</span>
@@ -1131,7 +1131,7 @@ function clearForm() {
                 </div>
               </div>
 
-              <div class="grid md:grid-cols-2 gap-4">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div class="form-control w-full">
                   <label class="label">
                     <span class="label-text font-medium">左下角图片 URL（前端专用，可选）</span>
@@ -1292,7 +1292,7 @@ function clearForm() {
       </div>
     </section>
 
-    <div v-if="!isJsonInput && (hasAuditRun || auditError || (hasAuditRun && (resultSvgText || resultSvgError)))" class="mt-8 grid min-w-0 gap-6 xl:grid-cols-[380px_minmax(0,1fr)]">
+    <div v-if="!isJsonInput && (hasAuditRun || auditError || (hasAuditRun && (resultSvgText || resultSvgError)))" class="mt-8 grid grid-cols-1 min-w-0 gap-6 xl:grid-cols-[380px_minmax(0,1fr)]">
       <section class="card min-w-0 bg-base-100 shadow-lg">
         <div class="card-body min-w-0 gap-4 p-4 sm:p-6">
           <div class="flex min-w-0 flex-wrap items-start justify-between gap-3">

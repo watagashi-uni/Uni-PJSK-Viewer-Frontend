@@ -673,7 +673,7 @@ onMounted(loadData)
 
 
           <!-- 信息区域 -->
-          <div class="grid md:grid-cols-2 gap-6">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <!-- 卡片信息 -->
             <div class="bg-base-200 rounded-xl p-5">
               <h3 class="font-semibold text-primary mb-4 flex items-center gap-2">
@@ -801,20 +801,20 @@ onMounted(loadData)
               <p class="text-sm font-medium flex items-center gap-1.5">
                 <Calendar class="w-4 h-4" /> 当期活动
               </p>
-              <div class="grid sm:grid-cols-2 gap-2">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <RouterLink
                   v-for="event in relatedEvents"
                   :key="event.id"
                   :to="`/events/${event.id}`"
-                  class="flex items-center gap-3 bg-base-100 rounded-lg p-2 hover:shadow-md transition-all group"
+                  class="flex min-w-0 items-center gap-3 bg-base-100 rounded-lg p-2 hover:shadow-md transition-all group"
                 >
                   <AssetImage
                     :src="eventBannerUrl(event)"
                     :alt="event.name"
                     class="h-12 rounded object-contain shrink-0 group-hover:scale-[1.02] transition-transform"
                   />
-                  <div class="min-w-0">
-                    <p class="text-sm font-medium truncate"><ZhText :text="event.name" table="events" path="name" layout="inline" /></p>
+                  <div class="min-w-0 flex-1">
+                    <p class="text-sm font-medium truncate"><ZhText :text="event.name" table="events" path="name" main-class="block truncate" sub-class="text-xs" /></p>
                     <p class="text-xs text-base-content/60">
                       {{ formatDateShort(event.startAt) }} ~ {{ formatDateShort(event.aggregateAt) }}
                     </p>
@@ -829,12 +829,12 @@ onMounted(loadData)
                 <Gift class="w-4 h-4" /> 出现卡池
                 <span class="text-xs text-base-content/50">共 {{ relatedGachas.length }} 个</span>
               </p>
-              <div class="grid sm:grid-cols-2 gap-2">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <RouterLink
                   v-for="(gacha, index) in displayedGachas"
                   :key="gacha.id"
                   :to="`/gachas/${gacha.id}`"
-                  class="flex items-center gap-3 bg-base-100 rounded-lg p-2 hover:shadow-md transition-all"
+                  class="flex min-w-0 items-center gap-3 bg-base-100 rounded-lg p-2 hover:shadow-md transition-all"
                 >
                   <AssetImage
                     v-if="gachaImgSrc(gacha)"
@@ -847,7 +847,7 @@ onMounted(loadData)
                     <Gift class="w-5 h-5 text-base-content/20" />
                   </div>
                   <div class="min-w-0 flex-1">
-                    <p class="text-sm font-medium truncate"><ZhText :text="gacha.name" table="gachas" path="name" layout="inline" /></p>
+                    <p class="text-sm font-medium truncate"><ZhText :text="gacha.name" table="gachas" path="name" main-class="block truncate" sub-class="text-xs" /></p>
                     <p class="text-xs text-base-content/60">
                       {{ formatDateShort(gacha.startAt) }} ~ {{ formatDateShort(gacha.endAt) }}
                     </p>

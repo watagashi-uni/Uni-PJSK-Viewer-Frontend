@@ -287,7 +287,7 @@ onMounted(async () => {
         <div class="stat bg-base-100 shadow-sm rounded-xl p-4 col-span-2 lg:col-span-1"><div class="stat-title text-xs">当前角色</div><div class="stat-value text-xl truncate">{{ selectedCharacterId ? characterName(selectedCharacterStats?.character) : '全部角色' }}</div><div class="stat-desc">{{ selectedCharacterStats ? `${hasCardData ? selectedCharacterStats.owned : '—'} / ${selectedCharacterStats.total}${hasCardData ? ` · 未读 ${selectedCharacterStats.unread}` : ''}` : `${filteredCards.length} 张结果` }}</div></div>
       </div>
 
-      <div class="grid lg:grid-cols-[17rem_minmax(0,1fr)] gap-5 items-start">
+      <div class="grid grid-cols-1 lg:grid-cols-[17rem_minmax(0,1fr)] gap-5 items-start">
         <aside class="card bg-base-100 shadow-sm border border-base-200 lg:sticky lg:top-20">
           <div class="card-body p-4 gap-3">
             <div class="flex items-center justify-between"><h2 class="font-bold">角色收藏</h2><button class="btn btn-xs btn-ghost" :class="{ 'btn-active': selectedCharacterId === 0 }" @click="selectedCharacterId = 0">全部</button></div>
@@ -304,7 +304,7 @@ onMounted(async () => {
         <main class="space-y-4 min-w-0">
           <div class="card bg-base-100 shadow-sm border border-base-200">
             <div class="card-body p-4 gap-3">
-              <div class="grid sm:grid-cols-2 xl:grid-cols-[minmax(12rem,1fr)_auto_auto] gap-3">
+              <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-[minmax(12rem,1fr)_auto_auto] gap-3">
                 <label class="input input-bordered input-sm flex items-center gap-2"><Search class="w-4 h-4 opacity-50" /><input v-model="search" class="grow min-w-0" placeholder="搜索卡片名、角色或 ID…" /></label>
                 <select v-model="selectedRarity" class="select select-bordered select-sm"><option value="">全部稀有度</option><option v-for="rarity in rarityOrder" :key="rarity" :value="rarity">{{ rarityLabels[rarity] }}</option></select>
                 <button class="btn btn-sm btn-ghost" @click="resetFilters">重置筛选</button>

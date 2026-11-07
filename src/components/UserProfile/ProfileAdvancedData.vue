@@ -132,7 +132,7 @@ function onBondCharacterFilterChange(e: Event) {
         <span class="text-sm">当前账号缺少加成信息数据，请先点击上方“同步数据”。</span>
       </div>
       <template v-else>
-        <div class="grid gap-3 lg:grid-cols-2">
+        <div class="grid grid-cols-1 gap-3 lg:grid-cols-2">
           <div
             v-for="group in powerBonusCharacterGroupRows"
             :key="`bonus-group-${group.unit}`"
@@ -142,7 +142,7 @@ function onBondCharacterFilterChange(e: Event) {
               <img :src="getUnitLogo(group.unit)" class="h-5 w-auto object-contain" />
               <p class="text-sm font-semibold">{{ unitLabelMap[group.unit] }}</p>
             </div>
-            <div class="grid gap-2 sm:grid-cols-2">
+            <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <div
                 v-for="row in group.rows"
                 :key="`bonus-chara-${group.unit}-${row.characterId}`"
@@ -163,10 +163,10 @@ function onBondCharacterFilterChange(e: Event) {
           </div>
         </div>
 
-        <div class="grid gap-3 xl:grid-cols-2">
+        <div class="grid grid-cols-1 gap-3 xl:grid-cols-2">
           <div class="rounded-xl border border-base-300 bg-base-100 p-3 shadow-sm">
             <p class="text-sm font-semibold">组合总加成</p>
-            <div class="mt-2 grid gap-2 sm:grid-cols-2">
+            <div class="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
               <div
                 v-for="row in powerBonusUnitRows"
                 :key="`bonus-unit-${row.unit}`"

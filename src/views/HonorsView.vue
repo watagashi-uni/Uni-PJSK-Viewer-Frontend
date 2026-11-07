@@ -375,7 +375,7 @@ onMounted(async () => {
       </button>
     </div>
 
-    <div v-if="isLoading" class="grid sm:grid-cols-2 xl:grid-cols-3 gap-3">
+    <div v-if="isLoading" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
       <div v-for="index in 12" :key="index" class="skeleton h-36 rounded-xl"></div>
     </div>
     <div v-else-if="loadError" class="alert alert-error">称号数据加载失败：{{ loadError }}</div>
@@ -409,7 +409,7 @@ onMounted(async () => {
         </div>
       </section>
 
-      <div v-if="paginatedHonors.length" class="grid sm:grid-cols-2 xl:grid-cols-3 gap-3">
+      <div v-if="paginatedHonors.length" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
         <button
           v-for="honor in paginatedHonors"
           :key="honor.id"
@@ -467,7 +467,7 @@ onMounted(async () => {
         </div>
       </section>
 
-      <div v-if="paginatedBondsHonors.length" class="grid sm:grid-cols-2 xl:grid-cols-3 gap-3">
+      <div v-if="paginatedBondsHonors.length" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
         <button
           v-for="honor in paginatedBondsHonors"
           :key="honor.id"
@@ -539,7 +539,7 @@ onMounted(async () => {
             />
           </div>
         </div>
-        <div class="grid md:grid-cols-2 gap-3">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
           <label class="form-control min-w-0">
             <span class="label-text mb-2">展示等级</span>
             <select v-model.number="selectedBondsLevel" class="select select-bordered w-full min-w-0 max-w-full">

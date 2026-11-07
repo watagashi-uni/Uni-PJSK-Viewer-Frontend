@@ -366,7 +366,7 @@ onMounted(async () => {
         </div>
       </div>
 
-      <div v-if="isLoading" class="grid lg:grid-cols-[360px_1fr] gap-6">
+      <div v-if="isLoading" class="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-6">
         <div class="skeleton h-[520px] rounded-2xl"></div>
         <div class="skeleton h-[520px] rounded-2xl"></div>
       </div>
@@ -383,7 +383,7 @@ onMounted(async () => {
         </div>
       </div>
 
-      <div v-else-if="selectedCharacter" class="grid lg:grid-cols-[minmax(300px,380px)_1fr] gap-6 items-stretch">
+      <div v-else-if="selectedCharacter" class="grid grid-cols-1 lg:grid-cols-[minmax(300px,380px)_1fr] gap-6 items-stretch">
         <section
           class="relative min-h-[520px] rounded-2xl overflow-hidden border border-base-200 bg-base-100"
           :style="{ background: `linear-gradient(160deg, ${getUnitColor(selectedCharacter.unit)}25, transparent 55%), var(--color-base-100)` }"
@@ -464,7 +464,7 @@ onMounted(async () => {
               </div>
             </div>
 
-            <dl v-if="selectedProfile" class="grid sm:grid-cols-2 gap-3 text-sm">
+            <dl v-if="selectedProfile" class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
               <div v-if="selectedProfile.birthday" class="bg-base-200/70 rounded-lg p-3">
                 <dt class="text-base-content/50 text-xs">生日</dt><dd class="font-medium mt-1">{{ selectedProfile.birthday }}</dd>
               </div>

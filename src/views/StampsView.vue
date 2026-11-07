@@ -259,7 +259,7 @@ onMounted(async () => {
         <button class="btn btn-sm btn-circle btn-ghost absolute! right-3 top-3 z-20 bg-base-100/80" aria-label="关闭" @click="selectedStamp = null">
           <X class="w-4 h-4" />
         </button>
-        <div class="grid md:grid-cols-[minmax(0,320px)_1fr]">
+        <div class="grid grid-cols-1 md:grid-cols-[minmax(0,320px)_1fr]">
           <div class="aspect-square bg-[radial-gradient(circle_at_center,var(--color-base-100),var(--color-base-200))] p-5 grid place-items-center">
             <AssetImage :src="getStampUrl(selectedStamp)" :alt="cleanName(selectedStamp.name)" :lazy="false" class="w-full h-full object-contain" />
           </div>

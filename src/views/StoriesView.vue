@@ -434,7 +434,7 @@ onMounted(async () => {
     </div>
 
     <section class="card bg-base-100 border border-base-200 shadow-sm">
-      <div class="card-body p-3 md:p-4 grid md:grid-cols-[minmax(0,1fr)_240px] gap-3">
+      <div class="card-body p-3 md:p-4 grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_240px] gap-3">
         <label class="input input-bordered flex items-center gap-2">
           <Search class="w-4 h-4 opacity-50" /><input v-model="searchQuery" class="grow min-w-0" placeholder="搜索故事或章节标题…" />
           <button v-if="searchQuery" class="btn btn-xs btn-circle btn-ghost" aria-label="清空" @click="searchQuery = ''"><X class="w-3 h-3" /></button>
@@ -447,12 +447,12 @@ onMounted(async () => {
       </div>
     </section>
 
-    <div v-if="isLoading" class="grid md:grid-cols-2 lg:grid-cols-3 gap-4"><div v-for="index in 12" :key="index" class="skeleton h-56 rounded-xl"></div></div>
+    <div v-if="isLoading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"><div v-for="index in 12" :key="index" class="skeleton h-56 rounded-xl"></div></div>
     <div v-else-if="loadError" class="alert alert-error">故事数据加载失败：{{ loadError }}</div>
 
     <template v-else-if="activeTab === 'event'">
       <div class="flex items-center justify-between gap-3"><p class="text-sm font-medium">{{ filteredEventStories.length }} 个活动故事</p><span class="text-xs text-base-content/45">按活动时间从新到旧</span></div>
-      <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <button v-for="story in paginatedEventStories" :key="story.id" class="group card bg-base-100 border border-base-200 hover:border-primary/30 hover:shadow-lg transition-all overflow-hidden text-left" @click="openEventStory(story)">
           <figure class="relative aspect-[122/52] bg-base-200 overflow-hidden"><AssetImage :src="eventBanner(story)" :alt="eventMap.get(story.eventId)?.name" class="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-300" /></figure>
           <div class="card-body p-4 gap-2.5">
@@ -468,7 +468,7 @@ onMounted(async () => {
 
     <template v-else-if="activeTab === 'unit'">
       <p class="text-sm font-medium">{{ flattenedUnitChapters.length }} 个主线章节</p>
-      <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <button v-for="chapter in flattenedUnitChapters" :key="chapter.id" class="group card bg-base-100 border border-base-200 hover:border-primary/30 hover:shadow-lg transition-all text-left overflow-hidden" @click="openUnitChapter(chapter)">
           <div class="h-1.5 bg-primary/70"></div><div class="card-body p-5 gap-3">
             <div class="flex items-center justify-between gap-3"><img :src="getUnitLogo(chapter.unit)" :alt="getUnitLabel(chapter.unit)" class="h-8 max-w-40 object-contain object-left" /><span class="badge badge-sm badge-ghost">Chapter {{ chapter.chapterNo }}</span></div>
@@ -485,7 +485,7 @@ onMounted(async () => {
       <div v-else-if="extraError" class="alert alert-error">{{ extraError }}<button class="btn btn-sm" @click="loadExtra">重试</button></div>
       <template v-else>
         <p class="text-sm opacity-60">{{ extraStories.length }} 篇故事 · {{ activeTab === 'card' ? '卡面前篇与后篇' : '仅展示已有可读剧本的特别篇' }}</p>
-        <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <button v-for="story in extraStories.slice((extraPage - 1) * 12, extraPage * 12)" :key="story.id" class="card bg-base-100 border border-base-200 hover:border-primary text-left overflow-hidden" @click="selectedStory = story">
             <AssetImage v-if="story.kind === 'card'" :src="`${assetsHost}/startapp/character/member/${story.assetbundleName}/card_${trainedOnlyStoryCardIds.has(Number(story.id)) ? 'after_training' : 'normal'}.jpg`" :alt="story.title" class="w-full aspect-video object-cover" />
             <div class="p-5 space-y-2"><span class="text-xs text-primary">{{ extraLabels[activeTab] }} / {{ story.id }}</span><h2 class="font-bold"><ZhText :text="story.title" v-bind="STORY_TITLE_ZH[story.kind]" sub-class="font-medium text-xs" /></h2><p class="text-xs opacity-50">{{ story.episodes.length }} 话 · 点击选集</p></div>

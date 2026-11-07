@@ -1905,7 +1905,7 @@ function closeFixtureDetail() {
 
           <div class="card bg-base-100 shadow-sm border border-base-200">
             <div class="card-body p-3 md:p-4 gap-3">
-              <div class="grid sm:grid-cols-2 lg:grid-cols-[minmax(12rem,1fr)_auto_auto_auto] gap-2">
+              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[minmax(12rem,1fr)_auto_auto_auto] gap-2">
                 <label class="input input-sm input-bordered flex items-center gap-2"><Search class="w-4 h-4 opacity-50" /><input v-model="canvasSearch" class="grow min-w-0" placeholder="搜索卡片、角色或 ID…" /></label>
                 <select v-model.number="selectedCanvasFixtureId" class="select select-sm select-bordered"><option :value="0">全部画布类型</option><option v-for="option in canvasFixtureOptions" :key="option.id" :value="option.id">{{ getCanvasFixtureLabel(option.id) }} · {{ option.label }}</option></select>
                 <select v-model="selectedCanvasTraining" class="select select-sm select-bordered"><option value="all">全部卡面</option><option value="normal">特训前</option><option value="trained">特训后</option></select>
@@ -2102,7 +2102,7 @@ function closeFixtureDetail() {
           </div>
         </div>
 
-        <div v-if="filteredPhenomenas.length" class="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+        <div v-if="filteredPhenomenas.length" class="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
           <article v-for="row in filteredPhenomenas" :key="row.id" class="rounded-xl border border-base-200 bg-base-100 p-3 shadow-sm">
             <div class="flex items-start gap-3">
               <div class="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-xl border border-black/5" :style="{ backgroundImage: phenomenaGradient(row) }">

@@ -472,7 +472,7 @@ function cleanInformation(description: string): string {
 
 <template>
   <div class="mx-auto max-w-7xl space-y-5">
-    <div v-if="isLoading" class="space-y-4"><div class="skeleton h-20 rounded-xl"></div><div class="skeleton h-64 rounded-xl"></div><div class="grid gap-3 lg:grid-cols-3"><div class="skeleton h-48 lg:col-span-2"></div><div class="skeleton h-48"></div></div></div>
+    <div v-if="isLoading" class="space-y-4"><div class="skeleton h-20 rounded-xl"></div><div class="skeleton h-64 rounded-xl"></div><div class="grid grid-cols-1 gap-3 lg:grid-cols-3"><div class="skeleton h-48 lg:col-span-2"></div><div class="skeleton h-48"></div></div></div>
     <div v-else-if="loadError" class="alert alert-error">Virtual Live 加载失败：{{ loadError }}</div>
     <div v-else-if="!vlive" class="rounded-xl border border-base-200 bg-base-100 py-20 text-center"><p class="text-xl text-base-content/60">Virtual Live 不存在</p><RouterLink to="/vlives" class="btn btn-primary mt-4">返回列表</RouterLink></div>
 
@@ -482,7 +482,7 @@ function cleanInformation(description: string): string {
         <template #actions><button type="button" class="btn btn-sm btn-ghost" @click="goBack"><ChevronLeft class="h-4 w-4" />返回列表</button></template>
       </PageHeader>
 
-      <section class="grid overflow-hidden rounded-xl border border-base-200 bg-base-100 shadow-sm lg:grid-cols-[minmax(0,1.45fr)_minmax(20rem,.75fr)]">
+      <section class="grid grid-cols-1 overflow-hidden rounded-xl border border-base-200 bg-base-100 shadow-sm lg:grid-cols-[minmax(0,1.45fr)_minmax(20rem,.75fr)]">
         <figure class="flex aspect-[122/52] items-center justify-center bg-base-200/70 lg:aspect-auto">
           <AssetImage :src="getBannerUrl(vlive.assetbundleName)" :alt="vlive.name" class="h-full max-h-72 w-full object-contain" />
         </figure>
@@ -496,11 +496,11 @@ function cleanInformation(description: string): string {
         </div>
       </section>
 
-      <div class="grid items-start gap-4 lg:grid-cols-[minmax(0,1.55fr)_minmax(19rem,.75fr)]">
+      <div class="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1.55fr)_minmax(19rem,.75fr)]">
         <main class="space-y-4">
           <section v-if="setlists.length" class="rounded-xl border border-base-200 bg-base-100 p-4 shadow-sm md:p-5">
             <div class="mb-4 flex flex-wrap items-center justify-between gap-2"><h2 class="flex items-center gap-2 text-lg font-bold"><Disc3 class="h-5 w-5 text-primary" />节目单</h2><div class="flex flex-wrap gap-1"><span class="badge badge-ghost">流程 {{ setlists.length }}</span><span class="badge badge-primary">歌曲 {{ musicSetlists.length }}</span><span v-if="setlistTypeCounts.get('mc')" class="badge badge-ghost">MC {{ setlistTypeCounts.get('mc') }}</span><span v-if="setlistTypeCounts.get('mc_timeline')" class="badge badge-ghost">Timeline MC {{ setlistTypeCounts.get('mc_timeline') }}</span><span v-if="setlistTypeCounts.get('virtual_message')" class="badge badge-ghost">Message {{ setlistTypeCounts.get('virtual_message') }}</span></div></div>
-            <div v-if="musicSetlists.length" class="grid gap-2 sm:grid-cols-2">
+            <div v-if="musicSetlists.length" class="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <RouterLink v-for="row in musicSetlists" :key="row.id" :to="`/musics/${row.musicId}`" class="group flex min-w-0 gap-3 rounded-xl border border-base-200 p-2.5 transition hover:border-primary/40 hover:bg-base-200/35">
                 <AssetImage v-if="musicMap.get(row.musicId || 0)" :src="`${assetsHost}/startapp/music/jacket/${musicMap.get(row.musicId || 0)?.assetbundleName}/${musicMap.get(row.musicId || 0)?.assetbundleName}.png`" :alt="musicMap.get(row.musicId || 0)?.title || ''" class="h-16 w-16 shrink-0 rounded-lg object-cover" />
                 <div class="min-w-0 flex-1"><div class="flex items-center gap-1.5 text-[10px] text-base-content/40"><span>#{{ row.seq }}</span><span>Stage {{ row.virtualLiveStageId }}</span></div><h3 class="mt-0.5 truncate font-bold group-hover:text-primary"><ZhText v-if="musicMap.get(row.musicId || 0)?.title" :text="musicMap.get(row.musicId || 0)?.title" table="musics" path="title" layout="inline" /><template v-else>歌曲 #{{ row.musicId }}</template></h3><p v-if="row.musicVocalId" class="truncate text-xs text-base-content/55"><ZhText v-if="musicVocalMap.get(row.musicVocalId)?.caption" :text="musicVocalMap.get(row.musicVocalId)?.caption" table="musicVocals" path="caption" layout="inline" /><template v-else>Vocal #{{ row.musicVocalId }}</template></p><p v-if="setlistPerformers(row).length" class="mt-1 line-clamp-2 text-[10px] text-base-content/45">出演：{{ setlistPerformers(row).join('、') }}</p></div>
@@ -511,10 +511,10 @@ function cleanInformation(description: string): string {
 
           <section v-if="scheduleGroups.length || beginnerScheduleGroups.length" class="rounded-xl border border-base-200 bg-base-100 p-4 shadow-sm md:p-5">
             <div class="mb-4 flex items-center justify-between"><h2 class="flex items-center gap-2 text-lg font-bold"><Clock class="h-5 w-5 text-primary" />场次安排</h2><span class="badge badge-ghost">{{ (vlive.virtualLiveSchedules?.length || 0) + (vlive.virtualLiveBeginnerSchedules?.length || 0) }} 场</span></div>
-            <div v-if="scheduleGroups.length" class="grid gap-2 sm:grid-cols-2">
+            <div v-if="scheduleGroups.length" class="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <div v-for="group in scheduleGroups" :key="group.key" class="rounded-xl bg-base-200/45 p-3"><p class="mb-2 text-sm font-bold">{{ group.label }}</p><div class="flex flex-wrap gap-1.5"><span v-for="schedule in group.schedules" :key="schedule.id" class="badge h-auto gap-1 py-1" :class="schedule.isAfterEvent ? 'badge-secondary' : 'badge-ghost'"><span v-if="schedule.isAfterEvent">After Event</span><span>{{ timeLabel(schedule.startAt) }}–{{ timeLabel(schedule.endAt) }}</span></span></div></div>
             </div>
-            <details v-if="beginnerScheduleGroups.length" class="collapse collapse-arrow mt-3 border border-base-200 bg-base-200/35"><summary class="collapse-title min-h-0 py-3 font-bold">每周循环场次</summary><div class="collapse-content space-y-3"><div v-for="group in beginnerScheduleGroups" :key="group.key" class="grid gap-2 sm:grid-cols-[5rem_1fr]"><strong class="text-sm">{{ group.label }}</strong><div class="flex flex-wrap gap-1"><span v-for="schedule in group.schedules" :key="schedule.id" class="badge badge-ghost">{{ schedule.startTime.slice(0, 5) }}–{{ schedule.endTime.slice(0, 5) }}</span></div></div></div></details>
+            <details v-if="beginnerScheduleGroups.length" class="collapse collapse-arrow mt-3 border border-base-200 bg-base-200/35"><summary class="collapse-title min-h-0 py-3 font-bold">每周循环场次</summary><div class="collapse-content space-y-3"><div v-for="group in beginnerScheduleGroups" :key="group.key" class="grid grid-cols-1 gap-2 sm:grid-cols-[5rem_1fr]"><strong class="text-sm">{{ group.label }}</strong><div class="flex flex-wrap gap-1"><span v-for="schedule in group.schedules" :key="schedule.id" class="badge badge-ghost">{{ schedule.startTime.slice(0, 5) }}–{{ schedule.endTime.slice(0, 5) }}</span></div></div></div></details>
           </section>
 
           <details v-if="informationText" class="collapse collapse-arrow border border-base-200 bg-base-100 shadow-sm">

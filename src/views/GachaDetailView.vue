@@ -695,7 +695,7 @@ watch(() => route.params.id, loadData)
             {{ probabilityAnalysis.error }}
           </div>
           <template v-else-if="probabilityAnalysis && !('error' in probabilityAnalysis)">
-            <div class="grid lg:grid-cols-[minmax(14rem,1fr)_minmax(0,2fr)] gap-5 items-start">
+            <div class="grid grid-cols-1 lg:grid-cols-[minmax(14rem,1fr)_minmax(0,2fr)] gap-5 items-start">
               <div class="rounded-xl bg-base-200 p-4 space-y-3">
                 <div class="flex justify-between items-end gap-3"><label class="font-medium">计划抽数</label><div class="join"><input v-model.number="probabilityPulls" type="number" min="1" :max="Math.max(1000, sparkPulls)" class="input input-bordered input-sm join-item w-24 text-right" /><span class="btn btn-sm join-item pointer-events-none">抽</span></div></div>
                 <input v-model.number="probabilityPulls" type="range" min="1" :max="Math.max(500, sparkPulls)" class="range range-primary range-sm" />

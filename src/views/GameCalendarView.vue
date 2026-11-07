@@ -487,7 +487,7 @@ onMounted(async () => {
         </div>
       </div>
 
-      <div class="grid items-start gap-5 xl:h-[calc(100dvh-6rem)] xl:min-h-[40rem] xl:max-h-[50rem] xl:grid-cols-[minmax(0,1fr)_20rem] xl:grid-rows-1 xl:items-stretch">
+      <div class="grid grid-cols-1 items-start gap-5 xl:h-[calc(100dvh-6rem)] xl:min-h-[40rem] xl:max-h-[50rem] xl:grid-cols-[minmax(0,1fr)_20rem] xl:grid-rows-1 xl:items-stretch">
         <div class="card hidden overflow-hidden border border-base-200 bg-base-100 shadow-sm md:flex md:flex-col xl:min-h-0 xl:self-stretch">
           <div class="grid grid-cols-7 border-b border-base-200 bg-base-200/55"><div v-for="weekday in weekdayLabels" :key="weekday" class="py-2 text-center text-xs font-bold text-base-content/55">周{{ weekday }}</div></div>
           <div class="grid flex-1 grid-cols-7 xl:min-h-0 xl:grid-rows-6">
@@ -562,7 +562,7 @@ onMounted(async () => {
         <div class="max-h-[58vh] overflow-y-auto bg-base-200/40 p-4">
           <div v-if="rewardLoading" class="flex justify-center py-16"><span class="loading loading-spinner loading-lg text-primary"></span></div>
           <div v-else-if="rewardError" class="alert alert-error"><span>{{ rewardError }}</span><button class="btn btn-sm" @click="ensureRewardData">重试</button></div>
-          <div v-else-if="selectedRewardDays.length" class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          <div v-else-if="selectedRewardDays.length" class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
             <div v-for="day in selectedRewardDays" :key="`${selectedLoginBonus.id}-${day.day}`" class="rounded-xl border border-base-200 bg-base-100 p-3">
               <div class="mb-2 flex items-center justify-between"><span class="font-bold text-primary">Day {{ day.day }}</span><span class="text-[10px] text-base-content/35">Box #{{ day.boxId }}</span></div>
               <div v-if="day.rewards.length" class="space-y-2">
