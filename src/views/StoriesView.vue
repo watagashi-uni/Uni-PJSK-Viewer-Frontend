@@ -558,7 +558,9 @@ onMounted(async () => {
                 <ChevronRight class="w-4 h-4 shrink-0 opacity-40 group-hover:translate-x-0.5 transition-transform" />
               </button>
               <!-- 每话梗概：显示总结后才出现，默认两行，点击展开 -->
-              <button v-if="summaries.revealed && episodeSynopsis(episode)" type="button" class="episode-synopsis" :class="{ expanded: expandedSynopses.has(episode.scenarioId) }" :aria-expanded="expandedSynopses.has(episode.scenarioId)" lang="zh-CN" @click="toggleSynopsis(episode.scenarioId)">{{ episodeSynopsis(episode) }}</button>
+              <button v-if="summaries.revealed && episodeSynopsis(episode)" type="button" class="episode-synopsis" :class="{ expanded: expandedSynopses.has(episode.scenarioId) }" :aria-expanded="expandedSynopses.has(episode.scenarioId)" lang="zh-CN" @click="toggleSynopsis(episode.scenarioId)">
+                <span class="synopsis-text">{{ episodeSynopsis(episode) }}</span>
+              </button>
             </div>
             <div v-if="selectedStoryEpisodes.length === 0" class="py-16 text-center text-sm text-base-content/45">没有匹配的章节</div>
           </div>
@@ -574,14 +576,15 @@ onMounted(async () => {
    （底部地址栏的浏览器、不支持 dvh/svh 的内嵌浏览器都会出现这种情况） */
 .story-modal .modal-box { max-height:94vh; max-height:94svh; }
 .episode-synopsis {
-  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
-  width:calc(100% - 1.25rem); margin:-.25rem .625rem .625rem; padding:.5rem .75rem;
+  display:block; width:calc(100% - 1.25rem); margin:-.25rem .625rem .625rem; padding:.5rem .75rem;
   border-radius:.625rem; text-align:left; font-size:.8rem; line-height:1.65;
   color:color-mix(in oklab, var(--color-base-content) 68%, transparent);
   background:color-mix(in oklab, var(--color-base-200) 70%, transparent);
 }
+/* 截断放在内层，避免内边距里露出第三行 */
+.synopsis-text { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
 .episode-synopsis:hover { color:color-mix(in oklab, var(--color-base-content) 85%, transparent); }
-.episode-synopsis.expanded { display:block; -webkit-line-clamp:unset; }
+.episode-synopsis.expanded .synopsis-text { display:block; -webkit-line-clamp:unset; }
 @media (max-width: 640px) {
   .story-modal { align-items:start; }
   .story-modal .modal-box {
