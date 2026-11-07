@@ -37,7 +37,6 @@ const route = useRoute()
 const router = useRouter()
 const masterStore = useMasterStore()
 const settingsStore = useSettingsStore()
-const zhCostumes = useZh('costume3ds')
 
 const characters = ref<Character[]>([])
 const costumeGroups = ref<CostumeGroup[]>([])
@@ -50,6 +49,8 @@ const selectedCharaId = computed(() => {
   const id = Number(route.query.charaId)
   return Number.isInteger(id) && id > 0 ? id : null
 })
+// 选了角色才有衣装列表，译文也等到那时再下载
+const zhCostumes = useZh('costume3ds', () => !!selectedCharaId.value)
 const selectedPart = computed(() => {
   const part = route.query.part
   return part === 'head' || part === 'hair' ? part : 'body'
