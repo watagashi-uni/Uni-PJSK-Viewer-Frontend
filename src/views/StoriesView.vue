@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useSpoilerWatermark } from '@/composables/useSpoilerWatermark'
 import { computed, onMounted, ref, watch, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { BookOpen, ChevronDown, ChevronRight, Library, Play, Search, Sparkles, X } from 'lucide-vue-next'
@@ -135,6 +136,8 @@ function handleEventPageChange(page: number) {
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 const selectedStory = ref<SelectedStory | null>(null)
+// 打开未公开的故事时显示剧透水印
+useSpoilerWatermark(() => !!selectedStory.value && (selectedStory.value.startAt || 0) > Date.now())
 const selectedEpisode = ref<StoryEpisode | null>(null)
 const storyDialog = ref<HTMLDialogElement | null>(null)
 watch(selectedEpisode, (episode, previous) => {
@@ -275,7 +278,7 @@ watch([searchQuery, selectedUnit], () => {
 const extraStories = computed<SelectedStory[]>(() => {
   const items: SelectedStory[] = activeTab.value === 'card'
     ? storyCards.value.filter(card => settingsStore.showSpoilers || card.releaseAt <= now).map(card => ({
-      kind: 'card', id: card.id, title: card.prefix, assetbundleName: card.assetbundleName,
+      kind: 'card', id: card.id, title: card.prefix, assetbundleName: card.assetbundleName, startAt: card.releaseAt,
       episodes: cardEpisodes.value.filter(episode => episode.cardId === card.id).map((episode, i) => ({ ...episode, episodeNo: i + 1 })),
     }))
     : specialStories.value.filter(story => settingsStore.showSpoilers || story.startAt <= now).map(story => ({ ...story, kind: 'special' as const }))

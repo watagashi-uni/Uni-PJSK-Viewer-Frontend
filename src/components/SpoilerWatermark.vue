@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
 import { useSettingsStore } from '@/stores/settings'
 import { unreleasedOnScreen } from '@/composables/useSpoilerWatermark'
 import { detectSpoilerLang, SPOILER_WATERMARK } from '@/utils/spoilerLocale'
@@ -9,8 +8,8 @@ import { detectSpoilerLang, SPOILER_WATERMARK } from '@/utils/spoilerLocale'
 // 铺满整个视口的斜向文字（一张 SVG 平铺背景，不生成大量节点）。
 // 放进浏览器顶层（popover），因此盖在弹窗和全屏播放器之上；不拦截点击。
 const settings = useSettingsStore()
-const route = useRoute()
-const visible = computed(() => settings.showSpoilers && (route.meta.spoilerList === true || unreleasedOnScreen.value > 0))
+// 只在单独打开的未公开内容页面显示（详情页、未公开的剧情）；首页和各列表页不显示
+const visible = computed(() => settings.showSpoilers && unreleasedOnScreen.value > 0)
 
 const label = SPOILER_WATERMARK[detectSpoilerLang()]
 // 截图里带上时间：日期加小时，整点更新
