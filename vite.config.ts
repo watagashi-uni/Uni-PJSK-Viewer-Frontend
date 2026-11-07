@@ -249,6 +249,9 @@ export default defineConfig({
   },
   build: {
     rollupOptions: {
+      // Rollup opens up to 1000 files at once by default; the EdgeOne builder's
+      // file limit is about that, so builds failed with EMFILE at random.
+      maxParallelFileOps: 64,
       output: {
         // 确保 chunk 文件名包含原始名称，以便 PWA 插件排除
         chunkFileNames: 'assets/[name]-[hash].js',
