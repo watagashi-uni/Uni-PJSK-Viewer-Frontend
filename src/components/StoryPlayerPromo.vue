@@ -27,9 +27,9 @@ const features = [
 
       <div class="promo-actions">
         <RouterLink
-          to="/stories?tab=unit&story=2&episode=20007"
+          to="/stories?story=223&episode=1001817"
           class="btn btn-sm btn-primary"
-          aria-label="试看凤笑梦与神代类的剧情"
+          aria-label="试看活动「いつかの君へ、旋律を」第 1 话"
         >
           <Play class="h-3.5 w-3.5 fill-current" aria-hidden="true" /> 试看一段
         </RouterLink>
@@ -40,8 +40,8 @@ const features = [
     </div>
 
     <!-- 与「试看一段」同目标，读屏和键盘只保留按钮这一个入口 -->
-    <RouterLink to="/stories?tab=unit&story=2&episode=20007" class="promo-shot" tabindex="-1" aria-hidden="true">
-      <img src="/img/promo/story-player-wonder.jpg" alt="" width="1280" height="720" fetchpriority="high" />
+    <RouterLink to="/stories?story=223&episode=1001817" class="promo-shot" tabindex="-1" aria-hidden="true">
+      <img src="/img/promo/story-player-promo.jpg" alt="" width="1280" height="720" fetchpriority="high" />
     </RouterLink>
   </section>
 </template>
