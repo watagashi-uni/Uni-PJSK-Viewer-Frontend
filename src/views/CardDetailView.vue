@@ -7,7 +7,7 @@ import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
 import AssetImage from '@/components/AssetImage.vue'
 import SekaiCard from '@/components/SekaiCard.vue'
-import { ChevronLeft, ScrollText, Zap, Link2, Shirt, Calendar, Gift } from 'lucide-vue-next'
+import { BookOpen, ChevronLeft, ScrollText, Zap, Link2, Shirt, Calendar, Gift } from 'lucide-vue-next'
 import { isTrainedOnlyCard } from '@/utils/card'
 import ZhText from '@/components/ZhText.vue'
 import { useCharacterName } from '@/composables/useCharacterName'
@@ -163,6 +163,11 @@ const maxNormalLevel = ref(1)
 const maxTrainedLevel = ref(1)
 const masterRank = ref(0)
 const cardEpisodes = ref<any[]>([])
+// 剧情页只列出已实装（或打开了剧透）的卡，链接与它保持一致
+const storyEpisodes = computed(() => {
+  if (!card.value || !(settingsStore.showSpoilers || (card.value.releaseAt || 0) <= Date.now())) return []
+  return cardEpisodes.value.filter((episode: any) => episode.scenarioId)
+})
 
 const masterRankRewards = [0, 50, 100, 150, 200]
 const cardRarityTypeToRarity: Record<string, number> = {
@@ -719,6 +724,21 @@ onMounted(loadData)
                 <p><span class="font-medium text-base-content">卡片类型：</span>{{ cardTypeLabel }}</p>
                 <p v-if="trainedOnly"><span class="font-medium text-base-content">特训：</span>获得时即为特训后，没有特训前形态</p>
                 <p><span class="font-medium text-base-content">实装时间：</span>{{ card?.releaseAt ? formatDate(card.releaseAt) : '-' }}</p>
+              </div>
+
+              <!-- 卡面剧情：剧情页的卡面标签支持直接打开某一话 -->
+              <div v-if="storyEpisodes.length" class="border-t border-base-300 pt-4 mt-4">
+                <p class="font-medium text-sm mb-2 flex items-center gap-1.5"><BookOpen class="w-4 h-4 text-primary" aria-hidden="true" />卡面剧情</p>
+                <div class="flex flex-wrap gap-2">
+                  <RouterLink
+                    v-for="episode in storyEpisodes"
+                    :key="episode.id"
+                    :to="{ path: '/stories', query: { tab: 'card', story: String(card.id), episode: String(episode.id) } }"
+                    class="btn btn-sm btn-outline btn-primary h-auto min-h-8 py-1 text-left font-normal"
+                  >
+                    <span class="flex flex-col items-start leading-tight"><ZhText :text="episode.title" table="cardEpisodes" path="title" sub-class="text-[11px]" /></span>
+                  </RouterLink>
+                </div>
               </div>
             </div>
             

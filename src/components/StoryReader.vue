@@ -315,7 +315,7 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.story-reader { display:flex; flex-direction:column; height:min(90dvh,920px); background:var(--color-base-100); }
+.story-reader { display:flex; flex-direction:column; height:min(90vh,920px); height:min(90svh,920px); background:var(--color-base-100); }
 .reader-heading { display:flex; align-items:center; gap:1rem; padding:1rem 1.25rem; border-bottom:1px solid var(--color-base-200); flex-shrink:0; }
 .story-stage { position:relative; display:flex; align-items:center; justify-content:center; flex:1; min-height:0; overflow:hidden; background:#111820; }
 .player-host { width:100%; height:100%; }
@@ -331,6 +331,11 @@ onBeforeUnmount(() => {
 .zh-source { margin-left:.5rem; padding:.05rem .4rem; border-radius:999px; font-weight:500; letter-spacing:0; color:var(--color-base-content); background:var(--color-base-200); opacity:.75; }
 .zh-speaker { margin-left:.45rem; font-weight:500; opacity:.7; }
 .zh-script-sub { display:block; margin-top:.2rem; white-space:pre-line; line-height:1.6; font-size:.92em; color:color-mix(in oklab, var(--color-base-content) 68%, transparent); }
-@media(max-width:640px) { .reader-heading {padding:.7rem .75rem;gap:.5rem;} .story-reader {height:92dvh;} }
+/* 手机：按地址栏展开时的可视高度（svh）算，不支持时退回 vh；弹窗外层在 StoriesView 里贴顶，
+   保证标题栏和关闭按钮始终在屏幕内，即使地址栏在底部或浏览器不支持 svh */
+@media(max-width:640px) {
+  .reader-heading {padding:.7rem .75rem;gap:.5rem;}
+  .story-reader {height:calc(100vh - 1rem); height:calc(100svh - 1rem - env(safe-area-inset-top) - env(safe-area-inset-bottom));}
+}
 @media(prefers-reduced-motion:reduce) { .player-host :deep(.pjsk-start) {animation:none;} }
 </style>

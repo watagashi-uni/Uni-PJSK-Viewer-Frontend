@@ -496,8 +496,8 @@ onMounted(async () => {
       </template>
     </template>
 
-    <dialog ref="storyDialog" class="modal" :class="{ 'modal-open': selectedStory }" @cancel.prevent="closeStory">
-      <div v-if="selectedStory" class="modal-box p-0" :class="selectedEpisode ? 'max-w-5xl max-h-[94dvh] w-[96vw]' : 'max-w-3xl'">
+    <dialog ref="storyDialog" class="modal story-modal" :class="{ 'modal-open': selectedStory }" @cancel.prevent="closeStory">
+      <div v-if="selectedStory" class="modal-box p-0" :class="selectedEpisode ? 'max-w-5xl w-[96vw]' : 'max-w-3xl'">
         <StoryReader
           v-if="selectedEpisode"
           :key="selectedEpisode.scenarioId"
@@ -542,3 +542,17 @@ onMounted(async () => {
     </dialog>
   </div>
 </template>
+
+<style scoped>
+/* 剧情弹窗：桌面居中；手机贴顶并让出安全区，弹窗比可视区域高时也不会把关闭按钮推到屏幕外
+   （底部地址栏的浏览器、不支持 dvh/svh 的内嵌浏览器都会出现这种情况） */
+.story-modal .modal-box { max-height:94vh; max-height:94svh; }
+@media (max-width: 640px) {
+  .story-modal { align-items:start; }
+  .story-modal .modal-box {
+    margin-top:calc(.5rem + env(safe-area-inset-top));
+    max-height:calc(100vh - 1rem);
+    max-height:calc(100svh - 1rem - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  }
+}
+</style>
