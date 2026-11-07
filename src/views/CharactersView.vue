@@ -19,6 +19,7 @@ import type {
 } from '@/types/master'
 import ZhText from '@/components/ZhText.vue'
 import { useZh } from '@/composables/useZh'
+import { useCharacterName } from '@/composables/useCharacterName'
 
 interface UserCharacter {
   characterId?: number
@@ -53,6 +54,7 @@ interface CharacterLevel {
   totalExp: number
 }
 
+const { characterName, characterSearch, jpName } = useCharacterName()
 const route = useRoute()
 const router = useRouter()
 const masterStore = useMasterStore()
@@ -203,7 +205,7 @@ const groupedCharacters = computed(() => {
         .filter(character => {
           if (!query) return true
           return [
-            getCharacterName(character),
+            characterSearch(character),
             getEnglishName(character),
             profile?.unitName,
             character.id,
@@ -226,7 +228,7 @@ const groupedCharacters = computed(() => {
 })
 
 function getCharacterName(character: GameCharacterData): string {
-  return `${character.firstName || ''}${character.givenName}`
+  return characterName(character)
 }
 
 function getEnglishName(character: GameCharacterData): string {
@@ -404,7 +406,7 @@ onMounted(async () => {
           <div class="card-body p-6 md:p-8 gap-6">
             <header>
               <p class="text-sm tracking-[0.18em] text-base-content/45 uppercase">{{ getEnglishName(selectedCharacter) }}</p>
-              <h1 class="text-3xl md:text-4xl font-bold mt-1">{{ getCharacterName(selectedCharacter) }}</h1>
+              <h1 class="text-3xl md:text-4xl font-bold mt-1">{{ getCharacterName(selectedCharacter) }}<span v-if="jpName(selectedCharacter) !== getCharacterName(selectedCharacter)" class="ml-3 text-lg font-medium text-base-content/55" lang="ja">{{ jpName(selectedCharacter) }}</span></h1>
               <p v-if="selectedProfile?.characterVoice" class="text-sm text-base-content/60 mt-2">CV：{{ selectedProfile.characterVoice }}</p>
             </header>
 

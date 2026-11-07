@@ -22,7 +22,9 @@ import type {
 import PageHeader from '@/components/PageHeader.vue'
 import ZhText from '@/components/ZhText.vue'
 import { useZh } from '@/composables/useZh'
+import { useCharacterName } from '@/composables/useCharacterName'
 
+const { characterName } = useCharacterName()
 const route = useRoute()
 const router = useRouter()
 const accountStore = useAccountStore()
@@ -355,7 +357,7 @@ const mainGenreOptions = computed(() => {
 const gameCharacterNameMap = computed(() => {
   const map = new Map<number, string>()
   for (const row of gameCharacters.value) {
-    map.set(row.id, `${row.firstName || ''}${row.givenName || ''}`.trim() || `角色 ${row.id}`)
+    map.set(row.id, characterName(row).trim() || `角色 ${row.id}`)
   }
   return map
 })

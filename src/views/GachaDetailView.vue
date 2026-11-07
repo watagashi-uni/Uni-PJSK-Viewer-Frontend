@@ -22,6 +22,8 @@ const route = useRoute()
 // 上一页是列表时后退以保留筛选与页码，否则打开列表
 const goBack = useBackToList('/gachas')
 const infoModal = ref<HTMLDialogElement | null>(null)
+// 介绍文字的译文是单独的大文件，打开弹窗后才下载
+const infoOpened = ref(false)
 const masterStore = useMasterStore()
 const settingsStore = useSettingsStore()
 const zhGachas = useZh('gachas')
@@ -533,9 +535,9 @@ watch(() => route.params.id, loadData)
             <button 
               v-if="gacha.gachaInformation?.summary || gacha.gachaInformation?.description"
               class="btn btn-outline btn-sm font-normal"
-              @click="infoModal?.showModal()"
+              @click="infoOpened = true; infoModal?.showModal()"
             >
-              {{ zhGachas.t('gachaInformation.summary', gacha.gachaInformation?.summary) || zhGachas.t('gachaInformation.description', gacha.gachaInformation?.description) ? '卡池介绍' : '卡池介绍（日文）' }}
+              {{ zhGachas.enabled.value ? '卡池介绍' : '卡池介绍（日文）' }}
             </button>
           </div>
 
@@ -821,11 +823,11 @@ watch(() => route.params.id, loadData)
         <h3 class="font-bold text-lg mb-4">卡池详情</h3>
         <div class="space-y-4 text-sm whitespace-pre-wrap leading-relaxed">
           <div v-if="gacha.gachaInformation.summary">
-            <ZhText :text="gacha.gachaInformation.summary" table="gachas" path="gachaInformation.summary" sub-class="mt-3" />
+            <ZhText :text="gacha.gachaInformation.summary" :table="infoOpened ? 'gachas' : ''" path="gachaInformation.summary" sub-class="mt-3" />
           </div>
           <div v-if="gacha.gachaInformation.summary && gacha.gachaInformation.description" class="divider my-1"></div>
           <div v-if="gacha.gachaInformation.description">
-            <ZhText :text="gacha.gachaInformation.description" table="gachas" path="gachaInformation.description" sub-class="mt-3" />
+            <ZhText :text="gacha.gachaInformation.description" :table="infoOpened ? 'gachas' : ''" path="gachaInformation.description" sub-class="mt-3" />
           </div>
         </div>
         <div class="modal-action">

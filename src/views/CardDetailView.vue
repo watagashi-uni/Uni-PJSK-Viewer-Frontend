@@ -10,6 +10,7 @@ import SekaiCard from '@/components/SekaiCard.vue'
 import { ChevronLeft, ScrollText, Zap, Link2, Shirt, Calendar, Gift } from 'lucide-vue-next'
 import { isTrainedOnlyCard } from '@/utils/card'
 import ZhText from '@/components/ZhText.vue'
+import { useCharacterName } from '@/composables/useCharacterName'
 
 interface Card {
   id: number
@@ -109,6 +110,7 @@ interface Skill {
   skillEffects: SkillEffect[]
 }
 
+const { characterName } = useCharacterName()
 const route = useRoute()
 const masterStore = useMasterStore()
 const settingsStore = useSettingsStore()
@@ -292,7 +294,7 @@ const parseSkill = (skillObj: Skill | null, isTrained: boolean) => {
         }
       }
     } else if (p2 === 'c' && character.value) {
-      return (character.value.firstName || '') + character.value.givenName
+      return characterName(character.value)
     }
     return match
   })
@@ -639,7 +641,7 @@ onMounted(loadData)
               <span class="min-w-0"><ZhText :text="card.prefix" table="cards" path="prefix" sub-class="text-base mt-1" /></span>
             </h1>
             <p class="text-lg text-base-content/70 mt-1 mb-4 border-b border-base-200 pb-4">
-              {{ character ? (character.firstName || '') + character.givenName : '' }}
+              {{ characterName(character) }}
             </p>
             
             <div class="flex justify-center gap-6 mt-4 opacity-90">

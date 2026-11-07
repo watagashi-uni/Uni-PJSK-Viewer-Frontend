@@ -11,7 +11,9 @@ import { useSettingsStore } from '@/stores/settings'
 import type { GameCharacterData, StampData } from '@/types/master'
 import ZhText from '@/components/ZhText.vue'
 import { useZh } from '@/composables/useZh'
+import { useCharacterName } from '@/composables/useCharacterName'
 
+const { characterName, characterSearch } = useCharacterName()
 const route = useRoute()
 const router = useRouter()
 const masterStore = useMasterStore()
@@ -73,8 +75,8 @@ const filteredStamps = computed(() => {
     .filter(stamp => {
       if (!query) return true
       const character = stamp.characterId1 ? characterMap.value.get(stamp.characterId1) : undefined
-      const characterName = character ? `${character.firstName || ''}${character.givenName}` : ''
-      return [stamp.id, zhStamps.searchText('name', stamp.name), zhStamps.searchText('description', stamp.description), stamp.assetbundleName, characterName]
+      const characterLabel = character ? characterSearch(character) : ''
+      return [stamp.id, zhStamps.searchText('name', stamp.name), zhStamps.searchText('description', stamp.description), stamp.assetbundleName, characterLabel]
         .some(value => String(value || '').toLocaleLowerCase().includes(query))
     })
     .sort((a, b) => b.archivePublishedAt - a.archivePublishedAt || b.id - a.id)
@@ -122,7 +124,7 @@ function zhName(stamp: StampData): string | null {
 function getCharacterName(stamp: StampData): string {
   if (!stamp.characterId1) return '无指定角色'
   const character = characterMap.value.get(stamp.characterId1)
-  return character ? `${character.firstName || ''}${character.givenName}` : `角色 #${stamp.characterId1}`
+  return character ? characterName(character) : `角色 #${stamp.characterId1}`
 }
 
 function getTypeLabel(type: string): string {
@@ -188,7 +190,7 @@ onMounted(async () => {
           <select v-model="selectedCharacterId" class="select select-bordered w-full">
             <option value="">全部角色</option>
             <option v-for="character in characterOptions" :key="character.id" :value="String(character.id)">
-              {{ character.firstName || '' }}{{ character.givenName }}（{{ character.count }}）
+              {{ characterName(character) }}（{{ character.count }}）
             </option>
           </select>
 

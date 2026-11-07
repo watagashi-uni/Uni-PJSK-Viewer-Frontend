@@ -21,7 +21,7 @@ const settings = useSettingsStore()
 const store = useTranslationStore()
 const enabled = computed(() => settings.translationMode !== 'off')
 
-watchEffect(() => { if (enabled.value && props.table && props.zh === undefined) store.ensure(props.table) })
+watchEffect(() => { if (enabled.value && props.table && props.zh === undefined && props.text) store.ensure(props.table, props.path || undefined) })
 
 const translated = computed<ZhEntry | undefined>(() => {
   if (!enabled.value || !props.text) return undefined

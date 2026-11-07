@@ -79,6 +79,7 @@ import { toRomaji } from '@/utils/kanaToRomaji'
 import AccountSelector from '@/components/AccountSelector.vue'
 import { request } from '@/utils/request'
 import { APPEND_GRADIENT, DIFFICULTY_COLORS, difficultyBackground } from '@/utils/difficulty'
+import { useCharacterName } from '@/composables/useCharacterName'
 
 interface Music {
   id: number
@@ -167,6 +168,7 @@ interface MusicAchievement {
   musicDifficultyType?: string
 }
 
+const { characterName } = useCharacterName()
 const route = useRoute()
 const router = useRouter()
 const masterStore = useMasterStore()
@@ -681,7 +683,7 @@ const gameCharacterOptions = computed(() => {
     .sort((a, b) => a.id - b.id)
     .map(character => ({
       value: `game_character:${character.id}`,
-      label: [character.firstName, character.givenName].filter(Boolean).join('') || `#${character.id}`,
+      label: characterName(character) || `#${character.id}`,
       icon: getCharaIcon(character.id),
       count: counts.get(`game_character:${character.id}`) || 0,
     }))

@@ -10,6 +10,7 @@ import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
 import ZhText from '@/components/ZhText.vue'
 import { useZh } from '@/composables/useZh'
+import { useCharacterName } from '@/composables/useCharacterName'
 
 interface VirtualLiveSchedule {
   id: number
@@ -165,6 +166,7 @@ interface BeginnerScheduleGroup {
   schedules: BeginnerSchedule[]
 }
 
+const { characterName: formatCharacterName } = useCharacterName()
 const route = useRoute()
 // 上一页是列表时后退以保留筛选与页码，否则打开列表
 const goBack = useBackToList('/vlives')
@@ -331,7 +333,7 @@ function getScheduleBounds(row: VirtualLive) {
 
 function characterName(characterId: number): string {
   const character = gameCharacterMap.value.get(characterId)
-  return character ? `${character.firstName || ''}${character.givenName}` : `角色 #${characterId}`
+  return character ? formatCharacterName(character) : `角色 #${characterId}`
 }
 
 function characterIcon(unit: GameCharacterUnit): string {

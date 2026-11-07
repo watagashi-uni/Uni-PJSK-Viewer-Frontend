@@ -19,6 +19,7 @@ import { buildCostumeGroups, COSTUME_PART_LABELS } from '@/utils/costume'
 import type { Costume3d, CardCostume3d, CostumePart } from '@/types/costume'
 import ZhText from '@/components/ZhText.vue'
 import { useZh } from '@/composables/useZh'
+import { useCharacterName } from '@/composables/useCharacterName'
 
 interface Character {
   id: number
@@ -33,6 +34,7 @@ interface CostumeListItem {
   part: CostumePart
 }
 
+const { characterName } = useCharacterName()
 const route = useRoute()
 const router = useRouter()
 const masterStore = useMasterStore()
@@ -85,7 +87,7 @@ const sourceTabs = [
 function getCharaName(characterId: number | null): string {
   const chara = characters.value.find(c => c.id === characterId)
   if (!chara) return ''
-  return (chara.firstName || '') + chara.givenName
+  return characterName(chara)
 }
 
 const characterOptions = computed(() => {
@@ -93,7 +95,7 @@ const characterOptions = computed(() => {
     .sort((a, b) => a.id - b.id)
     .map(chara => ({
       value: chara.id,
-      label: (chara.firstName || '') + chara.givenName,
+      label: characterName(chara),
       icon: `/img/chr_ts/chr_ts_90_${chara.id}.png`,
     }))
 })

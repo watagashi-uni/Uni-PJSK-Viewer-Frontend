@@ -19,6 +19,7 @@ import {
 } from '@/utils/costume'
 import type { Costume3d, CardCostume3d, CostumeGroup } from '@/types/costume'
 import ZhText from '@/components/ZhText.vue'
+import { useCharacterName } from '@/composables/useCharacterName'
 
 interface Character {
   id: number
@@ -50,6 +51,7 @@ interface EventInfo {
   aggregateAt: number
 }
 
+const { characterName } = useCharacterName()
 const route = useRoute()
 const router = useRouter()
 const masterStore = useMasterStore()
@@ -68,12 +70,12 @@ const notFoundText = ref('未找到该衣装')
 
 function getCharaName(): string {
   if (!character.value) return ''
-  return (character.value.firstName || '') + character.value.givenName
+  return characterName(character.value)
 }
 
 function getSourceCardCharaName(): string {
   if (!sourceCardCharacter.value) return ''
-  return (sourceCardCharacter.value.firstName || '') + sourceCardCharacter.value.givenName
+  return characterName(sourceCardCharacter.value)
 }
 
 // 衣装角色与卡片角色不同 = 该衣装是卡片衣装的角色配布版本

@@ -11,6 +11,7 @@ import { useAccountStore } from '@/stores/account'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
 import type { GameCharacterData } from '@/types/master'
+import { useCharacterName } from '@/composables/useCharacterName'
 
 type RecordsTab = 'events' | 'world_bloom' | 'challenge' | 'rank' | 'decks' | 'missions'
 
@@ -197,6 +198,7 @@ interface UserCharacterRank {
   totalExp?: number
 }
 
+const { characterName } = useCharacterName()
 const masterStore = useMasterStore()
 const accountStore = useAccountStore()
 const settingsStore = useSettingsStore()
@@ -651,7 +653,7 @@ function tierLabel(row: typeof rankRows.value[number]): string {
 }
 
 function getCharacterName(character: GameCharacterData): string {
-  return `${character.firstName || ''}${character.givenName}`
+  return characterName(character)
 }
 
 function characterIcon(characterId: number): string {

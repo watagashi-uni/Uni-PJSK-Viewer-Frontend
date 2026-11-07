@@ -31,6 +31,7 @@ import {
 } from '@/utils/haruki3dRegistry'
 import type { CostumePart, CostumeColorVariant } from '@/types/costume'
 import { trackEvent } from '@/utils/analytics'
+import { useCharacterName } from '@/composables/useCharacterName'
 
 interface Character {
   id: number
@@ -45,6 +46,7 @@ interface Character3dRole {
   unit: string
 }
 
+const { characterName } = useCharacterName()
 const props = defineProps<{
   characterId: number
   unit?: string
@@ -238,7 +240,7 @@ async function loadContextData() {
       const roleId = `${role.characterId}:${role.unit}`
       if (!character || !role.unit || seen.has(roleId)) return []
       seen.add(roleId)
-      return [{ roleId, label: `${character.firstName ?? ''}${character.givenName ?? role.characterId} · ${unitNames[role.unit] ?? role.unit}` }]
+      return [{ roleId, label: `${characterName(character) || role.characterId} · ${unitNames[role.unit] ?? role.unit}` }]
     })
   }
   unitOptions.value = units.length > 0 ? units : (chara ? [chara.unit] : [])

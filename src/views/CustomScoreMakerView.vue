@@ -13,6 +13,7 @@ import PageHeader from '@/components/PageHeader.vue'
 import { difficultyStyle } from '@/utils/difficulty'
 import { cardImageVariant } from '@/utils/card'
 import { trackEvent } from '@/utils/analytics'
+import { useCharacterName } from '@/composables/useCharacterName'
 
 type FeedTab = 'ranking' | 'new' | 'search' | 'official_all'
 type RankingMode = 'daily' | 'total'
@@ -188,6 +189,7 @@ interface AuthorResponse extends FeedResponse {
   userCustomMusicScoreAuthorProfile?: AuthorProfile
 }
 
+const { characterName } = useCharacterName()
 const GAME_API_HOST = 'https://api.unipjsk.com'
 const GAME_SCORE_BLOB_FULL_BASE = '/blob/custom-music-score/full'
 const CHART_PLAYBACK_HOST = import.meta.env.VITE_CUSTOM_SCORE_3D_PREVIEW_URL || 'https://chartview.unipjsk.com'
@@ -859,7 +861,7 @@ function getVocalSingers(vocal: MusicVocal, separator = '・'): string {
   return vocal.characters.map((item) => {
     if (item.characterType === 'game_character') {
       const character = characters.value.find((candidate) => candidate.id === item.characterId)
-      if (character) return `${character.firstName || ''}${character.givenName}`
+      if (character) return characterName(character)
     } else if (item.characterType === 'outside_character') {
       const outsideCharacter = outsideCharacters.value.find((candidate) => candidate.id === item.characterId)
       if (outsideCharacter) return outsideCharacter.name

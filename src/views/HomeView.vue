@@ -448,7 +448,7 @@ onMounted(async () => {
                 />
               </span>
               <span class="border-t border-base-300 px-2.5 py-1.5">
-                <span class="block truncate text-xs font-medium group-hover:text-primary" :title="gacha.name">{{ gacha.name }}</span>
+                <span class="block truncate text-xs font-medium group-hover:text-primary" :title="gacha.name"><ZhText :text="gacha.name" table="gachas" path="name" sub-class="font-normal" /></span>
                 <span class="block text-xs text-base-content/50">剩 {{ durationText(gacha.endAt - now) }}</span>
               </span>
             </RouterLink>

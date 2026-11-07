@@ -11,6 +11,7 @@ import { useSettingsStore } from '@/stores/settings'
 import type { GameCharacterData } from '@/types/master'
 import ZhText from '@/components/ZhText.vue'
 import { useZh } from '@/composables/useZh'
+import { useCharacterName } from '@/composables/useCharacterName'
 
 interface AreaData {
   id: number
@@ -74,6 +75,7 @@ interface UpgradeCost {
   quantity: number
 }
 
+const { characterName } = useCharacterName()
 const masterStore = useMasterStore()
 const settingsStore = useSettingsStore()
 const zhAreaItems = useZh('areaItems')
@@ -216,7 +218,7 @@ function getTargetLabel(item: AreaItem): string {
   const level = getLevel(item, 1)
   if (level?.targetGameCharacterId) {
     const character = characterMap.value.get(level.targetGameCharacterId)
-    return character ? `${character.firstName || ''}${character.givenName}` : `角色 #${level.targetGameCharacterId}`
+    return character ? characterName(character) : `角色 #${level.targetGameCharacterId}`
   }
   if (level?.targetUnit && level.targetUnit !== 'any') return unitLabel(level.targetUnit)
   if (level?.targetCardAttr && level.targetCardAttr !== 'any') return attrLabel(level.targetCardAttr)

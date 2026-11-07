@@ -9,6 +9,7 @@ import SekaiCard from '@/components/SekaiCard.vue'
 import { useAccountStore } from '@/stores/account'
 import { useMasterStore } from '@/stores/master'
 import { useZh } from '@/composables/useZh'
+import { useCharacterName } from '@/composables/useCharacterName'
 
 interface Card {
   id: number
@@ -46,6 +47,7 @@ interface UserCard {
 type OwnershipFilter = 'all' | 'owned' | 'missing'
 type ProgressFilter = 'all' | 'story_unread' | 'untrained' | 'not_maxed'
 
+const { characterName: formatCharacterName, characterSearch } = useCharacterName()
 const masterStore = useMasterStore()
 const zhCards = useZh('cards')
 const accountStore = useAccountStore()
@@ -168,7 +170,7 @@ const filteredCards = computed(() => {
     .filter(card => {
       if (!query) return true
       const character = characterMap.value.get(card.characterId)
-      return [card.id, zhCards.searchText('prefix', card.prefix), character?.firstName, character?.givenName]
+      return [card.id, zhCards.searchText('prefix', card.prefix), characterSearch(character)]
         .some(value => String(value || '').toLocaleLowerCase().includes(query))
     })
     .sort((a, b) => {
@@ -197,7 +199,7 @@ const isSelectedFullCollection = computed(() => Boolean(
 ))
 
 function characterName(character?: Character): string {
-  return character ? `${character.firstName || ''}${character.givenName}` : ''
+  return character ? formatCharacterName(character) : ''
 }
 
 function characterIcon(characterId: number): string {

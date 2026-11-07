@@ -7,6 +7,7 @@ import PageHeader from '@/components/PageHeader.vue'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
 import { cardImageVariant } from '@/utils/card'
+import { useCharacterName } from '@/composables/useCharacterName'
 
 type CalendarCategory = 'event' | 'gacha' | 'music' | 'virtual_live' | 'login_bonus' | 'birthday'
 
@@ -119,6 +120,7 @@ interface CalendarDay {
   entries: CalendarEntry[]
 }
 
+const { characterName: formatCharacterName } = useCharacterName()
 const masterStore = useMasterStore()
 const settingsStore = useSettingsStore()
 const today = new Date()
@@ -170,7 +172,7 @@ function monthKey(date: Date): string {
 
 function characterName(characterId: number): string {
   const character = characters.value.find(row => row.id === characterId)
-  return character ? `${character.firstName || ''}${character.givenName}` : `角色 #${characterId}`
+  return character ? formatCharacterName(character) : `角色 #${characterId}`
 }
 
 function characterIcon(characterId: number): string {

@@ -14,6 +14,7 @@ import type { GameCharacterData } from '@/types/master'
 import { readQueryPage, readQueryString, replaceListQuery } from '@/utils/routeQuery'
 import ZhText from '@/components/ZhText.vue'
 import { useZh } from '@/composables/useZh'
+import { useCharacterName } from '@/composables/useCharacterName'
 
 interface HonorLevel {
   level: number
@@ -74,6 +75,7 @@ interface GameCharacterUnit {
 
 type HonorTab = 'normal' | 'bonds'
 
+const { characterName } = useCharacterName()
 const route = useRoute()
 const router = useRouter()
 const masterStore = useMasterStore()
@@ -318,7 +320,7 @@ function openHonor(honor: HonorData) {
 function getCharacterNameByUnitId(unitId: number): string {
   const characterId = characterUnitMap.value.get(unitId)?.gameCharacterId
   const character = characterId ? characterMap.value.get(characterId) : undefined
-  return character ? `${character.firstName || ''}${character.givenName}` : `角色单元 #${unitId}`
+  return character ? characterName(character) : `角色单元 #${unitId}`
 }
 
 function firstWordId(honor: BondsHonor): number {
@@ -451,7 +453,7 @@ onMounted(async () => {
             </label>
             <select v-model.number="selectedBondsCharacter" class="select select-bordered w-full min-w-0 max-w-full">
               <option :value="0">全部角色</option>
-              <option v-for="character in characterOptions" :key="character.id" :value="character.id">{{ character.firstName || '' }}{{ character.givenName }}</option>
+              <option v-for="character in characterOptions" :key="character.id" :value="character.id">{{ characterName(character) }}</option>
             </select>
             <select v-model="selectedBondsRarity" class="select select-bordered w-full min-w-0 max-w-full">
               <option value="">全部稀有度</option>

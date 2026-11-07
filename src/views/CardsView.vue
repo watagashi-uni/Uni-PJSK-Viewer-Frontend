@@ -16,6 +16,7 @@ import Pagination from '@/components/Pagination.vue'
 import SekaiCard from '@/components/SekaiCard.vue'
 import AccountSelector from '@/components/AccountSelector.vue'
 import ZhText from '@/components/ZhText.vue'
+import { useCharacterName } from '@/composables/useCharacterName'
 
 interface Card {
   id: number
@@ -46,6 +47,7 @@ interface Skill {
   skillEffects: SkillEffect[]
 }
 
+const { characterName } = useCharacterName()
 const route = useRoute()
 const router = useRouter()
 const masterStore = useMasterStore()
@@ -215,7 +217,7 @@ const characterOptions = computed(() => {
     .sort((a, b) => a.id - b.id)
     .map(chara => ({
       value: chara.id,
-      label: (chara.firstName || '') + chara.givenName,
+      label: characterName(chara),
       icon: `/img/chr_ts/chr_ts_90_${chara.id}.png`,
       count: counts.get(chara.id) || 0,
     }))
@@ -322,7 +324,7 @@ const paginatedCards = computed(() => {
 function getCharaName(characterId: number): string {
   const chara = characters.value.find(c => c.id === characterId)
   if (!chara) return ''
-  return (chara.firstName || '') + chara.givenName
+  return characterName(chara)
 }
 
 // 判断是否为剧透内容

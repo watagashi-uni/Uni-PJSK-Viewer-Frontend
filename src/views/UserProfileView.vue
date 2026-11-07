@@ -23,7 +23,9 @@ import type {
 } from '@/types/profile'
 import PageHeader from '@/components/PageHeader.vue'
 import { difficultyStyle } from '@/utils/difficulty'
+import { useCharacterName } from '@/composables/useCharacterName'
 
+const { characterName } = useCharacterName()
 const masterStore = useMasterStore()
 const accountStore = useAccountStore()
 const settingsStore = useSettingsStore()
@@ -378,7 +380,7 @@ const charaNameByGameCharacterId = computed(() => {
   for (const chara of gameCharacters.value) {
     const id = Number(chara.id)
     if (!Number.isFinite(id)) continue
-    map.set(id, `${chara.firstName || ''}${chara.givenName}`)
+    map.set(id, characterName(chara))
   }
   return map
 })

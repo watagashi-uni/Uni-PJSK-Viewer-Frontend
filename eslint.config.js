@@ -30,6 +30,6 @@ export default tseslint.config(
         },
     },
     {
-        ignores: ['dist/**', 'node_modules/**', 'src/vendor/**', 'public/wasm/**', 'public/basis/**', '.gitignore', '*.config.js', '*.config.ts'],
+        ignores: ['dist/**', 'dist-story-preview/**', 'node_modules/**', 'src/vendor/**', 'public/wasm/**', 'public/basis/**', '.gitignore', '*.config.js', '*.config.ts'],
     }
 );

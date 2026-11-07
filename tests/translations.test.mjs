@@ -126,3 +126,36 @@ test('stories use the index on demand and drop replaced files', async () => {
   assert.deepEqual((await api.loadZhStory('event_1_01')).lines, ['修订'])
   assert.deepEqual(requests, ['version.json', 's/index.s2.json', 's/event_1_01.a2.json'])
 })
+
+test('the store loads split field files only for the fields that are looked up', async () => {
+  const { createRequire } = await import('node:module')
+  const require = createRequire(import.meta.url)
+  const { createPinia } = require('pinia')
+  const storeSource = readFileSync(new URL('../src/stores/translations.ts', import.meta.url), 'utf8')
+  const storeCode = ts.transpileModule(storeSource, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText
+  const loaded = []
+  const files = {
+    gachas: { o: { name: { 'ガチャ': '招募' } }, a: {} },
+    'gachas~gachaInformation.summary': { o: {}, a: { 'gachaInformation.summary': { '説明': '说明' } } },
+  }
+  const deps = {
+    '@/api/translations': {
+      loadZhVersion: async () => ({ v: 2, d: { gachas: 'h1', 'gachas~gachaInformation.summary': 'h2' }, s: '' }),
+      loadZhTable: async name => { loaded.push(name); return files[name] ?? null },
+      clearZhCache: async () => {},
+    },
+  }
+  const module = { exports: {} }
+  new Function('require', 'module', 'exports', storeCode)(name => deps[name] ?? require(name), module, module.exports)
+  const store = module.exports.useTranslationStore(createPinia())
+  const settle = () => new Promise(resolve => setTimeout(resolve, 0))
+  store.ensure('gachas', 'name')
+  await settle()
+  assert.deepEqual(store.lookup('gachas', 'name', 'ガチャ'), { text: '招募', ai: false })
+  assert.equal(store.lookup('gachas', 'gachaInformation.summary', '説明'), undefined)
+  assert.deepEqual(loaded, ['gachas'], 'a list page only needs the names file')
+  store.ensure('gachas', 'gachaInformation.summary')
+  await settle()
+  assert.deepEqual(store.lookup('gachas', 'gachaInformation.summary', '説明'), { text: '说明', ai: true })
+  assert.deepEqual(loaded, ['gachas', 'gachas~gachaInformation.summary'])
+})

@@ -6,7 +6,9 @@ import SekaiProfileHonor from '@/components/SekaiProfileHonor.vue'
 import { RefreshCw } from 'lucide-vue-next'
 import { request } from '@/utils/request'
 import type { EventData, CardData } from '@/types/master'
+import { useCharacterName } from '@/composables/useCharacterName'
 
+const { characterName } = useCharacterName()
 const masterStore = useMasterStore()
 
 interface CharacterData {
@@ -236,7 +238,7 @@ function parseWorldBloomChapterRankings(chapters: any[] | undefined, rankingKey:
 function getCharacterName(characterId: number) {
   const character = charactersMap.value[characterId]
   if (!character) return `角色 ${characterId}`
-  return `${character.firstName || ''}${character.givenName}`
+  return characterName(character)
 }
 
 function getCharacterIcon(characterId: number) {

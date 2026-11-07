@@ -23,6 +23,7 @@ import { renderSusToSvg, type Sus2ImgFrontendResult } from '@/vendor/sekai-sus2i
 import ChartJudgmentPreview from '@/components/ChartJudgmentPreview.vue'
 import { DIFFICULTY_LABELS, difficultyBackground } from '@/utils/difficulty'
 import { trackEvent } from '@/utils/analytics'
+import { useCharacterName } from '@/composables/useCharacterName'
 
 interface Music {
   id: number
@@ -138,6 +139,7 @@ type PreviewPayload = {
   difficulty?: string | number
 }
 
+const { characterName } = useCharacterName()
 const route = useRoute()
 const router = useRouter()
 const masterStore = useMasterStore()
@@ -639,7 +641,7 @@ function getVocalSingers(vocal: MusicVocal, separator = '・'): string {
     if (c.characterType === 'game_character') {
       const char = characters.value.find(ch => ch.id === c.characterId)
       if (char) {
-        return (char.firstName || '') + char.givenName
+        return characterName(char)
       }
     } else if (c.characterType === 'outside_character') {
       const outsideChar = outsideCharacters.value.find(ch => ch.id === c.characterId)
@@ -1137,7 +1139,7 @@ const musicVideoVersionLabel = computed(() => {
 function getCharacterName(characterId: number): string {
   const character = characters.value.find(row => row.id === characterId)
   if (!character) return `角色 #${characterId}`
-  return `${character.firstName || ''}${character.givenName}`
+  return characterName(character)
 }
 
 function getCharacterIcon(characterId: number): string {

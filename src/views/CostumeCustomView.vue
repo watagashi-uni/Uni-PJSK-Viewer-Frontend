@@ -28,6 +28,7 @@ import type {
 } from '@/types/costume'
 import PageHeader from '@/components/PageHeader.vue'
 import { useZh } from '@/composables/useZh'
+import { useCharacterName } from '@/composables/useCharacterName'
 
 interface Character {
   id: number
@@ -53,6 +54,7 @@ interface PickerItem {
   variant: CostumeColorVariant
 }
 
+const { characterName: formatCharacterName } = useCharacterName()
 const masterStore = useMasterStore()
 const settingsStore = useSettingsStore()
 const zhCostumes = useZh('costume3ds')
@@ -193,7 +195,7 @@ const bodyUnitOptions = computed(() => unitsFor(effectiveBodyCharacterId.value))
 
 function characterName(character: Character | null | undefined): string {
   if (!character) return ''
-  return `${character.firstName ?? ''}${character.givenName}`
+  return formatCharacterName(character)
 }
 
 function itemList(partType: PickerPart): PickerItem[] {

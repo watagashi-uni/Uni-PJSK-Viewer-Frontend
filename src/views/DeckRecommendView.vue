@@ -24,6 +24,7 @@ import type { EventData, MusicData, CardData } from '@/types/master'
 import PageHeader from '@/components/PageHeader.vue'
 import { difficultyStyle } from '@/utils/difficulty'
 import { trackEvent } from '@/utils/analytics'
+import { useCharacterName } from '@/composables/useCharacterName'
 
 interface MusicDiffData {
   id: number
@@ -96,6 +97,7 @@ interface RecommendDeckResult {
 }
 
 // ==================== 状态 ====================
+const { characterName } = useCharacterName()
 const userId = ref('')
 const mode = ref<'1' | '2'>('2') // 1=挑战, 2=活动
 const calculatorEngine = ref<'moesekai' | '33'>('moesekai')
@@ -190,7 +192,7 @@ const showSupportCharacter = computed(() =>
 
 function getCharacterName(c: CharacterData | null): string {
   if (!c) return ''
-  return c.firstName ? `${c.firstName}${c.givenName}` : c.givenName
+  return characterName(c)
 }
 
 
