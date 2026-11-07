@@ -3,6 +3,7 @@ import { computed, ref, onMounted, onUnmounted, watch } from 'vue'
 import { useMasterStore } from '@/stores/master'
 import SekaiCard from '@/components/SekaiCard.vue'
 import SekaiProfileHonor from '@/components/SekaiProfileHonor.vue'
+import LazyMount from '@/components/LazyMount.vue'
 import { RefreshCw } from 'lucide-vue-next'
 import { request } from '@/utils/request'
 import type { EventData, CardData } from '@/types/master'
@@ -426,11 +427,13 @@ function getHonor(honors: any[], seq: number) {
                 <template v-for="i in 3" :key="i">
                   <!-- 有数据则渲染 -->
                   <div v-if="getHonor(row.userProfileHonors, i)" class="h-6">
-                    <SekaiProfileHonor 
-                      :data="getHonor(row.userProfileHonors, i)" 
-                      :user-honor-missions="row.userHonorMissions"
-                      class="h-full w-auto block"
-                    />
+                    <LazyMount :aspect="i === 1 ? 380 / 80 : 180 / 80">
+                      <SekaiProfileHonor 
+                        :data="getHonor(row.userProfileHonors, i)" 
+                        :user-honor-missions="row.userHonorMissions"
+                        class="h-full w-auto block"
+                      />
+                    </LazyMount>
                   </div>
                   <!-- 无数据渲染占位符 Frame -->
                   <div v-else class="h-6">
@@ -487,11 +490,13 @@ function getHonor(honors: any[], seq: number) {
                       <template v-for="i in 3" :key="i">
                         <!-- 有数据则渲染 -->
                         <div v-if="getHonor(row.userProfileHonors, i)" class="h-full">
-                          <SekaiProfileHonor 
-                            :data="getHonor(row.userProfileHonors, i)" 
-                            :user-honor-missions="row.userHonorMissions"
-                            class="h-full w-auto block"
-                          />
+                          <LazyMount :aspect="i === 1 ? 380 / 80 : 180 / 80">
+                            <SekaiProfileHonor 
+                              :data="getHonor(row.userProfileHonors, i)" 
+                              :user-honor-missions="row.userHonorMissions"
+                              class="h-full w-auto block"
+                            />
+                          </LazyMount>
                         </div>
                         <!-- 无数据渲染占位符 Frame -->
                         <div v-else class="h-full">

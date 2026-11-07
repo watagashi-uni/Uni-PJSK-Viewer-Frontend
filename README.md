@@ -47,8 +47,6 @@ Variable notes:
 - `VITE_TOOLBOX_OAUTH_CLIENT_ID`: OAuth client id for toolbox game-data read access; the server-side client should allow both `game-data:read` and `offline_access` so the browser can keep a refresh token
 - `VITE_PROFILE_API_BASE_URL`, `VITE_SUITE_API_BASE_URL`: user profile and suite data API base URLs
 
-If you want to deploy your own backend, you can refer to [API_README.md](API_README.md).
-
 ## Contributing
 
 1. Create a branch: `git checkout -b feature/<name>`
