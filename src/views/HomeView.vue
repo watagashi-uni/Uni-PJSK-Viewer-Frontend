@@ -8,6 +8,7 @@ import {
   CalendarDays, Zap, BookOpen,
 } from 'lucide-vue-next'
 import AssetImage from '@/components/AssetImage.vue'
+import EventBanner from '@/components/EventBanner.vue'
 import StoryPlayerPromo from '@/components/StoryPlayerPromo.vue'
 import type { EventData, MusicData } from '@/types/master'
 
@@ -386,11 +387,7 @@ onMounted(async () => {
           <div v-if="isLoading" class="skeleton h-56 w-full rounded-box"></div>
           <article v-else-if="currentEvent" class="overflow-hidden rounded-box border border-base-300 bg-base-100 md:grid md:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
             <RouterLink :to="`/events/${currentEvent.id}`" class="block self-center bg-base-200 md:m-3 md:overflow-hidden md:rounded-lg" :aria-label="currentEvent.name">
-              <AssetImage
-                :src="`${assetsHost}/startapp/home/banner/${currentEvent.assetbundleName}/${currentEvent.assetbundleName}.png`"
-                :alt="currentEvent.name"
-                class="aspect-[122/52] w-full object-cover"
-              />
+              <EventBanner :event="currentEvent" :assets-host="assetsHost" />
             </RouterLink>
             <div class="flex flex-col gap-3 p-4 md:pl-1">
               <div class="flex flex-wrap items-center gap-2 text-xs">

@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
 import { Calendar, Trophy, Users, EyeOff, Globe } from 'lucide-vue-next'
-import AssetImage from '@/components/AssetImage.vue'
+import EventBanner from '@/components/EventBanner.vue'
 import type { EventData } from '@/types/master'
 import { pushListPage, readQueryPage, readQueryString, replaceListQuery } from '@/utils/routeQuery'
 import PageHeader from '@/components/PageHeader.vue'
@@ -87,11 +87,6 @@ function formatDate(timestamp: number): string {
     month: '2-digit',
     day: '2-digit',
   })
-}
-
-// 获取 banner 图片 URL
-function getBannerUrl(assetbundleName: string): string {
-  return `${assetsHost.value}/startapp/home/banner/${assetbundleName}/${assetbundleName}.png`
 }
 
 async function loadData() {
@@ -187,11 +182,7 @@ onMounted(loadData)
       >
         <!-- Banner 图片 -->
         <figure class="relative">
-          <AssetImage 
-            :src="getBannerUrl(event.assetbundleName)" 
-            :alt="event.name"
-            class="w-full aspect-[122/52] object-cover"
-          />
+          <EventBanner :event="event" :assets-host="assetsHost" />
           
           <!-- 简单角标 (替代之前的内部遮罩) -->
           <div v-if="event.startAt > Date.now()" class="absolute top-2 left-2 z-20 badge badge-warning gap-1 font-bold shadow-md">

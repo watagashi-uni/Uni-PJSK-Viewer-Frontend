@@ -12,10 +12,12 @@ import {
 } from 'lucide-vue-next'
 import SekaiCard from '@/components/SekaiCard.vue'
 import AssetImage from '@/components/AssetImage.vue'
+import EventImagePlaceholder from '@/components/EventImagePlaceholder.vue'
 import SekaiHonor from '@/components/SekaiHonor.vue'
 import AccountSelector from '@/components/AccountSelector.vue'
 import type { EventData } from '@/types/master'
 import { cardImageVariant } from '@/utils/card'
+import { getEventBannerUrl, isTestEvent } from '@/utils/event'
 import ZhText from '@/components/ZhText.vue'
 import { useResourceZh } from '@/composables/useResourceZh'
 import StorySummaryPanel from '@/components/StorySummaryPanel.vue'
@@ -199,7 +201,8 @@ const exchangeQuantities = ref<Record<number, number>>({})
 const manualBadgeCount = ref(0)
 
 const isLoading = ref(true)
-const currentImageIndex = ref(0)
+const selectedImageLabel = ref('Logo')
+const failedImageUrls = ref(new Set<string>())
 
 const selectedUserId = computed({
   get: () => accountStore.currentUserId || '',
@@ -336,15 +339,30 @@ const eventStatus = computed(() => {
 
 // 获取活动图片列表
 const eventImages = computed(() => {
-  if (!event.value) return []
+  if (!event.value?.assetbundleName) return []
   const assetName = event.value.assetbundleName
+  const bannerUrl = getEventBannerUrl(event.value, assetsHost.value)
   return [
     { label: 'Logo', url: `${assetsHost.value}/ondemand/event/${assetName}/logo/logo.png` },
     { label: '背景', url: `${assetsHost.value}/ondemand/event/${assetName}/screen/bg.png` },
     { label: '角色', url: `${assetsHost.value}/ondemand/event/${assetName}/screen/character.png` },
-    { label: 'Banner', url: `${assetsHost.value}/startapp/home/banner/${assetName}/${assetName}.png` },
+    ...(bannerUrl ? [{ label: 'Banner', url: bannerUrl }] : []),
   ]
 })
+
+const availableEventImages = computed(() => eventImages.value.filter(img => !failedImageUrls.value.has(img.url)))
+const currentImage = computed(() => availableEventImages.value.find(img => img.label === selectedImageLabel.value)
+  ?? availableEventImages.value[0])
+
+watch([() => event.value?.id, assetsHost], () => {
+  selectedImageLabel.value = 'Logo'
+  failedImageUrls.value = new Set()
+})
+
+function markEventImageFailed(error: Event) {
+  const url = (error.target as HTMLImageElement).getAttribute('src')
+  if (url && eventImages.value.some(img => img.url === url)) failedImageUrls.value.add(url)
+}
 
 // 获取活动加成属性
 const bonusAttr = computed(() => {
@@ -490,11 +508,18 @@ function useAfterTrainingStar(rarity: string): boolean {
 
 // 切换图片
 function nextImage() {
-  currentImageIndex.value = (currentImageIndex.value + 1) % eventImages.value.length
+  moveImage(1)
 }
 
 function prevImage() {
-  currentImageIndex.value = (currentImageIndex.value - 1 + eventImages.value.length) % eventImages.value.length
+  moveImage(-1)
+}
+
+function moveImage(offset: number) {
+  const images = availableEventImages.value
+  if (images.length < 2) return
+  const index = images.findIndex(img => img.url === currentImage.value?.url)
+  selectedImageLabel.value = images[(index + offset + images.length) % images.length]!.label
 }
 
 function formatNumber(value: number): string {
@@ -674,11 +699,8 @@ const pageDescription = computed(() => {
 })
 
 const pageImage = computed(() => {
-  if (eventImages.value.length > 0) {
-    const banner = eventImages.value.find((img: any) => img.label === 'Banner')
-    return banner ? banner.url : eventImages.value[0]?.url || ''
-  }
-  return ''
+  const images = availableEventImages.value
+  return images.find(img => img.label === 'Banner')?.url ?? images[0]?.url ?? ''
 })
 
 useSeoMeta({
@@ -881,14 +903,19 @@ watch(() => route.params.id, loadData)
           <h3 class="text-lg font-medium mb-3">活动视觉</h3>
           <div class="relative">
             <div class="flex justify-center items-center min-h-[300px] bg-base-200 rounded-lg overflow-hidden">
-              <AssetImage 
-                :src="eventImages[currentImageIndex]?.url ?? ''"
-                :alt="eventImages[currentImageIndex]?.label ?? ''"
+              <AssetImage
+                v-if="currentImage"
+                :key="currentImage.url"
+                :src="currentImage.url"
+                :alt="currentImage.label"
                 class="max-w-full max-h-[500px] object-contain"
+                @error="markEventImageFailed"
               />
+              <EventImagePlaceholder v-else :test-event="isTestEvent(event)" class="min-h-[300px] w-full" />
             </div>
             
             <button 
+              v-if="availableEventImages.length > 1"
               class="btn btn-circle btn-sm absolute! left-2 top-1/2 -translate-y-1/2"
               style="position: absolute;"
               type="button"
@@ -898,6 +925,7 @@ watch(() => route.params.id, loadData)
               <ChevronLeft class="w-4 h-4" />
             </button>
             <button 
+              v-if="availableEventImages.length > 1"
               class="btn btn-circle btn-sm absolute! right-2 top-1/2 -translate-y-1/2"
               style="position: absolute;"
               type="button"
@@ -908,13 +936,13 @@ watch(() => route.params.id, loadData)
             </button>
           </div>
           
-          <div class="flex justify-center gap-2 mt-4">
+          <div v-if="availableEventImages.length" class="flex justify-center gap-2 mt-4">
             <button 
-              v-for="(img, idx) in eventImages" 
-              :key="idx"
+              v-for="img in availableEventImages"
+              :key="img.url"
               class="btn btn-sm"
-              :class="idx === currentImageIndex ? 'btn-primary' : 'btn-ghost'"
-              @click="currentImageIndex = idx"
+              :class="img.url === currentImage?.url ? 'btn-primary' : 'btn-ghost'"
+              @click="selectedImageLabel = img.label"
             >
               {{ img.label }}
             </button>
