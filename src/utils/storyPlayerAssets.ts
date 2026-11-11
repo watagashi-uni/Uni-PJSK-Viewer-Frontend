@@ -14,6 +14,7 @@ export interface StoryPlayerIndex {
   motions: Record<string, Record<string, string>>
   backgrounds: Record<string, string>
   bgm: Record<string, string>
+  bgmSequences?: Record<string, string>
   se: Record<string, string>
   movies: Record<string, string>
   specialScenarios: string[]
@@ -27,6 +28,18 @@ export async function loadStoryPlayerIndex(signal?: AbortSignal): Promise<StoryP
   if (!response.ok) throw new Error('场景资源目录暂不可用，可切换到文本阅读')
   const index = await response.json() as StoryPlayerIndex
   if (index.version !== 1 || !index.models || !index.motions) throw new Error('场景资源目录格式不支持')
+  const sequences = await fetch(storyAssetUrl('story-player/bgm/index.json'), {
+    signal: signal ? AbortSignal.any([signal, timeout]) : timeout, cache: 'no-cache',
+  })
+  if (sequences.status !== 404) {
+    if (!sequences.ok) throw new Error('分段音乐目录暂不可用，可切换到文本阅读')
+    const paths: unknown = await sequences.json()
+    if (!paths || typeof paths !== 'object' || Array.isArray(paths)
+      || Object.values(paths).some(p => typeof p !== 'string' || !/^[\w-]+\/sequence\.json$/.test(p))) {
+      throw new Error('分段音乐目录格式不支持')
+    }
+    index.bgmSequences = paths as Record<string, string>
+  }
   return index
 }
 
@@ -47,6 +60,7 @@ export function storyPlayerResolver(index: StoryPlayerIndex, scenarioUrl: string
     },
     background: id => fromIndex(index.backgrounds, id),
     bgm: id => id === 'bgm00000' ? null : fromIndex(index.bgm, id),
+    bgmSequence: id => index.bgmSequences?.[id] ? storyAssetUrl(`story-player/bgm/${index.bgmSequences[id]}`) : null,
     se: id => fromIndex(index.se, id),
     voice: (scenarioId, voiceId, ctx) => {
       const local = voicePaths(scenarioId, voiceId)

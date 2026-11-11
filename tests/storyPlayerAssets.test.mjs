@@ -69,3 +69,25 @@ test('shared voice candidates use appearing character master rows, not the cue s
   assert.equal(assets.voice('022057_rin02', 'partvoice_96_022_band', { scenario: { AppearCharacters: [] } }).length, 3)
   assert.deepEqual(assets.voice('../bad', 'partvoice_96_022_band', ctx), [])
 })
+
+test('block sequence URLs use the separate descriptor index and retain flat BGM paths', () => {
+  const assets = storyPlayerResolver({models:{},motions:{},backgrounds:{},bgm:{bgm_test:'sound/bgm_test.mp3'},se:{},movies:{},
+    bgmSequences:{bgm_test:'bgm_test/sequence.json'}}, '')
+  assert.equal(assets.bgm('bgm_test'),'https://assets.unipjsk.com/sound/bgm_test.mp3')
+  assert.equal(assets.bgmSequence('bgm_test'),'https://assets.unipjsk.com/story-player/bgm/bgm_test/sequence.json')
+  assert.equal(assets.bgmSequence('ordinary'),null)
+})
+test('sequence index is loaded separately; malformed paths and failures are surfaced', async () => {
+  const original=globalThis.fetch
+  const index={version:1,models:{},motions:{}}
+  try {
+    globalThis.fetch=async url=>new Response(JSON.stringify(url.endsWith('bgm/index.json')?{test:'test/sequence.json'}:index))
+    assert.deepEqual((await loadStoryPlayerIndex()).bgmSequences,{test:'test/sequence.json'})
+    globalThis.fetch=async url=>url.endsWith('bgm/index.json')?new Response('',{status:404}):new Response(JSON.stringify(index))
+    assert.equal((await loadStoryPlayerIndex()).bgmSequences,undefined)
+    globalThis.fetch=async url=>new Response(JSON.stringify(url.endsWith('bgm/index.json')?{test:'../secret.json'}:index))
+    await assert.rejects(loadStoryPlayerIndex(),/分段音乐目录格式/)
+    globalThis.fetch=async url=>url.endsWith('bgm/index.json')?new Response('',{status:503}):new Response(JSON.stringify(index))
+    await assert.rejects(loadStoryPlayerIndex(),/分段音乐目录暂不可用/)
+  }finally{globalThis.fetch=original}
+})
