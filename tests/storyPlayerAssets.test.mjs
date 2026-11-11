@@ -7,7 +7,8 @@ const compile = file => ts.transpileModule(readFileSync(new URL(file, import.met
 }).outputText
 const url = source => `data:text/javascript;base64,${Buffer.from(source).toString('base64')}`
 const playback = url(compile('../src/utils/storyPlayback.ts'))
-const source = compile('../src/utils/storyPlayerAssets.ts').replace("'./storyPlayback'", JSON.stringify(playback))
+const sharedVoices = url(compile('../node_modules/pjsk-scenario-player/src/scenario/shared-voices.ts'))
+const source = compile('../src/utils/storyPlayerAssets.ts').replace("'./storyPlayback'", JSON.stringify(playback)).replace("'pjsk-scenario-player'", JSON.stringify(sharedVoices))
 const { storyPlayerResolver, parsePlayerScenario, loadStoryPlayerIndex } = await import(url(source))
 const { buildStoryFrames } = await import(playback)
 
@@ -53,4 +54,18 @@ test('index failures are surfaced and an aborted load cannot silently continue',
     controller.abort()
     await assert.rejects(loadStoryPlayerIndex(controller.signal), { name: 'AbortError' })
   } finally { globalThis.fetch = fetch }
+})
+
+
+test('shared voice candidates use appearing character master rows, not the cue suffix', () => {
+  const assets = storyPlayerResolver({ models: {}, motions: {}, backgrounds: {}, bgm: {}, se: {}, movies: {} }, '',
+    [{ id: 306, characterId: 22, characterType: 'game_character', assetName: 'v2_22rin', unit: 'idol' }],
+    [{ id: 22, unit: 'piapro' }])
+  const ctx = { scenario: { AppearCharacters: [{ Character2dId: 306 }] } }
+  const urls = assets.voice('022057_rin02', 'partvoice_96_022_band', ctx)
+  assert.equal(urls.length, 5)
+  assert.match(urls[0], /card_scenario/)
+  assert.match(urls.at(-1), /part_voice_v2_22rin_idol\/partvoice_96_022_band.mp3$/)
+  assert.equal(assets.voice('022057_rin02', 'partvoice_96_022_band', { scenario: { AppearCharacters: [] } }).length, 3)
+  assert.deepEqual(assets.voice('../bad', 'partvoice_96_022_band', ctx), [])
 })

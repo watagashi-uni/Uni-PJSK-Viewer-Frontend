@@ -1,4 +1,4 @@
-import type { AssetResolver, ModelManifestEntry, ScenarioSceneData } from 'pjsk-scenario-player'
+import { sharedVoicePaths, type VoiceCharacter2d, type VoiceGameCharacter, type AssetResolver, type ModelManifestEntry, type ScenarioSceneData } from 'pjsk-scenario-player'
 import { storyAssetUrl, voicePaths } from './storyPlayback'
 
 export interface StoryPlayerModel extends ModelManifestEntry {
@@ -32,7 +32,7 @@ export async function loadStoryPlayerIndex(signal?: AbortSignal): Promise<StoryP
 
 // Every URL stays on the existing public asset origin. The R2 completion
 // follower regenerates this index so new costumes need no frontend rebuild.
-export function storyPlayerResolver(index: StoryPlayerIndex, scenarioUrl: string): AssetResolver {
+export function storyPlayerResolver(index: StoryPlayerIndex, scenarioUrl: string, characters: VoiceCharacter2d[] = [], gameCharacters: VoiceGameCharacter[] = []): AssetResolver {
   const fromIndex = (paths: Record<string, string>, id: string) => paths[id] ? storyAssetUrl(paths[id]) : null
   return {
     scenario: () => scenarioUrl,
@@ -48,10 +48,13 @@ export function storyPlayerResolver(index: StoryPlayerIndex, scenarioUrl: string
     background: id => fromIndex(index.backgrounds, id),
     bgm: id => id === 'bgm00000' ? null : fromIndex(index.bgm, id),
     se: id => fromIndex(index.se, id),
-    voice: (scenarioId, voiceId) => [
-      ...voicePaths(scenarioId, voiceId),
-      ...(voicePaths(scenarioId, voiceId).length ? [`startapp/sound/scenario/voice/${scenarioId}/${voiceId}.mp3`] : []),
-    ].map(storyAssetUrl),
+    voice: (scenarioId, voiceId, ctx) => {
+      const local = voicePaths(scenarioId, voiceId)
+      if (!local.length) return []
+      return [...local, `startapp/sound/scenario/voice/${scenarioId}/${voiceId}.mp3`,
+        ...sharedVoicePaths(ctx?.scenario || {}, voiceId, characters, gameCharacters),
+      ].map(storyAssetUrl)
+    },
     movie: name => fromIndex(index.movies, name),
     // Converted particle effects and extracted UI are optional in the engine.
     fx: path => storyAssetUrl(`story-player/fx/${path}`),

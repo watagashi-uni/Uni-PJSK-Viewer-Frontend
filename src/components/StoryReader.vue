@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { BookOpen, ChevronLeft, ChevronRight, Copy, Film, Languages, Music2, Play, ScrollText, Search, Sparkles, Volume2, VolumeX, X } from 'lucide-vue-next'
-import type { PjskPlayer, ScenarioSceneData } from 'pjsk-scenario-player'
+import type { PjskPlayer, ScenarioSceneData, VoiceCharacter2d, VoiceGameCharacter } from 'pjsk-scenario-player'
 import { buildStoryFrames } from '@/utils/storyPlayback'
 import { loadStoryPlayerIndex, parsePlayerScenario, storyPlayerResolver } from '@/utils/storyPlayerAssets'
 import { attachStoryZhOverlay, trimFullStop, type StoryZhOverlay } from '@/utils/storyZhOverlay'
 import { loadZhStory, peekZhStorySource, type ZhStory, type ZhStorySource } from '@/api/translations'
+import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
 import ZhText from '@/components/ZhText.vue'
 
@@ -18,6 +19,7 @@ const props = withDefaults(defineProps<{
   synopsis?: string
 }>(), { episodeLabel: '', hasPrevious: false, hasNext: false, titleZh: '', synopsis: '' })
 const emit = defineEmits<{ close: []; previous: []; next: []; play: [] }>()
+const masterStore = useMasterStore()
 const scenario = shallowRef<ScenarioSceneData>()
 const frames = computed(() => scenario.value ? buildStoryFrames(scenario.value) : [])
 const stage = ref<HTMLElement>()
@@ -138,11 +140,17 @@ async function mountPlayer() {
   stageLoading.value = true
   stageError.value = ''
   try {
-    const [engine, assets] = await Promise.all([import('pjsk-scenario-player'), loadStoryPlayerIndex(controller.signal)])
+    const needsSharedVoices = scenario.value.TalkData.some(t => t.Voices?.some(v => v.VoiceId.startsWith('partvoice_')))
+      || scenario.value.SpecialEffectData.some(e => e.StringValSub?.startsWith('partvoice_'))
+    const [engine, assets, characters, gameCharacters] = await Promise.all([
+      import('pjsk-scenario-player'), loadStoryPlayerIndex(controller.signal),
+      needsSharedVoices ? masterStore.getMaster<VoiceCharacter2d>('character2ds') : Promise.resolve([]),
+      needsSharedVoices ? masterStore.getMaster<VoiceGameCharacter>('gameCharacters') : Promise.resolve([]),
+    ])
     await nextTick()
     if (current !== generation || disposed || !stage.value) return
     const instance = engine.createPlayer(stage.value, {
-      assets: storyPlayerResolver(assets, sourceUrl), models: assets.models,
+      assets: storyPlayerResolver(assets, sourceUrl, characters, gameCharacters), models: assets.models,
       autoplay: false, auto: auto.value, voice: voiceEnabled.value, locale: 'zh', fonts: false,
       volumes: { voice: volume.value, bgm: bgmEnabled.value ? volume.value * 0.4 : 0, se: volume.value },
       menu: ['fullscreen', 'auto', 'fast', 'hide', 'log'],
