@@ -29,7 +29,7 @@
     "lucide-vue-next": "^0.563.0",
     "pinia": "^3.0.4",
     "pixi.js": "^7.4.3",
-    "pjsk-scenario-player": "github:Team-Haruki/sekai-scenario-player#a3062b1451311813aa7fc3945389a4cb52f6ef32",
+    "pjsk-scenario-player": "github:Team-Haruki/sekai-scenario-player#9de8fc233af8fa318d85d6735d34749095a7ee9b",
     "sekai-calculator": "^0.19.2",
     "three": "^0.178.0",
     "vue": "^3.5.24",
