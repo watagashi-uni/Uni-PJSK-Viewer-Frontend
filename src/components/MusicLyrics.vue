@@ -654,7 +654,16 @@ onBeforeUnmount(() => {
 /* Sung text is solid, text still to come is faint, and the boundary sweeps across each timed unit. */
 .ly-row.active .ly-word {
   --p: -6%;
+  /* Safari lets a hairline of a text-clipped background leak along the edges of the box, which
+     showed as a line above and below the current lyric. The box is therefore made larger than
+     the glyphs (the padding and the negative margin cancel out, so nothing moves) and the
+     gradient is kept off its outermost pixels: there is nothing at the edges left to leak. */
+  margin-inline: -2px;
+  padding: 0.2em 2px;
   background-image: linear-gradient(to right, currentColor calc(var(--p) - 6%), color-mix(in srgb, currentColor 34%, transparent) calc(var(--p) + 6%));
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: calc(100% - 2px) calc(100% - 4px);
   background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
