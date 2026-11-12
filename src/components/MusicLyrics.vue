@@ -2,7 +2,7 @@
 import { ref, shallowRef, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { ChevronDown, Languages, LocateFixed } from 'lucide-vue-next'
 import {
-  linePerformerIds, loadSongLyrics, lyricGaps, lyricParts, lyricRuns, pieceProgress, wordProgress,
+  linePerformerIds, loadSongLyrics, lyricGaps, lyricParts, lyricRuns, pieceProgress, untimedFill, wordProgress,
   type LyricLine, type LyricWord, type SongLyrics,
 } from '@/api/lyrics'
 import { useSingerAvatars } from '@/composables/useSingerAvatars'
@@ -45,11 +45,17 @@ const ROW_STAGGER_MS = 46
 /** Phone-sized windows, where a line wraps into tall rows and only a few of them are in view. */
 const NARROW_QUERY = '(max-width: 899px)'
 
-interface RenderPart { text: string; word?: LyricWord; share?: [number, number]; avatars?: SingerAvatar[] }
-/** Text under a reading (drawn as ruby), or one piece of bare text. */
+interface RenderPart { text: string; word?: LyricWord; avatars?: SingerAvatar[] }
+/** When a piece of text fills on a word-timed line; `share` is its stretch of a unit a reading cut. */
+interface Fill { start: number; end: number; share?: [number, number] }
+interface Segment { text: string; fill?: Fill }
+/**
+ * Text under a reading (drawn as ruby), or one piece of bare text. A portrait is glued to
+ * `head`, the bit it must not be separated from when the row wraps; `tail` follows freely.
+ */
 type RenderRun =
-  | { kind: 'ruby'; reading: string; pieces: RenderPart[]; avatars?: SingerAvatar[] }
-  | { kind: 'text'; piece: RenderPart }
+  | { kind: 'ruby'; reading: string; segments: Segment[]; avatars?: SingerAvatar[]; timed: boolean }
+  | { kind: 'text'; avatars?: SingerAvatar[]; head: Segment[]; tail: Segment[] }
 interface LineItem { kind: 'line'; start: number; end: number; line: LyricLine; runs: RenderRun[]; singerKeys: string[] }
 interface GapItem { kind: 'gap'; start: number; end: number }
 type Item = LineItem | GapItem
@@ -74,8 +80,10 @@ let request = 0
 let frame = 0
 let resumeTimer: ReturnType<typeof setTimeout> | undefined
 let resizeObserver: ResizeObserver | undefined
-/** Timed words of the rows being sung, kept so each frame only touches those. */
-const painted = new Map<number, HTMLElement[]>()
+/** A filling element of a row being sung. A reading fills by the text under it. */
+interface Painted { el: HTMLElement; fill?: Fill; under?: { painted: Painted; weight: number }[]; value?: string }
+/** Filling elements of the rows being sung, kept so each frame only touches those. */
+const painted = new Map<number, Painted[]>()
 const rowMotion = new WeakMap<HTMLElement, Animation>()
 
 /** On/off switches remembered across visits; both start on. */
@@ -164,16 +172,31 @@ const items = computed<Item[]>(() => {
     }
     // Cut the parts where readings begin and end. A portrait stays at the head of its part;
     // one that would land inside a reading leads the whole reading instead.
+    // On a word-timed line every piece fills: a unit on its own clock, other text with its neighbours.
+    const timed = !!line.words?.length
     const runs: RenderRun[] = []
     let lastPart = -1
+    let offset = 0
     for (const run of lyricRuns(line, split)) {
       const pieces = run.pieces.map((piece) => {
         const avatars = piece.part !== lastPart ? parts[piece.part]!.avatars : undefined
         lastPart = piece.part
-        return { text: piece.text, word: piece.word, share: piece.share, avatars }
+        const from = offset
+        offset += piece.text.length
+        const fill: Fill | undefined = piece.word
+          ? { start: piece.word.start, end: piece.word.end, share: piece.share }
+          : timed ? untimedFill(line.words, from, offset) : undefined
+        return { text: piece.text, fill, word: piece.word, avatars }
       })
-      if (run.reading === undefined) runs.push({ kind: 'text', piece: pieces[0]! })
-      else runs.push({ kind: 'ruby', reading: run.reading, pieces, avatars: pieces.find(p => p.avatars)?.avatars })
+      if (run.reading !== undefined) {
+        runs.push({ kind: 'ruby', reading: run.reading, segments: pieces, avatars: pieces.find(p => p.avatars)?.avatars, timed })
+        continue
+      }
+      const piece = pieces[0]!
+      // A timed unit stays whole beside its portrait; other text only lends its first word.
+      const lead = !piece.avatars ? '' : piece.word ? piece.text : leadOf(piece.text)
+      const cut = (text: string): Segment[] => (text ? [{ text, fill: piece.fill }] : [])
+      runs.push({ kind: 'text', avatars: piece.avatars, head: cut(lead), tail: cut(piece.text.slice(lead.length)) })
     }
     result.push({ kind: 'line', start: line.start, end: line.end, line, runs, singerKeys })
   })
@@ -208,10 +231,7 @@ function tick(time: number) {
 function paint(time: number, active: number[]) {
   for (const [index, words] of painted) {
     if (active.includes(index)) continue
-    for (const word of words) {
-      word.style.removeProperty('--p')
-      delete word.dataset.p
-    }
+    for (const { el } of words) el.style.removeProperty('--p')
     rowElement(index)?.style.removeProperty('--gap-progress')
     painted.delete(index)
   }
@@ -220,7 +240,7 @@ function paint(time: number, active: number[]) {
     if (!row) continue
     let words = painted.get(index)
     if (!words) {
-      words = [...row.querySelectorAll<HTMLElement>('.ly-word')]
+      words = collectFills(row)
       painted.set(index, words)
     }
     const item = items.value[index]
@@ -229,16 +249,46 @@ function paint(time: number, active: number[]) {
       continue
     }
     for (const word of words) {
-      // A unit cut by a reading fills across its pieces in turn, on the unit's own clock.
-      const share = word.dataset.a ? [Number(word.dataset.a), Number(word.dataset.b)] as [number, number] : undefined
-      const progress = pieceProgress(wordProgress(time, { start: Number(word.dataset.s), end: Number(word.dataset.e) }), share)
-      const value = progress.toFixed(3)
-      if (word.dataset.p === value) continue
-      word.dataset.p = value
+      const value = fillProgress(time, word).toFixed(3)
+      if (word.value === value) continue
+      word.value = value
       // The fill edge is a soft 12% ramp, so it runs from just before the word to just past it.
-      word.style.setProperty('--p', `${(progress * 112 - 6).toFixed(1)}%`)
+      word.el.style.setProperty('--p', `${(Number(value) * 112 - 6).toFixed(1)}%`)
     }
   }
+}
+
+function collectFills(row: HTMLElement): Painted[] {
+  const list: Painted[] = []
+  const byElement = new Map<Element, Painted>()
+  for (const el of row.querySelectorAll<HTMLElement>('.ly-word')) {
+    const entry: Painted = { el }
+    if (el.tagName === 'RT') {
+      // Readings come after the text they sit over, so that text is already collected.
+      entry.under = [...el.parentElement!.children].flatMap(child => {
+        const under = byElement.get(child)
+        return under ? [{ painted: under, weight: child.textContent?.length || 0 }] : []
+      })
+    } else {
+      const share = el.dataset.a ? [Number(el.dataset.a), Number(el.dataset.b)] as [number, number] : undefined
+      entry.fill = { start: Number(el.dataset.s), end: Number(el.dataset.e), share }
+    }
+    byElement.set(el, entry)
+    list.push(entry)
+  }
+  return list
+}
+
+/** A unit cut by a reading fills across its pieces in turn, on the unit's own clock. */
+function fillProgress(time: number, entry: Painted): number {
+  if (entry.fill) return pieceProgress(wordProgress(time, entry.fill), entry.fill.share)
+  let done = 0
+  let total = 0
+  for (const { painted: under, weight } of entry.under || []) {
+    done += fillProgress(time, under) * weight
+    total += weight
+  }
+  return total ? done / total : 0
 }
 
 function clearPaint() {
@@ -252,7 +302,7 @@ function loop() {
   frame = requestAnimationFrame(loop)
 }
 
-watch([live, () => props.playing, expanded, items], () => {
+watch([live, () => props.playing, expanded, items, rubied], () => {
   cancelAnimationFrame(frame)
   frame = 0
   // Rows may have been re-rendered: forget the cached word elements.
@@ -485,7 +535,7 @@ onBeforeUnmount(() => {
             >
               <div v-if="item.kind === 'gap'" class="ly-gap" aria-hidden="true"><i></i><i></i><i></i></div>
               <button v-else class="ly-line" :aria-current="isActive(index) ? 'true' : undefined" @click="seek(item.start)">
-                <span class="ly-original" lang="ja"><template v-for="(run, n) in item.runs" :key="n"><span v-if="run.kind === 'ruby'" class="ly-ruby" :class="run.avatars && ['ly-glue', { 'ly-glue--break': n > 0 }]"><SingerAvatars v-if="run.avatars" class="ly-handover" :singers="run.avatars" :size="variant === 'immersive' ? 28 : 22" /><ruby><template v-for="(piece, k) in run.pieces" :key="k"><span v-if="piece.word" class="ly-word" :data-s="piece.word.start" :data-e="piece.word.end" :data-a="piece.share?.[0]" :data-b="piece.share?.[1]">{{ piece.text }}</span><template v-else>{{ piece.text }}</template></template><template v-if="rubied"><rp>(</rp><rt>{{ run.reading }}</rt><rp>)</rp></template></ruby></span><template v-else-if="run.piece.avatars"><span class="ly-glue" :class="{ 'ly-glue--break': n > 0 }"><SingerAvatars class="ly-handover" :singers="run.piece.avatars" :size="variant === 'immersive' ? 28 : 22" /><span v-if="run.piece.word" class="ly-word" :data-s="run.piece.word.start" :data-e="run.piece.word.end" :data-a="run.piece.share?.[0]" :data-b="run.piece.share?.[1]">{{ run.piece.text }}</span><template v-else>{{ leadOf(run.piece.text) }}</template></span><template v-if="!run.piece.word">{{ run.piece.text.slice(leadOf(run.piece.text).length) }}</template></template><span v-else-if="run.piece.word" class="ly-word" :data-s="run.piece.word.start" :data-e="run.piece.word.end" :data-a="run.piece.share?.[0]" :data-b="run.piece.share?.[1]">{{ run.piece.text }}</span><template v-else>{{ run.piece.text }}</template></template></span>
+                <span class="ly-original" lang="ja"><template v-for="(run, n) in item.runs" :key="n"><span v-if="run.kind === 'ruby'" class="ly-ruby" :class="run.avatars && ['ly-glue', { 'ly-glue--break': n > 0 }]"><SingerAvatars v-if="run.avatars" class="ly-handover" :singers="run.avatars" :size="variant === 'immersive' ? 28 : 22" /><ruby><template v-for="(segment, k) in run.segments" :key="k"><span v-if="segment.fill" class="ly-word" :data-s="segment.fill.start" :data-e="segment.fill.end" :data-a="segment.fill.share?.[0]" :data-b="segment.fill.share?.[1]">{{ segment.text }}</span><template v-else>{{ segment.text }}</template></template><template v-if="rubied"><rp>(</rp><rt :class="{ 'ly-word': run.timed }">{{ run.reading }}</rt><rp>)</rp></template></ruby></span><template v-else><span v-if="run.avatars" class="ly-glue" :class="{ 'ly-glue--break': n > 0 }"><SingerAvatars class="ly-handover" :singers="run.avatars" :size="variant === 'immersive' ? 28 : 22" /><template v-for="(segment, k) in run.head" :key="k"><span v-if="segment.fill" class="ly-word" :data-s="segment.fill.start" :data-e="segment.fill.end" :data-a="segment.fill.share?.[0]" :data-b="segment.fill.share?.[1]">{{ segment.text }}</span><template v-else>{{ segment.text }}</template></template></span><template v-for="(segment, k) in run.tail" :key="k"><span v-if="segment.fill" class="ly-word" :data-s="segment.fill.start" :data-e="segment.fill.end" :data-a="segment.fill.share?.[0]" :data-b="segment.fill.share?.[1]">{{ segment.text }}</span><template v-else>{{ segment.text }}</template></template></template></template></span>
                 <span v-if="translated && item.line.translation" class="ly-translation" lang="zh-CN">{{ item.line.translation }}</span>
               </button>
             </div>

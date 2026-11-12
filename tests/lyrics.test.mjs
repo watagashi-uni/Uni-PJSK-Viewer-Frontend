@@ -146,3 +146,16 @@ test('readings group the text they cover; a unit cut by a reading keeps its timi
   assert.deepEqual(lyricRuns({ text: '考える', ruby: [{ from: 0, to: 1, reading: 'かんが' }] }).map(r => [r.reading, r.pieces.map(p => [p.text, !!p.word])]), [['かんが', [['考', false]]], [undefined, [['える', false]]]])
   assert.deepEqual(lyricRuns({ text: 'AB' }), [{ pieces: [{ text: 'AB', part: 0 }] }])
 })
+test('untimed text on a word-timed line fills with its neighbours; a long pause does not stretch it', () => {
+  const { untimedFill } = load()
+  const words = [{ from: 1, to: 2, start: 10, end: 11 }, { from: 3, to: 4, start: 11, end: 12 }, { from: 5, to: 6, start: 15, end: 16 }]
+  // 「あ、い…う」: opening bracket with the first unit, comma between touching units, ellipsis over a pause, closing after the last
+  assert.deepEqual(untimedFill(words, 0, 1), { start: 10, end: 10 })
+  assert.deepEqual(untimedFill(words, 2, 3), { start: 11, end: 11 })
+  assert.deepEqual(untimedFill(words, 4, 5), { start: 12, end: 12.25 })
+  assert.deepEqual(untimedFill(words, 6, 7), { start: 16, end: 16 })
+  // overlapping neighbours never run backwards; lines without units have no fill
+  assert.deepEqual(untimedFill([{ from: 0, to: 1, start: 1, end: 3 }, { from: 2, to: 3, start: 2, end: 4 }], 1, 2), { start: 3, end: 3 })
+  assert.equal(untimedFill(undefined, 0, 1), undefined)
+  assert.equal(untimedFill([], 0, 1), undefined)
+})

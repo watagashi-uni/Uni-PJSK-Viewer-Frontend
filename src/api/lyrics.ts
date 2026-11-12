@@ -218,6 +218,30 @@ export function pieceProgress(progress: number, share?: [number, number]): numbe
   return Math.max(0, Math.min(1, (progress - share[0]) / (share[1] - share[0])))
 }
 
+/** Longest time untimed text between two units takes to fill, so a long pause does not drag it out. */
+const UNTIMED_FILL_SEC = 0.25
+
+/**
+ * When text no unit covers (punctuation, spaces, symbols) fills on a word-timed line:
+ * right after the unit before it ends, catching up by the start of the unit after it.
+ * Text in front of the first unit fills as that unit starts; text after the last, as it ends.
+ * Lines without units have no fill: they are highlighted as a whole.
+ */
+export function untimedFill(words: LyricWord[] | undefined, from: number, to: number): { start: number; end: number } | undefined {
+  let before: LyricWord | undefined
+  let after: LyricWord | undefined
+  for (const word of words || []) {
+    if (word.to <= from) before = word
+    else if (word.from >= to) {
+      after = word
+      break
+    }
+  }
+  if (!before) return after && { start: after.start, end: after.start }
+  if (!after) return { start: before.end, end: before.end }
+  return { start: before.end, end: Math.max(before.end, Math.min(after.start, before.end + UNTIMED_FILL_SEC)) }
+}
+
 /** Everyone heard on a line, whether assigned to the whole line or to parts of it. */
 export function linePerformerIds(line: LyricLine): string[] {
   return [...new Set([...(line.performerIds || []), ...(line.segments || []).flatMap(s => s.performerIds)])]
