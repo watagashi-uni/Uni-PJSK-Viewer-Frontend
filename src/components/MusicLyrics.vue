@@ -455,6 +455,8 @@ onBeforeUnmount(() => {
 .ly {
   --ly-size: clamp(1.3rem, 2.7vw, 1.85rem);
   --ly-rest: 0.34;
+  /* Colour of the lyric text; lines out of focus are drawn as a soft shadow of it. */
+  --ly-ink: var(--color-base-content);
   position: relative;
   display: flex;
   min-height: 0;
@@ -471,6 +473,7 @@ onBeforeUnmount(() => {
 .ly--immersive {
   --ly-size: clamp(1.55rem, 2.3vw + 0.7rem, 2.7rem);
   --ly-rest: 0.3;
+  --ly-ink: #fff;
   color: #fff;
 }
 
@@ -605,10 +608,11 @@ onBeforeUnmount(() => {
   padding: 0.7em 0;
   text-align: left;
   font-size: var(--ly-size);
+  color: var(--ly-ink);
   cursor: pointer;
   opacity: 0.86;
   transform-origin: left center;
-  transition: opacity 0.5s ease, filter 0.5s ease, transform 0.6s cubic-bezier(0.2, 0.9, 0.3, 1);
+  transition: opacity 0.5s ease, color 0.5s ease, text-shadow 0.5s ease, transform 0.6s cubic-bezier(0.2, 0.9, 0.3, 1);
 }
 
 .ly-line:focus-visible {
@@ -616,10 +620,14 @@ onBeforeUnmount(() => {
   border-radius: 0.5rem;
 }
 
-/* Lines waiting their turn recede with distance; the reader can still pull any of them forward. */
+/* Lines waiting their turn recede with distance; the reader can still pull any of them forward.
+   They are softened by hiding the glyphs and showing only a blurred shadow of them. A blur
+   filter on the row would look the same, but Safari draws a black line along the edge of a
+   filtered row that lies next to the line being repainted while it is sung. */
 .live .ly-line {
   opacity: var(--ly-rest);
-  filter: blur(calc(min(var(--distance, 0), 4) * 0.75px));
+  color: transparent;
+  text-shadow: 0 0 calc(min(var(--distance, 0), 4) * 1.5px) var(--ly-ink);
   transform: scale(0.96);
 }
 
@@ -627,7 +635,8 @@ onBeforeUnmount(() => {
 .live .ly-line:hover,
 .live .ly-line:focus-visible {
   opacity: 1;
-  filter: none;
+  color: var(--ly-ink);
+  text-shadow: none;
 }
 
 .live .ly-row.active .ly-line {
@@ -636,7 +645,8 @@ onBeforeUnmount(() => {
 
 .browsing .ly-line {
   opacity: 0.6;
-  filter: none;
+  color: var(--ly-ink);
+  text-shadow: none;
 }
 
 .ly-original {
@@ -654,16 +664,7 @@ onBeforeUnmount(() => {
 /* Sung text is solid, text still to come is faint, and the boundary sweeps across each timed unit. */
 .ly-row.active .ly-word {
   --p: -6%;
-  /* Safari lets a hairline of a text-clipped background leak along the edges of the box, which
-     showed as a line above and below the current lyric. The box is therefore made larger than
-     the glyphs (the padding and the negative margin cancel out, so nothing moves) and the
-     gradient is kept off its outermost pixels: there is nothing at the edges left to leak. */
-  margin-inline: -2px;
-  padding: 0.2em 2px;
   background-image: linear-gradient(to right, currentColor calc(var(--p) - 6%), color-mix(in srgb, currentColor 34%, transparent) calc(var(--p) + 6%));
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: calc(100% - 2px) calc(100% - 4px);
   background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -770,7 +771,8 @@ onBeforeUnmount(() => {
   .ly-line {
     transition: none;
     transform: none !important;
-    filter: none !important;
+    color: var(--ly-ink) !important;
+    text-shadow: none !important;
   }
 
   .ly-gap i {
