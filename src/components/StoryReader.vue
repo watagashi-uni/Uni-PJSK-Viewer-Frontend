@@ -8,6 +8,7 @@ import { attachStoryZhOverlay, trimFullStop, type StoryZhOverlay } from '@/utils
 import { loadZhStory, peekZhStorySource, type ZhStory, type ZhStorySource } from '@/api/translations'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
+import { usePlayerStore } from '@/stores/player'
 import ZhText from '@/components/ZhText.vue'
 
 const props = withDefaults(defineProps<{
@@ -36,6 +37,7 @@ const voiceEnabled = ref(true)
 const bgmEnabled = ref(true)
 const volume = ref(0.8)
 const playerReady = ref(false)
+const musicPlayer = usePlayerStore()
 const started = ref(false)
 const settings = useSettingsStore()
 // 梗概默认收起，展开时在标题栏下方滑出，不遮挡舞台
@@ -160,6 +162,8 @@ async function mountPlayer() {
     const resumeAt = snippet.value
     instance.on('play', () => {
       started.value = true
+      // The scene brings its own voices and BGM: the site-wide music player yields.
+      musicPlayer.pause()
       emit('play')
       // The library installs its seek handler immediately after emitting play.
       queueMicrotask(() => { if (player === instance && resumeAt > 0) void instance.jumpTo(resumeAt) })

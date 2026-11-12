@@ -70,7 +70,7 @@ import { useAccountStore } from '@/stores/account'
 import { useNotificationStore } from '@/stores/notification'
 import { useTranslationStore } from '@/stores/translations'
 import { useZh } from '@/composables/useZh'
-import { Search, ArrowUpDown, Languages, Trophy, List, LayoutGrid, RefreshCw, Layers, Github, Camera, Loader2, Bell, BellRing, FilterX, SlidersHorizontal, ChevronDown, ListFilter } from 'lucide-vue-next'
+import { Search, ArrowUpDown, Languages, Trophy, List, LayoutGrid, RefreshCw, Layers, Github, Camera, Loader2, Bell, BellRing, FilterX, SlidersHorizontal, ChevronDown, ListFilter, Play, Shuffle } from 'lucide-vue-next'
 import { toPng } from 'html-to-image'
 import MusicCard from '@/components/MusicCard.vue'
 import Pagination from '@/components/Pagination.vue'
@@ -81,6 +81,9 @@ import { request } from '@/utils/request'
 import { APPEND_GRADIENT, DIFFICULTY_COLORS, difficultyBackground } from '@/utils/difficulty'
 import { useCharacterName } from '@/composables/useCharacterName'
 import ZhText from '@/components/ZhText.vue'
+import MusicPlayButton from '@/components/player/MusicPlayButton.vue'
+import MusicQueueButton from '@/components/player/MusicQueueButton.vue'
+import { usePlayerStore } from '@/stores/player'
 
 interface Music {
   id: number
@@ -1024,6 +1027,30 @@ const filteredMusics = computed(() => {
   return result
 })
 
+// 播放全部 / 随机播放：把筛选结果（不止当前页）放进全站播放器
+const player = usePlayerStore()
+const isQueueingAll = ref(false)
+async function playFiltered(shuffle: boolean) {
+  if (isQueueingAll.value) return
+  isQueueingAll.value = true
+  try {
+    const ids = filteredMusics.value.map(music => music.id)
+    if (shuffle) {
+      for (let i = ids.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1))
+        const swap = ids[i]!
+        ids[i] = ids[j]!
+        ids[j] = swap
+      }
+    }
+    player.playTracks(await player.tracksOf(ids))
+  } catch (error) {
+    console.error('无法播放筛选结果:', error)
+  } finally {
+    isQueueingAll.value = false
+  }
+}
+
 const totalPages = computed(() => Math.ceil(filteredMusics.value.length / pageSize))
 
 const paginatedMusics = computed(() => {
@@ -1511,6 +1538,27 @@ watch(totalPages, (pages) => {
         <div class="divider divider-horizontal mx-1"></div>
       </template>
 
+      <!-- 把当前筛选结果交给全站播放器 -->
+      <div class="join">
+        <button
+          class="join-item btn btn-sm btn-ghost gap-1"
+          :disabled="!filteredMusics.length || isQueueingAll"
+          title="按当前排序播放全部筛选结果"
+          @click="playFiltered(false)"
+        >
+          <Play class="w-4 h-4" /> 播放全部
+        </button>
+        <button
+          class="join-item btn btn-sm btn-ghost gap-1"
+          :disabled="!filteredMusics.length || isQueueingAll"
+          title="随机顺序播放全部筛选结果"
+          @click="playFiltered(true)"
+        >
+          <Shuffle class="w-4 h-4" /> 随机播放
+        </button>
+      </div>
+      <div class="divider divider-horizontal mx-0 max-sm:hidden"></div>
+
       <!-- 视图切换 (总是显示) -->
       <div class="join">
         <button class="join-item btn btn-sm" :class="viewMode === 'grid' ? 'btn-primary' : 'btn-ghost'" @click="viewMode = 'grid'">
@@ -1856,11 +1904,14 @@ watch(totalPages, (pages) => {
             <tbody>
               <tr v-for="music in displayedMusics" :key="music.id" class="hover text-sm relative group">
                 <td class="p-2">
-                  <AssetImage
-                    :src="getMusicThumbnailUrl(music.id)"
-                    :alt="music.title"
-                    class="w-12 h-12 rounded object-cover"
-                  />
+                  <div class="list-thumb relative w-12 h-12">
+                    <AssetImage
+                      :src="getMusicThumbnailUrl(music.id)"
+                      :alt="music.title"
+                      class="w-12 h-12 rounded object-cover"
+                    />
+                    <MusicPlayButton :music-id="music.id" :title="music.title" class="list-play absolute inset-0 m-auto !h-8 !w-8" />
+                  </div>
                 </td>
                 <td class="p-2">
                   <RouterLink :to="`/musics/${music.id}`" class="hover:text-primary">
@@ -1877,6 +1928,7 @@ watch(totalPages, (pages) => {
                       <ListFilter class="h-3 w-3 shrink-0" />
                       <span class="truncate">{{ music.composer }}</span>
                     </button>
+                    <MusicQueueButton :music-id="music.id" :title="music.title" variant="inline" />
                     <div v-if="isLimitedTime(music.id)" class="badge badge-sm badge-warning text-warning-content font-bold shadow-sm whitespace-nowrap">期间限定</div>
                     <div v-else-if="isExpired(music.id)" class="badge badge-sm bg-base-300 text-base-content/60 font-bold border-none whitespace-nowrap">已过期</div>
                     <div v-if="music.musicCollaborationId && musicCollaborationMap.get(music.musicCollaborationId)" class="badge badge-sm badge-secondary badge-outline max-w-44 truncate" :title="musicCollaborationMap.get(music.musicCollaborationId)">{{ musicCollaborationMap.get(music.musicCollaborationId) }}</div>
@@ -1923,11 +1975,14 @@ watch(totalPages, (pages) => {
         <!-- Mobile List View -->
         <div class="block sm:hidden space-y-2">
           <div v-for="music in displayedMusics" :key="music.id" class="bg-base-100 p-2 rounded-lg flex gap-3 shadow-sm cv-auto-row relative overflow-hidden group">
-            <AssetImage
-              :src="getMusicThumbnailUrl(music.id)"
-              :alt="music.title"
-              class="w-16 h-16 rounded object-cover shrink-0"
-            />
+            <div class="relative w-16 h-16 shrink-0">
+              <AssetImage
+                :src="getMusicThumbnailUrl(music.id)"
+                :alt="music.title"
+                class="w-16 h-16 rounded object-cover"
+              />
+              <MusicPlayButton :music-id="music.id" :title="music.title" class="absolute bottom-1 right-1 !h-7 !w-7" />
+            </div>
             <div class="flex-1 min-w-0 flex flex-col gap-1">
               <RouterLink :to="`/musics/${music.id}`" class="hover:text-primary">
                 <div class="font-medium truncate text-sm leading-tight">{{ musicMainTitle(music) }}</div>
@@ -1944,6 +1999,7 @@ watch(totalPages, (pages) => {
                   <ListFilter class="h-2.5 w-2.5 shrink-0" />
                   <span class="truncate">{{ music.composer }}</span>
                 </button>
+                <MusicQueueButton :music-id="music.id" :title="music.title" variant="inline" class="!h-5 !w-5" />
                 <div v-if="isLimitedTime(music.id)" class="badge badge-xs badge-warning text-warning-content font-bold shadow-sm whitespace-nowrap">限定</div>
                 <div v-if="music.musicCollaborationId && musicCollaborationMap.get(music.musicCollaborationId)" class="badge badge-xs badge-secondary badge-outline max-w-24 truncate" :title="musicCollaborationMap.get(music.musicCollaborationId)">{{ musicCollaborationMap.get(music.musicCollaborationId) }}</div>
                 <div v-if="hasSuiteData && hasOwnershipData" class="badge badge-xs" :class="ownedMusicIds.has(music.id) ? 'badge-success badge-outline' : 'badge-ghost'">{{ getMusicOwnershipLabel(music) }}</div>
@@ -2145,5 +2201,18 @@ watch(totalPages, (pages) => {
 .cv-auto-level {
   content-visibility: auto;
   contain-intrinsic-size: 360px;
+}
+
+/* 列表视图：有鼠标时悬停行才显示播放按钮，正在播放的那首一直显示 */
+@media (hover: hover) {
+  .list-thumb .list-play {
+    opacity: 0;
+  }
+
+  tr:hover .list-thumb .list-play,
+  .list-thumb .list-play:focus-visible,
+  .list-thumb .list-play.active {
+    opacity: 1;
+  }
 }
 </style>

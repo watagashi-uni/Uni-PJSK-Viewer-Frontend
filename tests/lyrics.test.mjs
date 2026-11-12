@@ -63,3 +63,35 @@ test('LRC gains words from its original cue; malformed ranges fall back to line 
   const bad = normalizeLyrics({ format: 'bilingual_json', duration: 20, lines: [{ start: 1, end: 2, text: 'A', words: [{ from: 0, to: 2, start: 1, end: 2 }] }] })
   assert.equal(bad.lines[0].words, undefined)
 })
+test('untimed text is cut where the singers change, and nothing is lost', () => {
+  const { lyricParts, linePerformerIds } = load()
+  const line = { text: 'Oh… up　灯火を', performerIds: ['c'], segments: [{ text: 'Oh… up　', performerIds: ['a'] }, { text: '灯火を', performerIds: ['b'] }] }
+  const parts = lyricParts(line)
+  assert.deepEqual(parts, [{ text: 'Oh… up　', performerIds: ['a'] }, { text: '灯火を', performerIds: ['b'] }])
+  assert.deepEqual(linePerformerIds(line), ['c', 'a', 'b'])
+  // timed units inside each singer's stretch, punctuation between them stays with its singer
+  const timed = lyricParts({ ...line, words: [{ from: 0, to: 2, start: 1, end: 2 }, { from: 7, to: 9, start: 3, end: 4 }] })
+  assert.equal(timed.map(p => p.text).join(''), line.text)
+  assert.deepEqual(timed.map(p => [p.text, !!p.word, p.performerIds.join()]), [['Oh', true, 'a'], ['… up　', false, 'a'], ['灯火', true, 'b'], ['を', false, 'b']])
+  // text beyond the annotated segments has no singer; a line without segments is one piece
+  assert.deepEqual(lyricParts({ text: 'AB', segments: [{ text: 'A', performerIds: ['a'] }] }).map(p => p.performerIds), [['a'], []])
+  assert.deepEqual(lyricParts({ text: 'AB' }), [{ text: 'AB', performerIds: [] }])
+})
+test('cast singers map to game characters; guests and junk have no portrait', () => {
+  const { performerCharacterId } = load()
+  assert.equal(performerCharacterId('歌唱者-21'), 21)
+  assert.equal(performerCharacterId('歌唱者-01'), 1)
+  assert.equal(performerCharacterId('21'), 21)
+  assert.equal(performerCharacterId('外部歌唱者-02'), null)
+  assert.equal(performerCharacterId('歌唱者-27'), null)
+  assert.equal(performerCharacterId('歌唱者-0'), null)
+  assert.equal(performerCharacterId(''), null)
+})
+test('long silences become waiting markers; overlapping lines do not open a gap early', () => {
+  const { lyricGaps } = load()
+  const lines = [{ start: 9, end: 12 }, { start: 11, end: 20 }, { start: 13, end: 14 }, { start: 27, end: 30 }, { start: 33, end: 40 }]
+  // intro from the trimmed start; the break is measured from the last voice to stop (20), not the last line to start
+  assert.deepEqual(lyricGaps(lines, 2), [{ start: 2, end: 9, before: 0 }, { start: 20, end: 27, before: 3 }])
+  assert.deepEqual(lyricGaps(lines, 8), [{ start: 20, end: 27, before: 3 }])
+  assert.deepEqual(lyricGaps([], 0), [])
+})

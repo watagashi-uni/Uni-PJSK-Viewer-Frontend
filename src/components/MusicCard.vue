@@ -3,6 +3,8 @@ import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import { ListFilter } from 'lucide-vue-next'
 import AssetImage from '@/components/AssetImage.vue'
+import MusicPlayButton from '@/components/player/MusicPlayButton.vue'
+import MusicQueueButton from '@/components/player/MusicQueueButton.vue'
 import { DIFFICULTY_LABELS, DIFFICULTY_ORDER, difficultyStyle } from '@/utils/difficulty'
 
 const props = defineProps<{
@@ -100,6 +102,9 @@ function selectArtist() {
           class="w-6 h-6 drop-shadow-md"
         />
       </div>
+      <!-- 直接在全站播放器里播放；位于整卡链接之上 -->
+      <MusicQueueButton :music-id="id" :title="title" class="card-queue absolute bottom-3 right-14 z-30" />
+      <MusicPlayButton :music-id="id" :title="title" class="card-play absolute bottom-2 right-2 z-30" />
     </figure>
 
     <div class="card-body p-3 gap-2">
@@ -199,5 +204,22 @@ function selectArtist() {
 <style scoped>
 .card {
   contain: layout style paint;
+}
+
+/* 有鼠标时悬停才出现，触屏设备始终可见；正在播放的那首一直显示 */
+@media (hover: hover) {
+  .card .card-play,
+  .card .card-queue {
+    opacity: 0;
+  }
+
+  .card:hover .card-play,
+  .card:hover .card-queue,
+  .card .card-play:focus-visible,
+  .card .card-queue:focus-visible,
+  .card .card-queue.done,
+  .card .card-play.active {
+    opacity: 1;
+  }
 }
 </style>

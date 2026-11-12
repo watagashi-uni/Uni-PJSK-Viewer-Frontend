@@ -13,6 +13,10 @@ import { useAccountStore } from '@/stores/account'
 import { useOAuthStore } from '@/stores/oauth'
 import { useNotificationStore } from '@/stores/notification'
 import AppSidebar from '@/components/AppSidebar.vue'
+import PlayerBar from '@/components/player/PlayerBar.vue'
+import NowPlayingView from '@/components/player/NowPlayingView.vue'
+import PlayerLyricsSidebar from '@/components/player/PlayerLyricsSidebar.vue'
+import { usePlayerStore } from '@/stores/player'
 
 const route = useRoute()
 const masterStore = useMasterStore()
@@ -20,6 +24,7 @@ const settingsStore = useSettingsStore()
 const accountStore = useAccountStore()
 const oauthStore = useOAuthStore()
 const notificationStore = useNotificationStore()
+const playerStore = usePlayerStore()
 const { onDialogClose: onOAuthConfirmClose } = useModalDialog(
   'oauthConfirmDialog',
   () => accountStore.oauthConfirmVisible,
@@ -38,6 +43,8 @@ onMounted(async () => {
     caches.delete('external-images')
   }
   settingsStore.initialize()
+  // Restores the queue of the last visit (paused); reads local storage only.
+  playerStore.initialize()
   oauthStore.initialize()
   await accountStore.initialize()
   void masterStore.initialize().catch((error) => {
@@ -73,7 +80,7 @@ watch(
   <div v-else class="drawer lg:drawer-open min-h-screen bg-base-200">
     <input id="my-drawer-2" type="checkbox" class="drawer-toggle" />
     
-    <div class="drawer-content flex flex-col">
+    <div class="drawer-content flex flex-col" :class="{ 'with-lyrics-sidebar': playerStore.lyricsSidebarShown }">
       <AppNavbar />
       
       <main class="flex-1 w-full max-w-7xl mx-auto px-4 py-5 sm:px-6 lg:py-8">
@@ -86,6 +93,9 @@ watch(
           <span v-if="masterStore.version" class="font-mono">数据 {{ masterStore.version }}<template v-if="masterStore.assetVersion && masterStore.assetVersion !== masterStore.version"> · 资源 {{ masterStore.assetVersion }}</template></span>
         </div>
       </footer>
+
+      <!-- Sticks to the bottom of the window; playback itself lives in the player store and survives navigation. -->
+      <PlayerBar />
     </div>
     
     <div class="drawer-side z-50">
@@ -93,6 +103,7 @@ watch(
       <AppSidebar />
     </div>
     
+    <PlayerLyricsSidebar />
     <ToastContainer />
     <SpoilerRulesDialog />
     <SpoilerWatermark />
@@ -112,9 +123,20 @@ watch(
       </form>
     </dialog>
   </div>
+
+  <NowPlayingView />
 </template>
 
 <style>
+:root {
+  --lyrics-sidebar-width: clamp(20rem, 25vw, 26rem);
+}
+
+/* The lyrics column is fixed to the right edge: the page (and the player bar inside it) makes room. */
+.drawer-content.with-lyrics-sidebar {
+  padding-right: var(--lyrics-sidebar-width);
+}
+
 .fade-enter-active,
 .fade-leave-active {
   transition: opacity 0.3s ease;

@@ -17,7 +17,7 @@ export interface SongLyrics {
   assetbundle?: string
   format: 'lrc' | 'bilingual_json'
   lines: LyricLine[]
-  performers?: { performerId: string; name: string }[]
+  performers?: { performerId: string; name: string; color?: string }[]
   credits?: Record<string, string>
   sources?: [string, string | null, string | null][]
 }
@@ -103,21 +103,70 @@ export function wordProgress(time: number, word: Pick<LyricWord, 'start' | 'end'
   return Math.max(0, Math.min(1, (time - word.start) / (word.end - word.start)))
 }
 
-export function lyricParts(line: LyricLine): { text: string; word?: LyricWord; performerIds: string[] }[] {
-  const parts: { text: string; word?: LyricWord; performerIds: string[] }[] = []
-  const roles = (from: number, to: number) => {
-    let offset = 0
-    return [...new Set((line.segments || []).flatMap(s => {
-      const left = offset; offset += s.text.length
-      return left < to && offset > from ? s.performerIds : []
-    }))]
+export interface LyricPart { text: string; word?: LyricWord; performerIds: string[] }
+
+/**
+ * A line cut at every timed unit and, between them, wherever the singers change,
+ * so each piece can be filled on its own clock and labelled with who sings it.
+ */
+export function lyricParts(line: LyricLine): LyricPart[] {
+  const parts: LyricPart[] = []
+  const spans: { from: number; to: number; performerIds: string[] }[] = []
+  let offset = 0
+  for (const segment of line.segments || []) {
+    spans.push({ from: offset, to: offset + segment.text.length, performerIds: segment.performerIds })
+    offset += segment.text.length
+  }
+  const roles = (from: number, to: number) => [...new Set(spans.flatMap(s => (s.from < to && s.to > from ? s.performerIds : [])))]
+  // Untimed text keeps the singer boundaries; text past the last segment has no singer.
+  const plain = (from: number, to: number) => {
+    let cursor = from
+    for (const span of spans) {
+      if (span.to <= cursor || span.from >= to) continue
+      if (span.from > cursor) parts.push({ text: line.text.slice(cursor, span.from), performerIds: [] })
+      const end = Math.min(span.to, to)
+      parts.push({ text: line.text.slice(Math.max(cursor, span.from), end), performerIds: span.performerIds })
+      cursor = end
+    }
+    if (cursor < to) parts.push({ text: line.text.slice(cursor, to), performerIds: [] })
   }
   let cursor = 0
   for (const word of line.words || []) {
-    if (word.from > cursor) parts.push({ text: line.text.slice(cursor, word.from), performerIds: roles(cursor, word.from) })
+    if (word.from > cursor) plain(cursor, word.from)
     parts.push({ text: line.text.slice(word.from, word.to), word, performerIds: roles(word.from, word.to) })
     cursor = word.to
   }
-  if (cursor < line.text.length) parts.push({ text: line.text.slice(cursor), performerIds: roles(cursor, line.text.length) })
+  if (cursor < line.text.length) plain(cursor, line.text.length)
   return parts
+}
+
+/** Everyone heard on a line, whether assigned to the whole line or to parts of it. */
+export function linePerformerIds(line: LyricLine): string[] {
+  return [...new Set([...(line.performerIds || []), ...(line.segments || []).flatMap(s => s.performerIds)])]
+}
+
+/**
+ * The in-game cast is identified as "歌唱者-21" (game character 21). Guest singers
+ * ("外部歌唱者-…") are numbered separately and have no in-game portrait.
+ */
+export function performerCharacterId(performerId: string): number | null {
+  const match = /^(?:歌唱者-)?0*(\d{1,2})$/.exec(performerId)
+  const id = match ? Number(match[1]) : 0
+  return id >= 1 && id <= 26 ? id : null
+}
+
+export interface LyricGap { start: number; end: number }
+
+/**
+ * Stretches with nothing to sing (the intro and instrumental breaks) long enough
+ * to deserve a "waiting" marker between the lines around them.
+ */
+export function lyricGaps(lines: Pick<LyricLine, 'start' | 'end'>[], from = 0, minimum = 5): (LyricGap & { before: number })[] {
+  const gaps: (LyricGap & { before: number })[] = []
+  let quietSince = from
+  lines.forEach((line, index) => {
+    if (line.start - quietSince >= minimum) gaps.push({ start: quietSince, end: line.start, before: index })
+    quietSince = Math.max(quietSince, line.end)
+  })
+  return gaps
 }
