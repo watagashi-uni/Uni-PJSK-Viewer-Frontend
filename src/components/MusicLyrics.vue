@@ -672,9 +672,10 @@ onBeforeUnmount(() => {
 .ly-translation {
   display: block;
   margin-top: 0.4em;
-  font-size: 0.56em;
+  /* Follows the lyric size, but never drops below a comfortable reading size in narrow columns. */
+  font-size: max(0.66em, 0.875rem);
   font-weight: 600;
-  line-height: 1.55;
+  line-height: 1.5;
   opacity: 0.72;
   white-space: pre-wrap;
 }
