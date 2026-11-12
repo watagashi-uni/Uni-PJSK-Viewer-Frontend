@@ -29,7 +29,7 @@ import { parseSusBpm, type SusBpmEvent } from '@/utils/susBpm'
 import type { EventData } from '@/types/master'
 import { renderSusToSvg, type Sus2ImgFrontendResult } from '@/vendor/sekai-sus2img'
 import ChartJudgmentPreview from '@/components/ChartJudgmentPreview.vue'
-import { DIFFICULTY_LABELS, difficultyBackground } from '@/utils/difficulty'
+import { DIFFICULTY_COLORS, DIFFICULTY_LABELS, difficultyBackground, difficultyStyle } from '@/utils/difficulty'
 import { trackEvent } from '@/utils/analytics'
 import { useCharacterName } from '@/composables/useCharacterName'
 import ZhText from '@/components/ZhText.vue'
@@ -552,8 +552,23 @@ function difficultyBadgeStyle(difficulty: string) {
   return { background: difficultyBackground(difficulty) }
 }
 
-function difficultyCardStyle(difficulty: string) {
-  return { background: difficultyBackground(difficulty) }
+// 谱面：一排难度选择 + 当前难度的操作，默认选中 MASTER
+const selectedChartDifficulty = ref<string | null>(null)
+const selectedChart = computed(() => {
+  const list = difficulties.value
+  return list.find(d => d.musicDifficulty === selectedChartDifficulty.value)
+    ?? list.find(d => d.musicDifficulty === 'master')
+    ?? list[list.length - 1]
+    ?? null
+})
+
+function chartTabVars(difficulty: string) {
+  const { background, color } = difficultyStyle(difficulty)
+  return {
+    '--diff': DIFFICULTY_COLORS[difficulty] || '#9ca3af',
+    '--diff-bg': background,
+    '--diff-fg': color,
+  }
 }
 
 // 封面图片 URL (startapp)
@@ -1105,6 +1120,38 @@ useHead({
   ]
 })
 
+// 头部的模糊封面要铺到内容区两端：main 有最大宽度，超宽屏时两侧还有空白，
+// 量出 main 与内容区之间的距离，让背景向两侧延伸同样的长度
+const musicHeadRef = ref<HTMLElement | null>(null)
+const backdropBleed = ref({ left: 0, right: 0 })
+let backdropObserver: ResizeObserver | undefined
+
+function measureBackdropBleed() {
+  const head = musicHeadRef.value
+  const host = head?.closest('main')?.parentElement
+  if (!head || !host) return
+  const headRect = head.getBoundingClientRect()
+  const hostRect = host.getBoundingClientRect()
+  const hostStyle = getComputedStyle(host)
+  // 取整向下，宁可差半个像素也不撑出横向滚动条
+  const left = Math.max(0, Math.floor(headRect.left - hostRect.left - parseFloat(hostStyle.paddingLeft)))
+  const right = Math.max(0, Math.floor(hostRect.right - parseFloat(hostStyle.paddingRight) - headRect.right))
+  if (left !== backdropBleed.value.left || right !== backdropBleed.value.right) backdropBleed.value = { left, right }
+}
+
+watch(musicHeadRef, (head) => {
+  backdropObserver?.disconnect()
+  backdropObserver = undefined
+  const host = head?.closest('main')?.parentElement
+  if (!head || !host || typeof ResizeObserver === 'undefined') return
+  backdropObserver = new ResizeObserver(measureBackdropBleed)
+  backdropObserver.observe(head)
+  backdropObserver.observe(host)
+  measureBackdropBleed()
+})
+
+onBeforeUnmount(() => backdropObserver?.disconnect())
+
 // 上一页是列表时后退以保留筛选与页码，否则打开列表
 const goBack = useBackToList('/musics', ['/musics/search'])
 
@@ -1129,182 +1176,191 @@ const isExpired = computed(() => {
 </script>
 
 <template>
-  <div class="max-w-6xl mx-auto px-4">
+  <div class="max-w-6xl mx-auto sm:px-4">
     <div v-if="isLoading" class="flex justify-center py-20">
       <span class="loading loading-spinner loading-lg text-primary"></span>
     </div>
 
     <!-- 歌曲详情 -->
     <template v-else-if="music">
-      <!-- 顶部导航 -->
-      <div class="mb-4">
-        <button class="btn btn-ghost btn-sm gap-2 pl-0" @click="goBack">
-          <ChevronLeft class="w-4 h-4" /> 返回列表
-        </button>
-      </div>
-
       <div class="music-page">
-        <!-- 头部：封面、曲名与播放操作 -->
-        <section class="music-hero">
-          <div class="music-hero-wash" aria-hidden="true"><img :src="coverUrl" alt="" crossorigin="anonymous" /></div>
-
-          <div class="music-hero-art">
-            <a :href="coverUrl" target="_blank" rel="noopener noreferrer" class="block rounded-2xl overflow-hidden shadow-2xl transition-transform duration-300 hover:scale-[1.02]">
-              <AssetImage
-                :src="coverUrl"
-                :alt="music.title"
-                :lazy="false"
-                class="w-full h-auto object-cover aspect-square"
-              />
-            </a>
-            <!-- 类别图标 -->
-            <div v-if="matchedIcons.length" class="absolute bottom-3 left-3 flex gap-1.5 z-20">
-              <img
-                v-for="cat in matchedIcons"
-                :key="cat"
-                :src="`/img/${cat}.png`"
-                :alt="cat"
-                class="w-8 h-8 drop-shadow-lg"
-              />
-            </div>
+        <!-- 头部铺满内容区，模糊的封面从顶部一直延伸到下方内容 -->
+        <header ref="musicHeadRef" class="music-head">
+          <div
+            class="music-head-backdrop"
+            aria-hidden="true"
+            :style="{ '--bleed-left': `${backdropBleed.left}px`, '--bleed-right': `${backdropBleed.right}px` }"
+          >
+            <img :src="coverUrl" alt="" crossorigin="anonymous" />
           </div>
 
-          <div class="music-hero-info">
-            <div v-if="isLimitedTime || isExpired || musicOwnershipLabel || musicCollaborationLabel" class="music-hero-badges">
-              <div v-if="isLimitedTime" class="badge badge-warning text-warning-content font-bold shadow-sm h-auto py-1.5 px-3 flex flex-col text-center whitespace-normal leading-tight">
-                <span>期间限定</span>
-                <span class="text-[10px] sm:text-[11px] font-normal opacity-90 mt-0.5">
-                  {{ formatDate(currentLimitedData!.startAt) }} - {{ formatDate(currentLimitedData!.endAt) }}
-                </span>
-              </div>
-              <div v-else-if="isExpired" class="badge bg-base-300 text-base-content/60 font-bold border-none">已过期</div>
-              <div v-if="musicOwnershipLabel" class="badge" :class="isCurrentMusicOwned ? 'badge-success badge-outline' : 'badge-ghost'">{{ musicOwnershipLabel }}</div>
-              <div v-if="musicCollaborationLabel" class="badge badge-secondary badge-outline max-w-full h-auto py-1 text-center whitespace-normal"><ZhText :text="musicCollaborationLabel" table="musicCollaborations" path="label" layout="inline" /></div>
-            </div>
+          <!-- 顶部导航 -->
+          <div class="music-back">
+            <button class="btn btn-ghost btn-sm gap-2 pl-0" @click="goBack">
+              <ChevronLeft class="w-4 h-4" /> 返回列表
+            </button>
+          </div>
 
-            <h1 v-if="music.pronunciation && hasFurigana" class="music-title select-all leading-relaxed">
-              <template v-for="(seg, i) in furiganaSegments" :key="i">
-                <ruby v-if="seg.ruby">{{ seg.text }}<rp>(</rp><rt class="text-xs font-medium text-primary/70 select-none">{{ seg.ruby }}</rt><rp>)</rp></ruby><template v-else>{{ seg.text }}</template>
-              </template>
-            </h1>
-            <h1 v-else class="music-title select-all">{{ music.title }}</h1>
-
-            <!-- 翻译 -->
-            <p v-if="translation" class="text-base-content/70 mt-1 select-all">{{ translation }}</p>
-            <a
-              v-else-if="zhMusicEnabled"
-              href="https://paratranz.cn/projects/18073"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="text-sm text-primary/60 hover:text-primary mt-1 inline-flex items-center gap-1 transition-colors"
-            >
-              贡献翻译 →
-            </a>
-
-            <dl class="music-credits">
-              <div><dt>作词</dt><dd class="select-all">{{ music.lyricist }}</dd></div>
-              <div><dt>作曲</dt><dd class="select-all">{{ music.composer }}</dd></div>
-              <div><dt>编曲</dt><dd class="select-all">{{ music.arranger }}</dd></div>
-            </dl>
-
-            <!-- 当前选中的版本 -->
-            <div class="music-version">
-              <div class="flex flex-wrap items-center gap-2">
-                <p class="font-semibold text-base-content"><ZhText v-if="currentVocal?.caption" :text="currentVocal.caption" table="musicVocals" path="caption" layout="inline" /><template v-else>加载中...</template></p>
-                <span v-if="currentVocal && getVocalAccountStatus(currentVocal)" class="badge badge-sm gap-1" :class="isVocalAvailable(currentVocal) ? 'badge-success' : 'badge-ghost'">
-                  <CheckCircle2 v-if="isVocalAvailable(currentVocal)" class="w-3 h-3" />
-                  <LockKeyhole v-else class="w-3 h-3" />
-                  {{ getVocalAccountLabel(currentVocal) }}
-                </span>
-                <span v-if="currentVocal && hasVocalJacket(currentVocal.id)" class="badge badge-sm badge-secondary badge-outline">专属封面</span>
-              </div>
-              <p v-if="currentVocal && getVocalSingers(currentVocal)" class="text-sm text-base-content/60 flex items-center gap-2 mt-2 pl-0.5">
-                <SingerAvatars :singers="vocalAvatars.get(currentVocal.id) || []" :size="26" :max="8" />
-                <span class="min-w-0">{{ getVocalSingers(currentVocal) }}</span>
-              </p>
-            </div>
-
-            <!-- 播放与队列操作：音频在全站播放器里，离开本页继续播放 -->
-            <div class="music-actions">
-              <button class="btn btn-primary rounded-full gap-2 pl-5 pr-6 shadow-lg" :disabled="!currentTrack" @click="togglePlay">
-                <Loader2 v-if="isPlaying && player.isBuffering" class="w-5 h-5 animate-spin" />
-                <Pause v-else-if="isPlaying" class="w-5 h-5" fill="currentColor" />
-                <Play v-else class="w-5 h-5" fill="currentColor" />
-                {{ isPlaying ? '暂停' : isActiveVocal ? '继续播放' : '播放' }}
-              </button>
-              <button class="btn btn-ghost btn-sm gap-1.5" :disabled="!currentTrack" title="排在当前歌曲之后播放" @click="addToQueue('next')">
-                <Check v-if="queuedFeedback === 'next'" class="w-4 h-4 text-success" />
-                <ListStart v-else class="w-4 h-4" />
-                {{ queuedFeedback === 'next' ? '已添加' : '下一首播放' }}
-              </button>
-              <button class="btn btn-ghost btn-sm gap-1.5" :disabled="!currentTrack" title="添加到播放队列末尾" @click="addToQueue('end')">
-                <Check v-if="queuedFeedback === 'end'" class="w-4 h-4 text-success" />
-                <ListPlus v-else class="w-4 h-4" />
-                {{ queuedFeedback === 'end' ? '已添加' : '加入队列' }}
-              </button>
-              <div class="dropdown dropdown-end">
-                <button 
-                  tabindex="0"
-                  class="btn btn-ghost btn-sm gap-1.5 hover:bg-base-200/50"
-                  :disabled="!currentVocal"
-                  aria-label="下载"
-                >
-                  <Download class="w-4 h-4" />
-                  <span class="hidden sm:inline">下载</span>
-                </button>
-                <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-20 w-56 p-2 shadow-lg border border-base-200">
-                  <li>
-                    <button :disabled="!currentVocal" @click="downloadAudio">
-                      下载原音频
-                    </button>
-                  </li>
-                  <li>
-                    <button :disabled="!currentVocal || audioTrimStartSec <= 0" @click="downloadTrimmedAudio">
-                      下载去头部静音音频
-                    </button>
-                  </li>
-                </ul>
-              </div>
-              <button v-if="isActiveSong" class="btn btn-ghost btn-sm gap-1.5" title="全屏显示歌词" @click="player.openNowPlaying('lyrics')">
-                <Maximize2 class="w-4 h-4" /> 全屏
-              </button>
-            </div>
-
-            <!-- 正在播放这个版本时的进度与音量 -->
-            <div v-if="isActiveVocal" class="music-transport">
-              <button class="btn btn-ghost btn-sm btn-circle" title="后退10秒" aria-label="后退10秒" :disabled="!isAudioLoaded" @click="player.skip(-10)">
-                <SkipBack class="w-4 h-4" />
-              </button>
-              <PlayerScrubber
-                class="detail-scrubber min-w-0 flex-1"
-                :time="currentTime"
-                :duration="duration"
-                :disabled="!isAudioLoaded"
-                @seek="player.seek"
-              />
-              <button class="btn btn-ghost btn-sm btn-circle" title="前进10秒" aria-label="前进10秒" :disabled="!isAudioLoaded" @click="player.skip(10)">
-                <SkipForward class="w-4 h-4" />
-              </button>
-              <div class="music-volume">
-                <button class="btn btn-ghost btn-xs btn-circle" :aria-label="player.muted || player.volume === 0 ? '取消静音' : '静音'" @click="player.toggleMute()">
-                  <VolumeX v-if="player.muted || player.volume === 0" class="w-4 h-4 text-base-content/60" />
-                  <Volume2 v-else class="w-4 h-4 text-base-content/60" />
-                </button>
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.01"
-                  aria-label="音量"
-                  :value="player.muted ? 0 : player.volume"
-                  class="range range-xs range-primary w-20 focus:outline-none focus:ring-0"
-                  @input="onVolumeChange"
+          <!-- 头部：封面、曲名与播放操作 -->
+          <section class="music-hero">
+            <div class="music-hero-art">
+              <a :href="coverUrl" target="_blank" rel="noopener noreferrer" class="block rounded-2xl overflow-hidden shadow-2xl transition-transform duration-300 hover:scale-[1.02]">
+                <AssetImage
+                  :src="coverUrl"
+                  :alt="music.title"
+                  :lazy="false"
+                  class="w-full h-auto object-cover aspect-square"
+                />
+              </a>
+              <!-- 类别图标 -->
+              <div v-if="matchedIcons.length" class="absolute bottom-3 left-3 flex gap-1.5 z-20">
+                <img
+                  v-for="cat in matchedIcons"
+                  :key="cat"
+                  :src="`/img/${cat}.png`"
+                  :alt="cat"
+                  class="w-8 h-8 drop-shadow-lg"
                 />
               </div>
             </div>
-            <p v-if="isActiveVocal && player.hasError" class="mt-2 text-xs text-error">音频加载失败，点击播放重试</p>
-          </div>
-        </section>
+
+            <div class="music-hero-info">
+              <div v-if="isLimitedTime || isExpired || musicOwnershipLabel || musicCollaborationLabel" class="music-hero-badges">
+                <div v-if="isLimitedTime" class="badge badge-warning text-warning-content font-bold shadow-sm h-auto py-1.5 px-3 flex flex-col text-center whitespace-normal leading-tight">
+                  <span>期间限定</span>
+                  <span class="text-[10px] sm:text-[11px] font-normal opacity-90 mt-0.5">
+                    {{ formatDate(currentLimitedData!.startAt) }} - {{ formatDate(currentLimitedData!.endAt) }}
+                  </span>
+                </div>
+                <div v-else-if="isExpired" class="badge bg-base-300 text-base-content/60 font-bold border-none">已过期</div>
+                <div v-if="musicOwnershipLabel" class="badge" :class="isCurrentMusicOwned ? 'badge-success badge-outline' : 'badge-ghost'">{{ musicOwnershipLabel }}</div>
+                <div v-if="musicCollaborationLabel" class="badge badge-secondary badge-outline max-w-full h-auto py-1 text-center whitespace-normal"><ZhText :text="musicCollaborationLabel" table="musicCollaborations" path="label" layout="inline" /></div>
+              </div>
+
+              <h1 v-if="music.pronunciation && hasFurigana" class="music-title select-all leading-relaxed">
+                <template v-for="(seg, i) in furiganaSegments" :key="i">
+                  <ruby v-if="seg.ruby">{{ seg.text }}<rp>(</rp><rt class="text-xs font-medium text-primary/70 select-none">{{ seg.ruby }}</rt><rp>)</rp></ruby><template v-else>{{ seg.text }}</template>
+                </template>
+              </h1>
+              <h1 v-else class="music-title select-all">{{ music.title }}</h1>
+
+              <!-- 翻译 -->
+              <p v-if="translation" class="music-translation text-base-content/70 mt-1 select-all">{{ translation }}</p>
+              <a
+                v-else-if="zhMusicEnabled"
+                href="https://paratranz.cn/projects/18073"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="text-sm text-primary/60 hover:text-primary mt-1 inline-flex items-center gap-1 transition-colors"
+              >
+                贡献翻译 →
+              </a>
+
+              <dl class="music-credits">
+                <div><dt>作词</dt><dd class="select-all">{{ music.lyricist }}</dd></div>
+                <div><dt>作曲</dt><dd class="select-all">{{ music.composer }}</dd></div>
+                <div><dt>编曲</dt><dd class="select-all">{{ music.arranger }}</dd></div>
+              </dl>
+
+              <!-- 当前选中的版本 -->
+              <div class="music-version">
+                <div class="music-version-head flex flex-wrap items-center gap-2">
+                  <p class="font-semibold text-base-content"><ZhText v-if="currentVocal?.caption" :text="currentVocal.caption" table="musicVocals" path="caption" layout="inline" /><template v-else>加载中...</template></p>
+                  <span v-if="currentVocal && getVocalAccountStatus(currentVocal)" class="badge badge-sm gap-1" :class="isVocalAvailable(currentVocal) ? 'badge-success' : 'badge-ghost'">
+                    <CheckCircle2 v-if="isVocalAvailable(currentVocal)" class="w-3 h-3" />
+                    <LockKeyhole v-else class="w-3 h-3" />
+                    {{ getVocalAccountLabel(currentVocal) }}
+                  </span>
+                  <span v-if="currentVocal && hasVocalJacket(currentVocal.id)" class="badge badge-sm badge-secondary badge-outline">专属封面</span>
+                </div>
+                <p v-if="currentVocal && getVocalSingers(currentVocal)" class="music-version-singers text-sm text-base-content/60 flex items-center gap-2 mt-2 pl-0.5">
+                  <SingerAvatars :singers="vocalAvatars.get(currentVocal.id) || []" :size="26" :max="8" />
+                  <span class="min-w-0">{{ getVocalSingers(currentVocal) }}</span>
+                </p>
+              </div>
+
+              <!-- 播放与队列操作：音频在全站播放器里，离开本页继续播放 -->
+              <div class="music-actions">
+                <button class="btn btn-primary rounded-full gap-2 pl-5 pr-6 shadow-lg" :disabled="!currentTrack" @click="togglePlay">
+                  <Loader2 v-if="isPlaying && player.isBuffering" class="w-5 h-5 animate-spin" />
+                  <Pause v-else-if="isPlaying" class="w-5 h-5" fill="currentColor" />
+                  <Play v-else class="w-5 h-5" fill="currentColor" />
+                  {{ isPlaying ? '暂停' : isActiveVocal ? '继续播放' : '播放' }}
+                </button>
+                <button class="music-action btn btn-ghost btn-sm gap-1.5" :disabled="!currentTrack" title="排在当前歌曲之后播放" @click="addToQueue('next')">
+                  <Check v-if="queuedFeedback === 'next'" class="w-4 h-4 text-success" />
+                  <ListStart v-else class="w-4 h-4" />
+                  {{ queuedFeedback === 'next' ? '已添加' : '下一首播放' }}
+                </button>
+                <button class="music-action btn btn-ghost btn-sm gap-1.5" :disabled="!currentTrack" title="添加到播放队列末尾" @click="addToQueue('end')">
+                  <Check v-if="queuedFeedback === 'end'" class="w-4 h-4 text-success" />
+                  <ListPlus v-else class="w-4 h-4" />
+                  {{ queuedFeedback === 'end' ? '已添加' : '加入队列' }}
+                </button>
+                <div class="music-action-menu dropdown dropdown-end">
+                  <button 
+                    tabindex="0"
+                    class="music-action btn btn-ghost btn-sm gap-1.5 hover:bg-base-200/50"
+                    :disabled="!currentVocal"
+                    aria-label="下载"
+                  >
+                    <Download class="w-4 h-4" />
+                    <span>下载</span>
+                  </button>
+                  <ul tabindex="0" class="dropdown-content menu bg-base-100 rounded-box z-20 w-56 p-2 shadow-lg border border-base-200">
+                    <li>
+                      <button :disabled="!currentVocal" @click="downloadAudio">
+                        下载原音频
+                      </button>
+                    </li>
+                    <li>
+                      <button :disabled="!currentVocal || audioTrimStartSec <= 0" @click="downloadTrimmedAudio">
+                        下载去头部静音音频
+                      </button>
+                    </li>
+                  </ul>
+                </div>
+                <button v-if="isActiveSong" class="music-action btn btn-ghost btn-sm gap-1.5" title="全屏显示歌词" @click="player.openNowPlaying('lyrics')">
+                  <Maximize2 class="w-4 h-4" /> 全屏
+                </button>
+              </div>
+
+              <!-- 正在播放这个版本时的进度与音量 -->
+              <div v-if="isActiveVocal" class="music-transport">
+                <button class="btn btn-ghost btn-sm btn-circle" title="后退10秒" aria-label="后退10秒" :disabled="!isAudioLoaded" @click="player.skip(-10)">
+                  <SkipBack class="w-4 h-4" />
+                </button>
+                <PlayerScrubber
+                  class="detail-scrubber min-w-0 flex-1"
+                  :time="currentTime"
+                  :duration="duration"
+                  :disabled="!isAudioLoaded"
+                  @seek="player.seek"
+                />
+                <button class="btn btn-ghost btn-sm btn-circle" title="前进10秒" aria-label="前进10秒" :disabled="!isAudioLoaded" @click="player.skip(10)">
+                  <SkipForward class="w-4 h-4" />
+                </button>
+                <div class="music-volume">
+                  <button class="btn btn-ghost btn-xs btn-circle" :aria-label="player.muted || player.volume === 0 ? '取消静音' : '静音'" @click="player.toggleMute()">
+                    <VolumeX v-if="player.muted || player.volume === 0" class="w-4 h-4 text-base-content/60" />
+                    <Volume2 v-else class="w-4 h-4 text-base-content/60" />
+                  </button>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.01"
+                    aria-label="音量"
+                    :value="player.muted ? 0 : player.volume"
+                    class="range range-xs range-primary w-20 focus:outline-none focus:ring-0"
+                    @input="onVolumeChange"
+                  />
+                </div>
+              </div>
+              <p v-if="isActiveVocal && player.hasError" class="mt-2 text-xs text-error">音频加载失败，点击播放重试</p>
+            </div>
+          </section>
+        </header>
 
         <div class="music-body" :class="{ 'music-body--single': !showLyricsColumn }">
           <div class="music-main">
@@ -1364,55 +1420,40 @@ const isExpired = computed(() => {
               <h2 class="music-section-title">
                 <BarChart2 class="w-5 h-5 text-secondary" /> 谱面详情
               </h2>
-              <div class="grid grid-cols-[repeat(auto-fit,minmax(115px,1fr))] gap-2 sm:gap-3">
-                <div
-                  v-for="diff in difficulties"
-                  :key="diff.id"
-                  class="rounded-xl shadow-sm transition-all hover:shadow-md"
-                  :style="difficultyCardStyle(diff.musicDifficulty)"
-                >
-                  <div class="flex h-full flex-col items-center rounded-[calc(0.75rem-4px)] bg-base-100 mt-1 p-2 sm:p-4">
-                    <!-- 难度标签 -->
-                    <div
-                      class="badge border-none text-white font-bold mb-3 px-4 py-3"
-                      :style="difficultyBadgeStyle(diff.musicDifficulty)"
-                    >
-                      {{ difficultyLabels[diff.musicDifficulty] }}
-                    </div>
-
-                    <!-- 等级与各种数 -->
-                    <div class="text-3xl font-black text-base-content mb-1 tracking-tight">{{ diff.playLevel }}</div>
-                    <div class="text-xs text-base-content/50 font-medium uppercase tracking-wide mb-4 whitespace-nowrap">{{ diff.totalNoteCount }} COMBO</div>
-
-                    <!-- 按钮组 -->
-                    <div class="w-full space-y-2 mt-auto">
-                      <!-- 谱面预览 (前端 sus2img 生成) -->
-                      <button
-                        class="btn btn-sm btn-block btn-ghost btn-outline h-9 min-h-0 font-normal hover:bg-base-200 whitespace-nowrap"
-                        :class="{ 'chart-difficulty-action': difficulties.length >= 6 }"
-                        @click="openChartSvgPreview(diff)"
-                      >
-                        <Eye class="w-4 h-4 shrink-0" /> 谱面预览
-                      </button>
-
-                      <!-- 谱面播放预览 -->
-                      <button
-                        class="btn btn-sm btn-block btn-ghost btn-outline h-9 min-h-0 font-normal hover:bg-base-200 whitespace-nowrap"
-                        :class="{ 'chart-difficulty-action': difficulties.length >= 6 }"
-                        @click="openChartPreview(diff.musicDifficulty)"
-                      >
-                        <PlayCircle class="w-4 h-4 shrink-0" /> 在线游玩
-                      </button>
-
-                      <!-- 下载文件 (.sus) -->
-                      <button
-                        class="btn btn-sm btn-block btn-ghost btn-outline h-9 min-h-0 font-normal hover:bg-base-200 whitespace-nowrap"
-                        :class="{ 'chart-difficulty-action': difficulties.length >= 6 }"
-                        @click="forceDownload(diff.musicDifficulty)"
-                      >
-                        <Download class="w-4 h-4 shrink-0" /> 谱面下载
-                      </button>
-                    </div>
+              <!-- 一排难度，下面是选中难度的操作 -->
+              <div v-if="selectedChart" class="chart-picker">
+                <div class="chart-tabs" role="radiogroup" aria-label="难度">
+                  <button
+                    v-for="diff in difficulties"
+                    :key="diff.id"
+                    class="chart-tab"
+                    :class="{ active: selectedChart.id === diff.id }"
+                    :style="chartTabVars(diff.musicDifficulty)"
+                    role="radio"
+                    :aria-checked="selectedChart.id === diff.id"
+                    @click="selectedChartDifficulty = diff.musicDifficulty"
+                  >
+                    <span class="chart-tab-label">{{ difficultyLabels[diff.musicDifficulty] || diff.musicDifficulty.toUpperCase() }}</span>
+                    <span class="chart-tab-level">{{ diff.playLevel }}</span>
+                  </button>
+                </div>
+                <div class="chart-panel" :style="chartTabVars(selectedChart.musicDifficulty)">
+                  <p class="chart-panel-meta">
+                    <span class="chart-panel-label">{{ difficultyLabels[selectedChart.musicDifficulty] || selectedChart.musicDifficulty.toUpperCase() }}</span>
+                    <span>Lv.<b>{{ selectedChart.playLevel }}</b></span>
+                    <span class="opacity-40">·</span>
+                    <span><b>{{ selectedChart.totalNoteCount }}</b> COMBO</span>
+                  </p>
+                  <div class="chart-panel-actions">
+                    <button class="btn btn-sm" @click="openChartSvgPreview(selectedChart)">
+                      <Eye class="w-4 h-4 shrink-0" /> 谱面预览
+                    </button>
+                    <button class="btn btn-sm" @click="openChartPreview(selectedChart.musicDifficulty)">
+                      <PlayCircle class="w-4 h-4 shrink-0" /> 在线游玩
+                    </button>
+                    <button class="btn btn-sm" @click="forceDownload(selectedChart.musicDifficulty)">
+                      <Download class="w-4 h-4 shrink-0" /> 谱面下载
+                    </button>
                   </div>
                 </div>
               </div>
@@ -1707,39 +1748,17 @@ const isExpired = computed(() => {
 .music-hero {
   position: relative;
   display: grid;
-  gap: 1.25rem;
-  padding: 1.25rem;
-  overflow: hidden;
-  border-radius: 1.5rem;
-  background: var(--color-base-100);
-  box-shadow: 0 1px 3px rgb(0 0 0 / 0.06), 0 12px 32px -16px rgb(0 0 0 / 0.18);
-}
-
-/* 封面放大模糊后铺在头部背后，让页面带上这首歌的颜色 */
-.music-hero-wash {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-.music-hero-wash img {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 130%;
-  max-width: none;
-  height: 260%;
-  object-fit: cover;
-  opacity: 0.26;
-  filter: blur(64px) saturate(1.7);
-  transform: translate(-50%, -50%);
+  gap: 1.125rem;
 }
 
 .music-hero-art {
   position: relative;
   width: min(100%, 17rem);
   margin-inline: auto;
+}
+
+.music-hero-art > a {
+  box-shadow: 0 22px 44px -14px rgb(0 0 0 / 0.5);
 }
 
 .music-hero-info {
@@ -1790,9 +1809,6 @@ const isExpired = computed(() => {
 
 .music-version {
   margin-top: 1rem;
-  padding: 0.75rem 0.875rem;
-  border-radius: 0.875rem;
-  background: color-mix(in srgb, var(--color-base-content) 5%, transparent);
 }
 
 .music-actions {
@@ -1927,12 +1943,313 @@ const isExpired = computed(() => {
   pointer-events: none;
 }
 
+.music-back {
+  margin-bottom: 1rem;
+}
+
+/* 头部向外抵消页面的左右与顶部留白，铺满内容区；封面模糊后垫在下面 */
+.music-head {
+  --bleed-x: 1rem;
+  --bleed-top: 1.25rem;
+  position: relative;
+  isolation: isolate;
+  margin: calc(-1 * var(--bleed-top)) calc(-1 * var(--bleed-x)) 0;
+  padding: 0.5rem var(--bleed-x);
+}
+
+.music-head-backdrop {
+  position: absolute;
+  z-index: -1;
+  inset: 0 calc(-1 * var(--bleed-right, 0px)) 0 calc(-1 * var(--bleed-left, 0px));
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.music-head-backdrop img {
+  position: absolute;
+  top: -10%;
+  left: -30%;
+  width: 160%;
+  max-width: none;
+  height: 85%;
+  object-fit: cover;
+  opacity: 0.7;
+  filter: blur(44px) saturate(1.6);
+  transform: translateZ(0);
+}
+
+/* 上方保留封面的颜色，往下逐渐融进页面背景 */
+.music-head-backdrop::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--color-base-200) 30%, transparent) 0%,
+    color-mix(in srgb, var(--color-base-200) 50%, transparent) 40%,
+    color-mix(in srgb, var(--color-base-200) 85%, transparent) 70%,
+    var(--color-base-200) 100%
+  );
+}
+
+.chart-picker {
+  container: chart / inline-size;
+}
+
+.chart-tabs {
+  display: grid;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+  gap: 0.375rem;
+}
+
+.chart-tab {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.0625rem;
+  padding: 0.5rem 0 0.4375rem;
+  overflow: hidden;
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, var(--diff) 16%, var(--color-base-100));
+  color: var(--color-base-content);
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s, background-color 0.15s;
+}
+
+.chart-tab::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: var(--diff-bg);
+}
+
+.chart-tab.active {
+  background: var(--diff-bg);
+  color: var(--diff-fg);
+  box-shadow: 0 6px 14px -6px color-mix(in srgb, var(--diff) 75%, transparent);
+  transform: translateY(-1px);
+}
+
+.chart-tab-label {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 0.5625rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-overflow: clip;
+  white-space: nowrap;
+  opacity: 0.75;
+}
+
+.chart-tab.active .chart-tab-label {
+  opacity: 0.9;
+}
+
+.chart-tab-level {
+  font-size: 1.25rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+}
+
+.chart-panel {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  border-radius: 0.875rem;
+  background: color-mix(in srgb, var(--diff) 10%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--diff) 28%, transparent);
+}
+
+.chart-panel-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.5rem;
+  margin-bottom: 0.625rem;
+  font-size: 0.8125rem;
+  color: color-mix(in srgb, var(--color-base-content) 70%, transparent);
+}
+
+.chart-panel-meta b {
+  font-weight: 800;
+  color: var(--color-base-content);
+}
+
+.chart-panel-label {
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  background: var(--diff-bg);
+  color: var(--diff-fg);
+  font-size: 0.6875rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+}
+
+.chart-panel-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.chart-panel-actions .btn {
+  height: 2.5rem;
+  min-height: 0;
+  gap: 0.25rem;
+  padding-inline: 0.25rem;
+  border: none;
+  background: var(--color-base-100);
+  font-weight: 500;
+  white-space: nowrap;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.06);
+}
+
+@media (min-width: 640px) {
+  .music-head {
+    /* 页面自身的 sm:px-4 加上 main 的 sm:px-6 */
+    --bleed-x: 2.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .music-head {
+    --bleed-top: 2rem;
+  }
+}
+
+/* ===== 窄屏：内容居中，播放占满一行，其余操作平分成一排图标按钮 ===== */
+@container music (width < 36rem) {
+  .music-back {
+    margin-bottom: 0.5rem;
+  }
+
+  .music-hero {
+    text-align: center;
+  }
+
+  .music-hero-art {
+    width: min(76%, 17rem);
+  }
+
+  .music-hero-badges,
+  .music-credits,
+  .music-version-head,
+  .music-version-singers {
+    justify-content: center;
+  }
+
+  .music-title {
+    font-size: 1.625rem;
+  }
+
+  .music-credits {
+    gap: 0.25rem 1rem;
+    margin-top: 0.625rem;
+  }
+
+  .music-version {
+    margin-top: 0.875rem;
+  }
+
+  .music-actions {
+    gap: 0.25rem;
+    margin-top: 1.125rem;
+  }
+
+  .music-actions > .btn-primary {
+    flex: 1 0 100%;
+    height: 3rem;
+    margin: 0 0 0.25rem;
+    font-size: 1rem;
+  }
+
+  .music-actions > .music-action,
+  .music-action-menu {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .music-action {
+    height: auto;
+    min-height: 0;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.5rem 0.125rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .music-action-menu > .music-action {
+    width: 100%;
+  }
+
+  .music-action svg {
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+
+  .music-transport {
+    margin-top: 0.5rem;
+  }
+}
+
+/* 宽一些的谱面区：难度说明和三个操作排成一行 */
+@container chart (min-width: 32rem) {
+  .chart-tab {
+    padding: 0.625rem 0 0.5rem;
+  }
+
+  .chart-tab-label {
+    font-size: 0.6875rem;
+  }
+
+  .chart-tab-level {
+    font-size: 1.5rem;
+  }
+
+  .chart-panel {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+
+  .chart-panel-meta {
+    flex: 1;
+    margin-bottom: 0;
+  }
+
+  .chart-panel-actions {
+    grid-template-columns: repeat(3, auto);
+  }
+
+  .chart-panel-actions .btn {
+    padding-inline: 0.875rem;
+  }
+}
+
 @container music (min-width: 36rem) {
+  .music-head {
+    padding-bottom: 0.75rem;
+  }
+
+  /* 宽屏背景是一条横幅：整张封面横向拉伸后模糊，左右各处带上封面对应位置的颜色 */
+  .music-head-backdrop img {
+    top: -15%;
+    left: -5%;
+    width: 110%;
+    height: 95%;
+    object-fit: fill;
+    filter: blur(56px) saturate(1.6);
+  }
+
   .music-hero {
     align-items: center;
-    gap: 1.75rem;
-    grid-template-columns: minmax(11rem, 15rem) minmax(0, 1fr);
-    padding: 1.5rem;
+    gap: 2rem;
+    grid-template-columns: minmax(11rem, 16rem) minmax(0, 1fr);
   }
 
   .music-hero-art {
@@ -1990,34 +2307,6 @@ const isExpired = computed(() => {
 
 .range:hover::-webkit-slider-thumb {
   transform: scale(1.2);
-}
-
-@media (min-width: 768px) {
-  .chart-difficulty-action {
-    gap: 0.125rem !important;
-    padding-inline: 0.125rem !important;
-    font-size: 0.6875rem !important;
-    line-height: 1 !important;
-  }
-
-  .chart-difficulty-action svg {
-    width: 0.8125rem !important;
-    height: 0.8125rem !important;
-    flex-shrink: 0 !important;
-  }
-}
-
-@media (min-width: 1280px) {
-  .chart-difficulty-action {
-    gap: 0.25rem !important;
-    padding-inline: 0.25rem !important;
-    font-size: 0.8125rem !important;
-  }
-
-  .chart-difficulty-action svg {
-    width: 0.9375rem !important;
-    height: 0.9375rem !important;
-  }
 }
 
 .chart-svg-preview-canvas {
