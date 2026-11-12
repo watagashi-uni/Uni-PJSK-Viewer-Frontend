@@ -54,10 +54,12 @@ export function parseLrc(text: string, duration: number): LyricLine[] {
 export function normalizeLyrics(data: Payload): SongLyrics {
   const lines = data.format === 'lrc' ? parseLrc(data.lrc || '', data.duration) : data.lines || []
   if (data.format === 'lrc') {
-    const translated = parseLrc(data.translationLrc || '', data.duration)
-    for (const line of lines) {
-      // Chinese cues are independent line groups, sometimes spanning several original lines.
-      line.translation = translated.filter(t => t.start <= line.start + 0.05 && t.end > line.start).map(t => t.text).join(' ')
+    // A translation row belongs to one line: the first that starts while the row is current.
+    // Lines that follow under the same row get none of their own, so a sentence written for
+    // several lines is shown once instead of being repeated under each of them.
+    for (const cue of parseLrc(data.translationLrc || '', data.duration)) {
+      const owner = lines.find(line => cue.start <= line.start + 0.05 && cue.end > line.start)
+      if (owner) owner.translation = owner.translation ? `${owner.translation} ${cue.text}` : cue.text
     }
   }
   if (data.format === 'lrc') {

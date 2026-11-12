@@ -15,10 +15,17 @@ test('LRC supports repeated timestamps, simultaneous cues and final duration', (
     { start: 15, end: 62.25, text: '次の句' }, { start: 62.25, end: 80, text: '歌詞' },
   ])
 })
-test('translation groups span original lines; rich partial text and roles survive', () => {
+test('a translation row shows once, under the line it starts on; rich partial text and roles survive', () => {
   const { normalizeLyrics } = load()
+  // one row written for two lines is not repeated under the second
   const song = normalizeLyrics({ format: 'lrc', duration: 20, lrc: '[00:09.0]A\n[00:11.0]B', translationLrc: '[00:09.0]甲乙' })
-  assert.deepEqual(song.lines.map(l => l.translation), ['甲乙', '甲乙'])
+  assert.deepEqual(song.lines.map(l => l.translation), ['甲乙', undefined])
+  // rows on their own lines; an untranslated line in between stays empty instead of inheriting
+  const perLine = normalizeLyrics({ format: 'lrc', duration: 20, lrc: '[00:09.0]A\n[00:11.0]B\n[00:13.0]C\n[00:15.0]D', translationLrc: '[00:09.0]甲\n[00:13.0]丙\n[00:15.0]丁' })
+  assert.deepEqual(perLine.lines.map(l => l.translation), ['甲', undefined, '丙', '丁'])
+  // two rows landing on the same line are both kept; a row with no line under it is dropped
+  const odd = normalizeLyrics({ format: 'lrc', duration: 20, lrc: '[00:09.0]A\n[00:15.0]B', translationLrc: '[00:09.0]甲\n[00:09.0]乙\n[00:12.0]无主\n[00:15.0]丙' })
+  assert.deepEqual(odd.lines.map(l => l.translation), ['甲 乙', '丙'])
   const line = { start: 9, end: 10, text: 'ヘイ', segments: [{ text: 'ヘイ', performerIds: ['singer'] }] }
   assert.deepEqual(normalizeLyrics({ format: 'bilingual_json', duration: 20, lines: [line] }).lines, [line])
 })
