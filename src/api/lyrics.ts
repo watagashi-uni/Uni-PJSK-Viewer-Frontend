@@ -1,6 +1,8 @@
 import { masterApiBaseUrl } from './masterClient'
 
 export interface LyricWord { from: number; to: number; start: number; end: number }
+/** Reading of `text.slice(from, to)`, in the same UTF-16 offsets as the timed units. */
+export interface LyricRuby { from: number; to: number; reading: string }
 export interface LyricLine {
   words?: LyricWord[]
   start: number
@@ -9,6 +11,7 @@ export interface LyricLine {
   translation?: string
   segments?: { text: string; performerIds: string[] }[]
   performerIds?: string[]
+  ruby?: LyricRuby[]
 }
 export interface SongLyrics {
   musicId: number
@@ -26,6 +29,7 @@ interface Payload extends Omit<SongLyrics, 'lines'> {
   lrc?: string
   translationLrc?: string
   wordLines?: (LyricLine & { cueStart: number })[]
+  rubyLines?: { cueStart: number; text: string; ruby: LyricRuby[] }[]
 }
 interface LyricIndex { v: number; songs: Record<string, string> }
 const base = `${masterApiBaseUrl}/lyrics`
@@ -63,16 +67,32 @@ export function normalizeLyrics(data: Payload): SongLyrics {
     }
   }
   if (data.format === 'lrc') {
+    // Readings are keyed by the original cue, so they are matched before word timing moves the line.
+    for (const line of lines) {
+      const read = data.rubyLines?.find(r => Math.abs(r.cueStart - line.start) < 0.001 && r.text === line.text)
+      if (read) line.ruby = read.ruby
+    }
     for (const line of lines) {
       const timed = data.wordLines?.find(w => Math.abs(w.cueStart - line.start) < 0.001 && w.text === line.text)
       if (timed) { line.words = timed.words; line.start = timed.start; line.end = timed.end }
     }
   }
   for (const line of lines) {
+    if (line.ruby) line.ruby = validRuby(line.ruby, line.text)
     // Invalid or overlapping text ranges fall back to line timing.
     if (line.words && !line.words.every((w, i, all) => Number.isInteger(w.from) && Number.isInteger(w.to) && w.from >= 0 && w.to > w.from && w.to <= line.text.length && Number.isFinite(w.start) && Number.isFinite(w.end) && w.start >= 0 && w.end >= w.start && (i === 0 || w.from >= all[i - 1]!.to))) line.words = undefined
   }
   return { ...data, lines: lines.filter(l => Number.isFinite(l.start) && Number.isFinite(l.end) && l.end >= l.start && l.text).sort((a, b) => a.start - b.start) }
+}
+
+/** Readings in text order; a malformed or overlapping one is dropped and its text shown bare. */
+function validRuby(ruby: unknown, text: string): LyricRuby[] | undefined {
+  if (!Array.isArray(ruby)) return undefined
+  const valid = (ruby as LyricRuby[])
+    .filter(r => r && Number.isInteger(r.from) && Number.isInteger(r.to) && r.from >= 0 && r.to > r.from && r.to <= text.length && typeof r.reading === 'string' && r.reading.trim())
+    .sort((a, b) => a.from - b.from)
+    .filter((r, i, all) => i === 0 || r.from >= all[i - 1]!.to)
+  return valid.length ? valid.map(({ from, to, reading }) => ({ from, to, reading })) : undefined
 }
 
 async function fetchJson<T>(path: string): Promise<T> {
@@ -140,6 +160,62 @@ export function lyricParts(line: LyricLine): LyricPart[] {
   }
   if (cursor < line.text.length) plain(cursor, line.text.length)
   return parts
+}
+
+/** A piece of a part, cut where a reading begins or ends. */
+export interface LyricPiece {
+  text: string
+  /** The part of `lyricParts()` this piece comes from. */
+  part: number
+  word?: LyricWord
+  /** Where the piece lies inside its timed unit (0–1), when a reading cut the unit. */
+  share?: [number, number]
+}
+/** Text under one reading, or a single piece with none. */
+export interface LyricRun { reading?: string; pieces: LyricPiece[] }
+
+/**
+ * The parts of a line grouped under their readings. A timed unit that a reading boundary
+ * falls inside is cut into pieces that keep the unit's own timing and fill in turn by its
+ * progress, so no timing that is not in the data is invented.
+ */
+export function lyricRuns(line: LyricLine, parts: LyricPart[] = lyricParts(line)): LyricRun[] {
+  const ruby = line.ruby || []
+  const runs: LyricRun[] = []
+  let offset = 0
+  let current: { index: number; run: LyricRun } | undefined
+  parts.forEach((part, index) => {
+    const from = offset
+    const to = offset + part.text.length
+    offset = to
+    const cuts = [from, ...ruby.flatMap(r => [r.from, r.to]).filter(at => at > from && at < to), to]
+    for (let c = 0; c + 1 < cuts.length; c++) {
+      const a = cuts[c]!
+      const b = cuts[c + 1]!
+      const piece: LyricPiece = { text: line.text.slice(a, b), part: index }
+      if (part.word) {
+        piece.word = part.word
+        if (b - a < to - from) piece.share = [(a - from) / (to - from), (b - from) / (to - from)]
+      }
+      const reading = ruby.findIndex(r => r.from <= a && r.to >= b)
+      if (reading < 0) {
+        current = undefined
+        runs.push({ pieces: [piece] })
+      } else if (current?.index === reading) {
+        current.run.pieces.push(piece)
+      } else {
+        current = { index: reading, run: { reading: ruby[reading]!.reading, pieces: [piece] } }
+        runs.push(current.run)
+      }
+    }
+  })
+  return runs
+}
+
+/** Fill of one piece of a timed unit: the unit's progress, read across the stretch the piece covers. */
+export function pieceProgress(progress: number, share?: [number, number]): number {
+  if (!share) return progress
+  return Math.max(0, Math.min(1, (progress - share[0]) / (share[1] - share[0])))
 }
 
 /** Everyone heard on a line, whether assigned to the whole line or to parts of it. */

@@ -2,7 +2,7 @@
 import { ref, shallowRef, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { ChevronDown, Languages, LocateFixed } from 'lucide-vue-next'
 import {
-  linePerformerIds, loadSongLyrics, lyricGaps, lyricParts, wordProgress,
+  linePerformerIds, loadSongLyrics, lyricGaps, lyricParts, lyricRuns, pieceProgress, wordProgress,
   type LyricLine, type LyricWord, type SongLyrics,
 } from '@/api/lyrics'
 import { useSingerAvatars } from '@/composables/useSingerAvatars'
@@ -36,12 +36,17 @@ const emit = defineEmits<{
 }>()
 
 const TRANSLATION_KEY = 'player_lyricsTranslation'
+const RUBY_KEY = 'player_lyricsRuby'
 /** Where the current line rests, as a fraction of the visible height. */
 const ANCHOR_RATIO = { panel: 0.36, immersive: 0.3, sidebar: 0.3 } as const
 const BROWSE_RESUME_MS = 4000
 
-interface RenderPart { text: string; word?: LyricWord; avatars?: SingerAvatar[] }
-interface LineItem { kind: 'line'; start: number; end: number; line: LyricLine; parts: RenderPart[]; singerKeys: string[] }
+interface RenderPart { text: string; word?: LyricWord; share?: [number, number]; avatars?: SingerAvatar[] }
+/** Text under a reading (drawn as ruby), or one piece of bare text. */
+type RenderRun =
+  | { kind: 'ruby'; reading: string; pieces: RenderPart[]; avatars?: SingerAvatar[] }
+  | { kind: 'text'; piece: RenderPart }
+interface LineItem { kind: 'line'; start: number; end: number; line: LyricLine; runs: RenderRun[]; singerKeys: string[] }
 interface GapItem { kind: 'gap'; start: number; end: number }
 type Item = LineItem | GapItem
 
@@ -51,7 +56,8 @@ const lyrics = shallowRef<SongLyrics | null>(null)
 const loading = ref(false)
 const failed = ref(false)
 const expanded = ref(true)
-const translated = ref(readTranslationPreference())
+const translated = ref(readPreference(TRANSLATION_KEY))
+const rubied = ref(readPreference(RUBY_KEY))
 const following = ref(true)
 /** Row the view is centred on: the last one that has started. -1 before the first. */
 const anchor = ref(-1)
@@ -68,9 +74,10 @@ let resizeObserver: ResizeObserver | undefined
 const painted = new Map<number, HTMLElement[]>()
 const rowMotion = new WeakMap<HTMLElement, Animation>()
 
-function readTranslationPreference(): boolean {
+/** On/off switches remembered across visits; both start on. */
+function readPreference(key: string): boolean {
   try {
-    return localStorage.getItem(TRANSLATION_KEY) !== '0'
+    return localStorage.getItem(key) !== '0'
   } catch {
     return true
   }
@@ -109,6 +116,7 @@ const mismatched = computed(() => !!lyrics.value && (
 /** Lines move with the music. Until the audio length is known the lyrics are shown as plain text. */
 const live = computed(() => props.synced && !mismatched.value && props.duration > 0)
 const hasTranslation = computed(() => !!lyrics.value?.lines.some(line => line.translation))
+const hasRuby = computed(() => !!lyrics.value?.lines.some(line => line.ruby?.length))
 
 const items = computed<Item[]>(() => {
   const data = lyrics.value
@@ -125,12 +133,13 @@ const items = computed<Item[]>(() => {
       result.push({ kind: 'gap', start: gap.start, end: gap.end })
       previousKey = ''
     }
-    const parts: RenderPart[] = lyricParts(line).map(part => ({ text: part.text, word: part.word }))
+    const split = lyricParts(line)
+    const parts: RenderPart[] = split.map(part => ({ text: part.text, word: part.word }))
     let singerKeys: string[] = []
     if (showPerformers.value) {
       const union = inSongOrder(linePerformerIds(line))
       singerKeys = union.map(p => performerAvatar(p).key)
-      const sung = lyricParts(line).map((part, n) => ({ n, key: part.text.trim() ? setKey(part.performerIds) : '', ids: part.performerIds }))
+      const sung = split.map((part, n) => ({ n, key: part.text.trim() ? setKey(part.performerIds) : '', ids: part.performerIds }))
       const mixed = new Set(sung.filter(p => p.key).map(p => p.key)).size > 1
       if (mixed) {
         // Singers trade off inside the line: mark each hand-over where it happens.
@@ -149,7 +158,20 @@ const items = computed<Item[]>(() => {
         previousKey = key
       }
     }
-    result.push({ kind: 'line', start: line.start, end: line.end, line, parts, singerKeys })
+    // Cut the parts where readings begin and end. A portrait stays at the head of its part;
+    // one that would land inside a reading leads the whole reading instead.
+    const runs: RenderRun[] = []
+    let lastPart = -1
+    for (const run of lyricRuns(line, split)) {
+      const pieces = run.pieces.map((piece) => {
+        const avatars = piece.part !== lastPart ? parts[piece.part]!.avatars : undefined
+        lastPart = piece.part
+        return { text: piece.text, word: piece.word, share: piece.share, avatars }
+      })
+      if (run.reading === undefined) runs.push({ kind: 'text', piece: pieces[0]! })
+      else runs.push({ kind: 'ruby', reading: run.reading, pieces, avatars: pieces.find(p => p.avatars)?.avatars })
+    }
+    result.push({ kind: 'line', start: line.start, end: line.end, line, runs, singerKeys })
   })
   return result
 })
@@ -203,7 +225,9 @@ function paint(time: number, active: number[]) {
       continue
     }
     for (const word of words) {
-      const progress = wordProgress(time, { start: Number(word.dataset.s), end: Number(word.dataset.e) })
+      // A unit cut by a reading fills across its pieces in turn, on the unit's own clock.
+      const share = word.dataset.a ? [Number(word.dataset.a), Number(word.dataset.b)] as [number, number] : undefined
+      const progress = pieceProgress(wordProgress(time, { start: Number(word.dataset.s), end: Number(word.dataset.e) }), share)
       const value = progress.toFixed(3)
       if (word.dataset.p === value) continue
       word.dataset.p = value
@@ -314,18 +338,20 @@ watch(following, (value) => {
 }, { flush: 'post' })
 
 // Layout changed under the current line: put it back without a flourish.
-watch([translated, items, expanded, live], async () => {
+watch([translated, rubied, items, expanded, live], async () => {
   await nextTick()
   if (live.value && following.value) follow(false)
 }, { flush: 'post' })
 
-watch(translated, (value) => {
+function remember(key: string, value: boolean) {
   try {
-    localStorage.setItem(TRANSLATION_KEY, value ? '1' : '0')
+    localStorage.setItem(key, value ? '1' : '0')
   } catch {
     // Preference simply does not persist.
   }
-})
+}
+watch(translated, value => remember(TRANSLATION_KEY, value))
+watch(rubied, value => remember(RUBY_KEY, value))
 
 watch(viewport, (box, _old, onCleanup) => {
   if (!box) return
@@ -406,6 +432,16 @@ onBeforeUnmount(() => {
         >
           <Languages class="h-3.5 w-3.5" /> 译文
         </button>
+        <button
+          v-if="hasRuby"
+          class="ly-chip"
+          :class="{ on: rubied }"
+          :aria-pressed="rubied"
+          :title="rubied ? '隐藏注音' : '显示注音'"
+          @click="rubied = !rubied"
+        >
+          <span class="ly-chip-kana" aria-hidden="true">あ</span> 注音
+        </button>
       </div>
     </div>
 
@@ -435,7 +471,7 @@ onBeforeUnmount(() => {
             >
               <div v-if="item.kind === 'gap'" class="ly-gap" aria-hidden="true"><i></i><i></i><i></i></div>
               <button v-else class="ly-line" :aria-current="isActive(index) ? 'true' : undefined" @click="seek(item.start)">
-                <span class="ly-original" lang="ja"><template v-for="(part, n) in item.parts" :key="n"><template v-if="part.avatars"><span class="ly-glue" :class="{ 'ly-glue--break': n > 0 }"><SingerAvatars class="ly-handover" :singers="part.avatars" :size="variant === 'immersive' ? 28 : 22" /><span v-if="part.word" class="ly-word" :data-s="part.word.start" :data-e="part.word.end">{{ part.text }}</span><template v-else>{{ leadOf(part.text) }}</template></span><template v-if="!part.word">{{ part.text.slice(leadOf(part.text).length) }}</template></template><span v-else-if="part.word" class="ly-word" :data-s="part.word.start" :data-e="part.word.end">{{ part.text }}</span><template v-else>{{ part.text }}</template></template></span>
+                <span class="ly-original" lang="ja"><template v-for="(run, n) in item.runs" :key="n"><span v-if="run.kind === 'ruby'" class="ly-ruby" :class="run.avatars && ['ly-glue', { 'ly-glue--break': n > 0 }]"><SingerAvatars v-if="run.avatars" class="ly-handover" :singers="run.avatars" :size="variant === 'immersive' ? 28 : 22" /><ruby><template v-for="(piece, k) in run.pieces" :key="k"><span v-if="piece.word" class="ly-word" :data-s="piece.word.start" :data-e="piece.word.end" :data-a="piece.share?.[0]" :data-b="piece.share?.[1]">{{ piece.text }}</span><template v-else>{{ piece.text }}</template></template><template v-if="rubied"><rp>(</rp><rt>{{ run.reading }}</rt><rp>)</rp></template></ruby></span><template v-else-if="run.piece.avatars"><span class="ly-glue" :class="{ 'ly-glue--break': n > 0 }"><SingerAvatars class="ly-handover" :singers="run.piece.avatars" :size="variant === 'immersive' ? 28 : 22" /><span v-if="run.piece.word" class="ly-word" :data-s="run.piece.word.start" :data-e="run.piece.word.end" :data-a="run.piece.share?.[0]" :data-b="run.piece.share?.[1]">{{ run.piece.text }}</span><template v-else>{{ leadOf(run.piece.text) }}</template></span><template v-if="!run.piece.word">{{ run.piece.text.slice(leadOf(run.piece.text).length) }}</template></template><span v-else-if="run.piece.word" class="ly-word" :data-s="run.piece.word.start" :data-e="run.piece.word.end" :data-a="run.piece.share?.[0]" :data-b="run.piece.share?.[1]">{{ run.piece.text }}</span><template v-else>{{ run.piece.text }}</template></template></span>
                 <span v-if="translated && item.line.translation" class="ly-translation" lang="zh-CN">{{ item.line.translation }}</span>
               </button>
             </div>
@@ -524,6 +560,14 @@ onBeforeUnmount(() => {
   cursor: pointer;
   backdrop-filter: blur(12px);
   transition: opacity 0.2s, background-color 0.2s;
+}
+
+.ly-chip-kana {
+  width: 0.875rem;
+  font-family: 'Hiragino Sans', 'Yu Gothic UI', 'Noto Sans JP', sans-serif;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-align: center;
 }
 
 .ly-chip:hover,
@@ -688,6 +732,21 @@ onBeforeUnmount(() => {
   line-height: 1.5;
   opacity: 0.72;
   white-space: pre-wrap;
+}
+
+/* Furigana: a reading sits over its text and is not split from it when the row wraps.
+   It shares the line's colour and focus, but is not filled word by word. */
+.ly-ruby {
+  white-space: nowrap;
+}
+
+.ly-original rt {
+  font-size: 0.44em;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: 0.02em;
+  text-align: center;
+  opacity: 0.78;
 }
 
 /* A portrait never ends a row on its own: it wraps together with the first word it introduces. */
