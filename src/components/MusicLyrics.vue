@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { ref, shallowRef, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
-import { ChevronDown, Languages, LocateFixed } from 'lucide-vue-next'
+import { ChevronDown, Languages, LocateFixed, Type } from 'lucide-vue-next'
 import {
   linePerformerIds, loadSongLyrics, lyricGaps, lyricParts, lyricRuns, pieceProgress, untimedFill, wordProgress,
-  type LyricLine, type LyricWord, type SongLyrics,
+  SAME_CUE_SEC, type LyricLine, type LyricWord, type SongLyrics,
 } from '@/api/lyrics'
+import { useMasterStore } from '@/stores/master'
 import { useSingerAvatars } from '@/composables/useSingerAvatars'
 import SingerAvatars, { type SingerAvatar } from '@/components/player/SingerAvatars.vue'
 
@@ -37,11 +38,21 @@ const emit = defineEmits<{
 
 const TRANSLATION_KEY = 'player_lyricsTranslation'
 const RUBY_KEY = 'player_lyricsRuby'
+const ROMAJI_KEY = 'player_lyricsRomaji'
 /** Where the current line rests, as a fraction of the visible height. */
 const ANCHOR_RATIO = { panel: 0.36, immersive: 0.3, sidebar: 0.3 } as const
 const BROWSE_RESUME_MS = 4000
 /** Delay between one row and the next as the lines glide into place. */
-const ROW_STAGGER_MS = 46
+const ROW_STAGGER_MS = 30
+/** Rows further down than this all start together with the last of them. */
+const ROW_STAGGER_ROWS = 6
+/** How long the rows take to glide into place. */
+const ROW_GLIDE_MS = 760
+/**
+ * A line counts as started this much before its cue. A seek lands on the cue itself, and the
+ * audio clock may read back a hair earlier, which would otherwise leave the line above current.
+ */
+const CUE_SLACK_SEC = 0.01
 /** Phone-sized windows, where a line wraps into tall rows and only a few of them are in view. */
 const NARROW_QUERY = '(max-width: 899px)'
 
@@ -54,13 +65,16 @@ interface Segment { text: string; fill?: Fill }
  * `head`, the bit it must not be separated from when the row wraps; `tail` follows freely.
  */
 type RenderRun =
-  | { kind: 'ruby'; reading: string; segments: Segment[]; avatars?: SingerAvatar[]; timed: boolean }
-  | { kind: 'text'; avatars?: SingerAvatar[]; head: Segment[]; tail: Segment[] }
-interface LineItem { kind: 'line'; start: number; end: number; line: LyricLine; runs: RenderRun[]; singerKeys: string[] }
+  | { kind: 'ruby'; reading: string; segments: Segment[]; avatars?: SingerAvatar[]; timed: boolean; breaks?: boolean }
+  | { kind: 'text'; avatars?: SingerAvatar[]; head: Segment[]; tail: Segment[]; breaks?: boolean }
+/** From `start` on, these portraits are the ones singing (until the next voice of the line). */
+interface Voice { start: number; keys: string[] }
+interface LineItem { kind: 'line'; start: number; end: number; line: LyricLine; runs: RenderRun[]; singerKeys: string[]; voices?: Voice[] }
 interface GapItem { kind: 'gap'; start: number; end: number }
 type Item = LineItem | GapItem
 
 const { performerAvatar } = useSingerAvatars()
+const master = useMasterStore()
 
 const lyrics = shallowRef<SongLyrics | null>(null)
 const loading = ref(false)
@@ -68,6 +82,11 @@ const failed = ref(false)
 const expanded = ref(true)
 const translated = ref(readPreference(TRANSLATION_KEY))
 const rubied = ref(readPreference(RUBY_KEY))
+/**
+ * Romaji and the translation take turns under the lines: switching one on switches the
+ * other off, so a line never grows two extra rows. Romaji starts off, the translation on.
+ */
+const romanized = ref(readPreference(ROMAJI_KEY, false) && !translated.value)
 const following = ref(true)
 /** Row the view is centred on: the last one that has started. -1 before the first. */
 const anchor = ref(-1)
@@ -84,14 +103,18 @@ let resizeObserver: ResizeObserver | undefined
 interface Painted { el: HTMLElement; fill?: Fill; under?: { painted: Painted; weight: number }[]; value?: string }
 /** Filling elements of the rows being sung, kept so each frame only touches those. */
 const painted = new Map<number, Painted[]>()
-const rowMotion = new WeakMap<HTMLElement, Animation>()
+/** A row's glide into place, and how long it waits before it starts to move. */
+const rowMotion = new WeakMap<HTMLElement, { animation: Animation; delay: number }>()
+/** Portrait keys last reported through `singing`, so a frame only reports a change. */
+let singingKey: string | null = null
 
-/** On/off switches remembered across visits; both start on. */
-function readPreference(key: string): boolean {
+/** On/off switches remembered across visits. */
+function readPreference(key: string, initial = true): boolean {
   try {
-    return localStorage.getItem(key) !== '0'
+    const saved = localStorage.getItem(key)
+    return saved === null ? initial : saved !== '0'
   } catch {
-    return true
+    return initial
   }
 }
 
@@ -112,6 +135,28 @@ async function load() {
 }
 watch(() => props.musicId, load, { immediate: true })
 
+interface CreditRow { id: number; lyricist?: string; composer?: string }
+const credit = shallowRef<CreditRow | null>(null)
+watch(() => props.musicId, async (id) => {
+  credit.value = null
+  try {
+    const row = (await master.getMaster<CreditRow>('musics')).find(m => m.id === id)
+    if (props.musicId === id) credit.value = row || null
+  } catch {
+    // The lyrics simply show without credits.
+  }
+}, { immediate: true })
+/** Lyricist and composer, shown above the first line. Master writes "-" where there is none. */
+const credits = computed(() => {
+  const row = credit.value
+  const named = (value?: string) => (value && value.trim() !== '-' ? value.trim() : '')
+  return [['作词', named(row?.lyricist)], ['作曲', named(row?.composer)]].filter(([, name]) => name) as [string, string][]
+})
+/** Children of the track in front of the first row. */
+const headRows = computed(() => (credits.value.length ? 1 : 0))
+/** The Inst. ver. of a song has nothing to sing along to. */
+const instrumental = computed(() => props.vocalType === 'instrumental')
+
 // Singer assignments belong to the annotated rendition, not to every cover.
 // That rendition is named by its vocal id, or by its audio bundle where no id was recorded.
 const showPerformers = computed(() => {
@@ -126,9 +171,10 @@ const mismatched = computed(() => !!lyrics.value && (
   || (props.synced && props.duration > 0 && Math.abs(props.duration - lyrics.value.duration) >= 2)
 ))
 /** Lines move with the music. Until the audio length is known the lyrics are shown as plain text. */
-const live = computed(() => props.synced && !mismatched.value && props.duration > 0)
+const live = computed(() => props.synced && !instrumental.value && !mismatched.value && props.duration > 0)
 const hasTranslation = computed(() => !!lyrics.value?.lines.some(line => line.translation))
 const hasRuby = computed(() => !!lyrics.value?.lines.some(line => line.ruby?.length))
+const hasRomaji = computed(() => !!lyrics.value?.lines.some(line => line.romaji))
 
 const items = computed<Item[]>(() => {
   const data = lyrics.value
@@ -148,6 +194,7 @@ const items = computed<Item[]>(() => {
     const split = lyricParts(line)
     const parts: RenderPart[] = split.map(part => ({ text: part.text, word: part.word }))
     let singerKeys: string[] = []
+    let voices: Voice[] | undefined
     if (showPerformers.value) {
       const union = inSongOrder(linePerformerIds(line))
       singerKeys = union.map(p => performerAvatar(p).key)
@@ -160,6 +207,18 @@ const items = computed<Item[]>(() => {
           if (!piece.key || piece.key === last) continue
           last = piece.key
           parts[piece.n]!.avatars = inSongOrder(piece.ids).map(performerAvatar)
+        }
+        // With timed units the hand-overs have a time too, so the portraits outside the lyrics
+        // can follow the voice being heard instead of lighting everyone on the line at once.
+        if (line.words?.length) {
+          let previous = ''
+          for (const part of split) {
+            if (!part.word || !part.text.trim() || !part.performerIds.length) continue
+            const key = setKey(part.performerIds)
+            if (key === previous) continue
+            previous = key
+            ;(voices ??= []).push({ start: part.word.start, keys: inSongOrder(part.performerIds).map(p => performerAvatar(p).key) })
+          }
         }
         previousKey = ''
       } else {
@@ -198,7 +257,14 @@ const items = computed<Item[]>(() => {
       const cut = (text: string): Segment[] => (text ? [{ text, fill: piece.fill }] : [])
       runs.push({ kind: 'text', avatars: piece.avatars, head: cut(lead), tail: cut(piece.text.slice(lead.length)) })
     }
-    result.push({ kind: 'line', start: line.start, end: line.end, line, runs, singerKeys })
+    // A new voice starts its own row, unless the text before it already ended one.
+    let previousText = ''
+    for (const run of runs) {
+      if (run.avatars) run.breaks = !!previousText && !previousText.endsWith('\n')
+      const text = (run.kind === 'ruby' ? run.segments : [...run.head, ...run.tail]).map(s => s.text).join('')
+      if (text) previousText = text
+    }
+    result.push({ kind: 'line', start: line.start, end: line.end, line, runs, singerKeys, voices })
   })
   return result
 })
@@ -208,7 +274,7 @@ function now(): number {
 }
 
 function rowElement(index: number): HTMLElement | undefined {
-  return track.value?.children[index] as HTMLElement | undefined
+  return track.value?.children[index + headRows.value] as HTMLElement | undefined
 }
 
 /** Recompute which rows are current and advance the word fills. Runs every animation frame while playing. */
@@ -218,14 +284,43 @@ function tick(time: number) {
   const active: number[] = []
   for (let i = 0; i < list.length; i++) {
     const item = list[i]!
-    if (item.start > time) break
+    if (item.start > time + CUE_SLACK_SEC) break
     last = i
     if (time < item.end) active.push(i)
   }
-  if (last !== anchor.value) anchor.value = last
+  // Rows of one cue start together: the view rests on the first of them, where the cue begins.
+  let rest = last
+  while (rest > 0 && list[last]!.start - list[rest - 1]!.start <= SAME_CUE_SEC) rest--
+  if (rest !== anchor.value) anchor.value = rest
   const previous = activeRows.value
   if (active.length !== previous.length || active.some((row, n) => row !== previous[n])) activeRows.value = active
   paint(time, active)
+  reportSinging(time, active)
+}
+
+/** Whoever is heard now: on a line where the singers trade off, the voice that has come in last. */
+function reportSinging(time: number, active: number[]) {
+  let keys: string[] | null = null
+  if (showPerformers.value && active.length) {
+    const heard = new Set<string>()
+    for (const row of active) {
+      const item = items.value[row]
+      if (item?.kind !== 'line') continue
+      const voices = item.voices
+      if (!voices) {
+        item.singerKeys.forEach(key => heard.add(key))
+        continue
+      }
+      let voice = voices[0]!
+      for (const next of voices) if (next.start <= time) voice = next
+      voice.keys.forEach(key => heard.add(key))
+    }
+    if (heard.size) keys = [...heard]
+  }
+  const key = keys ? keys.join('|') : null
+  if (key === singingKey) return
+  singingKey = key
+  emit('singing', keys)
 }
 
 function paint(time: number, active: number[]) {
@@ -295,6 +390,7 @@ function clearPaint() {
   paint(0, [])
   anchor.value = -1
   activeRows.value = []
+  reportSinging(0, [])
 }
 
 function loop() {
@@ -320,18 +416,6 @@ watch(() => props.currentTime, () => {
   if (live.value && expanded.value && !frame) tick(now())
 })
 
-watch(activeRows, (rows) => {
-  if (!showPerformers.value || !rows.length) {
-    emit('singing', null)
-    return
-  }
-  const keys = new Set<string>()
-  for (const row of rows) {
-    const item = items.value[row]
-    if (item?.kind === 'line') item.singerKeys.forEach(key => keys.add(key))
-  }
-  emit('singing', keys.size ? [...keys] : null)
-})
 
 /**
  * On a narrow screen the rows move as one. Staggered there, each tall row in turn falls
@@ -345,12 +429,18 @@ function reducedMotion(): boolean {
   return matchMedia('(prefers-reduced-motion: reduce)').matches
 }
 
-/** How far a row currently sits from its resting place while a previous move is still settling. */
-function settlingOffset(row: HTMLElement): number {
+/** Where a row is in its glide: how far it still sits from its resting place, and whether it is already moving. */
+function settling(row: HTMLElement): { offset: number; wait: number } | null {
   const motion = rowMotion.get(row)
-  if (!motion || motion.playState === 'finished' || motion.playState === 'idle') return 0
+  if (!motion || motion.animation.playState !== 'running') return null
   const transform = getComputedStyle(row).transform
-  return transform && transform !== 'none' ? new DOMMatrixReadOnly(transform).m42 : 0
+  const offset = transform && transform !== 'none' ? new DOMMatrixReadOnly(transform).m42 : 0
+  return { offset, wait: Math.max(0, motion.delay - Number(motion.animation.currentTime ?? 0)) }
+}
+
+/** Rows (not the credits in front of them) in document order. */
+function rowElements(list: HTMLElement): HTMLElement[] {
+  return [...list.children].slice(headRows.value) as HTMLElement[]
 }
 
 /**
@@ -358,6 +448,13 @@ function settlingOffset(row: HTMLElement): number {
  * each visible row then glides from where it was, the rows below starting a beat
  * later than the one above, which gives the list its elastic, flowing motion
  * (on wide screens; see rowStagger).
+ *
+ * Lines often change again before the rows have settled. Every row still gliding is then
+ * picked up from where it is, wherever it lies (one left out would jump by the whole
+ * scroll). A row never waits longer than it already had to: one already moving keeps
+ * moving, and one waiting its turn is not sent to the back again. Otherwise, with lines
+ * coming quickly, the lower rows would keep stopping and starting, or stay behind and
+ * then catch up all at once.
  */
 function follow(animate: boolean) {
   const box = viewport.value
@@ -367,29 +464,35 @@ function follow(animate: boolean) {
   if (!row) return
   const lead = box.clientHeight * ANCHOR_RATIO[props.variant]
   const target = Math.max(0, Math.min(box.scrollHeight - box.clientHeight, anchor.value < 0 ? 0 : row.offsetTop - lead))
-  const delta = target - box.scrollTop
-  if (Math.abs(delta) < 0.5) return
+  const before = box.scrollTop
+  if (Math.abs(target - before) < 0.5) return
+  const rows = rowElements(list)
   if (!animate || reducedMotion()) {
+    for (const el of rows) rowMotion.get(el)?.animation.cancel()
     box.scrollTop = target
     return
   }
-  const top = Math.min(box.scrollTop, target) - 120
-  const bottom = Math.max(box.scrollTop, target) + box.clientHeight + 120
-  const moving: { row: HTMLElement; index: number; from: number }[] = []
-  for (let i = 0; i < list.children.length; i++) {
-    const el = list.children[i] as HTMLElement
-    if (el.offsetTop + el.offsetHeight < top || el.offsetTop > bottom) continue
-    moving.push({ row: el, index: i, from: settlingOffset(el) + delta })
-  }
+  const top = Math.min(before, target) - 120
+  const bottom = Math.max(before, target) + box.clientHeight + 120
+  const moving: { row: HTMLElement; index: number; offset: number; wait?: number }[] = []
+  rows.forEach((el, index) => {
+    const state = settling(el)
+    if (!state && (el.offsetTop + el.offsetHeight < top || el.offsetTop > bottom)) return
+    moving.push({ row: el, index, offset: state?.offset ?? 0, wait: state?.wait })
+  })
   box.scrollTop = target
+  // The scroll position snaps to the pixel grid: move the rows by what it actually moved.
+  const delta = box.scrollTop - before
   const stagger = rowStagger()
-  for (const { row: el, index, from } of moving) {
-    rowMotion.get(el)?.cancel()
-    const order = Math.max(0, Math.min(9, index - anchor.value + 1))
-    rowMotion.set(el, el.animate(
-      [{ transform: `translate3d(0, ${from}px, 0)` }, { transform: 'translate3d(0, 0, 0)' }],
-      { duration: 760, delay: order * stagger, easing: 'cubic-bezier(0.2, 0.95, 0.25, 1)', fill: 'backwards' },
-    ))
+  for (const { row: el, index, offset, wait } of moving) {
+    rowMotion.get(el)?.animation.cancel()
+    const turn = Math.max(0, Math.min(ROW_STAGGER_ROWS, index - anchor.value + 1)) * stagger
+    const delay = wait === undefined ? turn : Math.min(turn, wait)
+    const animation = el.animate(
+      [{ transform: `translate3d(0, ${offset + delta}px, 0)` }, { transform: 'translate3d(0, 0, 0)' }],
+      { duration: ROW_GLIDE_MS, delay, easing: 'cubic-bezier(0.2, 0.95, 0.25, 1)', fill: 'backwards' },
+    )
+    rowMotion.set(el, { animation, delay })
   }
 }
 
@@ -402,7 +505,7 @@ watch(following, (value) => {
 }, { flush: 'post' })
 
 // Layout changed under the current line: put it back without a flourish.
-watch([translated, rubied, items, expanded, live], async () => {
+watch([translated, rubied, romanized, items, expanded, live, headRows], async () => {
   await nextTick()
   if (live.value && following.value) follow(false)
 }, { flush: 'post' })
@@ -414,8 +517,15 @@ function remember(key: string, value: boolean) {
     // Preference simply does not persist.
   }
 }
-watch(translated, value => remember(TRANSLATION_KEY, value))
+watch(translated, (value) => {
+  remember(TRANSLATION_KEY, value)
+  if (value) romanized.value = false
+})
 watch(rubied, value => remember(RUBY_KEY, value))
+watch(romanized, (value) => {
+  remember(ROMAJI_KEY, value)
+  if (value) translated.value = false
+})
 
 watch(viewport, (box, _old, onCleanup) => {
   if (!box) return
@@ -475,12 +585,12 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <section class="ly" :class="[`ly--${variant}`, { 'ly--fill': variant !== 'panel' }]" aria-label="同步歌词">
+  <section class="ly" :class="[`ly--${variant}`, { 'ly--fill': variant !== 'panel', 'ly--paused': !playing }]" aria-label="同步歌词">
     <div class="ly-bar">
       <button v-if="variant === 'panel'" class="btn btn-ghost btn-sm gap-1" :aria-expanded="expanded" @click="expanded = !expanded">
         歌词 <ChevronDown class="h-4 w-4 transition-transform" :class="{ 'rotate-180': expanded }" />
       </button>
-      <div v-if="lyrics?.lines.length && expanded && !mismatched" class="ly-actions">
+      <div v-if="lyrics?.lines.length && expanded && !mismatched && !instrumental" class="ly-actions">
         <Transition name="ly-chip">
           <button v-if="live && !following" class="ly-chip" @click="resume">
             <LocateFixed class="h-3.5 w-3.5" /> 回到当前句
@@ -506,11 +616,25 @@ onBeforeUnmount(() => {
         >
           <span class="ly-chip-kana" aria-hidden="true">あ</span> 注音
         </button>
+        <button
+          v-if="hasRomaji"
+          class="ly-chip"
+          :class="{ on: romanized }"
+          :aria-pressed="romanized"
+          :title="romanized ? '隐藏罗马音' : '显示罗马音'"
+          @click="romanized = !romanized"
+        >
+          <Type class="h-3.5 w-3.5" /> 罗马音
+        </button>
       </div>
     </div>
 
     <template v-if="expanded">
-      <p v-if="loading" class="ly-status" role="status">正在加载歌词…</p>
+      <div v-if="instrumental" class="ly-status ly-status--inst">
+        <p v-for="[role, name] in credits" :key="role" class="ly-credit">{{ role }}：{{ name }}</p>
+        <p class="ly-inst">纯音乐，请欣赏</p>
+      </div>
+      <p v-else-if="loading" class="ly-status" role="status">正在加载歌词…</p>
       <p v-else-if="failed" class="ly-status">歌词加载失败 <button class="ly-chip ml-2" @click="load">重试</button></p>
       <p v-else-if="!lyrics?.lines.length" class="ly-status">暂无歌词</p>
       <p v-else-if="mismatched" class="ly-status">当前音频版本暂无匹配的歌词</p>
@@ -526,6 +650,9 @@ onBeforeUnmount(() => {
           @keydown="browse"
         >
           <div ref="track" class="ly-track">
+            <div v-if="credits.length" class="ly-head">
+              <p v-for="[role, name] in credits" :key="role" class="ly-credit">{{ role }}：{{ name }}</p>
+            </div>
             <div
               v-for="(item, index) in items"
               :key="index"
@@ -535,7 +662,8 @@ onBeforeUnmount(() => {
             >
               <div v-if="item.kind === 'gap'" class="ly-gap" aria-hidden="true"><i></i><i></i><i></i></div>
               <button v-else class="ly-line" :aria-current="isActive(index) ? 'true' : undefined" @click="seek(item.start)">
-                <span class="ly-original" lang="ja"><template v-for="(run, n) in item.runs" :key="n"><span v-if="run.kind === 'ruby'" class="ly-ruby" :class="run.avatars && ['ly-glue', { 'ly-glue--break': n > 0 }]"><SingerAvatars v-if="run.avatars" class="ly-handover" :singers="run.avatars" :size="variant === 'immersive' ? 28 : 22" /><ruby><template v-for="(segment, k) in run.segments" :key="k"><span v-if="segment.fill" class="ly-word" :data-s="segment.fill.start" :data-e="segment.fill.end" :data-a="segment.fill.share?.[0]" :data-b="segment.fill.share?.[1]">{{ segment.text }}</span><template v-else>{{ segment.text }}</template></template><template v-if="rubied"><rp>(</rp><rt :class="{ 'ly-word': run.timed }">{{ run.reading }}</rt><rp>)</rp></template></ruby></span><template v-else><span v-if="run.avatars" class="ly-glue" :class="{ 'ly-glue--break': n > 0 }"><SingerAvatars class="ly-handover" :singers="run.avatars" :size="variant === 'immersive' ? 28 : 22" /><template v-for="(segment, k) in run.head" :key="k"><span v-if="segment.fill" class="ly-word" :data-s="segment.fill.start" :data-e="segment.fill.end" :data-a="segment.fill.share?.[0]" :data-b="segment.fill.share?.[1]">{{ segment.text }}</span><template v-else>{{ segment.text }}</template></template></span><template v-for="(segment, k) in run.tail" :key="k"><span v-if="segment.fill" class="ly-word" :data-s="segment.fill.start" :data-e="segment.fill.end" :data-a="segment.fill.share?.[0]" :data-b="segment.fill.share?.[1]">{{ segment.text }}</span><template v-else>{{ segment.text }}</template></template></template></template></span>
+                <span class="ly-original" lang="ja"><template v-for="(run, n) in item.runs" :key="n"><span v-if="run.kind === 'ruby'" class="ly-ruby" :class="run.avatars && ['ly-glue', { 'ly-glue--break': run.breaks }]"><SingerAvatars v-if="run.avatars" class="ly-handover" :singers="run.avatars" :size="variant === 'immersive' ? 28 : 22" /><ruby><template v-for="(segment, k) in run.segments" :key="k"><span v-if="segment.fill" class="ly-word" :data-s="segment.fill.start" :data-e="segment.fill.end" :data-a="segment.fill.share?.[0]" :data-b="segment.fill.share?.[1]">{{ segment.text }}</span><template v-else>{{ segment.text }}</template></template><template v-if="rubied"><rp>(</rp><rt :class="{ 'ly-word': run.timed }">{{ run.reading }}</rt><rp>)</rp></template></ruby></span><template v-else><span v-if="run.avatars" class="ly-glue" :class="{ 'ly-glue--break': run.breaks }"><SingerAvatars class="ly-handover" :singers="run.avatars" :size="variant === 'immersive' ? 28 : 22" /><template v-for="(segment, k) in run.head" :key="k"><span v-if="segment.fill" class="ly-word" :data-s="segment.fill.start" :data-e="segment.fill.end" :data-a="segment.fill.share?.[0]" :data-b="segment.fill.share?.[1]">{{ segment.text }}</span><template v-else>{{ segment.text }}</template></template></span><template v-for="(segment, k) in run.tail" :key="k"><span v-if="segment.fill" class="ly-word" :data-s="segment.fill.start" :data-e="segment.fill.end" :data-a="segment.fill.share?.[0]" :data-b="segment.fill.share?.[1]">{{ segment.text }}</span><template v-else>{{ segment.text }}</template></template></template></template></span>
+                <span v-if="romanized && item.line.romaji" class="ly-romaji" lang="ja-Latn">{{ item.line.romaji }}</span>
                 <span v-if="translated && item.line.translation" class="ly-translation" lang="zh-CN">{{ item.line.translation }}</span>
               </button>
             </div>
@@ -665,6 +793,34 @@ onBeforeUnmount(() => {
   margin: auto;
 }
 
+.ly-status--inst {
+  opacity: 1;
+}
+
+.ly-inst {
+  margin-top: 0.75rem;
+  font-size: calc(var(--ly-size) * 0.8);
+  font-weight: 700;
+  opacity: 0.85;
+}
+
+.ly-status--inst .ly-credit {
+  opacity: 0.55;
+}
+
+/* Lyricist and composer, above the first line like the opening of a booklet. */
+.ly-head {
+  padding-bottom: 0.9rem;
+  font-size: max(calc(var(--ly-size) * 0.52), 0.8125rem);
+  font-weight: 600;
+  line-height: 1.6;
+  opacity: 0.55;
+}
+
+.ly-credit {
+  overflow-wrap: anywhere;
+}
+
 .ly-viewport {
   position: relative;
   height: clamp(280px, 46vh, 450px);
@@ -787,6 +943,19 @@ onBeforeUnmount(() => {
   }
 }
 
+/* Romaji sits right under the words it reads, lighter than the lyric, before any translation. */
+.ly-romaji {
+  display: block;
+  margin-top: 0.2em;
+  font-size: max(0.56em, 0.8125rem);
+  font-weight: 600;
+  line-height: 1.45;
+  letter-spacing: 0.01em;
+  opacity: 0.68;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
 .ly-translation {
   display: block;
   margin-top: 0.4em;
@@ -855,7 +1024,16 @@ onBeforeUnmount(() => {
   border-radius: 999px;
   background: currentColor;
   opacity: clamp(0.28, calc(var(--gap-progress, 0) * 3 - var(--dot) + 0.28), 1);
+}
+
+/* Only the break being waited through breathes, and only while the music plays:
+   hidden or paused dots that keep animating still cost a redraw every frame. */
+.ly-row.active .ly-gap i {
   animation: ly-breathe 2.6s ease-in-out infinite;
+}
+
+.ly--paused .ly-row.active .ly-gap i {
+  animation-play-state: paused;
 }
 
 .ly-gap i:nth-child(1) { --dot: 0; }

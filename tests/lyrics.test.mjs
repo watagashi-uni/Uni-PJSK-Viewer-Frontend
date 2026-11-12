@@ -14,6 +14,8 @@ test('LRC supports repeated timestamps, simultaneous cues and final duration', (
     { start: 9.5, end: 15, text: '歌詞' }, { start: 9.5, end: 15, text: '合唱' },
     { start: 15, end: 62.25, text: '次の句' }, { start: 62.25, end: 80, text: '歌詞' },
   ])
+  // a timestamp without text ends the line before it instead of showing as a line
+  assert.deepEqual(parseLrc('[00:01.0]A\n[00:03.0]B\n[00:05.0]', 80), [{ start: 1, end: 3, text: 'A' }, { start: 3, end: 5, text: 'B' }])
 })
 test('a translation row shows once, under the line it starts on; rich partial text and roles survive', () => {
   const { normalizeLyrics } = load()
@@ -158,4 +160,71 @@ test('untimed text on a word-timed line fills with its neighbours; a long pause 
   assert.deepEqual(untimedFill([{ from: 0, to: 1, start: 1, end: 3 }, { from: 2, to: 3, start: 2, end: 4 }], 1, 2), { start: 3, end: 3 })
   assert.equal(untimedFill(undefined, 0, 1), undefined)
   assert.equal(untimedFill([], 0, 1), undefined)
+})
+test('rows of one cue are told apart by their units; a line ends where the next one sung after it begins', () => {
+  const { playbackTiming } = load()
+  const w = (from, to, start, end) => ({ from, to, start, end })
+  const at = lines => playbackTiming(lines).map(l => [l.text, l.start, l.end])
+  // one cue split over two word-timed rows: each row is current while it is sung
+  assert.deepEqual(at([
+    { text: 'AB', start: 10, end: 20, words: [w(0, 2, 10, 13)] },
+    { text: 'CD', start: 10, end: 20, words: [w(0, 2, 14, 18)] },
+  ]), [['AB', 10, 14], ['CD', 14, 20]])
+  // an untimed row after a timed row of its cue, or starting while that row is sung, waits for it
+  assert.deepEqual(at([
+    { text: 'AB', start: 10, end: 20, words: [w(0, 2, 10, 13)] },
+    { text: 'rest', start: 10, end: 20 },
+  ]), [['AB', 10, 13], ['rest', 13, 20]])
+  assert.deepEqual(at([
+    { text: 'AB', start: 10, end: 13, words: [w(0, 2, 10, 13)] },
+    { text: 'late', start: 10.06, end: 16 },
+  ]), [['AB', 10, 13], ['late', 13, 16]])
+  // an untimed row in front of a timed one ends where the units begin
+  assert.deepEqual(at([
+    { text: 'lead', start: 10, end: 20 },
+    { text: 'AB', start: 10, end: 20, words: [w(0, 2, 15, 18)] },
+  ]), [['lead', 10, 15], ['AB', 15, 20]])
+  // a tail running into the next line is cut there, but not before the line's own units finish
+  assert.deepEqual(at([
+    { text: 'A', start: 1, end: 3.4 },
+    { text: 'B', start: 3, end: 5, words: [w(0, 1, 3, 4)] },
+    { text: 'C', start: 3.95, end: 6, words: [w(0, 1, 4.05, 5)] },
+  ]), [['A', 1, 3], ['B', 3, 4.05], ['C', 4.05, 6]])
+  // rows of one cue without units, bracketed backing vocals and voices that overlap stay together
+  assert.deepEqual(at([
+    { text: 'X', start: 1, end: 4 }, { text: 'Y', start: 1, end: 4 }, { text: 'Z', start: 3, end: 6 },
+  ]), [['X', 1, 3], ['Y', 1, 3], ['Z', 3, 6]])
+  assert.deepEqual(at([{ text: 'main', start: 1, end: 5 }, { text: '（ah ah）', start: 2, end: 6 }]), [['main', 1, 5], ['（ah ah）', 2, 6]])
+  assert.deepEqual(at([
+    { text: 'one', start: 1, end: 5, words: [w(0, 3, 1, 4)] },
+    { text: 'two', start: 2, end: 5, words: [w(0, 3, 2, 5)] },
+  ]), [['one', 1, 5], ['two', 2, 5]])
+})
+test('rows timed only as one cue become one line, keeping their rows, readings, singers and translations', () => {
+  const { mergeSharedCues, lyricParts } = load()
+  const merged = mergeSharedCues([
+    { text: '花束', start: 1, end: 4, translation: '花', ruby: [{ from: 0, to: 2, reading: 'はなたば' }], segments: [{ text: '花束', performerIds: ['a'] }] },
+    { text: '意味もなく', start: 1, end: 4, translation: '无意义', ruby: [{ from: 0, to: 2, reading: 'いみ' }], segments: [{ text: '意味も', performerIds: ['b'] }] },
+    { text: '次', start: 5, end: 6 },
+  ])
+  assert.deepEqual(merged.map(l => [l.text, l.start, l.end, l.translation]), [['花束\n意味もなく', 1, 4, '花\n无意义'], ['次', 5, 6, undefined]])
+  assert.deepEqual(merged[0].ruby, [{ from: 0, to: 2, reading: 'はなたば' }, { from: 3, to: 5, reading: 'いみ' }])
+  // each row keeps its singers; text past a row's segments stays without one
+  assert.deepEqual(lyricParts(merged[0]).map(p => [p.text, p.performerIds.join()]), [['花束', 'a'], ['\n', ''], ['意味も', 'b'], ['なく', '']])
+  // word-timed rows and rows of different cues stay apart
+  const timed = [{ text: 'A', start: 1, end: 4, words: [{ from: 0, to: 1, start: 1, end: 2 }] }, { text: 'B', start: 1, end: 4 }]
+  assert.equal(mergeSharedCues(timed).length, 2)
+})
+test('romaji is read per line in JSON songs and by the original cue in LRC songs; merged rows keep a row each', () => {
+  const { normalizeLyrics, mergeSharedCues } = load()
+  const lrc = normalizeLyrics({
+    format: 'lrc', duration: 30, lrc: '[00:09.0]形の\n[00:12.0]形の',
+    wordLines: [{ cueStart: 9, start: 8.7, end: 11, text: '形の', words: [{ from: 0, to: 2, start: 8.7, end: 9.5 }] }],
+    romajiLines: [{ cueStart: 9, text: '形の', romaji: 'katachi no' }, { cueStart: 12, text: '他', romaji: 'x' }],
+  })
+  assert.deepEqual(lrc.lines.map(l => l.romaji), ['katachi no', undefined])
+  const json = normalizeLyrics({ format: 'bilingual_json', duration: 20, lines: [{ start: 1, end: 2, text: '花', romaji: 'hana' }, { start: 3, end: 4, text: 'B', romaji: ' ' }] })
+  assert.deepEqual(json.lines.map(l => l.romaji), ['hana', undefined])
+  const merged = mergeSharedCues([{ text: '花', start: 1, end: 4, romaji: 'hana' }, { text: 'Hey', start: 1, end: 4 }, { text: '空', start: 1, end: 4, romaji: 'sora' }])
+  assert.equal(merged[0].romaji, 'hana\n\nsora')
 })

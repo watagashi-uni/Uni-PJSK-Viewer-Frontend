@@ -12,6 +12,8 @@ export interface LyricLine {
   segments?: { text: string; performerIds: string[] }[]
   performerIds?: string[]
   ruby?: LyricRuby[]
+  /** The line in romaji, when it has Japanese to read. */
+  romaji?: string
 }
 export interface SongLyrics {
   musicId: number
@@ -30,28 +32,33 @@ interface Payload extends Omit<SongLyrics, 'lines'> {
   translationLrc?: string
   wordLines?: (LyricLine & { cueStart: number })[]
   rubyLines?: { cueStart: number; text: string; ruby: LyricRuby[] }[]
+  romajiLines?: { cueStart: number; text: string; romaji: string }[]
 }
 interface LyricIndex { v: number; songs: Record<string, string> }
 const base = `${masterApiBaseUrl}/lyrics`
 let indexRequest: Promise<LyricIndex> | undefined
 const pending = new Map<number, Promise<SongLyrics | null>>()
 
-/** LRC may contain multiple timestamps per line; preserve simultaneous cues. */
+/**
+ * LRC may contain multiple timestamps per line; preserve simultaneous cues.
+ * A timestamp with no text is a cue too: the singing stops there, so it ends the line before it.
+ */
 export function parseLrc(text: string, duration: number): LyricLine[] {
   const lines: LyricLine[] = []
+  const cues: number[] = []
   for (const row of text.split(/\r?\n/)) {
     const stamps = [...row.matchAll(/\[(\d+):(\d+(?:\.\d+)?)\]/g)]
     const content = row.replace(/\[\d+:\d+(?:\.\d+)?\]/g, '').trim()
-    if (!content) continue
     for (const stamp of stamps) {
       const start = Number(stamp[1]) * 60 + Number(stamp[2])
-      if (start >= 0 && start <= duration) lines.push({ start, end: duration, text: content })
+      if (start < 0 || start > duration) continue
+      cues.push(start)
+      if (content) lines.push({ start, end: duration, text: content })
     }
   }
   lines.sort((a, b) => a.start - b.start)
-  for (let i = 0; i < lines.length; i++) {
-    lines[i]!.end = lines.slice(i + 1).find(line => line.start > lines[i]!.start)?.start ?? duration
-  }
+  cues.sort((a, b) => a - b)
+  for (const line of lines) line.end = cues.find(cue => cue > line.start) ?? duration
   return lines
 }
 
@@ -71,6 +78,8 @@ export function normalizeLyrics(data: Payload): SongLyrics {
     for (const line of lines) {
       const read = data.rubyLines?.find(r => Math.abs(r.cueStart - line.start) < 0.001 && r.text === line.text)
       if (read) line.ruby = read.ruby
+      const romaji = data.romajiLines?.find(r => Math.abs(r.cueStart - line.start) < 0.001 && r.text === line.text)
+      if (romaji) line.romaji = romaji.romaji
     }
     for (const line of lines) {
       const timed = data.wordLines?.find(w => Math.abs(w.cueStart - line.start) < 0.001 && w.text === line.text)
@@ -79,10 +88,118 @@ export function normalizeLyrics(data: Payload): SongLyrics {
   }
   for (const line of lines) {
     if (line.ruby) line.ruby = validRuby(line.ruby, line.text)
+    if (typeof line.romaji !== 'string' || !line.romaji.trim()) delete line.romaji
     // Invalid or overlapping text ranges fall back to line timing.
     if (line.words && !line.words.every((w, i, all) => Number.isInteger(w.from) && Number.isInteger(w.to) && w.from >= 0 && w.to > w.from && w.to <= line.text.length && Number.isFinite(w.start) && Number.isFinite(w.end) && w.start >= 0 && w.end >= w.start && (i === 0 || w.from >= all[i - 1]!.to))) line.words = undefined
   }
-  return { ...data, lines: lines.filter(l => Number.isFinite(l.start) && Number.isFinite(l.end) && l.end >= l.start && l.text).sort((a, b) => a.start - b.start) }
+  return { ...data, lines: mergeSharedCues(playbackTiming(lines.filter(l => Number.isFinite(l.start) && Number.isFinite(l.end) && l.end >= l.start && l.text).sort((a, b) => a.start - b.start))) }
+}
+
+/**
+ * Rows the source split out of one cue but timed only as a whole (no units, the same start
+ * and end) become one line, their rows kept as line breaks inside it. Nothing tells when each
+ * row is sung, so they could only ever light up, scroll and be clicked together: as one line
+ * they read as the single lyric line they are instead of several lines lit at once.
+ */
+export function mergeSharedCues(lines: LyricLine[]): LyricLine[] {
+  const merged: LyricLine[] = []
+  for (let i = 0; i < lines.length;) {
+    const first = lines[i]!
+    let j = i + 1
+    while (j < lines.length && !first.words?.length && !lines[j]!.words?.length
+      && Math.abs(lines[j]!.start - first.start) <= SAME_CUE_SEC && Math.abs(lines[j]!.end - first.end) <= SAME_CUE_SEC) j++
+    merged.push(j - i > 1 ? joinRows(lines.slice(i, j)) : first)
+    i = j
+  }
+  return merged
+}
+
+function joinRows(rows: LyricLine[]): LyricLine {
+  const line: LyricLine = { start: rows[0]!.start, end: Math.max(...rows.map(r => r.end)), text: rows.map(r => r.text).join('\n') }
+  const translation = rows.map(r => r.translation).filter(Boolean).join('\n')
+  if (translation) line.translation = translation
+  // Romaji keeps one row per row of text, so each reads under its own words.
+  if (rows.some(r => r.romaji)) line.romaji = rows.map(r => r.romaji || '').join('\n')
+  if (rows.some(r => r.segments?.length || r.performerIds?.length)) {
+    // Singers named for a whole row become a segment over that row, so each row keeps its own.
+    line.segments = rows.flatMap((r, n) => {
+      const own = r.segments?.length ? r.segments : [{ text: r.text, performerIds: r.performerIds || [] }]
+      // Text past a row's last segment has no singer; it is kept so the next row's singers stay on that row.
+      const covered = own.map(s => s.text).join('')
+      const rest = r.text.startsWith(covered) && covered.length < r.text.length ? [{ text: r.text.slice(covered.length), performerIds: [] as string[] }] : []
+      return [...(n ? [{ text: '\n', performerIds: [] as string[] }] : []), ...own, ...rest]
+    })
+    if (line.segments.map(s => s.text).join('') !== line.text) line.segments = undefined
+  }
+  let offset = 0
+  const ruby = rows.flatMap((r) => {
+    const shifted = (r.ruby || []).map(x => ({ ...x, from: x.from + offset, to: x.to + offset }))
+    offset += r.text.length + 1
+    return shifted
+  })
+  if (ruby.length) line.ruby = ruby
+  return line
+}
+
+/** Lines whose cues start this close together were written for the same moment. */
+export const SAME_CUE_SEC = 0.05
+/** Word-timed lines that share less than this are sung one after the other, not together. */
+const SHARED_SINGING_SEC = 0.1
+
+/** Background vocals written wholly in brackets, heard over the main line rather than after it. */
+function isBacking(text: string): boolean {
+  return /^\s*[(（][^]*[)）]\s*$/.test(text)
+}
+
+function sungSpan(line: LyricLine): [number, number] | undefined {
+  const words = line.words
+  return words?.length ? [words[0]!.start, words.reduce((end, w) => Math.max(end, w.end), words[0]!.end)] : undefined
+}
+
+/**
+ * When each line is current. The source often splits one cue across several rows that all
+ * carry the cue's start and end, and lets a line's end run into the next line's start.
+ * Taken as they are, every row of the cue lights up at once and two lines stay lit at each
+ * hand-over. So:
+ * - a word-timed row starts with its first unit, and an untimed row that follows a word-timed
+ *   row of the same cue, or whose cue starts while such a row is being sung, starts once that
+ *   row has been sung;
+ * - a line ends when the next line that is not sung together with it begins (but never before
+ *   its own units finish). Bracketed backing vocals and word-timed lines whose units overlap
+ *   keep their own timing, since those really are heard at the same time.
+ * Rows of one cue with no units have nothing to tell them apart and stay current together.
+ */
+export function playbackTiming(lines: LyricLine[]): LyricLine[] {
+  const timed = lines.map((line, i) => {
+    const span = sungSpan(line)
+    if (span) return { ...line, start: span[0], end: Math.max(line.end, span[1]) }
+    let start = line.start
+    if (!isBacking(line.text)) {
+      for (let k = 0; k < i; k++) {
+        const before = lines[k]!
+        const sung = sungSpan(before)
+        if (!sung || isBacking(before.text)) continue
+        const sameCue = Math.abs(before.start - line.start) <= SAME_CUE_SEC && Math.abs(before.end - line.end) <= SAME_CUE_SEC
+        const during = line.start >= sung[0] - SAME_CUE_SEC && line.start < sung[1]
+        if (sameCue || during) start = Math.max(start, sung[1])
+      }
+    }
+    return { ...line, start: Math.min(line.end, start) }
+  })
+  const sorted = timed.map((line, i) => ({ line, i })).sort((a, b) => a.line.start - b.line.start || a.i - b.i).map(e => e.line)
+  sorted.forEach((line, i) => {
+    const span = sungSpan(line)
+    for (let j = i + 1; j < sorted.length && sorted[j]!.start < line.end; j++) {
+      const next = sorted[j]!
+      if (next.start - line.start <= SAME_CUE_SEC) continue
+      if (isBacking(line.text) || isBacking(next.text)) continue
+      const other = sungSpan(next)
+      if (span && other && Math.min(span[1], other[1]) - Math.max(span[0], other[0]) > SHARED_SINGING_SEC) continue
+      line.end = Math.min(line.end, Math.max(next.start, span ? span[1] : line.start))
+      break
+    }
+  })
+  return sorted
 }
 
 /** Readings in text order; a malformed or overlapping one is dropped and its text shown bare. */
