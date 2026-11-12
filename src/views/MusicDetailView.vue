@@ -16,6 +16,7 @@ import {
   Activity, CheckCircle2, LockKeyhole, ExternalLink
 } from 'lucide-vue-next'
 import AssetImage from '@/components/AssetImage.vue'
+import MusicLyrics from '@/components/MusicLyrics.vue'
 import { alignFurigana } from '@/utils/furigana'
 import { parseSusBpm, type SusBpmEvent } from '@/utils/susBpm'
 import type { EventData } from '@/types/master'
@@ -308,6 +309,13 @@ const currentAudioUrl = computed(() => {
   if (!currentVocal.value) return ''
   return `${assetsHost.value}/ondemand/music/long/${currentVocal.value.assetbundleName}/${currentVocal.value.assetbundleName}.mp3`
 })
+
+function seekToLyric(time: number) {
+  if (!audioRef.value || !isAudioLoaded.value) return
+  const target = Math.max(0, Math.min(duration.value, time))
+  audioRef.value.currentTime = target
+  currentTime.value = target
+}
 
 // 进度百分比
 const progressPercent = computed(() => {
@@ -1596,6 +1604,18 @@ const isExpired = computed(() => {
                   />
                 </div>
               </div>
+
+              <MusicLyrics
+                :music-id="musicId"
+                :audio="audioRef"
+                :playing="isPlaying"
+                :vocal-id="currentVocal?.id"
+                :assetbundle="currentVocal?.assetbundleName"
+                :vocal-type="currentVocal?.musicVocalType"
+                :current-time="currentTime"
+                :duration="isAudioLoaded ? duration : 0"
+                @seek="seekToLyric"
+              />
 
               <!-- 版本选择列表 -->
               <div v-if="vocals.length > 1" class="mt-5 pt-4 border-t border-base-200/50">
