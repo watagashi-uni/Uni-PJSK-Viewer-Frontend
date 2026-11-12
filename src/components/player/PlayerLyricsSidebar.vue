@@ -58,7 +58,9 @@ function seekFromLyrics(time: number) {
       </header>
 
       <div class="lyrics-side-body">
+        <!-- Hidden under the full-screen view, which shows the same lyrics: no need to keep them moving twice. -->
         <MusicLyrics
+          v-if="!player.nowPlayingOpen"
           variant="sidebar"
           synced
           :music-id="track.musicId"

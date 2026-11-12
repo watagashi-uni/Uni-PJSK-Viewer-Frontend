@@ -11,6 +11,7 @@ import PlayerQueue from '@/components/player/PlayerQueue.vue'
 import PlayerScrubber from '@/components/player/PlayerScrubber.vue'
 import SingerAvatars from '@/components/player/SingerAvatars.vue'
 import ZhText from '@/components/ZhText.vue'
+import { drawBackdrop, paintBackdrop } from '@/utils/blurredCover'
 
 const route = useRoute()
 const router = useRouter()
@@ -18,6 +19,8 @@ const player = usePlayerStore()
 const { trackAvatars } = useSingerAvatars()
 
 const root = ref<HTMLElement>()
+const glowA = ref<HTMLCanvasElement>()
+const glowB = ref<HTMLCanvasElement>()
 const track = computed(() => player.current)
 const open = computed(() => player.nowPlayingOpen && !!track.value)
 const cover = computed(() => (track.value ? player.coverUrl(track.value) : ''))
@@ -36,6 +39,48 @@ const litSingers = computed(() => {
   return keys.every(key => known.has(key)) ? keys : null
 })
 watch(() => track.value?.uid, () => { singing.value = null })
+
+// The backdrop is the artwork blurred once into a tiny bitmap that the GPU stretches and turns.
+// Blurring the full-size artwork with a CSS filter while it turns had to be redone every frame,
+// which kept the machine busy (and its fans spinning) even with the music paused.
+let backdropRequest = 0
+watch([cover, glowA, glowB], async ([url, a, b]) => {
+  const serial = ++backdropRequest
+  if (!url || !a || !b) return
+  const bitmap = await paintBackdrop(url)
+  if (serial !== backdropRequest || !bitmap) return
+  drawBackdrop(a, bitmap)
+  drawBackdrop(b, bitmap, true)
+}, { flush: 'post' })
+
+// The backdrop turns slowly while the music plays and holds still when it is paused.
+// A paused animation, whether a CSS animation or Web Animation, still has the whole screen
+// redrawn every frame, so a paused one is frozen in place and dropped, and picked up again
+// from the same angle when the music resumes.
+const SPIN = { a: { duration: 60000, direction: 'normal' }, b: { duration: 44000, direction: 'reverse' } } as const
+const spinAt = { a: 0, b: 0 }
+const spinning = new Map<'a' | 'b', { el: HTMLCanvasElement; animation: Animation }>()
+watch([glowA, glowB, () => player.isPlaying], ([a, b, playing]) => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches
+  for (const [key, el] of [['a', a], ['b', b]] as const) {
+    const current = spinning.get(key)
+    // Stop when the music stops, or when the view closed and took the layer with it.
+    if (current && (!playing || still || current.el !== el)) {
+      spinAt[key] = Number(current.animation.currentTime ?? 0)
+      if (current.el === el) current.animation.commitStyles()
+      current.animation.cancel()
+      spinning.delete(key)
+    }
+    if (el && !spinning.has(key) && playing && !still) {
+      const animation = el.animate(
+        [{ transform: 'scale(2.6) rotate(0deg)' }, { transform: 'scale(2.6) rotate(360deg)' }],
+        { duration: SPIN[key].duration, direction: SPIN[key].direction, iterations: Infinity },
+      )
+      animation.currentTime = spinAt[key]
+      spinning.set(key, { el, animation })
+    }
+  }
+}, { flush: 'post', immediate: true })
 
 function togglePanel(name: 'lyrics' | 'queue') {
   player.nowPlayingPanel = player.nowPlayingPanel === name ? 'none' : name
@@ -99,8 +144,8 @@ onBeforeUnmount(() => { document.documentElement.style.overflow = '' })
       >
         <!-- The artwork, blown up and blurred, slowly turning: the whole view takes the colours of the song. -->
         <div class="np-backdrop" aria-hidden="true">
-          <img :src="cover" alt="" class="np-glow np-glow--a" crossorigin="anonymous" />
-          <img :src="cover" alt="" class="np-glow np-glow--b" crossorigin="anonymous" />
+          <canvas ref="glowA" class="np-glow np-glow--a"></canvas>
+          <canvas ref="glowB" class="np-glow np-glow--b"></canvas>
           <div class="np-shade"></div>
         </div>
 
@@ -233,10 +278,7 @@ onBeforeUnmount(() => { document.documentElement.style.overflow = '' })
   max-width: none;
   height: 70vmax;
   margin: -35vmax 0 0 -35vmax;
-  object-fit: cover;
-  filter: blur(4.5vmax) saturate(1.9);
   transform: scale(2.6);
-  animation: np-drift 60s linear infinite;
 }
 
 .np-glow--b {
@@ -244,19 +286,12 @@ onBeforeUnmount(() => { document.documentElement.style.overflow = '' })
   left: 82%;
   opacity: 0.7;
   mix-blend-mode: soft-light;
-  animation-duration: 44s;
-  animation-direction: reverse;
 }
 
 .np-shade {
   position: absolute;
   inset: 0;
   background: linear-gradient(180deg, rgb(10 11 16 / 0.5), rgb(10 11 16 / 0.72));
-}
-
-@keyframes np-drift {
-  from { transform: scale(2.6) rotate(0deg); }
-  to { transform: scale(2.6) rotate(360deg); }
 }
 
 .np-top {
@@ -616,11 +651,5 @@ onBeforeUnmount(() => { document.documentElement.style.overflow = '' })
 .np-leave-to {
   opacity: 0;
   transform: translateY(8%);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .np-glow {
-    animation: none;
-  }
 }
 </style>
