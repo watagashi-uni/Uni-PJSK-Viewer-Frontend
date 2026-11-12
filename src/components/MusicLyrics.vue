@@ -40,6 +40,10 @@ const RUBY_KEY = 'player_lyricsRuby'
 /** Where the current line rests, as a fraction of the visible height. */
 const ANCHOR_RATIO = { panel: 0.36, immersive: 0.3, sidebar: 0.3 } as const
 const BROWSE_RESUME_MS = 4000
+/** Delay between one row and the next as the lines glide into place. */
+const ROW_STAGGER_MS = 46
+/** Phone-sized windows, where a line wraps into tall rows and only a few of them are in view. */
+const NARROW_QUERY = '(max-width: 899px)'
 
 interface RenderPart { text: string; word?: LyricWord; share?: [number, number]; avatars?: SingerAvatar[] }
 /** Text under a reading (drawn as ruby), or one piece of bare text. */
@@ -279,6 +283,14 @@ watch(activeRows, (rows) => {
   emit('singing', keys.size ? [...keys] : null)
 })
 
+/**
+ * On a narrow screen the rows move as one. Staggered there, each tall row in turn falls
+ * behind the one above it and then catches up, which reads as the list bouncing.
+ */
+function rowStagger(): number {
+  return matchMedia(NARROW_QUERY).matches ? 0 : ROW_STAGGER_MS
+}
+
 function reducedMotion(): boolean {
   return matchMedia('(prefers-reduced-motion: reduce)').matches
 }
@@ -294,7 +306,8 @@ function settlingOffset(row: HTMLElement): number {
 /**
  * Bring the current line to its resting place. The container jumps there at once;
  * each visible row then glides from where it was, the rows below starting a beat
- * later than the one above, which gives the list its elastic, flowing motion.
+ * later than the one above, which gives the list its elastic, flowing motion
+ * (on wide screens; see rowStagger).
  */
 function follow(animate: boolean) {
   const box = viewport.value
@@ -319,12 +332,13 @@ function follow(animate: boolean) {
     moving.push({ row: el, index: i, from: settlingOffset(el) + delta })
   }
   box.scrollTop = target
+  const stagger = rowStagger()
   for (const { row: el, index, from } of moving) {
     rowMotion.get(el)?.cancel()
     const order = Math.max(0, Math.min(9, index - anchor.value + 1))
     rowMotion.set(el, el.animate(
       [{ transform: `translate3d(0, ${from}px, 0)` }, { transform: 'translate3d(0, 0, 0)' }],
-      { duration: 760, delay: order * 46, easing: 'cubic-bezier(0.2, 0.95, 0.25, 1)', fill: 'backwards' },
+      { duration: 760, delay: order * stagger, easing: 'cubic-bezier(0.2, 0.95, 0.25, 1)', fill: 'backwards' },
     ))
   }
 }
