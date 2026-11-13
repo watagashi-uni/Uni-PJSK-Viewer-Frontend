@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { BarChart3, Copy, Download, Eye, Heart, Music2, Play, PlayCircle, RefreshCw, Search, Sparkles, User, X } from 'lucide-vue-next'
+import { BarChart3, Copy, Download, Eye, Heart, Music2, PenLine, Play, PlayCircle, RefreshCw, Search, Sparkles, User, X } from 'lucide-vue-next'
 import { renderCustomScoreJsonToSvg, revokeSus2ImgResult, type Sus2ImgFrontendResult } from '@/vendor/sekai-sus2img'
 import AssetImage from '@/components/AssetImage.vue'
 import SekaiProfileHonor from '@/components/SekaiProfileHonor.vue'
@@ -1081,7 +1081,9 @@ function selectTab(tab: FeedTab) {
     </div>
 
     <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
-      <PageHeader title="谱面 Maker" description="浏览游戏内自制谱面" />
+      <PageHeader title="谱面 Maker" description="浏览游戏内自制谱面">
+        <template #icon><PenLine /></template>
+      </PageHeader>
       
       <div class="flex items-center gap-2 w-full lg:w-auto">
         <input
@@ -1136,7 +1138,7 @@ function selectTab(tab: FeedTab) {
       </button>
     </div>
 
-    <div class="card bg-base-100 shadow-sm border border-base-200 relative z-30 overflow-visible">
+    <div class="card bg-base-100 border border-base-200 relative z-30 overflow-visible">
       <div class="card-body p-4 sm:p-6 gap-4">
         <div v-if="activeTab === 'ranking'" class="flex flex-wrap items-center justify-between gap-3">
           <div class="join shadow-sm">
@@ -1293,7 +1295,7 @@ function selectTab(tab: FeedTab) {
     </div>
 
     <div class="space-y-4">
-      <div v-if="scoreTaskLabel || scoreError || previewInfo" class="card bg-base-100 shadow-sm border border-base-200">
+      <div v-if="scoreTaskLabel || scoreError || previewInfo" class="card bg-base-100 border border-base-200">
         <div class="card-body p-4 gap-3">
           <div v-if="scoreTaskLabel" class="flex items-center gap-3 text-sm text-primary font-medium">
             <span class="loading loading-spinner loading-sm"></span>
@@ -1308,14 +1310,14 @@ function selectTab(tab: FeedTab) {
         </div>
       </div>
 
-      <div v-if="isLoading || isMasterLoading" class="card bg-base-100 shadow-sm border border-base-200">
+      <div v-if="isLoading || isMasterLoading" class="card bg-base-100 border border-base-200">
         <div class="card-body items-center py-16">
           <span class="loading loading-spinner loading-lg text-primary"></span>
           <span class="text-sm text-base-content/60 mt-4 font-medium">正在加载谱面列表</span>
         </div>
       </div>
 
-      <div v-else-if="!displayedScores.length" class="card bg-base-100 shadow-sm border border-base-200">
+      <div v-else-if="!displayedScores.length" class="card bg-base-100 border border-base-200">
         <div class="card-body items-center py-16 text-center">
           <div class="w-16 h-16 rounded-full bg-base-200 flex items-center justify-center mx-auto mb-4">
             <Music2 class="w-8 h-8 text-base-content/30" />
@@ -1328,7 +1330,7 @@ function selectTab(tab: FeedTab) {
         <div
           v-for="(score, index) in displayedScores"
           :key="score.key"
-          class="card bg-base-100 shadow-sm border border-base-200 hover:shadow-md hover:border-primary/30 transition-all duration-300 group"
+          class="card bg-base-100 border border-base-200 hover:shadow-md hover:border-primary/30 transition-all duration-300 group"
           :class="{ 'ring-2 ring-primary ring-offset-2 ring-offset-base-100': selectedScore?.key === score.key }"
         >
           <div class="card-body p-4 gap-4">
@@ -1512,7 +1514,7 @@ function selectTab(tab: FeedTab) {
               <div
                 v-for="score in authorScores"
                 :key="score.key"
-                class="rounded-xl border border-base-200 bg-base-100 p-4 shadow-sm transition-all hover:border-primary/30 hover:shadow-md"
+                class="rounded-xl border border-base-300 bg-base-100 p-4 transition-all hover:border-primary/30 hover:shadow-md"
               >
                 <div class="flex gap-4">
                   <img

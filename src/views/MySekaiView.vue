@@ -11,6 +11,7 @@ import type {
   ResourceRenderCall, ResourceStat
 } from '@/types/mysekai'
 import PageHeader from '@/components/PageHeader.vue'
+import { Map as MapIcon } from 'lucide-vue-next'
 import { useZh } from '@/composables/useZh'
 
 const SITE_SCENES: SceneConfig[] = [
@@ -901,9 +902,11 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="max-w-6xl mx-auto space-y-6">
-    <PageHeader title="MySekai 资源地图" />
+    <PageHeader title="MySekai 资源地图">
+      <template #icon><MapIcon /></template>
+    </PageHeader>
 
-    <div class="card bg-base-100 shadow-lg">
+    <div class="card bg-base-100">
       <div class="card-body space-y-4">
         <div class="flex flex-wrap gap-3 items-center">
           <div
@@ -954,7 +957,7 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <div v-if="resourceStats.length > 0" class="card bg-base-100 shadow-lg">
+    <div v-if="resourceStats.length > 0" class="card bg-base-100">
       <div class="card-body p-4 space-y-2">
         <div class="flex items-center justify-between gap-3">
           <h3 class="text-sm font-bold">
@@ -985,7 +988,7 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <div class="card bg-base-100 shadow-lg overflow-hidden">
+    <div class="card bg-base-100 overflow-hidden">
       <div class="card-body p-0 relative w-full overflow-x-auto">
         <div class="relative inline-block w-full min-w-[900px]">
           <img

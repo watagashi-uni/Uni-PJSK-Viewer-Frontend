@@ -140,7 +140,7 @@ function closePlayer() {
               @input="onVolumeInput"
             />
           </div>
-          <button class="player-btn player-btn--desktop" aria-label="关闭播放器" title="关闭播放器" @click="closePlayer">
+          <button class="player-btn" aria-label="关闭播放器" title="关闭播放器" @click="closePlayer">
             <X class="h-4 w-4" />
           </button>
         </div>

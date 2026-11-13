@@ -870,9 +870,11 @@ function clearForm() {
 
 <template>
   <div class="max-w-4xl mx-auto">
-    <PageHeader title="谱面转图片" description="粘贴谱面内容或上传文件，支持 SUS / JSON 转图片与 SUS ⇄ JSON 互转" class="mb-6" />
+    <PageHeader title="谱面转图片" description="粘贴谱面内容或上传文件，支持 SUS / JSON 转图片与 SUS ⇄ JSON 互转" class="mb-6">
+      <template #icon><FileImage /></template>
+    </PageHeader>
 
-    <div class="card bg-base-100 shadow-lg">
+    <div class="card bg-base-100">
       <div class="card-body">
         <form class="space-y-6" @submit.prevent="handleFormSubmit">
           <div class="form-control">
@@ -1258,7 +1260,7 @@ function clearForm() {
       </div>
     </div>
 
-    <section v-if="hasDownloadableResult" class="card bg-base-100 shadow-lg mt-6">
+    <section v-if="hasDownloadableResult" class="card bg-base-100 mt-6">
       <div class="card-body gap-4">
         <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div>
@@ -1293,7 +1295,7 @@ function clearForm() {
     </section>
 
     <div v-if="!isJsonInput && (hasAuditRun || auditError || (hasAuditRun && (resultSvgText || resultSvgError)))" class="mt-8 grid grid-cols-1 min-w-0 gap-6 xl:grid-cols-[380px_minmax(0,1fr)]">
-      <section class="card min-w-0 bg-base-100 shadow-lg">
+      <section class="card min-w-0 bg-base-100">
         <div class="card-body min-w-0 gap-4 p-4 sm:p-6">
           <div class="flex min-w-0 flex-wrap items-start justify-between gap-3">
             <div class="min-w-0 flex-1">
@@ -1373,7 +1375,7 @@ function clearForm() {
         </div>
       </section>
 
-      <section class="card min-w-0 bg-base-100 shadow-lg">
+      <section class="card min-w-0 bg-base-100">
         <div class="card-body min-w-0 gap-4 p-4 sm:p-6">
           <div>
             <h2 class="card-title text-lg">SVG 高亮预览</h2>
@@ -1404,7 +1406,8 @@ function clearForm() {
 
     <dialog ref="rebaseHelpDialog" class="modal" @close="onRebaseHelpDialogClose">
       <div class="modal-box max-h-[calc(100dvh-1rem)] max-w-2xl overflow-y-auto">
-        <div class="flex items-start gap-3">
+        <form method="dialog" class="modal-x"><button class="btn btn-sm btn-circle" aria-label="关闭"><X class="h-4 w-4" /></button></form>
+        <div class="flex items-start gap-3 pr-8">
           <CircleHelp class="mt-0.5 h-6 w-6 shrink-0 text-primary" />
           <div class="min-w-0 flex-1">
             <h2 class="text-lg font-bold">rebase.json 是什么？</h2>

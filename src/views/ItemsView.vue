@@ -5,6 +5,7 @@ import { Boxes, CalendarClock, Search, X } from 'lucide-vue-next'
 import AccountSelector from '@/components/AccountSelector.vue'
 import AssetImage from '@/components/AssetImage.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import OwnedOnlyToggle from '@/components/OwnedOnlyToggle.vue'
 import Pagination from '@/components/Pagination.vue'
 import { useAccountStore } from '@/stores/account'
 import { useMasterStore } from '@/stores/master'
@@ -286,12 +287,17 @@ onMounted(async () => {
   <div class="max-w-7xl mx-auto space-y-6">
     <PageHeader title="物品图鉴" description="素材、体力道具、练习券、技能券与招募贴纸；选择账号后显示持有数量。"><template #icon><Boxes class="w-8 h-8 text-primary" /></template></PageHeader>
 
-    <section class="card bg-base-100 border border-base-200 shadow-sm">
+    <section class="card bg-base-100 border border-base-200">
       <div class="card-body p-4 gap-4">
         <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-[minmax(240px,1fr)_210px_180px_220px] gap-3">
           <label class="input input-bordered flex items-center gap-2"><Search class="w-4 h-4 opacity-50" /><input v-model="searchQuery" class="grow min-w-0" placeholder="搜索名称、说明或 ID…" /><button v-if="searchQuery" class="btn btn-xs btn-circle btn-ghost" aria-label="清空" @click="searchQuery = ''"><X class="w-3 h-3" /></button></label>
           <select v-model="selectedCategory" class="select select-bordered w-full"><option value="">全部分类（{{ allItems.length }}）</option><option v-for="(meta, key) in categoryMeta" :key="key" :value="key">{{ meta.label }}（{{ categoryCounts.get(key as ItemCategory) || 0 }}）</option></select>
-          <label class="label cursor-pointer justify-start gap-3 rounded-lg border border-base-300 px-4"><input v-model="ownedOnly" type="checkbox" class="checkbox checkbox-primary" :disabled="!selectedUserId || inventory.available.size === 0" /><span class="label-text">仅显示持有</span></label>
+          <OwnedOnlyToggle
+            v-model="ownedOnly"
+            label="仅显示持有"
+            :available="!!selectedUserId && inventory.available.size > 0"
+            :hint="selectedUserId ? '这个账号还没有同步游戏数据，或者数据里没有库存；同步后才能按持有筛选。' : '先在个人信息页绑定账号并同步游戏数据，才能按持有筛选。'"
+          />
           <AccountSelector v-if="accountStore.accounts.length" v-model="selectedUserId" />
         </div>
         <p class="text-sm text-base-content/55">匹配 {{ filteredItems.length }} 项<span v-if="selectedUserId && inventory.available.size"> · 已读取 {{ inventory.available.size }} 类账号库存</span><span v-else-if="selectedUserId"> · 当前 suite 未包含这些库存字段</span></p>
@@ -313,7 +319,7 @@ onMounted(async () => {
 
     <dialog ref="itemDialog" class="modal" @close="onItemDialogClose">
       <div v-if="selectedItem" class="modal-box max-w-xl">
-        <button class="btn btn-sm btn-circle btn-ghost absolute! right-3 top-3 z-20" aria-label="关闭" @click="selectedItem = null"><X class="w-4 h-4" /></button>
+        <div class="modal-x"><button class="btn btn-sm btn-circle" aria-label="关闭" @click="selectedItem = null"><X class="w-4 h-4" /></button></div>
         <div class="flex flex-col sm:flex-row gap-6">
           <div class="w-32 h-32 bg-base-200 rounded-2xl p-3 shrink-0 self-center"><AssetImage :src="selectedItem.icon" :alt="selectedItem.name" class="w-full h-full object-contain" /></div>
           <div class="min-w-0 space-y-3"><div><span class="badge badge-outline">{{ categoryMeta[selectedItem.category].label }}</span><p class="text-xs text-base-content/45 mt-2">#{{ selectedItem.id }}</p><h2 class="font-bold text-2xl"><ZhText :text="selectedItem.name" :table="ITEM_ZH_TABLE[selectedItem.category]" path="name" sub-class="text-base mt-1" /></h2></div><p class="text-sm text-primary font-medium">{{ selectedItem.detail }}</p><p class="text-sm leading-6 text-base-content/70"><ZhText v-if="selectedItem.description" :text="selectedItem.description" :table="ITEM_ZH_TABLE[selectedItem.category]" path="flavorText" sub-class="mt-1" /><template v-else>暂无说明</template></p><div v-if="hasInventory(selectedItem.category)" class="stat bg-base-200 rounded-xl p-3"><div class="stat-title text-xs">账号持有</div><div class="stat-value text-2xl text-primary">{{ formatNumber(getOwned(selectedItem)) }}</div></div><div v-if="selectedItem.convertStartAt" class="flex items-center gap-2 text-xs text-base-content/55"><CalendarClock class="w-4 h-4" />{{ formatDate(selectedItem.convertStartAt) }} 开始转换</div></div>

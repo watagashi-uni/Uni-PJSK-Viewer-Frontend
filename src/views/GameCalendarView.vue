@@ -474,7 +474,7 @@ onMounted(async () => {
     <div v-if="isLoading" class="space-y-4"><div class="skeleton h-24 rounded-xl"></div><div class="skeleton h-[34rem] rounded-xl"></div></div>
     <div v-else-if="loadError" class="alert alert-error">游戏日历加载失败：{{ loadError }}</div>
     <template v-else>
-      <div class="card bg-base-100 shadow-sm border border-base-200">
+      <div class="card bg-base-100 border border-base-200">
         <div class="card-body p-4 gap-4">
           <div class="flex flex-wrap items-center justify-between gap-3">
             <div class="join"><button class="btn btn-sm join-item" aria-label="上个月" @click="setMonth(-1)"><ChevronLeft class="w-4 h-4" /></button><button class="btn btn-sm join-item min-w-32" @click="goToday">{{ monthLabel }}</button><button class="btn btn-sm join-item" aria-label="下个月" :disabled="!canGoNextMonth" @click="setMonth(1)"><ChevronRight class="w-4 h-4" /></button></div>
@@ -488,7 +488,7 @@ onMounted(async () => {
       </div>
 
       <div class="grid grid-cols-1 items-start gap-5 xl:h-[calc(100dvh-6rem)] xl:min-h-[40rem] xl:max-h-[50rem] xl:grid-cols-[minmax(0,1fr)_20rem] xl:grid-rows-1 xl:items-stretch">
-        <div class="card hidden overflow-hidden border border-base-200 bg-base-100 shadow-sm md:flex md:flex-col xl:min-h-0 xl:self-stretch">
+        <div class="card hidden overflow-hidden border border-base-200 bg-base-100 md:flex md:flex-col xl:min-h-0 xl:self-stretch">
           <div class="grid grid-cols-7 border-b border-base-200 bg-base-200/55"><div v-for="weekday in weekdayLabels" :key="weekday" class="py-2 text-center text-xs font-bold text-base-content/55">周{{ weekday }}</div></div>
           <div class="grid flex-1 grid-cols-7 xl:min-h-0 xl:grid-rows-6">
             <button v-for="day in calendarDays" :key="day.key" class="min-h-32 overflow-hidden border-r border-b border-base-200 p-2 text-left align-top transition-colors xl:min-h-0" :class="[day.currentMonth ? 'bg-base-100 hover:bg-base-200/45' : 'bg-base-200/35 text-base-content/30', selectedDateKey === day.key ? 'ring-2 ring-inset ring-primary' : '']" @click="selectDay(day)">
@@ -526,7 +526,7 @@ onMounted(async () => {
           <div v-if="!calendarDays.some(row => row.currentMonth && (row.entries.length || row.today))" class="card bg-base-100 border border-base-200"><div class="card-body items-center py-12 text-base-content/45">当前筛选在本月没有日程</div></div>
         </div>
 
-        <aside ref="detailPanelRef" class="card border border-base-200 bg-base-100 shadow-sm xl:min-h-0 xl:self-stretch xl:overflow-hidden">
+        <aside ref="detailPanelRef" class="card border border-base-200 bg-base-100 xl:min-h-0 xl:self-stretch xl:overflow-hidden">
           <div class="card-body flex flex-col gap-3 p-4 xl:h-full xl:min-h-0 xl:overflow-hidden">
             <div class="shrink-0"><p class="text-xs text-base-content/45">日期详情</p><h2 class="font-bold">{{ selectedDateLabel }}</h2></div>
             <div v-if="selectedEntries.length" class="divide-y divide-base-200 xl:min-h-0 xl:flex-1 xl:overflow-y-auto xl:overscroll-contain xl:pr-1 [scrollbar-gutter:stable]">

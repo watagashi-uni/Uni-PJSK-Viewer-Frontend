@@ -642,12 +642,12 @@ onMounted(loadData)
     <template v-else-if="card">
       <!-- 顶部导航 -->
       <div class="mb-4 max-w-4xl mx-auto px-4 lg:px-0 flex justify-between">
-        <button class="btn btn-ghost btn-sm gap-2 pl-0" @click="goBack">
-          <ChevronLeft class="w-4 h-4" /> 返回列表
+        <button type="button" class="back-link" @click="goBack">
+          <ChevronLeft class="w-4 h-4" /> 返回卡片列表
         </button>
       </div>
 
-      <div class="card bg-base-100 shadow-lg max-w-4xl mx-auto animate-fade-in-up overflow-hidden">
+      <div class="card bg-base-100 max-w-4xl mx-auto animate-fade-in-up overflow-hidden">
         <div class="card-body">
           <!-- 标题区域 -->
           <div class="text-center pb-4 mb-4">

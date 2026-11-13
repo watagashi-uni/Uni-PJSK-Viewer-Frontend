@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { 
-  Music, Code, Wrench, ExternalLink, Github, Heart, Languages
+  Music, Code, Wrench, ExternalLink, Github, Heart, Languages, Info
 } from 'lucide-vue-next'
 import PageHeader from '@/components/PageHeader.vue'
 </script>
@@ -8,14 +8,16 @@ import PageHeader from '@/components/PageHeader.vue'
 <template>
   <div class="space-y-6">
     <!-- 页面标题 -->
-    <PageHeader title="关于 Uni PJSK Viewer" description="Project SEKAI 游戏资料查看与工具站" />
+    <PageHeader title="关于 Uni PJSK Viewer" description="Project SEKAI 游戏资料查看与工具站">
+      <template #icon><Info /></template>
+    </PageHeader>
 
     <!-- <AlertBanner type="warning">
       <strong class="flex items-center gap-1"><AlertTriangle class="w-4 h-4" /> 内测中！</strong> 该网站还在内部测试中，出现问题请及时反馈
     </AlertBanner> -->
 
     <!-- 开发者信息 -->
-    <div class="card bg-base-100 shadow-lg">
+    <div class="card bg-base-100">
       <div class="card-body">
         <h3 class="card-title text-lg flex items-center gap-2">
           <Music class="w-5 h-5 text-primary" /> 开发团队
@@ -41,7 +43,7 @@ import PageHeader from '@/components/PageHeader.vue'
     </div>
 
     <!-- 项目源码 & 参与开发 -->
-    <div class="card bg-base-100 shadow-lg">
+    <div class="card bg-base-100">
       <div class="card-body">
         <h3 class="card-title text-lg flex items-center gap-2">
           <Github class="w-5 h-5 text-primary" /> 开源项目
@@ -84,7 +86,7 @@ import PageHeader from '@/components/PageHeader.vue'
     </div>
 
     <!-- 参与翻译 -->
-    <div class="card bg-base-100 shadow-lg">
+    <div class="card bg-base-100">
       <div class="card-body">
         <h3 class="card-title text-lg flex items-center gap-2">
           <Languages class="w-5 h-5 text-primary" /> 参与翻译
@@ -109,7 +111,7 @@ import PageHeader from '@/components/PageHeader.vue'
 
 
     <!-- 技术栈 -->
-    <div class="card bg-base-100 shadow-lg">
+    <div class="card bg-base-100">
       <div class="card-body">
         <h3 class="card-title text-lg flex items-center gap-2">
           <Wrench class="w-5 h-5 text-primary" /> 技术栈
@@ -128,7 +130,7 @@ import PageHeader from '@/components/PageHeader.vue'
     </div>
 
     <!-- 开源协议 -->
-    <div class="card bg-base-100 shadow-lg">
+    <div class="card bg-base-100">
       <div class="card-body">
         <h3 class="card-title text-lg flex items-center gap-2">
           <Code class="w-5 h-5 text-primary" /> 开源协议

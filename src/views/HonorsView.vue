@@ -8,6 +8,7 @@ import SekaiHonor from '@/components/SekaiHonor.vue'
 import SekaiHonorBonds from '@/components/SekaiHonorBonds.vue'
 import AccountSelector from '@/components/AccountSelector.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import OwnedOnlyToggle from '@/components/OwnedOnlyToggle.vue'
 import { useMasterStore } from '@/stores/master'
 import { useAccountStore } from '@/stores/account'
 import type { GameCharacterData } from '@/types/master'
@@ -366,7 +367,7 @@ onMounted(async () => {
       <template v-if="accountStore.accounts.length" #actions><div class="w-full min-w-0 sm:w-56"><AccountSelector v-model="selectedUserId" /></div></template>
     </PageHeader>
 
-    <div role="tablist" class="tabs tabs-box bg-base-100 border border-base-200 w-fit">
+    <div role="tablist" class="tabs tabs-box w-fit p-1">
       <button role="tab" class="tab gap-2" :class="{ 'tab-active': activeTab === 'normal' }" @click="setTab('normal')">
         <Trophy class="w-4 h-4" /> 普通称号
       </button>
@@ -381,7 +382,7 @@ onMounted(async () => {
     <div v-else-if="loadError" class="alert alert-error">称号数据加载失败：{{ loadError }}</div>
 
     <template v-else-if="activeTab === 'normal'">
-      <section class="card min-w-0 bg-base-100 border border-base-200 shadow-sm">
+      <section class="card min-w-0 bg-base-100 border border-base-200">
         <div class="card-body min-w-0 p-4 gap-3">
           <div class="grid min-w-0 grid-cols-1 md:grid-cols-2 xl:grid-cols-[minmax(240px,1fr)_180px_160px_280px] gap-3">
             <label class="input input-bordered flex min-w-0 max-w-full items-center gap-2">
@@ -404,7 +405,7 @@ onMounted(async () => {
           </div>
           <div class="flex flex-wrap items-center gap-4">
             <p class="text-sm text-base-content/55">找到 {{ filteredHonors.length }} 个称号<span v-if="hasNormalOwnership"> · 资料库可匹配 {{ visibleNormalOwnedCount }} / {{ honors.length }} 个已拥有称号<span v-if="visibleNormalOwnedCount !== normalOwnedMap.size">（账号记录 {{ normalOwnedMap.size }}）</span></span></p>
-            <label class="label cursor-pointer gap-2 ml-auto"><input v-model="normalOwnedOnly" type="checkbox" class="checkbox checkbox-sm checkbox-primary" :disabled="!hasNormalOwnership" /><span class="label-text">仅看已拥有</span></label>
+            <OwnedOnlyToggle v-model="normalOwnedOnly" label="仅看已拥有" :available="hasNormalOwnership" hint="还没有这个账号的称号数据；在个人信息页绑定账号并同步游戏数据后才能筛选。" class="ml-auto" />
           </div>
         </div>
       </section>
@@ -443,7 +444,7 @@ onMounted(async () => {
     </template>
 
     <template v-else>
-      <section class="card min-w-0 bg-base-100 border border-base-200 shadow-sm">
+      <section class="card min-w-0 bg-base-100 border border-base-200">
         <div class="card-body min-w-0 p-4 gap-3">
           <div class="grid min-w-0 grid-cols-1 md:grid-cols-[minmax(240px,1fr)_220px_180px] gap-3">
             <label class="input input-bordered flex min-w-0 max-w-full items-center gap-2">
@@ -462,7 +463,7 @@ onMounted(async () => {
           </div>
           <div class="flex flex-wrap items-center gap-4">
             <p class="text-sm text-base-content/55">找到 {{ filteredBondsHonors.length }} 个牵绊称号<span v-if="hasBondsOwnership"> · 资料库可匹配 {{ visibleBondsOwnedCount }} / {{ bondsHonors.length }} 个已拥有称号<span v-if="visibleBondsOwnedCount !== bondsOwnedMap.size">（账号记录 {{ bondsOwnedMap.size }}）</span></span></p>
-            <label class="label cursor-pointer gap-2 ml-auto"><input v-model="bondsOwnedOnly" type="checkbox" class="checkbox checkbox-sm checkbox-secondary" :disabled="!hasBondsOwnership" /><span class="label-text">仅看已拥有</span></label>
+            <OwnedOnlyToggle v-model="bondsOwnedOnly" label="仅看已拥有" :available="hasBondsOwnership" hint="还没有这个账号的牵绊称号数据；在个人信息页绑定账号并同步游戏数据后才能筛选。" class="ml-auto" />
           </div>
         </div>
       </section>
@@ -509,7 +510,7 @@ onMounted(async () => {
 
     <dialog ref="honorDialog" class="modal" @close="onHonorDialogClose">
       <div v-if="selectedHonor" class="modal-box max-w-2xl overflow-x-hidden">
-        <button class="btn btn-sm btn-circle btn-ghost absolute! right-3 top-3 z-20" aria-label="关闭" @click="selectedHonor = null"><X class="w-4 h-4" /></button>
+        <div class="modal-x"><button class="btn btn-sm btn-circle" aria-label="关闭" @click="selectedHonor = null"><X class="w-4 h-4" /></button></div>
         <h2 class="font-bold text-xl pr-10"><ZhText v-bind="honorTitle(selectedHonor)" sub-class="text-base mt-1" /></h2>
         <p class="text-sm text-base-content/55 mt-1">称号 #{{ selectedHonor.id }} · {{ getTypeLabel(honorGroupMap.get(selectedHonor.groupId)?.honorType) }}<span v-if="normalOwnedMap.has(selectedHonor.id)" class="text-success font-medium"> · 已拥有 Lv.{{ normalOwnedMap.get(selectedHonor.id) }}</span></p>
         <div class="bg-base-200 rounded-xl p-4 my-5"><div class="mx-auto w-full min-w-0 max-w-[340px]"><SekaiHonor :honor-id="selectedHonor.id" :honor-level="selectedHonorLevel" /></div></div>
@@ -526,7 +527,7 @@ onMounted(async () => {
 
     <dialog ref="bondsHonorDialog" class="modal" @close="onBondsHonorDialogClose">
       <div v-if="selectedBondsHonor" class="modal-box max-w-2xl overflow-x-hidden">
-        <button class="btn btn-sm btn-circle btn-ghost absolute! right-3 top-3 z-20" aria-label="关闭" @click="selectedBondsHonor = null"><X class="w-4 h-4" /></button>
+        <div class="modal-x"><button class="btn btn-sm btn-circle" aria-label="关闭" @click="selectedBondsHonor = null"><X class="w-4 h-4" /></button></div>
         <h2 class="font-bold text-xl pr-10">{{ getCharacterNameByUnitId(selectedBondsHonor.gameCharacterUnitId1) }} × {{ getCharacterNameByUnitId(selectedBondsHonor.gameCharacterUnitId2) }}</h2>
         <p class="text-sm text-base-content/55 mt-1">牵绊称号 #{{ selectedBondsHonor.id }}<span v-if="bondsOwnedMap.has(selectedBondsHonor.id)" class="text-success font-medium"> · 已拥有 Lv.{{ bondsOwnedMap.get(selectedBondsHonor.id) }}</span></p>
         <div class="bg-base-200 rounded-xl p-4 my-5">

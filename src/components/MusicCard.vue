@@ -72,7 +72,7 @@ function selectArtist() {
 
 <template>
   <div
-    class="card bg-base-100 shadow-sm overflow-hidden relative has-[a:focus-visible]:outline has-[a:focus-visible]:outline-2 has-[a:focus-visible]:outline-offset-2 has-[a:focus-visible]:outline-primary"
+    class="card bg-base-100 overflow-hidden relative has-[a:focus-visible]:outline has-[a:focus-visible]:outline-2 has-[a:focus-visible]:outline-offset-2 has-[a:focus-visible]:outline-primary"
     :class="results ? 'hover:border-primary/30 border border-transparent transition-colors' : 'hover:shadow-md transition-shadow'"
   >
     <!-- 封面 -->

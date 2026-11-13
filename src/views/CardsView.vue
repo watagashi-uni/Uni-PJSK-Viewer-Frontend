@@ -10,7 +10,8 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
-import { RefreshCw, SlidersHorizontal, ChevronDown, FilterX } from 'lucide-vue-next'
+import { RefreshCw, SlidersHorizontal, ChevronDown, FilterX, Image as ImageIcon, Layers3 } from 'lucide-vue-next'
+import PageHeader from '@/components/PageHeader.vue'
 import { useAccountStore } from '@/stores/account'
 import Pagination from '@/components/Pagination.vue'
 import SekaiCard from '@/components/SekaiCard.vue'
@@ -434,9 +435,18 @@ onMounted(() => {
 
 <template>
   <div class="pb-10">
+    <PageHeader title="卡片" description="全部卡面、技能和综合力；绑定账号后可以标出已拥有的卡。" class="mb-5">
+      <template #icon><ImageIcon /></template>
+      <template #actions>
+        <RouterLink class="btn btn-sm btn-primary btn-soft w-full sm:w-auto" to="/card-collection">
+          <Layers3 class="h-4 w-4" /> 养成进度
+        </RouterLink>
+      </template>
+    </PageHeader>
+
     <!-- 拥有状态切换区 -->
-    <div class="card bg-base-100 shadow-md mb-4 mt-2">
-      <div class="card-body p-4 flex flex-row flex-wrap items-center gap-4">
+    <div class="toolbar mb-4">
+      <div class="flex flex-row flex-wrap items-center gap-x-4 gap-y-2 px-1">
         <label class="label cursor-pointer gap-2 p-0">
           <input v-model="showUserCards" type="checkbox" class="toggle toggle-primary toggle-sm" />
           <span class="label-text font-medium mt-0.5">显示拥有状态</span>
@@ -465,16 +475,11 @@ onMounted(() => {
             刷新数据
           </button>
         </template>
-
-        <div class="divider divider-horizontal mx-0"></div>
-        <RouterLink class="btn btn-sm btn-primary" to="/card-collection">
-          养成进度
-        </RouterLink>
       </div>
     </div>
 
     <!-- 筛选面板 -->
-    <div class="mb-6 bg-base-100 rounded-lg shadow-sm">
+    <div class="panel mb-6">
       <div class="flex flex-wrap items-center gap-2 p-2">
         <button class="btn btn-sm btn-ghost gap-2" @click="isFilterPanelOpen = !isFilterPanelOpen">
           <SlidersHorizontal class="w-4 h-4" />
@@ -595,7 +600,7 @@ onMounted(() => {
         class="group animate-fade-in-up"
       >
         <!-- 卡片背景框 -->
-        <div class="bg-base-100 rounded-xl p-2.5 shadow-md border border-base-200 hover:shadow-lg hover:border-primary/30 transition-all relative overflow-hidden">
+        <div class="bg-base-100 rounded-xl p-2.5 border border-base-300 hover:shadow-lg hover:border-primary/30 transition-all relative overflow-hidden">
           <!-- 简单角标 (替代之前的内部遮罩) -->
           <div v-if="isLeak(card.releaseAt)" class="absolute top-1 right-1 z-40 badge badge-warning badge-xs gap-0.5">
             剧透

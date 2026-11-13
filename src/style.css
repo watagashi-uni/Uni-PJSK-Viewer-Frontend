@@ -1,38 +1,54 @@
 @import "tailwindcss";
+@import "@fontsource-variable/outfit/wght.css";
 
 @plugin "daisyui" {
   exclude: properties;
 }
 
-/* 默认浅色主题（设置里的「浅色」/跟随系统的浅色都用它） */
+/* ==========================================================================
+   设计约定（新增页面请沿用）
+   - 页面底色 base-200，面板 base-100 + 1px base-300 边框，不靠阴影分层；
+     阴影只留给浮层（下拉、弹窗、播放器、搜索面板）。
+   - 面板用 .card 或 .panel；面板里的浅底块用 .well；列表条目用 .tile。
+   - 提示统一用 .alert（已改成浅色底），不要自己拼色块。
+   - 标题与数字用 font-display（拉丁字符、数字是 Outfit，中文仍是系统字体）。
+   - 颜色只用主题变量（base-*、primary、secondary、accent、info/success/warning/error），
+     这样四套主题都能正常显示。
+   ========================================================================== */
+
+@theme {
+  --font-display: 'Outfit Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Hiragino Sans', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Noto Sans SC', sans-serif;
+}
+
+/* 浅色：设置里的「浅色」和跟随系统时的浅色 */
 @plugin "daisyui/theme" {
   name: "unipjsk";
   default: true;
   prefersdark: false;
   color-scheme: "light";
   --color-base-100: #ffffff;
-  --color-base-200: #f4f5f7;
-  --color-base-300: #e2e5ea;
-  --color-base-content: #1d2330;
-  --color-primary: #0b8196;
+  --color-base-200: #f3f5f8;
+  --color-base-300: #e0e4ea;
+  --color-base-content: #1a2130;
+  --color-primary: #087f94;
   --color-primary-content: #ffffff;
-  --color-secondary: #c93a6e;
+  --color-secondary: #d03a71;
   --color-secondary-content: #ffffff;
-  --color-accent: #6d5bd0;
+  --color-accent: #6a58d6;
   --color-accent-content: #ffffff;
-  --color-neutral: #374151;
-  --color-neutral-content: #ffffff;
-  --color-info: #0277b6;
+  --color-neutral: #2b3342;
+  --color-neutral-content: #f3f5f8;
+  --color-info: #0b74b5;
   --color-info-content: #ffffff;
-  --color-success: #16803c;
+  --color-success: #15803d;
   --color-success-content: #ffffff;
-  --color-warning: #e08a00;
-  --color-warning-content: #1d2330;
-  --color-error: #d42a2a;
+  --color-warning: #d98200;
+  --color-warning-content: #241500;
+  --color-error: #cf2e2e;
   --color-error-content: #ffffff;
-  --radius-selector: 0.375rem;
-  --radius-field: 0.5rem;
-  --radius-box: 0.75rem;
+  --radius-selector: 0.5rem;
+  --radius-field: 0.625rem;
+  --radius-box: 0.875rem;
   --size-selector: 0.25rem;
   --size-field: 0.25rem;
   --border: 1px;
@@ -40,35 +56,35 @@
   --noise: 0;
 }
 
-/* 覆盖内置 dark，使深色与浅色共用同一套品牌色 */
+/* 深色：覆盖内置 dark，和浅色共用同一套品牌色 */
 @plugin "daisyui/theme" {
   name: "dark";
   default: false;
   prefersdark: true;
   color-scheme: "dark";
-  --color-base-100: #1a1d24;
-  --color-base-200: #13151a;
-  --color-base-300: #2a2f39;
-  --color-base-content: #e4e7ec;
-  --color-primary: #3cc4d8;
-  --color-primary-content: #06282e;
-  --color-secondary: #f07aa5;
+  --color-base-100: #1b1f27;
+  --color-base-200: #12151b;
+  --color-base-300: #2d333f;
+  --color-base-content: #e6e9ee;
+  --color-primary: #48c9dc;
+  --color-primary-content: #05262c;
+  --color-secondary: #f380a9;
   --color-secondary-content: #3a0d1e;
-  --color-accent: #a497ff;
+  --color-accent: #a99cff;
   --color-accent-content: #1b1240;
-  --color-neutral: #2b313c;
-  --color-neutral-content: #e4e7ec;
-  --color-info: #38bdf8;
+  --color-neutral: #2d333f;
+  --color-neutral-content: #e6e9ee;
+  --color-info: #4ab9f5;
   --color-info-content: #062033;
-  --color-success: #4ade80;
+  --color-success: #4fd88a;
   --color-success-content: #052e16;
-  --color-warning: #fbbf24;
+  --color-warning: #f7bd3a;
   --color-warning-content: #2a1a00;
-  --color-error: #f87171;
+  --color-error: #f77a7a;
   --color-error-content: #3b0909;
-  --radius-selector: 0.375rem;
-  --radius-field: 0.5rem;
-  --radius-box: 0.75rem;
+  --radius-selector: 0.5rem;
+  --radius-field: 0.625rem;
+  --radius-box: 0.875rem;
   --size-selector: 0.25rem;
   --size-field: 0.25rem;
   --border: 1px;
@@ -76,58 +92,148 @@
   --noise: 0;
 }
 
+/* Moe：粉色浅色主题，圆角更大 */
 @plugin "daisyui/theme" {
   name: "moe";
   default: false;
   prefersdark: false;
   color-scheme: "light";
-  --color-base-100: #fff5f7;
-  --color-base-200: #ffe5ec;
-  --color-base-300: #ffc2d1;
-  --color-base-content: #593d48;
-  --color-primary: #ff85a1;
+  --color-base-100: #fffbfc;
+  --color-base-200: #fdeef3;
+  --color-base-300: #f6cdd9;
+  --color-base-content: #4a2c38;
+  --color-primary: #d43a74;
   --color-primary-content: #ffffff;
-  --color-secondary: #ffb5a7;
-  --color-secondary-content: #4f2b32;
-  --color-accent: #fec5bb;
-  --color-neutral: #8b92a5;
-  --color-info: #0ea5e9;
-  --color-success: #10b981;
-  --color-warning: #f59e0b;
-  --color-error: #e11d48;
-  --radius-box: 1.5rem;
-  --radius-badge: 1.9rem;
+  --color-secondary: #f39a7f;
+  --color-secondary-content: #4a1d10;
+  --color-accent: #9173dc;
+  --color-accent-content: #ffffff;
+  --color-neutral: #6b4857;
+  --color-neutral-content: #fff5f8;
+  --color-info: #1784c7;
+  --color-info-content: #ffffff;
+  --color-success: #178a5c;
+  --color-success-content: #ffffff;
+  --color-warning: #e08a00;
+  --color-warning-content: #2b1a00;
+  --color-error: #d42a4f;
+  --color-error-content: #ffffff;
+  --radius-selector: 1rem;
+  --radius-field: 1rem;
+  --radius-box: 1.25rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 0;
+  --noise: 0;
 }
 
+/* 地雷：黑粉深色主题，圆角更小 */
 @plugin "daisyui/theme" {
   name: "jirai";
   default: false;
   prefersdark: false;
   color-scheme: "dark";
-  --color-base-100: #1a151b;
-  --color-base-200: #261f28;
-  --color-base-300: #332936;
-  --color-base-content: #f4e6e6;
-  --color-primary: #d65a85;
-  --color-primary-content: #ffffff;
-  --color-secondary: #8c7694;
-  --color-secondary-content: #ffffff;
-  --color-accent: #ff85a1;
-  --color-neutral: #8b92a5;
-  --color-info: #0ea5e9;
-  --color-success: #10b981;
-  --color-warning: #f59e0b;
-  --color-error: #e11d48;
-  --radius-box: 0.8rem;
-  --radius-btn: 0.5rem;
-  --radius-badge: 0.5rem;
+  --color-base-100: #221a24;
+  --color-base-200: #171118;
+  --color-base-300: #3d2d40;
+  --color-base-content: #f3e7ec;
+  --color-primary: #f07aa5;
+  --color-primary-content: #36101f;
+  --color-secondary: #b99bd2;
+  --color-secondary-content: #20132a;
+  --color-accent: #ffa3c0;
+  --color-accent-content: #3a0f20;
+  --color-neutral: #3d2d40;
+  --color-neutral-content: #f3e7ec;
+  --color-info: #5cb8f5;
+  --color-info-content: #062033;
+  --color-success: #57d39b;
+  --color-success-content: #052e1c;
+  --color-warning: #f4bc63;
+  --color-warning-content: #2a1a00;
+  --color-error: #ff7396;
+  --color-error-content: #3b0916;
+  --radius-selector: 0.25rem;
+  --radius-field: 0.375rem;
+  --radius-box: 0.5rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 0;
+  --noise: 0;
 }
 
-/* 自定义基础样式 */
+/* 主题里 daisyUI 管不到的部分：阴影色、Tailwind 圆角、侧边栏装饰 */
+:root {
+  --shadow-rgb: 22 32 51;
+  --shadow-panel: 0 1px 2px rgb(var(--shadow-rgb) / 0.04);
+  --shadow-float: 0 18px 48px -16px rgb(var(--shadow-rgb) / 0.28), 0 4px 12px -4px rgb(var(--shadow-rgb) / 0.1);
+  --sidebar-width: 15.5rem;
+  --sidebar-pattern: none;
+  --sidebar-pattern-size: auto;
+}
+
+[data-theme="dark"] {
+  --shadow-rgb: 0 0 0;
+  --shadow-panel: none;
+  --shadow-float: 0 20px 52px -14px rgb(0 0 0 / 0.7), 0 0 0 1px rgb(255 255 255 / 0.04);
+}
+
+[data-theme="moe"] {
+  --shadow-rgb: 190 70 110;
+  --shadow-panel: 0 2px 10px -4px rgb(var(--shadow-rgb) / 0.14);
+  --radius-md: 0.625rem;
+  --radius-lg: 0.875rem;
+  --radius-xl: 1.125rem;
+  --radius-2xl: 1.5rem;
+  --sidebar-pattern: url("data:image/svg+xml,%3Csvg width='300' height='300' viewBox='0 0 300 300' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffc2d1' fill-opacity='0.28'%3E%3Cg transform='translate(20, 20) rotate(15, 50, 50) scale(0.6)'%3E%3Cpath d='M36 29c-3.3 0-6-3.6-6-8s2.7-8 6-8 6 3.6 6 8-2.7 8-6 8zm28 0c-3.3 0-6-3.6-6-8s2.7-8 6-8 6 3.6 6 8-2.7 8-6 8zm-42 16c-3.3 0-6-2.7-6-6s2.7-6 6-6 6 2.7 6 6-2.7 6-6 6zm56 0c-3.3 0-6-2.7-6-6s2.7-6 6-6 6 2.7 6 6-2.7 6-6 6zm-28 29c-11 0-20-7.2-20-16s9-14 20-14 20 5.3 20 14-9 16-20 16z'/%3E%3C/g%3E%3Cg transform='translate(150, 60) rotate(75, 50, 50) scale(0.4)'%3E%3Cpath d='M36 29c-3.3 0-6-3.6-6-8s2.7-8 6-8 6 3.6 6 8-2.7 8-6 8zm28 0c-3.3 0-6-3.6-6-8s2.7-8 6-8 6 3.6 6 8-2.7 8-6 8zm-42 16c-3.3 0-6-2.7-6-6s2.7-6 6-6 6 2.7 6 6-2.7 6-6 6zm56 0c-3.3 0-6-2.7-6-6s2.7-6 6-6 6 2.7 6 6-2.7 6-6 6zm-28 29c-11 0-20-7.2-20-16s9-14 20-14 20 5.3 20 14-9 16-20 16z'/%3E%3C/g%3E%3Cg transform='translate(70, 180) rotate(-40, 50, 50) scale(0.7)'%3E%3Cpath d='M36 29c-3.3 0-6-3.6-6-8s2.7-8 6-8 6 3.6 6 8-2.7 8-6 8zm28 0c-3.3 0-6-3.6-6-8s2.7-8 6-8 6 3.6 6 8-2.7 8-6 8zm-42 16c-3.3 0-6-2.7-6-6s2.7-6 6-6 6 2.7 6 6-2.7 6-6 6zm56 0c-3.3 0-6-2.7-6-6s2.7-6 6-6 6 2.7 6 6-2.7 6-6 6zm-28 29c-11 0-20-7.2-20-16s9-14 20-14 20 5.3 20 14-9 16-20 16z'/%3E%3C/g%3E%3Cg transform='translate(200, 200) rotate(115, 50, 50) scale(0.5)'%3E%3Cpath d='M36 29c-3.3 0-6-3.6-6-8s2.7-8 6-8 6 3.6 6 8-2.7 8-6 8zm28 0c-3.3 0-6-3.6-6-8s2.7-8 6-8 6 3.6 6 8-2.7 8-6 8zm-42 16c-3.3 0-6-2.7-6-6s2.7-6 6-6 6 2.7 6 6-2.7 6-6 6zm56 0c-3.3 0-6-2.7-6-6s2.7-6 6-6 6 2.7 6 6-2.7 6-6 6zm-28 29c-11 0-20-7.2-20-16s9-14 20-14 20 5.3 20 14-9 16-20 16z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  --sidebar-pattern-size: 300px 300px;
+}
+
+[data-theme="jirai"] {
+  --shadow-rgb: 0 0 0;
+  --shadow-panel: none;
+  --shadow-float: 0 20px 52px -14px rgb(0 0 0 / 0.75), 0 0 0 1px rgb(240 122 165 / 0.14);
+  --radius-md: 0.25rem;
+  --radius-lg: 0.375rem;
+  --radius-xl: 0.5rem;
+  --radius-2xl: 0.625rem;
+  --sidebar-pattern: linear-gradient(45deg, #1d151f 25%, transparent 25%, transparent 75%, #1d151f 75%), linear-gradient(45deg, #1d151f 25%, transparent 25%, transparent 75%, #1d151f 75%);
+  --sidebar-pattern-size: 40px 40px;
+}
+
+/* ==========================================================================
+   基础
+   ========================================================================== */
+
+html {
+  scroll-behavior: smooth;
+  scrollbar-color: color-mix(in oklab, var(--color-base-content) 22%, transparent) transparent;
+}
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Hiragino Sans GB', 'Hiragino Sans', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Noto Sans SC', sans-serif;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  background-color: var(--color-base-200);
+  color: var(--color-base-content);
+}
+
+@layer base {
+  h1, h2, h3 {
+    font-family: var(--font-display);
+  }
+
+  /* 手机上双击不再放大页面（连点按钮、切换选项时很容易误触）；双指缩放和滚动不受影响。
+     touch-action 不继承，所以每个元素都要设；自己处理手势的组件（touch-action: none 等）优先级更高，不受影响 */
+  html, *, *::before, *::after {
+    touch-action: manipulation;
+  }
+}
+
+::selection {
+  background-color: color-mix(in oklab, var(--color-primary) 26%, transparent);
 }
 
 /* 键盘焦点可见，鼠标点击不出现 */
@@ -145,458 +251,244 @@ body {
   }
 }
 
-/* Moe Theme UI Overrides */
-[data-theme="moe"] .drawer-side .sidebar-wrapper {
-  background-color: #fff5f7;
-  background-image: url("data:image/svg+xml,%3Csvg width='300' height='300' viewBox='0 0 300 300' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23ffc2d1' fill-opacity='0.4'%3E%3Cg transform='translate(20, 20) rotate(15, 50, 50) scale(0.6)'%3E%3Cpath d='M36 29c-3.3 0-6-3.6-6-8s2.7-8 6-8 6 3.6 6 8-2.7 8-6 8zm28 0c-3.3 0-6-3.6-6-8s2.7-8 6-8 6 3.6 6 8-2.7 8-6 8zm-42 16c-3.3 0-6-2.7-6-6s2.7-6 6-6 6 2.7 6 6-2.7 6-6 6zm56 0c-3.3 0-6-2.7-6-6s2.7-6 6-6 6 2.7 6 6-2.7 6-6 6zm-28 29c-11 0-20-7.2-20-16s9-14 20-14 20 5.3 20 14-9 16-20 16z'/%3E%3C/g%3E%3Cg transform='translate(150, 60) rotate(75, 50, 50) scale(0.4)'%3E%3Cpath d='M36 29c-3.3 0-6-3.6-6-8s2.7-8 6-8 6 3.6 6 8-2.7 8-6 8zm28 0c-3.3 0-6-3.6-6-8s2.7-8 6-8 6 3.6 6 8-2.7 8-6 8zm-42 16c-3.3 0-6-2.7-6-6s2.7-6 6-6 6 2.7 6 6-2.7 6-6 6zm56 0c-3.3 0-6-2.7-6-6s2.7-6 6-6 6 2.7 6 6-2.7 6-6 6zm-28 29c-11 0-20-7.2-20-16s9-14 20-14 20 5.3 20 14-9 16-20 16z'/%3E%3C/g%3E%3Cg transform='translate(70, 180) rotate(-40, 50, 50) scale(0.7)'%3E%3Cpath d='M36 29c-3.3 0-6-3.6-6-8s2.7-8 6-8 6 3.6 6 8-2.7 8-6 8zm28 0c-3.3 0-6-3.6-6-8s2.7-8 6-8 6 3.6 6 8-2.7 8-6 8zm-42 16c-3.3 0-6-2.7-6-6s2.7-6 6-6 6 2.7 6 6-2.7 6-6 6zm56 0c-3.3 0-6-2.7-6-6s2.7-6 6-6 6 2.7 6 6-2.7 6-6 6zm-28 29c-11 0-20-7.2-20-16s9-14 20-14 20 5.3 20 14-9 16-20 16z'/%3E%3C/g%3E%3Cg transform='translate(200, 200) rotate(115, 50, 50) scale(0.5)'%3E%3Cpath d='M36 29c-3.3 0-6-3.6-6-8s2.7-8 6-8 6 3.6 6 8-2.7 8-6 8zm28 0c-3.3 0-6-3.6-6-8s2.7-8 6-8 6 3.6 6 8-2.7 8-6 8zm-42 16c-3.3 0-6-2.7-6-6s2.7-6 6-6 6 2.7 6 6-2.7 6-6 6zm56 0c-3.3 0-6-2.7-6-6s2.7-6 6-6 6 2.7 6 6-2.7 6-6 6zm-28 29c-11 0-20-7.2-20-16s9-14 20-14 20 5.3 20 14-9 16-20 16z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
-  background-size: 300px 300px;
-  border-right: 3px dashed #ffb5a7;
-  position: relative;
-  overflow: visible;
+/* 原生下拉菜单在深色主题下也要用主题色 */
+select option {
+  background-color: var(--color-base-100);
+  color: var(--color-base-content);
 }
 
-/* Cat Ears via CSS */
-[data-theme="moe"] .drawer-side .sidebar-wrapper::before,
-[data-theme="moe"] .drawer-side .sidebar-wrapper::after {
-  content: '';
-  position: absolute;
-  top: -20px;
-  width: 40px;
-  height: 40px;
-  background: #ffb5a7;
-  clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
-  z-index: 100;
-}
+/* ==========================================================================
+   daisyUI 组件的统一调整
+   写在 utilities.daisyui 层：盖过 daisyUI 默认值，但仍会被模板里的 Tailwind 工具类覆盖。
+   ========================================================================== */
 
-[data-theme="moe"] .drawer-side .sidebar-wrapper::before {
-  left: 40px;
-  transform: rotate(-15deg);
-}
+@layer utilities {
+  @layer daisyui {
+    /* 面板：细边框代替阴影，深色主题下也分得清层次 */
+    .card {
+      border: 1px solid var(--color-base-300);
+      box-shadow: var(--shadow-panel);
+    }
 
-[data-theme="moe"] .drawer-side .sidebar-wrapper::after {
-  right: 40px;
-  transform: rotate(15deg);
-}
+    .stat:not(.stats > .stat) {
+      border: 1px solid var(--color-base-300);
+      border-radius: var(--radius-box);
+      box-shadow: var(--shadow-panel);
+    }
 
-/* Buttons Boing Animation */
-@keyframes boing {
-  0% {
-    transform: scale(1);
-  }
+    .stat-value {
+      font-family: var(--font-display);
+    }
 
-  50% {
-    transform: scale(0.9);
-  }
+    /* 提示：浅色底 + 同色描边，正文保持正常文字颜色，只有图标带语义色 */
+    .alert {
+      background-color: color-mix(in oklab, var(--alert-color, var(--color-base-content)) 9%, var(--color-base-100));
+      --alert-border-color: color-mix(in oklab, var(--alert-color, var(--color-base-content)) 30%, var(--color-base-100));
+      color: var(--color-base-content);
+      box-shadow: none;
+      gap: 0.75rem;
+    }
 
-  100% {
-    transform: scale(1.1);
-  }
-}
+    .alert > :where(svg):first-child {
+      color: var(--alert-color, currentColor);
+    }
 
-[data-theme="moe"] .btn-primary:active {
-  animation: boing 0.3s ease;
-}
+    .btn {
+      font-weight: 600;
+    }
 
-[data-theme="moe"] .btn {
-  border: 2px solid transparent;
-  transition: all 0.3s ease;
-}
+    .badge {
+      font-weight: 500;
+    }
 
-[data-theme="moe"] .btn-primary {
-  background: linear-gradient(45deg, #ff85a1, #ffb5a7);
-  border: none;
-  color: white;
-  box-shadow: 0 4px 15px rgba(255, 133, 161, 0.4);
-}
+    .modal-box {
+      border: 1px solid var(--color-base-300);
+      box-shadow: var(--shadow-float);
+    }
 
-[data-theme="moe"] .btn-primary:hover {
-  transform: translateY(-2px) scale(1.02);
-  box-shadow: 0 6px 20px rgba(255, 133, 161, 0.6);
-}
+    .dropdown-content {
+      box-shadow: var(--shadow-float);
+    }
 
-[data-theme="moe"] .card {
-  border: 2px solid #ffe5ec;
-  box-shadow: 0 8px 24px rgba(255, 181, 167, 0.15);
-}
+    .tabs-box {
+      background-color: color-mix(in oklab, var(--color-base-content) 6%, var(--color-base-100));
+      box-shadow: none;
+    }
 
-/* Theme-consistent alert styles for Moe */
-[data-theme="moe"] .alert.alert-warning {
-  background: linear-gradient(135deg, #fff6e5 0%, #ffe9c2 100%);
-  border: 2px solid #ffc46b;
-  color: #7a4a00;
-  box-shadow: 0 10px 26px rgba(245, 158, 11, 0.18);
-}
+    .collapse {
+      border-radius: var(--radius-box);
+    }
 
-[data-theme="moe"] .alert.alert-success {
-  background: linear-gradient(135deg, #ebfff7 0%, #d5f7e9 100%);
-  border: 2px solid #56cf9f;
-  color: #0f5b40;
-  box-shadow: 0 10px 26px rgba(16, 185, 129, 0.18);
-}
-
-[data-theme="moe"] .alert.alert-error {
-  background: linear-gradient(135deg, #fff0f4 0%, #ffdbe5 100%);
-  border: 2px solid #ff8fad;
-  color: #8a1f45;
-  box-shadow: 0 10px 26px rgba(225, 29, 72, 0.18);
-}
-
-[data-theme="moe"] .alert.alert-info {
-  background: linear-gradient(135deg, #eef7ff 0%, #daeeff 100%);
-  border: 2px solid #7fc8ff;
-  color: #1f4f85;
-  box-shadow: 0 10px 26px rgba(14, 165, 233, 0.18);
-}
-
-[data-theme="moe"] .alert.alert-warning :is(h1, h2, h3, h4, p, span),
-[data-theme="moe"] .alert.alert-success :is(h1, h2, h3, h4, p, span),
-[data-theme="moe"] .alert.alert-error :is(h1, h2, h3, h4, p, span),
-[data-theme="moe"] .alert.alert-info :is(h1, h2, h3, h4, p, span) {
-  color: inherit;
-}
-
-/* Scrollbar styling for Moe */
-[data-theme="moe"] ::-webkit-scrollbar {
-  width: 8px;
-}
-
-[data-theme="moe"] ::-webkit-scrollbar-track {
-  background: #fff5f7;
-}
-
-[data-theme="moe"] ::-webkit-scrollbar-thumb {
-  background: #ffb5a7;
-  border-radius: 99px;
-}
-
-[data-theme="moe"] ::-webkit-scrollbar-thumb:hover {
-  background: #ff85a1;
-}
-
-/* Custom Cursors for Moe Theme */
-[data-theme="moe"],
-[data-theme="moe"] * {
-  cursor: url('/cursors/normal.cur'), auto !important;
-}
-
-[data-theme="moe"] a,
-[data-theme="moe"] button,
-[data-theme="moe"] [role="button"],
-[data-theme="moe"] input[type="checkbox"],
-[data-theme="moe"] input[type="radio"],
-[data-theme="moe"] select,
-[data-theme="moe"] .cursor-pointer,
-[data-theme="moe"] .cursor-pointer * {
-  cursor: url('/cursors/normal.cur'), pointer !important;
-}
-
-[data-theme="moe"] input[type="text"],
-[data-theme="moe"] input[type="number"],
-[data-theme="moe"] input[type="password"],
-[data-theme="moe"] textarea,
-[data-theme="moe"] .cursor-text {
-  cursor: url('/cursors/text.cur'), text !important;
-}
-
-[data-theme="moe"] .cursor-move,
-[data-theme="moe"] .cursor-move * {
-  cursor: url('/cursors/move.cur'), move !important;
-}
-
-/* 平滑滚动 */
-html {
-  scroll-behavior: smooth;
-}
-
-/* 隐藏滚动条但保留滚动功能 */
-.hide-scrollbar::-webkit-scrollbar {
-  display: none;
-}
-
-.hide-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-
-/* 动画延迟工具类 */
-.animation-delay-100 {
-  animation-delay: 0.1s;
-}
-
-.animation-delay-200 {
-  animation-delay: 0.2s;
-}
-
-.animation-delay-300 {
-  animation-delay: 0.3s;
-}
-
-/* 文本截断 */
-.line-clamp-2 {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-/* fadeInUp 动画 */
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(30px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
+    .table :where(thead th) {
+      font-weight: 600;
+      color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+    }
   }
 }
 
-.animate-fade-in-up {
-  animation: fadeInUp 0.6s ease-out;
-}
+/* ==========================================================================
+   站内通用组件
+   ========================================================================== */
 
-/* ========================================================== */
-/* Jirai Theme UI Overrides */
-/* ========================================================== */
-
-[data-theme="jirai"] .drawer-side .sidebar-wrapper {
-  background-color: #1a151b;
-  /* Dark cross checker pattern */
-  background-image: linear-gradient(45deg, #1e1820 25%, transparent 25%, transparent 75%, #1e1820 75%, #1e1820), linear-gradient(45deg, #1e1820 25%, transparent 25%, transparent 75%, #1e1820 75%, #1e1820);
-  background-size: 40px 40px;
-  background-position: 0 0, 20px 20px;
-  border-right: 2px solid #d65a85;
-  position: relative;
-  overflow: visible;
-}
-
-/* Vertical Gothic Lace Trim on Sidebar Right Edge */
-[data-theme="jirai"] .drawer-side .sidebar-wrapper::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  right: -10px;
-  /* Hang outside the sidebar */
-  width: 10px;
-  height: 100%;
-  /* Delicate vertical lace scallop with eyelet dots */
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='20'%3E%3Cpath fill='none' stroke='%23d65a85' stroke-width='1.5' d='M0,0 Q10,10 0,20'/%3E%3Ccircle cx='3' cy='10' r='1.5' fill='%23ff85a1'/%3E%3Ccircle cx='1.5' cy='5' r='1' fill='%23ff85a1'/%3E%3Ccircle cx='1.5' cy='15' r='1' fill='%23ff85a1'/%3E%3C/svg%3E");
-  background-repeat: repeat-y;
-  z-index: 100;
-  pointer-events: none;
-}
-
-/* Ribbon-style Buttons with Lace Drop */
-[data-theme="jirai"] .btn {
-  border: 1px solid #d65a85;
-  border-radius: 0.3rem;
-  /* Sharper edges fit Jirai */
-  outline: 1px solid transparent;
-  transition: all 0.2s ease-in-out;
-  background-color: #261f28;
-  color: #ff85a1;
-  position: relative;
-}
-
-[data-theme="jirai"] .btn-primary {
-  background: #d65a85;
-  color: white;
-  border: 1px solid #ff85a1;
-  /* Double box effect to look like a tailored ribbon */
-  box-shadow: inset 0 0 0 2px #d65a85, inset 0 0 0 3px #ff85a1;
-}
-
-[data-theme="jirai"] .btn-primary:hover {
-  background: #ff85a1;
-  color: white;
-  border-color: #ffffff;
-  box-shadow: inset 0 0 0 2px #ff85a1, inset 0 0 0 3px #ffffff, 0 0 10px rgba(255, 133, 161, 0.6);
-  transform: scale(1.02);
-}
-
-/* Keep semantic/selected button states readable after the base Jirai button override. */
-[data-theme="jirai"] .btn-secondary {
-  background-color: #8c7694;
-  color: #ffffff;
-  border-color: #d7b6d6;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
-}
-
-[data-theme="jirai"] .btn-secondary:hover,
-[data-theme="jirai"] .btn-secondary:focus-visible {
-  background-color: #a58bad;
-  color: #ffffff;
-  border-color: #ffb0ca;
-}
-
-[data-theme="jirai"] .btn.btn-active {
-  background-color: #d65a85;
-  color: #ffffff;
-  border-color: #ffb0ca;
-}
-
-/* Native selects need explicit option colors in Chromium/WebKit dark theme menus. */
-[data-theme="jirai"] :is(.select, select) {
-  background-color: #261f28;
-  color: #f4e6e6;
-  border-color: #8c7694;
-}
-
-[data-theme="jirai"] :is(.select, select) option {
-  background-color: #261f28;
-  color: #f4e6e6;
-}
-
-[data-theme="jirai"] :is(.select, select) option:checked {
-  background-color: #d65a85;
-  color: #ffffff;
-}
-
-/* Sidebar wobble fix */
-[data-theme="jirai"] .drawer-side .btn:hover {
-  transform: none;
-}
-
-/* Remove harsh borders and shadows from header/ghost buttons */
-[data-theme="jirai"] .btn-ghost {
-  border-color: transparent;
-  background-color: transparent;
-  box-shadow: none;
-}
-
-[data-theme="jirai"] .btn-ghost:hover {
-  background-color: rgba(214, 90, 133, 0.2);
-  box-shadow: none;
-}
-
-/* Add lace frill under standard cards */
-[data-theme="jirai"] .card::after {
-  content: '';
-  position: absolute;
-  bottom: -6px;
-  left: 5%;
-  width: 90%;
-  height: 6px;
-  /* Horizontal delicate lace scallop */
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='6'%3E%3Cpath fill='none' stroke='%23d65a85' stroke-width='1.5' d='M0,0 Q10,6 20,0'/%3E%3Ccircle cx='10' cy='2.5' r='1' fill='%23ff85a1'/%3E%3Ccircle cx='4' cy='1' r='0.8' fill='%23ff85a1'/%3E%3Ccircle cx='16' cy='1' r='0.8' fill='%23ff85a1'/%3E%3C/svg%3E");
-  background-repeat: repeat-x;
-  background-position: top;
-  pointer-events: none;
-  opacity: 0.9;
-}
-
-[data-theme="jirai"] .card {
-  position: relative;
-  border: 1px solid #332936;
-  border-bottom: 2px solid #d65a85;
-  /* Weight bottom to ground the lace */
-  background-color: rgba(38, 31, 40, 0.9);
-  backdrop-filter: blur(8px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-}
-
-[data-theme="jirai"] :is(.card, .collapse, .dropdown-content) .bg-base-200,
-[data-theme="jirai"] :is(.card, .collapse, .dropdown-content) .bg-base-200\/30,
-[data-theme="jirai"] :is(.card, .collapse, .dropdown-content) .bg-base-200\/50,
-[data-theme="jirai"] :is(.card, .collapse, .dropdown-content) .bg-base-200\/60,
-[data-theme="jirai"] :is(.card, .collapse, .dropdown-content) .bg-base-200\/70 {
-  background-color: rgba(18, 13, 20, 0.68);
-}
-
-[data-theme="jirai"] :is(.card, .collapse, .dropdown-content) :is(.border-base-200, .border-base-200\/50, .border-base-300) {
-  border-color: rgba(255, 133, 161, 0.2);
-}
-
-/* Theme-consistent alert styles for Jirai */
-[data-theme="jirai"] .alert.alert-warning {
-  background: linear-gradient(135deg, rgba(92, 64, 27, 0.72) 0%, rgba(122, 84, 30, 0.62) 100%);
-  border: 1px solid #e2a34a;
-  border-left: 4px solid #f4bc63;
-  color: #ffe2b8;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.32);
-}
-
-[data-theme="jirai"] .alert.alert-success {
-  background: linear-gradient(135deg, rgba(19, 65, 52, 0.78) 0%, rgba(26, 95, 75, 0.64) 100%);
-  border: 1px solid #4dbf94;
-  border-left: 4px solid #65d2aa;
-  color: #cafbe7;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.32);
-}
-
-[data-theme="jirai"] .alert.alert-error {
-  background: linear-gradient(135deg, rgba(101, 28, 49, 0.82) 0%, rgba(126, 35, 62, 0.66) 100%);
-  border: 1px solid #ff6e9c;
-  border-left: 4px solid #ff8ab1;
-  color: #ffd5e3;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.34);
-}
-
-[data-theme="jirai"] .alert.alert-info {
-  background: linear-gradient(135deg, rgba(28, 56, 84, 0.8) 0%, rgba(31, 70, 102, 0.66) 100%);
-  border: 1px solid #66b7ff;
-  border-left: 4px solid #8dcbff;
-  color: #d8eeff;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.34);
-}
-
-[data-theme="jirai"] .alert.alert-warning :is(h1, h2, h3, h4, p, span),
-[data-theme="jirai"] .alert.alert-success :is(h1, h2, h3, h4, p, span),
-[data-theme="jirai"] .alert.alert-error :is(h1, h2, h3, h4, p, span),
-[data-theme="jirai"] .alert.alert-info :is(h1, h2, h3, h4, p, span) {
-  color: inherit;
-}
-
-/* Scrollbar styling for Jirai */
-[data-theme="jirai"] ::-webkit-scrollbar {
-  width: 8px;
-}
-
-[data-theme="jirai"] ::-webkit-scrollbar-track {
-  background: #1a151b;
-}
-
-[data-theme="jirai"] ::-webkit-scrollbar-thumb {
-  background: #8c7694;
-  border-radius: 4px;
-}
-
-[data-theme="jirai"] ::-webkit-scrollbar-thumb:hover {
-  background: #d65a85;
-}
-
-/* Active links in Sidebar for Jirai */
-[data-theme="jirai"] .menu li>*:not(ul, .menu-title, details, .btn):active,
-[data-theme="jirai"] .menu li>*:not(ul, .menu-title, details, .btn).active,
-[data-theme="jirai"] .menu li>details>summary:active {
-  background-color: #332936;
-  color: #ff85a1;
-  border-left: 4px solid #ff85a1;
-}
-
-/* Fix DaisyUI range slider thumb jitter on active/focus */
-.range:focus::-webkit-slider-thumb,
-.range:active::-webkit-slider-thumb {
-  transform: translateY(-50%) !important;
-  margin-top: 0 !important;
-}
-
-.range::-webkit-slider-thumb {
-  transform: translateY(-50%) !important;
-}
-
-/* 侧边栏当前页：用品牌色浅底代替 daisyUI 默认的深色块（地雷主题有自己的规则，优先级更高） */
-.sidebar-wrapper .menu li > a.menu-active {
-  background-color: color-mix(in oklab, var(--color-primary) 12%, transparent);
-  color: var(--color-primary);
-  font-weight: 600;
-}
-
-/* 中文译名（ZhText）：附在原文下方或同一行，字号略小、颜色较淡。
-   放在 components 层，sub-class 里的工具类可以覆盖这里的默认值 */
 @layer components {
+  /* 面板：和 .card 同一层级，用在不需要 card 结构的地方 */
+  .panel {
+    border: 1px solid var(--color-base-300);
+    border-radius: var(--radius-box);
+    background-color: var(--color-base-100);
+    box-shadow: var(--shadow-panel);
+  }
+
+  /* 面板里的浅底块 */
+  .well {
+    border-radius: var(--radius-field);
+    background-color: color-mix(in oklab, var(--color-base-content) 5%, var(--color-base-100));
+  }
+
+  /* 列表页的搜索 / 筛选条 */
+  .toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 0.75rem;
+    padding: 0.75rem;
+    border: 1px solid var(--color-base-300);
+    border-radius: var(--radius-box);
+    background-color: var(--color-base-100);
+    box-shadow: var(--shadow-panel);
+  }
+
+  /* 可点击的条目（歌曲、卡片、活动……）：悬停时描边变成品牌色 */
+  .tile {
+    border: 1px solid var(--color-base-300);
+    border-radius: var(--radius-box);
+    background-color: var(--color-base-100);
+    box-shadow: var(--shadow-panel);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  :is(a, button, [role="button"]).tile:hover,
+  .tile:has(> a:hover) {
+    border-color: color-mix(in oklab, var(--color-primary) 55%, var(--color-base-300));
+    box-shadow: 0 6px 18px -10px rgb(var(--shadow-rgb) / 0.3);
+  }
+
+  /* 小节标题：前面一条斜切的品牌色块 */
+  .section-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-family: var(--font-display);
+    font-size: 1.0625rem;
+    font-weight: 700;
+    line-height: 1.5rem;
+  }
+
+  .section-title::before {
+    content: '';
+    flex: none;
+    width: 0.3125rem;
+    height: 1.05rem;
+    border-radius: 1px;
+    background-color: var(--color-primary);
+    transform: skewX(-14deg);
+  }
+
+  /* 数字：等宽数字 + 标题字体 */
+  .num {
+    font-family: var(--font-display);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* 键盘按键提示 */
+  .kbd-hint {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.25rem;
+    height: 1.25rem;
+    padding: 0 0.3rem;
+    border: 1px solid var(--color-base-300);
+    border-radius: 0.3rem;
+    background-color: var(--color-base-100);
+    color: color-mix(in oklab, var(--color-base-content) 55%, transparent);
+    font-family: var(--font-display);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    line-height: 1;
+  }
+
+  /* 空状态 */
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 3rem 1rem;
+    color: color-mix(in oklab, var(--color-base-content) 55%, transparent);
+    text-align: center;
+    font-size: 0.875rem;
+  }
+
+  .empty-state > svg {
+    width: 2.5rem;
+    height: 2.5rem;
+    margin-bottom: 0.25rem;
+    opacity: 0.45;
+  }
+
+  /* 弹窗右上角的关闭按钮：放在 .modal-box 里的第一个元素。
+     不占高度，内容滚动时一直停在右上角，手机上不用划到底部找“关闭”。
+       <form method="dialog" class="modal-x"><button class="btn btn-sm btn-circle" aria-label="关闭">…</button></form>
+     .modal-box 去掉了内边距（p-0）时再加 .modal-x-flush */
+  .modal-x {
+    position: sticky;
+    top: 1.5rem;
+    z-index: 20;
+    display: flex;
+    justify-content: flex-end;
+    height: 0;
+    pointer-events: none;
+  }
+
+  .modal-x > * {
+    pointer-events: auto;
+    border: 0;
+    background-color: color-mix(in oklab, var(--color-base-100) 88%, transparent);
+    box-shadow: 0 0 0 1px var(--color-base-300);
+    transform: translate(0.75rem, -0.75rem);
+  }
+
+  .modal-x-flush {
+    top: 0;
+  }
+
+  .modal-x-flush > * {
+    transform: translate(-0.75rem, 0.75rem);
+  }
+
+  /* 详情页顶部的返回链接 */
+  .back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-left: -0.375rem;
+    padding: 0.25rem 0.5rem 0.25rem 0.375rem;
+    border-radius: var(--radius-field);
+    color: color-mix(in oklab, var(--color-base-content) 65%, transparent);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    transition: color 0.15s ease, background-color 0.15s ease;
+  }
+
+  .back-link:hover {
+    background-color: color-mix(in oklab, var(--color-base-content) 7%, transparent);
+    color: var(--color-base-content);
+  }
+
+  /* 中文译名（ZhText）：附在原文下方或同一行，字号略小、颜色较淡。
+     sub-class 里的工具类可以覆盖这里的默认值 */
   .zh-sub {
     display: block;
     margin-top: 0.1em;
@@ -625,4 +517,109 @@ html {
     opacity: 0.5;
     vertical-align: 0.12em;
   }
+}
+
+/* ==========================================================================
+   工具类
+   ========================================================================== */
+
+/* 隐藏滚动条但保留滚动功能 */
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* 内容出现时的轻微上移，只用在提示条这类需要引起注意的地方 */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.28s ease-out;
+}
+
+/* 修正 daisyUI range 滑块在按下 / 聚焦时的抖动 */
+.range:focus::-webkit-slider-thumb,
+.range:active::-webkit-slider-thumb {
+  transform: translateY(-50%) !important;
+  margin-top: 0 !important;
+}
+
+.range::-webkit-slider-thumb {
+  transform: translateY(-50%) !important;
+}
+
+/* ==========================================================================
+   Moe 主题的额外装饰
+   ========================================================================== */
+
+[data-theme="moe"] .btn-primary:not(.btn-outline, .btn-ghost, .btn-soft, .btn-link, :disabled) {
+  box-shadow: 0 6px 16px -8px rgb(var(--shadow-rgb) / 0.75);
+}
+
+/* 自定义鼠标指针（只对鼠标生效，触屏设备不受影响） */
+[data-theme="moe"],
+[data-theme="moe"] * {
+  cursor: url('/cursors/normal.cur'), auto !important;
+}
+
+[data-theme="moe"] a,
+[data-theme="moe"] button,
+[data-theme="moe"] [role="button"],
+[data-theme="moe"] input[type="checkbox"],
+[data-theme="moe"] input[type="radio"],
+[data-theme="moe"] select,
+[data-theme="moe"] label[for],
+[data-theme="moe"] .cursor-pointer,
+[data-theme="moe"] .cursor-pointer * {
+  cursor: url('/cursors/link.cur'), pointer !important;
+}
+
+[data-theme="moe"] input[type="text"],
+[data-theme="moe"] input[type="search"],
+[data-theme="moe"] input[type="number"],
+[data-theme="moe"] input[type="password"],
+[data-theme="moe"] textarea,
+[data-theme="moe"] .cursor-text {
+  cursor: url('/cursors/text.cur'), text !important;
+}
+
+[data-theme="moe"] .cursor-move,
+[data-theme="moe"] .cursor-move * {
+  cursor: url('/cursors/move.cur'), move !important;
+}
+
+/* ==========================================================================
+   地雷主题的额外装饰
+   ========================================================================== */
+
+/* 面板底边压一条粉线 */
+[data-theme="jirai"] :is(.card, .panel, .toolbar) {
+  border-bottom-color: color-mix(in oklab, var(--color-primary) 55%, var(--color-base-300));
+}
+
+/* 侧边栏右缘的蕾丝花边：画在边框内侧，外层容器会裁掉超出侧边栏的部分 */
+[data-theme="jirai"] .app-sidebar::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 10px;
+  height: 100%;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='20'%3E%3Cpath fill='none' stroke='%23d65a85' stroke-width='1.5' d='M0,0 Q10,10 0,20'/%3E%3Ccircle cx='3' cy='10' r='1.5' fill='%23ff85a1'/%3E%3Ccircle cx='1.5' cy='5' r='1' fill='%23ff85a1'/%3E%3Ccircle cx='1.5' cy='15' r='1' fill='%23ff85a1'/%3E%3C/svg%3E");
+  background-repeat: repeat-y;
+  transform: scaleX(-1);
+  pointer-events: none;
 }

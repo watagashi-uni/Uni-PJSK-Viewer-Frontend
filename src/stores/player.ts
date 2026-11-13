@@ -8,7 +8,7 @@ import {
   shuffleUpcoming as shuffleUpcomingState, type QueueState, type RepeatMode,
 } from '@/utils/playerQueue'
 import {
-  isPlayerTrack, loadTrackSources, trackAudioPath, trackCoverPath, trackFor,
+  buildTrack, isPlayerTrack, loadTrackSources, trackAudioPath, trackCoverPath, trackFor,
   type PlayerTrack, type PlayerTrackInfo, type TrackSources,
 } from '@/utils/playerTracks'
 
@@ -462,6 +462,14 @@ export const usePlayerStore = defineStore('player', () => {
     return trackFor(await trackSources(), musicId, settings.defaultVocal, vocalId)
   }
 
+  /** Every rendition of a song, in master order. */
+  async function renditionsOf(musicId: number): Promise<PlayerTrackInfo[]> {
+    const sources = await trackSources()
+    const music = sources.musics.find(m => m.id === musicId)
+    if (!music) return []
+    return sources.vocals.filter(v => v.musicId === musicId).map(vocal => buildTrack(music, vocal, sources))
+  }
+
   async function tracksOf(musicIds: number[]): Promise<PlayerTrackInfo[]> {
     const sources = await trackSources()
     return musicIds.map(id => trackFor(sources, id, settings.defaultVocal)).filter((track): track is PlayerTrackInfo => track !== null)
@@ -594,6 +602,6 @@ export const usePlayerStore = defineStore('player', () => {
     audioUrl, coverUrl, isCurrent, sampleTime,
     play, pause, toggle, seek, skip, next, previous, setVolume, toggleMute, cycleRepeat,
     playTracks, playNow, playNext, enqueue, jumpTo, switchRendition, remove, move, clearUpcoming, shuffleUpcoming, close, openNowPlaying,
-    trackOf, tracksOf, initialize,
+    trackOf, tracksOf, renditionsOf, initialize,
   }
 })

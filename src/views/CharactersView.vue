@@ -358,8 +358,8 @@ onMounted(async () => {
   <div class="max-w-7xl mx-auto space-y-6">
     <template v-if="route.params.id">
       <div class="flex flex-wrap items-center justify-between gap-3">
-        <button class="btn btn-ghost btn-sm gap-2" @click="closeDetail">
-          <ArrowLeft class="w-4 h-4" /> 返回角色图鉴
+        <button type="button" class="back-link" @click="closeDetail">
+          <ArrowLeft class="w-4 h-4" /> 返回角色列表
         </button>
         <div v-if="accountStore.accounts.length" class="w-full sm:w-56">
           <AccountSelector v-model="selectedUserId" />
@@ -402,7 +402,7 @@ onMounted(async () => {
           </div>
         </section>
 
-        <section class="card bg-base-100 border border-base-200 shadow-sm">
+        <section class="card bg-base-100 border border-base-200">
           <div class="card-body p-6 md:p-8 gap-6">
             <header>
               <p class="text-sm tracking-[0.18em] text-base-content/45 uppercase">{{ getEnglishName(selectedCharacter) }}</p>

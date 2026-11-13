@@ -9,7 +9,7 @@ defineProps<{
 </script>
 
 <template>
-  <div class="card bg-base-100 shadow-lg">
+  <div class="card bg-base-100">
     <div class="card-body">
       <h3 class="text-lg font-medium mb-3 flex items-center gap-2">
         <Star class="w-5 h-5 text-primary" />

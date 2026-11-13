@@ -6,7 +6,9 @@ import { useSettingsStore } from '@/stores/settings'
 import {
   Music, Calendar, Clock, ChevronRight, BarChart3, Image, User, Gift,
   CalendarDays, Zap, BookOpen,
+  Search,
 } from 'lucide-vue-next'
+import { useGlobalSearch } from '@/composables/useGlobalSearch'
 import AssetImage from '@/components/AssetImage.vue'
 import EventBanner from '@/components/EventBanner.vue'
 import StoryPlayerPromo from '@/components/StoryPlayerPromo.vue'
@@ -15,6 +17,7 @@ import type { EventData, MusicData } from '@/types/master'
 const masterStore = useMasterStore()
 const accountStore = useAccountStore()
 const settingsStore = useSettingsStore()
+const globalSearch = useGlobalSearch()
 const assetsHost = computed(() => settingsStore.assetsHost)
 
 const isLoading = ref(true)
@@ -319,7 +322,7 @@ onMounted(async () => {
     <!-- 问候 + 账号 -->
     <header class="flex items-center justify-between gap-4">
       <div class="min-w-0">
-        <h1 class="truncate text-2xl font-bold tracking-tight">
+        <h1 class="truncate text-2xl font-bold">
           {{ greeting }}<template v-if="currentUserProfile">，{{ currentUserProfile.name }}</template>
         </h1>
         <p class="mt-0.5 text-sm text-base-content/55">{{ todayLabel }}</p>
@@ -344,10 +347,17 @@ onMounted(async () => {
           <span class="ml-1 font-semibold">{{ currentUserProfileData?.user?.rank || currentUserSuite?.user?.rank || '—' }}</span>
         </span>
       </RouterLink>
-      <RouterLink v-else to="/profile" class="btn btn-sm btn-primary btn-outline shrink-0">
+      <RouterLink v-else to="/profile" class="btn btn-sm btn-primary btn-soft shrink-0">
         <User class="h-4 w-4" /> 绑定账号
       </RouterLink>
     </header>
+
+    <!-- 全站搜索：点开之后才加载搜索用的数据 -->
+    <button type="button" class="home-search" @click="globalSearch.open()">
+      <Search class="h-5 w-5 shrink-0 text-primary" />
+      <span class="min-w-0 flex-1 truncate text-left">搜索歌曲、卡片、活动、角色、页面</span>
+      <span class="kbd-hint hidden sm:inline-flex">{{ globalSearch.shortcutLabel }}</span>
+    </button>
 
     <!-- 手机端常用入口（桌面端由侧边栏提供） -->
     <nav class="grid grid-cols-4 gap-2 lg:hidden" aria-label="常用入口">
@@ -371,14 +381,12 @@ onMounted(async () => {
       </RouterLink>
     </nav>
 
-    <StoryPlayerPromo />
-
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
       <div class="min-w-0 space-y-6 lg:col-span-2">
         <!-- 当前活动 -->
         <section aria-labelledby="home-event-title">
-          <div class="mb-2 flex items-baseline justify-between">
-            <h2 id="home-event-title" class="text-base font-semibold">
+          <div class="mb-2.5 flex items-center justify-between">
+            <h2 id="home-event-title" class="section-title">
               {{ currentEvent?.status === 'ongoing' ? '正在进行的活动' : '最近的活动' }}
             </h2>
             <RouterLink to="/events" class="text-sm text-base-content/55 hover:text-primary">全部活动</RouterLink>
@@ -422,8 +430,8 @@ onMounted(async () => {
 
         <!-- 进行中的卡池 -->
         <section v-if="isLoading || ongoingGachas.length" aria-labelledby="home-gacha-title">
-          <div class="mb-2 flex items-baseline justify-between">
-            <h2 id="home-gacha-title" class="text-base font-semibold">
+          <div class="mb-2.5 flex items-center justify-between">
+            <h2 id="home-gacha-title" class="section-title">
               限时卡池 <span v-if="!isLoading" class="font-normal text-base-content/45">{{ ongoingGachas.length }}</span>
             </h2>
             <RouterLink to="/gachas" class="text-sm text-base-content/55 hover:text-primary">全部卡池</RouterLink>
@@ -465,8 +473,8 @@ onMounted(async () => {
       <aside class="min-w-0 space-y-6">
         <!-- 日程 -->
         <section aria-labelledby="home-schedule-title">
-          <div class="mb-2 flex items-baseline justify-between">
-            <h2 id="home-schedule-title" class="text-base font-semibold">{{ scheduleTitle }}</h2>
+          <div class="mb-2.5 flex items-center justify-between">
+            <h2 id="home-schedule-title" class="section-title">{{ scheduleTitle }}</h2>
             <RouterLink to="/calendar" class="text-sm text-base-content/55 hover:text-primary">日历</RouterLink>
           </div>
           <div v-if="isLoading" class="space-y-2">
@@ -495,8 +503,8 @@ onMounted(async () => {
 
         <!-- 新曲 -->
         <section aria-labelledby="home-music-title">
-          <div class="mb-2 flex items-baseline justify-between">
-            <h2 id="home-music-title" class="text-base font-semibold">最新歌曲</h2>
+          <div class="mb-2.5 flex items-center justify-between">
+            <h2 id="home-music-title" class="section-title">最新歌曲</h2>
             <RouterLink to="/musics" class="text-sm text-base-content/55 hover:text-primary">全部歌曲</RouterLink>
           </div>
           <div v-if="isLoading" class="space-y-2">
@@ -522,12 +530,37 @@ onMounted(async () => {
       </aside>
     </div>
 
+    <StoryPlayerPromo />
+
     <!-- 友站 -->
     <footer class="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-base-300 pt-4 text-sm text-base-content/55">
       <span>友站</span>
-      <a href="https://pjsk.moe" target="_blank" rel="noopener noreferrer" class="hover:text-primary" title="多功能 PJSK Viewer">MoeSekai ↗</a>
-      <a href="https://haruki.seiunx.com" target="_blank" rel="noopener noreferrer" class="hover:text-primary" title="上传游戏数据">Haruki 工具箱 ↗</a>
-      <a href="https://3-3.dev" target="_blank" rel="noopener noreferrer" class="hover:text-primary" title="在线组卡 / 活动预测">33 Kit ↗</a>
+      <a href="https://pjsk.moe" target="_blank" rel="noopener noreferrer" class="hover:text-primary" title="多功能 PJSK Viewer">MoeSekai</a>
+      <a href="https://haruki.seiunx.com" target="_blank" rel="noopener noreferrer" class="hover:text-primary" title="上传游戏数据">Haruki 工具箱</a>
+      <a href="https://3-3.dev" target="_blank" rel="noopener noreferrer" class="hover:text-primary" title="在线组卡 / 活动预测">33 Kit</a>
     </footer>
   </div>
 </template>
+
+<style scoped>
+.home-search {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  height: 3rem;
+  padding: 0 0.875rem 0 1rem;
+  border: 1px solid var(--color-base-300);
+  border-radius: var(--radius-box);
+  background-color: var(--color-base-100);
+  box-shadow: var(--shadow-panel);
+  color: color-mix(in oklab, var(--color-base-content) 50%, transparent);
+  font-size: 0.9375rem;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.home-search:hover {
+  border-color: color-mix(in oklab, var(--color-primary) 55%, var(--color-base-300));
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-primary) 12%, transparent);
+}
+</style>

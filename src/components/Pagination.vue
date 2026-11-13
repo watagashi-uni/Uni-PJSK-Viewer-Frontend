@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { ChevronLeft, ChevronRight } from 'lucide-vue-next'
 
 const props = defineProps<{
   currentPage: number
@@ -57,68 +58,60 @@ function goToPage(page: number) {
 </script>
 
 <template>
-  <div class="mt-8 flex w-full min-w-0 flex-wrap items-center justify-center gap-4">
-    <!-- 分页按钮 -->
-    <div class="max-w-full overflow-x-auto rounded-full pb-1">
-      <div class="join w-max bg-base-100 p-2 shadow-lg">
-        <!-- 上一页 -->
+  <nav class="mt-8 flex w-full min-w-0 flex-wrap items-center justify-center gap-3" aria-label="分页">
+    <div class="max-w-full overflow-x-auto">
+      <div class="panel flex w-max items-center gap-0.5 p-1">
         <button
           type="button"
-          class="join-item btn btn-sm btn-ghost"
+          class="btn btn-sm btn-ghost btn-square"
           aria-label="上一页"
           :disabled="currentPage === 1"
           @click="goToPage(currentPage - 1)"
         >
-          «
+          <ChevronLeft class="h-4 w-4" />
         </button>
 
-        <!-- 页码 -->
         <template v-for="(page, index) in visiblePages" :key="typeof page === 'number' ? `page-${page}` : `ellipsis-${index}`">
           <button
             v-if="typeof page === 'number'"
             type="button"
-            class="join-item btn btn-sm"
-            :class="page === currentPage ? 'btn-primary' : 'btn-ghost'"
+            class="btn btn-sm num min-w-8 px-2"
+            :class="page === currentPage ? 'btn-primary' : 'btn-ghost font-medium'"
+            :aria-current="page === currentPage ? 'page' : undefined"
             @click="goToPage(page)"
           >
             {{ page }}
           </button>
-          <span v-else class="join-item btn btn-sm btn-ghost btn-disabled">...</span>
+          <span v-else class="px-1 text-base-content/40" aria-hidden="true">…</span>
         </template>
 
-        <!-- 下一页 -->
         <button
           type="button"
-          class="join-item btn btn-sm btn-ghost"
+          class="btn btn-sm btn-ghost btn-square"
           aria-label="下一页"
           :disabled="currentPage === totalPages"
           @click="goToPage(currentPage + 1)"
         >
-          »
+          <ChevronRight class="h-4 w-4" />
         </button>
       </div>
     </div>
 
-    <!-- 跳转输入框 -->
-    <form 
-      v-if="totalPages > 1"
-      class="flex items-center gap-2"
+    <form
+      v-if="totalPages > 8"
+      class="flex items-center gap-1.5"
       @submit.prevent="goToPage(Number(($event.target as HTMLFormElement).page.value))"
     >
-      <input 
+      <input
         type="number"
         name="page"
         :min="1"
         :max="totalPages"
         placeholder="页码"
         aria-label="跳转页码"
-        class="input input-sm input-bordered w-16 text-center"
+        class="input input-sm w-16 text-center"
       />
-      <button type="submit" class="btn btn-sm btn-ghost" aria-label="跳转">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
-        </svg>
-      </button>
+      <button type="submit" class="btn btn-sm btn-ghost">跳转</button>
     </form>
-  </div>
+  </nav>
 </template>

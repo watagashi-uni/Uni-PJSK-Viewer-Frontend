@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { AlertTriangle, CheckCircle2, CircleX, Info, X } from 'lucide-vue-next'
+
 defineProps<{
   type?: 'warning' | 'info' | 'success' | 'error'
   dismissible?: boolean
@@ -10,9 +12,9 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <div 
-    role="alert" 
-    class="alert shadow-sm mb-5 animate-fade-in-up"
+  <div
+    role="alert"
+    class="alert mb-5 animate-fade-in-up"
     :class="{
       'alert-warning': type === 'warning' || !type,
       'alert-info': type === 'info',
@@ -20,25 +22,23 @@ const emit = defineEmits<{
       'alert-error': type === 'error',
     }"
   >
-    <svg v-if="type === 'warning' || !type" xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-    </svg>
-    <svg v-else-if="type === 'info'" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="stroke-current shrink-0 w-6 h-6">
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-    </svg>
-    
-    <div class="flex-1">
+    <Info v-if="type === 'info'" class="h-5 w-5 shrink-0" />
+    <CheckCircle2 v-else-if="type === 'success'" class="h-5 w-5 shrink-0" />
+    <CircleX v-else-if="type === 'error'" class="h-5 w-5 shrink-0" />
+    <AlertTriangle v-else class="h-5 w-5 shrink-0" />
+
+    <div class="min-w-0 flex-1">
       <slot />
     </div>
-    
-    <button 
-      v-if="dismissible" 
+
+    <button
+      v-if="dismissible"
       type="button"
       class="btn btn-sm btn-ghost btn-circle"
       aria-label="关闭"
       @click="emit('dismiss')"
     >
-      ✕
+      <X class="h-4 w-4" />
     </button>
   </div>
 </template>

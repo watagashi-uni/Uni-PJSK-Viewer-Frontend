@@ -485,7 +485,7 @@ function cleanInformation(description: string): string {
         <template #actions><button type="button" class="btn btn-sm btn-ghost" @click="goBack"><ChevronLeft class="h-4 w-4" />返回列表</button></template>
       </PageHeader>
 
-      <section class="grid grid-cols-1 overflow-hidden rounded-xl border border-base-200 bg-base-100 shadow-sm lg:grid-cols-[minmax(0,1.45fr)_minmax(20rem,.75fr)]">
+      <section class="grid grid-cols-1 overflow-hidden rounded-xl border border-base-300 bg-base-100 lg:grid-cols-[minmax(0,1.45fr)_minmax(20rem,.75fr)]">
         <figure class="flex aspect-[122/52] items-center justify-center bg-base-200/70 lg:aspect-auto">
           <AssetImage :src="getBannerUrl(vlive.assetbundleName)" :alt="vlive.name" class="h-full max-h-72 w-full object-contain" />
         </figure>
@@ -501,7 +501,7 @@ function cleanInformation(description: string): string {
 
       <div class="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1.55fr)_minmax(19rem,.75fr)]">
         <main class="space-y-4">
-          <section v-if="setlists.length" class="rounded-xl border border-base-200 bg-base-100 p-4 shadow-sm md:p-5">
+          <section v-if="setlists.length" class="rounded-xl border border-base-300 bg-base-100 p-4 md:p-5">
             <div class="mb-4 flex flex-wrap items-center justify-between gap-2"><h2 class="flex items-center gap-2 text-lg font-bold"><Disc3 class="h-5 w-5 text-primary" />节目单</h2><div class="flex flex-wrap gap-1"><span class="badge badge-ghost">流程 {{ setlists.length }}</span><span class="badge badge-primary">歌曲 {{ musicSetlists.length }}</span><span v-if="setlistTypeCounts.get('mc')" class="badge badge-ghost">MC {{ setlistTypeCounts.get('mc') }}</span><span v-if="setlistTypeCounts.get('mc_timeline')" class="badge badge-ghost">Timeline MC {{ setlistTypeCounts.get('mc_timeline') }}</span><span v-if="setlistTypeCounts.get('virtual_message')" class="badge badge-ghost">Message {{ setlistTypeCounts.get('virtual_message') }}</span></div></div>
             <div v-if="musicSetlists.length" class="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <RouterLink v-for="row in musicSetlists" :key="row.id" :to="`/musics/${row.musicId}`" class="group flex min-w-0 gap-3 rounded-xl border border-base-200 p-2.5 transition hover:border-primary/40 hover:bg-base-200/35">
@@ -512,7 +512,7 @@ function cleanInformation(description: string): string {
             <p v-else class="rounded-lg bg-base-200/50 py-6 text-center text-sm text-base-content/45">该节目流程没有歌曲段落</p>
           </section>
 
-          <section v-if="scheduleGroups.length || beginnerScheduleGroups.length" class="rounded-xl border border-base-200 bg-base-100 p-4 shadow-sm md:p-5">
+          <section v-if="scheduleGroups.length || beginnerScheduleGroups.length" class="rounded-xl border border-base-300 bg-base-100 p-4 md:p-5">
             <div class="mb-4 flex items-center justify-between"><h2 class="flex items-center gap-2 text-lg font-bold"><Clock class="h-5 w-5 text-primary" />场次安排</h2><span class="badge badge-ghost">{{ (vlive.virtualLiveSchedules?.length || 0) + (vlive.virtualLiveBeginnerSchedules?.length || 0) }} 场</span></div>
             <div v-if="scheduleGroups.length" class="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <div v-for="group in scheduleGroups" :key="group.key" class="rounded-xl bg-base-200/45 p-3"><p class="mb-2 text-sm font-bold">{{ group.label }}</p><div class="flex flex-wrap gap-1.5"><span v-for="schedule in group.schedules" :key="schedule.id" class="badge h-auto gap-1 py-1" :class="schedule.isAfterEvent ? 'badge-secondary' : 'badge-ghost'"><span v-if="schedule.isAfterEvent">After Event</span><span>{{ timeLabel(schedule.startAt) }}–{{ timeLabel(schedule.endAt) }}</span></span></div></div>
@@ -527,7 +527,7 @@ function cleanInformation(description: string): string {
         </main>
 
         <aside class="space-y-4">
-          <section v-if="cast.length" class="rounded-xl border border-base-200 bg-base-100 p-4 shadow-sm">
+          <section v-if="cast.length" class="rounded-xl border border-base-300 bg-base-100 p-4">
             <div class="mb-3 flex items-center justify-between"><h2 class="flex items-center gap-2 font-bold"><Users class="h-5 w-5 text-primary" />出演角色</h2><span class="badge badge-sm badge-ghost">{{ cast.length }} 人</span></div>
             <div class="grid grid-cols-4 gap-x-2 gap-y-3">
               <div v-for="row in cast" :key="row.id" class="min-w-0 text-center">
@@ -538,18 +538,18 @@ function cleanInformation(description: string): string {
             </div>
           </section>
 
-          <section v-if="rewardGroups.length" class="rounded-xl border border-base-200 bg-base-100 p-4 shadow-sm">
+          <section v-if="rewardGroups.length" class="rounded-xl border border-base-300 bg-base-100 p-4">
             <div class="mb-3 flex items-center justify-between"><h2 class="flex items-center gap-2 font-bold"><Gift class="h-5 w-5 text-primary" />参加奖励</h2><span class="badge badge-sm badge-ghost">{{ rewardGroups.length }} 组</span></div>
             <div class="space-y-3">
               <div v-for="group in rewardGroups" :key="group.id" class="rounded-xl bg-base-200/45 p-3"><div class="mb-2 flex items-center justify-between"><strong class="text-sm">{{ rewardTypeLabels[group.virtualLiveType] || group.virtualLiveType }}</strong><span class="text-[9px] text-base-content/35">Box #{{ group.resourceBoxId }}</span></div><div v-if="group.details.length" class="space-y-2"><div v-for="reward in group.details" :key="`${reward.seq}-${reward.resourceType}-${reward.resourceId || 0}`" class="flex items-center gap-2"><SekaiHonor v-if="reward.resourceType === 'honor' && reward.resourceId" :honor-id="reward.resourceId" :honor-level="reward.resourceLevel || 1" sub class="w-24 shrink-0" /><AssetImage v-else-if="resourceIcon(reward)" :src="resourceIcon(reward)" :alt="resourceName(reward)" class="h-9 w-9 shrink-0 object-contain" /><div v-else class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-primary/10"><Gift class="h-4 w-4 text-primary" /></div><div class="min-w-0 flex-1"><p class="truncate text-xs" :title="resourceName(reward)"><ZhText :text="resourceName(reward)" :zh="resourceDisplayZh(reward.resourceType, resourceName(reward)) ?? null" layout="inline" /></p><p class="text-sm font-bold">× {{ formatNumber(reward.resourceQuantity) }}</p></div></div></div><p v-else class="text-xs text-base-content/40">奖励箱数据缺失</p></div>
             </div>
           </section>
 
-          <section v-if="relatedTickets.length" class="rounded-xl border border-base-200 bg-base-100 p-4 shadow-sm">
+          <section v-if="relatedTickets.length" class="rounded-xl border border-base-300 bg-base-100 p-4">
             <h2 class="mb-3 flex items-center gap-2 font-bold"><Ticket class="h-5 w-5 text-primary" />入场票券</h2><div class="space-y-2"><div v-for="item in relatedTickets" :key="item.id" class="rounded-xl bg-base-200/45 p-3"><div class="flex items-start justify-between gap-2"><strong class="text-sm"><ZhText :text="item.name" table="virtualLiveTickets" path="name" sub-class="text-xs font-normal" /></strong><span class="badge badge-sm">{{ item.virtualLiveTicketType }}</span></div><p class="mt-1 text-xs text-base-content/55"><ZhText :text="item.flavorText" table="virtualLiveTickets" path="flavorText" /></p><p class="mt-2 text-[10px] text-primary">{{ ticketScheduleLabel(item) }}</p></div></div>
           </section>
 
-          <section v-if="relatedPamphlets.length" class="rounded-xl border border-base-200 bg-base-100 p-4 shadow-sm">
+          <section v-if="relatedPamphlets.length" class="rounded-xl border border-base-300 bg-base-100 p-4">
             <h2 class="mb-3 flex items-center gap-2 font-bold"><FileText class="h-5 w-5 text-primary" />场刊</h2><div class="space-y-2"><div v-for="item in relatedPamphlets" :key="item.id" class="rounded-xl bg-base-200/45 p-3"><strong class="text-sm"><ZhText :text="item.name" table="virtualLivePamphlets" path="name" sub-class="text-xs font-normal" /></strong><p class="mt-1 text-xs text-base-content/55"><ZhText :text="item.flavorText" table="virtualLivePamphlets" path="flavorText" /></p></div></div>
           </section>
         </aside>

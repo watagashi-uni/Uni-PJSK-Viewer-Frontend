@@ -7,7 +7,7 @@ import { useSettingsStore } from '@/stores/settings'
 import AccountSelector from '@/components/AccountSelector.vue'
 import AssetImage from '@/components/AssetImage.vue'
 import SekaiCard from '@/components/SekaiCard.vue'
-import { RefreshCw, Sofa, DoorOpen, Disc3, Images, Search, CloudSun, Music2 } from 'lucide-vue-next'
+import { House, RefreshCw, Sofa, DoorOpen, Disc3, Images, Search, CloudSun, Music2, X } from 'lucide-vue-next'
 
 import type {
   TabKey, FixtureRow, BlueprintRow, GenreRow, BlueprintMaterialCostRow,
@@ -20,6 +20,7 @@ import type {
   TalkCharacterOption, TalkUnitOption, FixtureTalkStat
 } from '@/types/mysekai'
 import PageHeader from '@/components/PageHeader.vue'
+import OwnedOnlyToggle from '@/components/OwnedOnlyToggle.vue'
 import ZhText from '@/components/ZhText.vue'
 import { useZh } from '@/composables/useZh'
 import { useCharacterName } from '@/composables/useCharacterName'
@@ -1621,9 +1622,11 @@ function closeFixtureDetail() {
 
 <template>
   <div class="max-w-7xl mx-auto space-y-5 pb-10">
-    <PageHeader title="MySekai" />
+    <PageHeader title="MySekai">
+      <template #icon><House /></template>
+    </PageHeader>
 
-    <div class="card bg-base-100 shadow-md relative z-10">
+    <div class="card bg-base-100 relative z-10">
       <div class="card-body p-4 space-y-3">
         <div class="flex flex-wrap items-center gap-2">
           <label class="label cursor-pointer gap-2 p-0">
@@ -1685,7 +1688,7 @@ function closeFixtureDetail() {
 
     <template v-else>
       <div v-if="activeTab === 'furniture'" class="space-y-4">
-        <div class="card bg-base-100 shadow-sm">
+        <div class="card bg-base-100">
           <div class="card-body p-4 space-y-3">
             <div class="flex flex-wrap items-center gap-2">
               <div class="badge badge-lg">总家具: {{ allFurniture.length }}</div>
@@ -1711,15 +1714,12 @@ function closeFixtureDetail() {
                 <option v-for="genre in mainGenreOptions" :key="genre.id" :value="genre.id">{{ zhMainGenres.inline('name', genre.name) }}</option>
               </select>
 
-              <label class="label cursor-pointer gap-2 p-0" :class="{ 'opacity-60': !hasMysekaiBlueprintData }">
-                <input
-                  v-model="onlyOwned"
-                  type="checkbox"
-                  class="toggle toggle-secondary toggle-sm"
-                  :disabled="!hasMysekaiBlueprintData"
-                />
-                <span class="label-text">只看已拥有</span>
-              </label>
+              <OwnedOnlyToggle
+                v-model="onlyOwned"
+                label="只看已拥有"
+                :available="hasMysekaiBlueprintData"
+                hint="还没有这个账号的家具蓝图数据；同步包含 MySekai 的游戏数据后才能筛选。"
+              />
             </div>
 
             <div class="rounded-xl border border-base-200 bg-base-200/30 p-3 space-y-2">
@@ -1897,13 +1897,13 @@ function closeFixtureDetail() {
         </div>
         <template v-else>
           <div class="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
-            <div class="stat rounded-xl bg-base-100 shadow-sm p-3"><div class="stat-title text-xs">画布款式</div><div class="stat-value text-2xl text-primary">{{ canvasSummary.rows }}</div><div class="stat-desc">账号记录</div></div>
-            <div class="stat rounded-xl bg-base-100 shadow-sm p-3"><div class="stat-title text-xs">画布数量</div><div class="stat-value text-2xl">{{ canvasSummary.quantity }}</div><div class="stat-desc">含重复数量</div></div>
-            <div class="stat rounded-xl bg-base-100 shadow-sm p-3"><div class="stat-title text-xs">特训后画布</div><div class="stat-value text-2xl text-secondary">{{ canvasSummary.trained }}</div><div class="stat-desc">普通 {{ canvasSummary.rows - canvasSummary.trained }}</div></div>
-            <div class="stat rounded-xl bg-base-100 shadow-sm p-3"><div class="stat-title text-xs">受加成卡片</div><div class="stat-value text-2xl text-accent">{{ canvasSummary.cards }}</div><div class="stat-desc">对应卡片三项各 +{{ canvasSummary.minBonus }}<template v-if="canvasSummary.maxBonus !== canvasSummary.minBonus">～{{ canvasSummary.maxBonus }}</template></div></div>
+            <div class="stat rounded-xl bg-base-100 p-3"><div class="stat-title text-xs">画布款式</div><div class="stat-value text-2xl text-primary">{{ canvasSummary.rows }}</div><div class="stat-desc">账号记录</div></div>
+            <div class="stat rounded-xl bg-base-100 p-3"><div class="stat-title text-xs">画布数量</div><div class="stat-value text-2xl">{{ canvasSummary.quantity }}</div><div class="stat-desc">含重复数量</div></div>
+            <div class="stat rounded-xl bg-base-100 p-3"><div class="stat-title text-xs">特训后画布</div><div class="stat-value text-2xl text-secondary">{{ canvasSummary.trained }}</div><div class="stat-desc">普通 {{ canvasSummary.rows - canvasSummary.trained }}</div></div>
+            <div class="stat rounded-xl bg-base-100 p-3"><div class="stat-title text-xs">受加成卡片</div><div class="stat-value text-2xl text-accent">{{ canvasSummary.cards }}</div><div class="stat-desc">对应卡片三项各 +{{ canvasSummary.minBonus }}<template v-if="canvasSummary.maxBonus !== canvasSummary.minBonus">～{{ canvasSummary.maxBonus }}</template></div></div>
           </div>
 
-          <div class="card bg-base-100 shadow-sm border border-base-200">
+          <div class="card bg-base-100 border border-base-200">
             <div class="card-body p-3 md:p-4 gap-3">
               <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[minmax(12rem,1fr)_auto_auto_auto] gap-2">
                 <label class="input input-sm input-bordered flex items-center gap-2"><Search class="w-4 h-4 opacity-50" /><input v-model="canvasSearch" class="grow min-w-0" placeholder="搜索卡片、角色或 ID…" /></label>
@@ -1916,7 +1916,7 @@ function closeFixtureDetail() {
           </div>
 
           <div v-if="filteredCanvasItems.length" class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 gap-2.5">
-            <RouterLink v-for="item in filteredCanvasItems" :key="item.key" :to="`/cards/${item.cardId}`" class="group card bg-base-100 border border-base-200 shadow-sm overflow-hidden hover:border-primary/40 hover:shadow-md transition-all">
+            <RouterLink v-for="item in filteredCanvasItems" :key="item.key" :to="`/cards/${item.cardId}`" class="group card bg-base-100 border border-base-200 overflow-hidden hover:border-primary/40 hover:shadow-md transition-all">
               <div class="relative"><SekaiCard :card="item.card" :trained="item.isSpecialTraining" class="transition-transform group-hover:scale-[1.02]" /><span class="absolute top-1 right-1 badge badge-xs border-0 bg-base-100/90">{{ getCanvasFixtureLabel(item.mysekaiFixtureId) }}</span><span v-if="item.quantity > 1" class="absolute bottom-1 right-1 badge badge-primary badge-xs">×{{ item.quantity }}</span></div>
               <div class="p-2 space-y-1 min-w-0">
                 <p class="text-xs font-bold truncate" :title="zhCards.inline('prefix', item.card.prefix)"><ZhText :text="item.card.prefix" table="cards" path="prefix" sub-class="font-normal" /></p>
@@ -1931,7 +1931,7 @@ function closeFixtureDetail() {
       </div>
 
       <div v-else-if="activeTab === 'gate'" class="space-y-4">
-        <div class="card bg-base-100 shadow-sm">
+        <div class="card bg-base-100">
           <div class="card-body p-4">
             <p v-if="!hasSuiteGateData" class="text-sm text-base-content/70">
               当前上传数据中没有大门/材料数据，展示基础全量升级需求。
@@ -1942,7 +1942,7 @@ function closeFixtureDetail() {
           </div>
         </div>
 
-        <div v-if="gateViews.length > 0" class="card bg-base-100 shadow-sm">
+        <div v-if="gateViews.length > 0" class="card bg-base-100">
           <div class="card-body p-4">
             <div class="flex flex-wrap items-center gap-1.5 sm:gap-2">
               <span class="text-sm text-base-content/70 mr-1">选择大门:</span>
@@ -1965,7 +1965,7 @@ function closeFixtureDetail() {
           </div>
         </div>
 
-        <div v-if="selectedGate" :key="selectedGate.gateId" class="card bg-base-100 shadow-sm">
+        <div v-if="selectedGate" :key="selectedGate.gateId" class="card bg-base-100">
           <div class="card-body p-4 space-y-3">
             <div class="flex flex-wrap items-center gap-2">
               <img
@@ -1985,7 +1985,7 @@ function closeFixtureDetail() {
               <div
                 v-for="row in selectedGate.rows"
                 :key="`${selectedGate.gateId}-${row.level}`"
-                class="rounded-xl border-2 border-base-300 bg-base-100 shadow-sm p-3 h-full"
+                class="rounded-xl border-2 border-base-300 bg-base-100 p-3 h-full"
               >
                 <div class="flex items-center justify-between mb-2">
                   <span class="font-semibold">Lv.{{ row.level }}</span>
@@ -2028,7 +2028,7 @@ function closeFixtureDetail() {
       </div>
 
       <div v-else-if="activeTab === 'record'" class="space-y-4">
-        <div class="card bg-base-100 shadow-sm">
+        <div class="card bg-base-100">
           <div class="card-body p-4 flex flex-wrap items-center gap-2">
             <div class="badge badge-lg">总唱片: {{ recordItems.length }}</div>
             <div v-if="hasRecordData" class="badge badge-primary badge-lg">已获得: {{ recordOwnedCount }} / {{ recordItems.length }}</div>
@@ -2084,13 +2084,13 @@ function closeFixtureDetail() {
 
       <div v-else class="space-y-4">
         <div class="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
-          <div class="stat rounded-xl bg-base-100 p-3 shadow-sm"><div class="stat-title text-xs">天气现象</div><div class="stat-value text-2xl text-primary">{{ phenomenaSummary.total }}</div><div class="stat-desc">当前资料</div></div>
-          <div class="stat rounded-xl bg-base-100 p-3 shadow-sm"><div class="stat-title text-xs">特殊现象</div><div class="stat-value text-2xl text-secondary">{{ phenomenaSummary.special }}</div><div class="stat-desc">独立演出环境</div></div>
-          <div class="stat rounded-xl bg-base-100 p-3 shadow-sm"><div class="stat-title text-xs">专属 BGM</div><div class="stat-value text-2xl">{{ phenomenaSummary.bgm }}</div><div class="stat-desc">天气专属音轨</div></div>
-          <div class="stat rounded-xl bg-base-100 p-3 shadow-sm"><div class="stat-title text-xs">背景色板</div><div class="stat-value text-2xl">{{ phenomenaSummary.palettes }}</div><div class="stat-desc">用于场景环境色</div></div>
+          <div class="stat rounded-xl bg-base-100 p-3"><div class="stat-title text-xs">天气现象</div><div class="stat-value text-2xl text-primary">{{ phenomenaSummary.total }}</div><div class="stat-desc">当前资料</div></div>
+          <div class="stat rounded-xl bg-base-100 p-3"><div class="stat-title text-xs">特殊现象</div><div class="stat-value text-2xl text-secondary">{{ phenomenaSummary.special }}</div><div class="stat-desc">独立演出环境</div></div>
+          <div class="stat rounded-xl bg-base-100 p-3"><div class="stat-title text-xs">专属 BGM</div><div class="stat-value text-2xl">{{ phenomenaSummary.bgm }}</div><div class="stat-desc">天气专属音轨</div></div>
+          <div class="stat rounded-xl bg-base-100 p-3"><div class="stat-title text-xs">背景色板</div><div class="stat-value text-2xl">{{ phenomenaSummary.palettes }}</div><div class="stat-desc">用于场景环境色</div></div>
         </div>
 
-        <div class="card border border-base-200 bg-base-100 shadow-sm">
+        <div class="card border border-base-200 bg-base-100">
           <div class="card-body gap-3 p-3 md:p-4">
             <div class="flex flex-col gap-2 md:flex-row md:items-center">
               <label class="input input-sm input-bordered flex min-w-0 flex-1 items-center gap-2"><Search class="h-4 w-4 opacity-50" /><input v-model="phenomenaSearch" class="grow min-w-0" placeholder="搜索天气、英文名、BGM 或 ID…" /></label>
@@ -2103,7 +2103,7 @@ function closeFixtureDetail() {
         </div>
 
         <div v-if="filteredPhenomenas.length" class="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-          <article v-for="row in filteredPhenomenas" :key="row.id" class="rounded-xl border border-base-200 bg-base-100 p-3 shadow-sm">
+          <article v-for="row in filteredPhenomenas" :key="row.id" class="rounded-xl border border-base-300 bg-base-100 p-3">
             <div class="flex items-start gap-3">
               <div class="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-xl border border-black/5" :style="{ backgroundImage: phenomenaGradient(row) }">
                 <AssetImage :src="`${mysekaiAssetsHost}/ondemand/mysekai/thumbnail/phenomena/${row.iconAssetbundleName}.png`" :alt="row.name" class="h-10 w-10 object-contain drop-shadow-sm" />
@@ -2133,6 +2133,7 @@ function closeFixtureDetail() {
 
     <dialog ref="fixtureDetailModalRef" class="modal" @close="selectedFixtureId = null">
       <div class="modal-box max-w-4xl">
+        <form method="dialog" class="modal-x"><button class="btn btn-sm btn-circle" aria-label="关闭"><X class="h-4 w-4" /></button></form>
         <div v-if="selectedFixture" class="space-y-4">
           <div class="flex flex-wrap gap-4">
             <div class="w-36 h-36 rounded-lg border border-base-300 bg-base-200 flex items-center justify-center overflow-hidden shrink-0">

@@ -6,7 +6,7 @@ import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
 import { 
   ChevronLeft, Gift, Calendar, Clock, Percent, 
-  Dices, RotateCcw, CreditCard, Sparkles, EyeOff, Target
+  Dices, RotateCcw, CreditCard, Sparkles, EyeOff, Target, X
 } from 'lucide-vue-next'
 import SekaiCard from '@/components/SekaiCard.vue'
 import AssetImage from '@/components/AssetImage.vue'
@@ -503,7 +503,7 @@ watch(() => route.params.id, loadData)
 <template>
   <div class="space-y-6">
     <!-- 返回按钮 -->
-    <button type="button" class="btn btn-ghost btn-sm gap-1" @click="goBack">
+    <button type="button" class="back-link" @click="goBack">
       <ChevronLeft class="w-4 h-4" />
       返回卡池列表
     </button>
@@ -514,7 +514,7 @@ watch(() => route.params.id, loadData)
     </div>
 
     <!-- 剧透警告/隐藏 -->
-    <div v-else-if="shouldHideContent && gacha" class="card bg-base-100 shadow-lg p-10 text-center">
+    <div v-else-if="shouldHideContent && gacha" class="card bg-base-100 p-10 text-center">
       <div class="flex flex-col items-center gap-4">
         <EyeOff class="w-16 h-16 text-warning opacity-50" />
         <h2 class="text-xl font-bold">涉及剧透内容</h2>
@@ -527,7 +527,7 @@ watch(() => route.params.id, loadData)
 
     <template v-else-if="gacha">
       <!-- 卡池信息卡片 -->
-      <div class="card bg-base-100 shadow-lg">
+      <div class="card bg-base-100">
         <div class="card-body">
           <div class="flex items-center gap-2 mb-2">
             <span class="badge badge-lg">#{{ gacha.id }}</span>
@@ -578,7 +578,7 @@ watch(() => route.params.id, loadData)
       </div>
 
       <!-- Logo和Banner展示 -->
-      <div v-if="hasLogo || hasBanner" class="card bg-base-100 shadow-lg">
+      <div v-if="hasLogo || hasBanner" class="card bg-base-100">
         <div class="card-body p-3 sm:p-5">
           <h2 class="text-base font-medium mb-1 opacity-80">
             展示图
@@ -606,7 +606,7 @@ watch(() => route.params.id, loadData)
       </div>
 
       <!-- 背景展示 -->
-      <div v-if="bgType !== 'none'" class="card bg-base-100 shadow-lg overflow-hidden">
+      <div v-if="bgType !== 'none'" class="card bg-base-100 overflow-hidden">
         <div class="px-5 pt-3 pb-2 border-b border-base-200">
           <h2 class="text-base font-medium opacity-80">
             卡池背景
@@ -647,7 +647,7 @@ watch(() => route.params.id, loadData)
       </div>
 
       <!-- 本期角色 -->
-      <div v-if="featuredCards.length > 0" class="card bg-base-100 shadow-lg">
+      <div v-if="featuredCards.length > 0" class="card bg-base-100">
         <div class="card-body">
           <h2 class="text-lg font-medium mb-3 flex items-center gap-2">
             <CreditCard class="w-5 h-5 text-primary" />
@@ -671,7 +671,7 @@ watch(() => route.params.id, loadData)
       </div>
 
       <!-- 目标卡概率分析 -->
-      <div v-if="featuredCards.length > 0" class="card bg-base-100 shadow-lg">
+      <div v-if="featuredCards.length > 0" class="card bg-base-100">
         <div class="card-body gap-5">
           <div>
             <h2 class="text-lg font-medium flex items-center gap-2">
@@ -724,7 +724,7 @@ watch(() => route.params.id, loadData)
       </div>
 
       <!-- 模拟抽卡区域 -->
-      <div class="card bg-base-100 shadow-lg">
+      <div class="card bg-base-100">
         <div class="card-body">
           <h2 class="text-lg font-medium mb-3 flex items-center gap-2">
             <Dices class="w-5 h-5 text-primary" />
@@ -823,7 +823,8 @@ watch(() => route.params.id, loadData)
     <!-- 详情 Modal -->
     <dialog ref="infoModal" class="modal modal-bottom sm:modal-middle">
       <div v-if="gacha?.gachaInformation" class="modal-box">
-        <h3 class="font-bold text-lg mb-4">卡池详情</h3>
+        <form method="dialog" class="modal-x"><button class="btn btn-sm btn-circle" aria-label="关闭"><X class="h-4 w-4" /></button></form>
+        <h3 class="font-bold text-lg mb-4 pr-8">卡池详情</h3>
         <div class="space-y-4 text-sm whitespace-pre-wrap leading-relaxed">
           <div v-if="gacha.gachaInformation.summary">
             <ZhText :text="gacha.gachaInformation.summary" :table="infoOpened ? 'gachas' : ''" path="gachaInformation.summary" sub-class="mt-3" />

@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { applyThemeToDocument } from '@/utils/themes'
 import { computed, ref, watch } from 'vue'
 import { DEFAULT_CN_ASSETS_HOST, getVersion, isCnAssetsEnabled, normalizeCnAssetsHost } from '@/api/version'
 import { detectIsChina } from '@/utils/location'
@@ -76,18 +77,7 @@ export const useSettingsStore = defineStore('settings', () => {
 
     // 应用主题
     function applyTheme(newTheme: string) {
-        if (newTheme === 'auto') {
-            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-            document.documentElement.setAttribute('data-theme', prefersDark ? 'dark' : 'unipjsk')
-        } else if (newTheme === 'dark') {
-            document.documentElement.setAttribute('data-theme', 'dark')
-        } else if (newTheme === 'moe') {
-            document.documentElement.setAttribute('data-theme', 'moe')
-        } else if (newTheme === 'jirai') {
-            document.documentElement.setAttribute('data-theme', 'jirai')
-        } else {
-            document.documentElement.setAttribute('data-theme', 'unipjsk')
-        }
+        applyThemeToDocument(newTheme)
     }
 
     // 设置主题

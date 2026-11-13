@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, watch } from 'vue'
+import { computed, defineAsyncComponent, onMounted, watch } from 'vue'
 import { useModalDialog } from '@/composables/useModalDialog'
 import { RouterView, useRoute } from 'vue-router'
 import { isRouteLoading } from '@/router'
@@ -17,6 +17,12 @@ import PlayerBar from '@/components/player/PlayerBar.vue'
 import NowPlayingView from '@/components/player/NowPlayingView.vue'
 import PlayerLyricsSidebar from '@/components/player/PlayerLyricsSidebar.vue'
 import { usePlayerStore } from '@/stores/player'
+import { useGlobalSearch } from '@/composables/useGlobalSearch'
+
+// 搜索面板的代码不进首屏包；空闲时预取，第一次按快捷键就能立刻输入。
+// 这里只是组件代码，搜索用的数据仍然等到面板打开才加载
+const loadGlobalSearch = () => import('@/components/GlobalSearch.vue')
+const GlobalSearch = defineAsyncComponent(loadGlobalSearch)
 
 const route = useRoute()
 const masterStore = useMasterStore()
@@ -25,6 +31,7 @@ const accountStore = useAccountStore()
 const oauthStore = useOAuthStore()
 const notificationStore = useNotificationStore()
 const playerStore = usePlayerStore()
+const globalSearch = useGlobalSearch()
 const { onDialogClose: onOAuthConfirmClose } = useModalDialog(
   'oauthConfirmDialog',
   () => accountStore.oauthConfirmVisible,
@@ -43,6 +50,7 @@ onMounted(async () => {
     caches.delete('external-images')
   }
   settingsStore.initialize()
+  globalSearch.installHotkeys()
   // Restores the queue of the last visit (paused); reads local storage only.
   playerStore.initialize()
   oauthStore.initialize()
@@ -51,6 +59,8 @@ onMounted(async () => {
     console.error('初始化 master 版本失败:', error)
   })
   await notificationStore.initialize()
+  if (typeof requestIdleCallback === 'function') requestIdleCallback(() => void loadGlobalSearch(), { timeout: 5000 })
+  else setTimeout(() => void loadGlobalSearch(), 3000)
 })
 
 watch(
@@ -83,14 +93,14 @@ watch(
     <div class="drawer-content flex flex-col" :class="{ 'with-lyrics-sidebar': playerStore.lyricsSidebarShown }">
       <AppNavbar />
       
-      <main class="flex-1 w-full max-w-7xl mx-auto px-4 py-5 sm:px-6 lg:py-8">
+      <main class="mx-auto w-full max-w-7xl flex-1 px-4 py-5 sm:px-6 lg:px-8 lg:py-7">
         <RouterView :key="routerViewKey" />
       </main>
-      
-      <footer class="mt-auto border-t border-base-300 px-4 py-4 text-xs text-base-content/50 sm:px-6">
-        <div class="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-x-4 gap-y-1">
-          <span>Uni PJSK Viewer © {{ currentYear }} · 綿菓子ウニ</span>
-          <span v-if="masterStore.version" class="font-mono">数据 {{ masterStore.version }}<template v-if="masterStore.assetVersion && masterStore.assetVersion !== masterStore.version"> · 资源 {{ masterStore.assetVersion }}</template></span>
+
+      <footer class="mt-auto px-4 pb-5 pt-8 text-xs text-base-content/45 sm:px-6 lg:px-8">
+        <div class="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-x-4 gap-y-1 border-t border-base-300 pt-4">
+          <span>Uni PJSK Viewer © {{ currentYear }} 綿菓子ウニ</span>
+          <span v-if="masterStore.version" class="num">数据 {{ masterStore.version }}<template v-if="masterStore.assetVersion && masterStore.assetVersion !== masterStore.version"> / 资源 {{ masterStore.assetVersion }}</template></span>
         </div>
       </footer>
 
@@ -107,12 +117,13 @@ watch(
     <ToastContainer />
     <SpoilerRulesDialog />
     <SpoilerWatermark />
+    <GlobalSearch v-if="globalSearch.everOpened.value" />
 
     <!-- OAuth 授权确认弹窗 -->
     <dialog ref="oauthConfirmDialog" class="modal" @close="onOAuthConfirmClose">
       <div class="modal-box">
         <h3 class="text-lg font-bold">需要 OAuth 授权</h3>
-        <p class="py-4">你没有勾选公开访问，需要 OAuth 授权本站访问游戏数据。是否现在去授权？</p>
+        <p class="py-4 text-sm leading-6 text-base-content/75">你没有勾选公开访问，需要 OAuth 授权本站访问游戏数据。是否现在去授权？</p>
         <div class="modal-action">
           <button class="btn btn-ghost" @click="accountStore.cancelOAuth()">取消</button>
           <button class="btn btn-primary" @click="accountStore.confirmOAuth()">去授权</button>
@@ -153,18 +164,16 @@ watch(
   top: 0;
   right: 0;
   left: 0;
-  height: 4px;
+  height: 3px;
   overflow: hidden;
   pointer-events: none;
-  background: color-mix(in srgb, var(--color-primary) 18%, transparent);
+  background: color-mix(in srgb, var(--color-primary) 16%, transparent);
 }
 
 .route-progress__bar {
   width: 45%;
   height: 100%;
-  border-radius: 0 999px 999px 0;
-  background: linear-gradient(90deg, var(--color-primary), var(--color-secondary), var(--color-primary));
-  box-shadow: 0 0 10px color-mix(in srgb, var(--color-primary) 80%, transparent);
+  background: linear-gradient(90deg, var(--color-primary), var(--color-secondary));
   animation: route-progress-slide 1.1s ease-in-out infinite;
 }
 

@@ -1,117 +1,30 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import type { Component } from 'vue'
-import {
-  Home, Music, Image, Users, Shirt, Trophy, Smile, Boxes, Wrench, BookOpen,
-  Calendar, BarChart3, Gift, Radio, CalendarDays,
-  Zap, FileImage, PenLine, Dices,
-  User, History, Layers3, House,
-  Settings, Info, Github, Palette, RefreshCw, Check,
-} from 'lucide-vue-next'
+import { User, Settings, Info, Github, Palette, RefreshCw, Check, Search } from 'lucide-vue-next'
 import AccountSelector from '@/components/AccountSelector.vue'
 import { useAccountStore } from '@/stores/account'
 import { useSettingsStore } from '@/stores/settings'
-
-interface NavItem {
-  to: string
-  label: string
-  icon: Component
-  // 额外归属到此入口的路径前缀（详情页等）
-  also?: string[]
-}
-
-interface NavGroup {
-  title?: string
-  items: NavItem[]
-}
-
-const groups: NavGroup[] = [
-  {
-    items: [{ to: '/', label: '首页', icon: Home }],
-  },
-  {
-    title: '图鉴',
-    items: [
-      { to: '/musics', label: '歌曲', icon: Music },
-      { to: '/cards', label: '卡片', icon: Image },
-      { to: '/characters', label: '角色', icon: Users },
-      { to: '/costumes', label: '衣装', icon: Shirt },
-      { to: '/honors', label: '称号', icon: Trophy },
-      { to: '/stamps', label: '表情贴图', icon: Smile },
-      { to: '/items', label: '物品', icon: Boxes },
-      { to: '/area-items', label: '区域道具', icon: Wrench },
-      { to: '/stories', label: '剧情', icon: BookOpen },
-    ],
-  },
-  {
-    title: '活动与卡池',
-    items: [
-      { to: '/events', label: '活动', icon: Calendar },
-      { to: '/ranking', label: '实时榜线', icon: BarChart3 },
-      { to: '/gachas', label: '卡池', icon: Gift },
-      { to: '/vlives', label: '虚拟 Live', icon: Radio },
-      { to: '/calendar', label: '游戏日历', icon: CalendarDays },
-    ],
-  },
-  {
-    title: '工具',
-    items: [
-      { to: '/deck-recommend', label: '自动组队', icon: Zap },
-      { to: '/sus2img', label: '谱面转图片', icon: FileImage },
-      { to: '/custom-score-maker', label: '谱面 Maker', icon: PenLine },
-      { to: '/costumes/custom', label: '衣装自由搭配', icon: Dices },
-    ],
-  },
-  {
-    title: '我的',
-    items: [
-      { to: '/profile', label: '个人信息', icon: User },
-      { to: '/card-collection', label: '养成进度', icon: Layers3 },
-      { to: '/account-records', label: '账号记录', icon: History },
-      { to: '/mysekai', label: 'MySekai', icon: House },
-    ],
-  },
-]
+import { useGlobalSearch } from '@/composables/useGlobalSearch'
+import { navGroups, resolveActiveNav } from '@/utils/navigation'
+import { themeOptions } from '@/utils/themes'
 
 const route = useRoute()
 const accountStore = useAccountStore()
 const settingsStore = useSettingsStore()
+const search = useGlobalSearch()
 
-// 用最长前缀匹配决定高亮项，让详情页（/musics/123 等）也能定位到所属栏目，
-// 同时避免 /costumes 与 /costumes/custom 同时高亮
-const activePath = computed(() => {
-  const path = route.path
-  let best = ''
-  let bestLength = -1
-  for (const group of groups) {
-    for (const item of group.items) {
-      const prefixes = item.to === '/' ? [] : [item.to, ...(item.also ?? [])]
-      if (item.to === '/' && path === '/') return '/'
-      for (const prefix of prefixes) {
-        const matches = path === prefix || path.startsWith(prefix.endsWith('/') ? prefix : `${prefix}/`)
-        if (matches && prefix.length > bestLength) {
-          best = item.to
-          bestLength = prefix.length
-        }
-      }
-    }
-  }
-  return best
-})
+const activePath = computed(() => resolveActiveNav(route.path))
 
 function closeDrawer() {
   const toggle = document.getElementById('my-drawer-2') as HTMLInputElement | null
   if (toggle) toggle.checked = false
 }
 
-const themes = [
-  { value: 'auto', label: '跟随系统' },
-  { value: 'light', label: '浅色' },
-  { value: 'dark', label: '深色' },
-  { value: 'moe', label: 'Moe' },
-  { value: 'jirai', label: '地雷' },
-]
+function openSearch() {
+  closeDrawer()
+  search.open()
+}
 
 function selectTheme(value: string) {
   settingsStore.setTheme(value)
@@ -152,37 +65,41 @@ const suiteAge = computed(() => {
 </script>
 
 <template>
-  <div class="sidebar-wrapper relative z-10 flex h-full w-64 flex-col bg-base-100 text-base-content border-r border-base-300">
-    <div class="flex items-center justify-between gap-2 px-4 pt-4 pb-2">
-      <RouterLink to="/" class="flex items-baseline gap-1.5 rounded-md px-1 text-lg font-bold" @click="closeDrawer">
-        <span class="text-primary">Uni PJSK</span>
-        <span class="text-xs font-normal text-base-content/50">Viewer</span>
+  <aside class="app-sidebar">
+    <div class="app-sidebar__head">
+      <RouterLink to="/" class="app-brand" @click="closeDrawer">
+        <span class="app-brand__mark" aria-hidden="true"><i></i><i></i></span>
+        <span class="app-brand__name">Uni PJSK</span>
+        <span class="app-brand__sub">Viewer</span>
       </RouterLink>
+      <button type="button" class="app-search-trigger" @click="openSearch">
+        <Search class="h-4 w-4 shrink-0" />
+        <span class="flex-1 truncate text-left">搜索歌曲、卡片、活动</span>
+        <span class="kbd-hint hidden lg:inline-flex">{{ search.shortcutLabel }}</span>
+      </button>
     </div>
 
-    <nav class="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-2 pb-3" aria-label="主导航">
-      <ul class="menu menu-sm w-full gap-0.5 p-0">
-        <template v-for="(group, groupIndex) in groups" :key="groupIndex">
-          <li v-if="group.title" class="menu-title mt-2.5 px-3 pb-0.5 pt-0 text-xs font-medium text-base-content/45">
-            {{ group.title }}
-          </li>
+    <nav class="app-sidebar__nav" aria-label="主导航">
+      <template v-for="(group, groupIndex) in navGroups" :key="groupIndex">
+        <p v-if="group.title" class="app-nav-title">{{ group.title }}</p>
+        <ul>
           <li v-for="item in group.items" :key="item.to">
             <RouterLink
               :to="item.to"
-              class="gap-3 py-1.5"
-              :class="{ 'menu-active active': activePath === item.to }"
+              class="app-nav-item"
+              :class="{ 'is-active': activePath === item.to }"
               :aria-current="activePath === item.to ? 'page' : undefined"
               @click="closeDrawer"
             >
-              <component :is="item.icon" class="h-4 w-4 shrink-0" />
-              {{ item.label }}
+              <component :is="item.icon" class="h-[1.05rem] w-[1.05rem] shrink-0" />
+              <span class="truncate">{{ item.label }}</span>
             </RouterLink>
           </li>
-        </template>
-      </ul>
+        </ul>
+      </template>
     </nav>
 
-    <div class="border-t border-base-300 px-3 py-3 space-y-2">
+    <div class="app-sidebar__foot">
       <template v-if="accountStore.accounts.length > 0">
         <AccountSelector
           placement="top"
@@ -191,7 +108,7 @@ const suiteAge = computed(() => {
         />
         <div v-if="accountStore.currentUserId" class="grid grid-cols-2 gap-1.5">
           <button
-            class="btn btn-xs btn-ghost h-auto min-h-0 items-start gap-0 rounded-md px-2 py-1 text-left font-normal lg:flex-col lg:py-1.5"
+            class="app-refresh"
             :disabled="accountStore.profileRefreshing"
             :title="`从公开接口刷新等级、卡组、名片等资料（${profileAge || '未刷新'}）`"
             @click="runRefresh('profile')"
@@ -200,10 +117,10 @@ const suiteAge = computed(() => {
               <RefreshCw class="h-3 w-3" :class="{ 'animate-spin': accountStore.profileRefreshing }" />
               刷新资料
             </span>
-            <span class="hidden text-[11px] text-base-content/45 lg:inline">{{ profileAge || '未刷新' }}</span>
+            <span class="hidden truncate text-[11px] text-base-content/50 lg:block">{{ profileAge || '未刷新' }}</span>
           </button>
           <button
-            class="btn btn-xs btn-ghost h-auto min-h-0 items-start gap-0 rounded-md px-2 py-1 text-left font-normal lg:flex-col lg:py-1.5"
+            class="app-refresh"
             :disabled="accountStore.suiteRefreshing"
             :title="`获取你在 Haruki 工具箱上传的完整游戏数据（${suiteAge ? `上传于 ${suiteAge}` : '未同步'}）`"
             @click="runRefresh('suite')"
@@ -212,7 +129,7 @@ const suiteAge = computed(() => {
               <RefreshCw class="h-3 w-3" :class="{ 'animate-spin': accountStore.suiteRefreshing }" />
               同步数据
             </span>
-            <span class="hidden text-[11px] text-base-content/45 lg:inline">{{ suiteAge ? `上传于 ${suiteAge}` : '未同步' }}</span>
+            <span class="hidden truncate text-[11px] text-base-content/50 lg:block">{{ suiteAge ? `上传于 ${suiteAge}` : '未同步' }}</span>
           </button>
         </div>
         <p v-if="refreshError" class="px-1 text-xs text-error">{{ refreshError }}</p>
@@ -220,29 +137,38 @@ const suiteAge = computed(() => {
       <RouterLink
         v-else
         to="/profile"
-        class="btn btn-sm btn-outline btn-primary w-full"
+        class="btn btn-sm btn-primary btn-soft w-full"
         @click="closeDrawer"
       >
         <User class="h-4 w-4" /> 绑定游戏账号
       </RouterLink>
 
-      <div class="flex items-center gap-1">
+      <div class="relative flex items-center gap-0.5">
         <RouterLink
           to="/settings"
-          class="btn btn-ghost btn-sm flex-1 justify-start gap-2 px-2 font-normal"
-          :class="{ 'btn-active': route.path === '/settings' }"
+          class="app-nav-item flex-1"
+          :class="{ 'is-active': route.path === '/settings' }"
           @click="closeDrawer"
         >
-          <Settings class="h-4 w-4" /> 设置
+          <Settings class="h-[1.05rem] w-[1.05rem] shrink-0" /> 设置
         </RouterLink>
-        <div class="dropdown dropdown-top dropdown-end">
+        <div class="dropdown dropdown-top static">
           <button tabindex="0" class="btn btn-ghost btn-sm btn-square" title="切换主题" aria-label="切换主题">
             <Palette class="h-4 w-4" />
           </button>
-          <ul tabindex="0" class="dropdown-content menu menu-sm z-30 mb-1 w-32 rounded-box border border-base-300 bg-base-100 p-1 shadow-lg">
-            <li v-for="t in themes" :key="t.value">
-              <button class="justify-between" @click="selectTheme(t.value)">
-                {{ t.label }}
+          <!-- 相对整行底栏定位，宽度和侧边栏一致，窄屏上也不会被裁掉 -->
+          <ul tabindex="0" class="dropdown-content inset-x-0 z-30 mb-2 rounded-box border border-base-300 bg-base-100 p-1.5">
+            <li v-for="t in themeOptions" :key="t.value">
+              <button
+                type="button"
+                class="flex w-full items-center gap-2.5 rounded-field px-2 py-1.5 text-left text-sm hover:bg-base-content/7"
+                :class="{ 'font-semibold text-primary': settingsStore.theme === t.value }"
+                @click="selectTheme(t.value)"
+              >
+                <span class="theme-dot" :class="{ 'is-split': t.preview.length > 1 }" aria-hidden="true">
+                  <i v-for="name in t.preview" :key="name" :data-theme="name"></i>
+                </span>
+                <span class="flex-1">{{ t.label }}</span>
                 <Check v-if="settingsStore.theme === t.value" class="h-3.5 w-3.5" />
               </button>
             </li>
@@ -270,5 +196,191 @@ const suiteAge = computed(() => {
         </a>
       </div>
     </div>
-  </div>
+  </aside>
 </template>
+
+<style>
+/* 不加 scoped：主题装饰（style.css 里的地雷花边）要能选中 .app-sidebar */
+.app-sidebar {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  width: var(--sidebar-width);
+  max-width: 86vw;
+  height: 100%;
+  border-right: 1px solid var(--color-base-300);
+  background-color: var(--color-base-100);
+  background-image: var(--sidebar-pattern);
+  background-size: var(--sidebar-pattern-size);
+  background-position: 0 0, 20px 20px;
+  color: var(--color-base-content);
+}
+
+.app-sidebar__head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem 0.75rem 0.5rem;
+}
+
+.app-brand {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  padding: 0 0.375rem;
+  border-radius: var(--radius-field);
+  font-family: var(--font-display);
+}
+
+/* 两条斜切色块：品牌色 + 辅色 */
+.app-brand__mark {
+  display: flex;
+  gap: 2px;
+  align-self: center;
+  margin-right: 0.15rem;
+  transform: skewX(-14deg);
+}
+
+.app-brand__mark i {
+  display: block;
+  width: 0.3125rem;
+  height: 1.125rem;
+  border-radius: 1px;
+  background-color: var(--color-primary);
+}
+
+.app-brand__mark i + i {
+  height: 0.75rem;
+  align-self: flex-end;
+  background-color: var(--color-secondary);
+}
+
+/* 侧边栏里是纵向排列，品牌不拉满整行；手机顶栏里由顶栏负责垂直居中 */
+.app-sidebar__head .app-brand {
+  align-self: flex-start;
+}
+
+.app-brand__name {
+  font-size: 1.1875rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.75rem;
+}
+
+.app-brand__sub {
+  color: color-mix(in oklab, var(--color-base-content) 50%, transparent);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.app-search-trigger {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  height: 2.25rem;
+  padding: 0 0.5rem 0 0.625rem;
+  border: 1px solid var(--color-base-300);
+  border-radius: var(--radius-field);
+  background-color: color-mix(in oklab, var(--color-base-content) 4%, var(--color-base-100));
+  color: color-mix(in oklab, var(--color-base-content) 55%, transparent);
+  font-size: 0.8125rem;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.app-search-trigger:hover {
+  border-color: color-mix(in oklab, var(--color-primary) 50%, var(--color-base-300));
+  color: var(--color-base-content);
+}
+
+.app-sidebar__nav {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  padding: 0 0.5rem 0.75rem;
+}
+
+.app-nav-title {
+  margin: 0.875rem 0 0.25rem;
+  padding: 0 0.625rem;
+  color: color-mix(in oklab, var(--color-base-content) 45%, transparent);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.app-nav-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  height: 2.125rem;
+  padding: 0 0.625rem;
+  border-radius: var(--radius-field);
+  color: color-mix(in oklab, var(--color-base-content) 82%, transparent);
+  font-size: 0.875rem;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.app-nav-item:hover {
+  background-color: color-mix(in oklab, var(--color-base-content) 6%, transparent);
+  color: var(--color-base-content);
+}
+
+.app-nav-item.is-active {
+  background-color: color-mix(in oklab, var(--color-primary) 14%, transparent);
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.app-sidebar__foot {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border-top: 1px solid var(--color-base-300);
+  background-color: var(--color-base-100);
+}
+
+/* 主题菜单里的色点：每一格带 data-theme，取的是那个主题自己的主色 */
+.theme-dot {
+  display: flex;
+  flex: none;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 999px;
+  overflow: hidden;
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--color-base-content) 22%, transparent);
+}
+
+/* daisyUI 会给带 data-theme 的元素铺一层底色渐变，要去掉才看得到下面的颜色 */
+.theme-dot i {
+  display: block;
+  flex: 1;
+  background-color: var(--color-primary);
+  background-image: none;
+}
+
+.theme-dot.is-split i {
+  background-color: var(--color-base-100);
+}
+
+.app-refresh {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+  padding: 0.375rem 0.5rem;
+  border-radius: var(--radius-field);
+  text-align: left;
+  transition: background-color 0.12s ease;
+}
+
+.app-refresh:hover:not(:disabled) {
+  background-color: color-mix(in oklab, var(--color-base-content) 6%, transparent);
+}
+
+.app-refresh:disabled {
+  opacity: 0.6;
+}
+</style>

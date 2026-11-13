@@ -70,7 +70,8 @@ import { useAccountStore } from '@/stores/account'
 import { useNotificationStore } from '@/stores/notification'
 import { useTranslationStore } from '@/stores/translations'
 import { useZh } from '@/composables/useZh'
-import { Search, ArrowUpDown, Languages, Trophy, List, LayoutGrid, RefreshCw, Layers, Github, Camera, Loader2, Bell, BellRing, FilterX, SlidersHorizontal, ChevronDown, ListFilter, Play, Shuffle } from 'lucide-vue-next'
+import PageHeader from '@/components/PageHeader.vue'
+import { Music as MusicIcon, Search, ArrowUpDown, Languages, Trophy, List, LayoutGrid, RefreshCw, Layers, Github, Camera, Loader2, Bell, BellRing, FilterX, SlidersHorizontal, ChevronDown, ListFilter, Play, Shuffle } from 'lucide-vue-next'
 import { toPng } from 'html-to-image'
 import MusicCard from '@/components/MusicCard.vue'
 import Pagination from '@/components/Pagination.vue'
@@ -287,8 +288,8 @@ async function captureB30() {
     // 获取容器的真实解析后背景色（应对 oklch CSS 变量）
     let bgColor = window.getComputedStyle(b30CaptureRef.value).backgroundColor
     if (!bgColor || bgColor === 'rgba(0, 0, 0, 0)' || bgColor === 'transparent') {
-      const theme = document.documentElement.getAttribute('data-theme')
-      bgColor = theme === 'dark' ? '#1d232a' : '#ffffff'
+      // 容器本身透明时用页面底色，四套主题都适用
+      bgColor = window.getComputedStyle(document.body).backgroundColor || '#ffffff'
     }
 
     const dataUrl = await toPng(b30CaptureRef.value, {
@@ -1380,8 +1381,36 @@ watch(totalPages, (pages) => {
 
 <template>
   <div>
-    <!-- 第一行：搜索框 + 排序 + 订阅 -->
-    <div class="flex flex-col sm:flex-row gap-3 mb-3 items-center">
+    <PageHeader title="歌曲" description="按歌名、译名、作曲者或读音查找，可以按难度、分类筛选，也能直接试听。" class="mb-5">
+      <template #icon><MusicIcon /></template>
+      <template #actions>
+        <div class="flex flex-wrap items-center gap-1">
+          <a 
+            href="https://paratranz.cn/projects/18073" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            class="btn btn-ghost btn-sm gap-1"
+          >
+            <Languages class="w-4 h-4" />
+            贡献翻译
+          </a>
+
+          <button 
+            v-if="notificationStore.isSupported || notificationStore.isIOS"
+            class="btn btn-sm gap-1"
+            :class="isMusicSubscribed ? 'btn-primary' : 'btn-ghost'"
+            @click="toggleMusicSub"
+          >
+            <BellRing v-if="isMusicSubscribed" class="w-4 h-4" />
+            <Bell v-else class="w-4 h-4" />
+            {{ isMusicSubscribed ? '已订阅新歌' : '订阅新歌' }}
+          </button>
+        </div>
+      </template>
+    </PageHeader>
+
+    <!-- 第一行：搜索框 + 排序 -->
+    <div class="toolbar mb-3">
       <div class="relative w-full sm:w-72">
         <input 
           ref="searchInputRef"
@@ -1447,32 +1476,11 @@ watch(totalPages, (pages) => {
           <option value="master">Master</option>
           <option value="append">Append</option>
         </select>
-
-        <a 
-          href="https://paratranz.cn/projects/18073" 
-          target="_blank" 
-          rel="noopener noreferrer"
-          class="btn btn-ghost btn-sm gap-1 text-primary/70 hover:text-primary ml-auto"
-        >
-          <Languages class="w-4 h-4" />
-          贡献翻译
-        </a>
-
-        <button 
-          v-if="notificationStore.isSupported || notificationStore.isIOS"
-          class="btn btn-sm gap-1"
-          :class="isMusicSubscribed ? 'btn-primary' : 'btn-ghost'"
-          @click="toggleMusicSub"
-        >
-          <BellRing v-if="isMusicSubscribed" class="w-4 h-4" />
-          <Bell v-else class="w-4 h-4" />
-          {{ isMusicSubscribed ? '已订阅新歌' : '订阅新歌' }}
-        </button>
       </div>
     </div>
 
     <!-- 第二行：成绩筛选 + 视图切换 + suite 刷新 -->
-    <div class="flex flex-wrap items-center gap-2 mb-4 bg-base-100 p-2 rounded-lg shadow-sm">
+    <div class="toolbar mb-4">
       <label class="label cursor-pointer gap-2 p-0 mr-2">
         <input v-model="showUserResults" type="checkbox" class="toggle toggle-primary toggle-sm" />
         <span class="label-text font-medium mt-0.5">显示成绩数据</span>
@@ -1561,10 +1569,10 @@ watch(totalPages, (pages) => {
 
       <!-- 视图切换 (总是显示) -->
       <div class="join">
-        <button class="join-item btn btn-sm" :class="viewMode === 'grid' ? 'btn-primary' : 'btn-ghost'" @click="viewMode = 'grid'">
+        <button class="join-item btn btn-sm" :class="viewMode === 'grid' ? 'btn-primary' : 'btn-ghost'" title="封面网格" aria-label="封面网格" @click="viewMode = 'grid'">
           <LayoutGrid class="w-4 h-4" />
         </button>
-        <button class="join-item btn btn-sm" :class="viewMode === 'list' ? 'btn-primary' : 'btn-ghost'" @click="viewMode = 'list'">
+        <button class="join-item btn btn-sm" :class="viewMode === 'list' ? 'btn-primary' : 'btn-ghost'" title="列表" aria-label="列表" @click="viewMode = 'list'">
           <List class="w-4 h-4" />
         </button>
         <button class="join-item btn btn-sm" :class="viewMode === 'b30' ? 'btn-primary' : 'btn-ghost'" title="Best 30" @click="viewMode = 'b30'">
@@ -1577,7 +1585,7 @@ watch(totalPages, (pages) => {
     </div>
 
     <!-- 第三行：歌曲资料筛选 -->
-    <div class="mb-4 bg-base-100 rounded-lg shadow-sm">
+    <div class="panel mb-4">
       <div class="flex flex-wrap items-center gap-2 p-2">
         <button class="btn btn-sm btn-ghost gap-2" @click="isFilterPanelOpen = !isFilterPanelOpen">
           <SlidersHorizontal class="w-4 h-4" />
@@ -1750,7 +1758,7 @@ watch(totalPages, (pages) => {
             <div 
               v-for="(entry, idx) in b30List" 
               :key="`b30-${entry.musicId}-${entry.difficulty}`"
-              class="flex items-center gap-3 p-2 rounded-lg bg-base-100 shadow-sm"
+              class="flex items-center gap-3 p-2 rounded-lg bg-base-100 border border-base-300"
             >
               <span class="text-xs font-bold text-base-content/40 w-6 text-right">#{{ idx + 1 }}</span>
               <AssetImage 
@@ -1788,7 +1796,7 @@ watch(totalPages, (pages) => {
       <!-- 定数表视图 -->
       <div v-else-if="viewMode === 'level'" :class="{ 'animate-fade-in-up': enableHeavyAnimation }">
         <!-- 总体进度条 -->
-        <div v-if="showUserResults && hasSuiteData && levelStats" class="flex flex-wrap gap-4 items-center bg-base-100 p-3 mb-4 rounded-lg shadow-sm border border-base-200/50">
+        <div v-if="showUserResults && hasSuiteData && levelStats" class="flex flex-wrap gap-4 items-center bg-base-100 p-3 mb-4 rounded-lg border border-base-300">
           <div class="font-bold border-r border-base-200 pr-4 drop-shadow-sm flex items-center gap-1 text-base sm:text-lg" :style="diffTextStyle(selectedDiffType)">
             {{ diffLabels[selectedDiffType] }} 的完成度
           </div>
@@ -1849,7 +1857,7 @@ watch(totalPages, (pages) => {
             <span class="ml-auto text-xs text-base-content/30" aria-hidden="true">{{ expandedLevels.has(group.level) ? '▲' : '▼' }}</span>
           </button>
           <!-- 封面墙（仅展开时渲染） -->
-          <div v-if="expandedLevels.has(group.level)" class="flex flex-wrap gap-1.5 sm:gap-2 bg-base-100 p-2 sm:p-3 rounded-xl shadow-sm border border-base-200/50 mt-1.5">
+          <div v-if="expandedLevels.has(group.level)" class="flex flex-wrap gap-1.5 sm:gap-2 bg-base-100 p-2 sm:p-3 rounded-xl border border-base-300 mt-1.5">
             <RouterLink v-for="music in group.musics" :key="music.id" :to="`/musics/${music.id}`" class="relative group block shrink-0">
               <AssetImage 
                 :src="getMusicThumbnailUrl(music.id)" 
@@ -1974,7 +1982,7 @@ watch(totalPages, (pages) => {
 
         <!-- Mobile List View -->
         <div class="block sm:hidden space-y-2">
-          <div v-for="music in displayedMusics" :key="music.id" class="bg-base-100 p-2 rounded-lg flex gap-3 shadow-sm cv-auto-row relative overflow-hidden group">
+          <div v-for="music in displayedMusics" :key="music.id" class="bg-base-100 p-2 rounded-lg flex gap-3 cv-auto-row relative overflow-hidden group border border-base-300">
             <div class="relative w-16 h-16 shrink-0">
               <AssetImage
                 :src="getMusicThumbnailUrl(music.id)"

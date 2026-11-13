@@ -481,12 +481,12 @@ const rarityList = [
     </div>
 
     <template v-else>
-      <div class="card bg-base-100 shadow-lg">
+      <div class="card bg-base-100">
         <div class="card-body space-y-4">
           <!-- 用户ID -->
           <div>
             <label class="label"><span class="font-medium text-base-content">用户账号</span></label>
-            <div class="max-w-md w-full border border-base-300 rounded-lg p-1 bg-base-100 shadow-sm">
+            <div class="max-w-md w-full border border-base-300 rounded-lg p-1 bg-base-100">
               <AccountSelector 
                 v-model="userId"
                 show-id
@@ -538,7 +538,7 @@ const rarityList = [
             <label class="label"><span class="font-medium text-base-content">活动</span></label>
             <div class="relative event-dropdown max-w-md">
               <div 
-                class="border border-base-300 rounded-lg p-2 flex items-center gap-3 cursor-pointer hover:bg-base-200 transition-colors bg-base-100 shadow-sm"
+                class="border border-base-300 rounded-lg p-2 flex items-center gap-3 cursor-pointer hover:bg-base-200 transition-colors bg-base-100"
                 @click="showEventDropdown = !showEventDropdown"
               >
                 <template v-if="selectedEvent">
@@ -707,7 +707,7 @@ const rarityList = [
       </div>
 
       <!-- 结果 -->
-      <div v-if="recommend && recommend.length > 0" class="card bg-base-100 shadow-lg overflow-x-auto">
+      <div v-if="recommend && recommend.length > 0" class="card bg-base-100 overflow-x-auto">
         <div class="card-body p-4">
           <table class="table table-sm">
             <thead>

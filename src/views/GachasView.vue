@@ -134,7 +134,7 @@ onMounted(loadData)
     <PageHeader title="卡池"><template #icon><Gift /></template></PageHeader>
 
     <!-- 搜索和筛选 -->
-    <div class="card bg-base-100 shadow-sm">
+    <div class="card bg-base-100">
       <div class="card-body p-4">
         <div class="flex flex-wrap gap-4 items-center">
           <div class="flex-1 min-w-[200px]">
@@ -174,7 +174,7 @@ onMounted(loadData)
           v-for="gacha in paginatedGachas"
           :key="gacha.id"
           :to="`/gachas/${gacha.id}`"
-          class="card bg-base-100 shadow-sm hover:shadow-lg transition-all group overflow-hidden relative"
+          class="card bg-base-100 hover:shadow-lg transition-all group overflow-hidden relative"
         >
           <figure class="relative aspect-[7/2] bg-base-200 overflow-hidden flex items-center justify-center">
             <AssetImage

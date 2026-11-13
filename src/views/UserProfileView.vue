@@ -9,7 +9,7 @@ import ProfileDeck from '@/components/UserProfile/ProfileDeck.vue'
 import ProfileCharacterRank from '@/components/UserProfile/ProfileCharacterRank.vue'
 import ProfileAdvancedData from '@/components/UserProfile/ProfileAdvancedData.vue'
 import {
-  User, Download, Upload, Plus, Trash2, RefreshCw, Star, Zap, Trophy, Music, CircleHelp
+  User, Download, Upload, Plus, Trash2, RefreshCw, Star, Zap, Trophy, Music, CircleHelp, X
 } from 'lucide-vue-next'
 import type {
   ProfileTabKey, UnitKey, AttrKey, ProfileData, CardInfo,
@@ -1174,7 +1174,7 @@ watch(currentUserId, async (newId) => {
 
     <template v-else>
       <!-- ==================== 账号管理 ==================== -->
-      <div class="card bg-base-100 shadow-lg overflow-visible relative z-30">
+      <div class="card bg-base-100 overflow-visible relative z-30">
         <div class="card-body space-y-4">
           <!-- 尚未添加账号 -->
           <div v-if="accounts.length === 0" class="space-y-1">
@@ -1275,7 +1275,8 @@ watch(currentUserId, async (newId) => {
 
       <dialog ref="infoModalRef" class="modal modal-bottom sm:modal-middle">
         <div class="modal-box max-w-3xl">
-          <h3 class="text-lg font-semibold mb-3">账号信息说明</h3>
+          <form method="dialog" class="modal-x"><button class="btn btn-sm btn-circle" aria-label="关闭"><X class="h-4 w-4" /></button></form>
+          <h3 class="text-lg font-semibold mb-3 pr-8">账号信息说明</h3>
           <div class="space-y-3">
             <p class="text-sm text-base-content/70">当前仅支持日服 ID。</p>
             <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -1356,7 +1357,7 @@ watch(currentUserId, async (newId) => {
             />
 
             <!-- 综合力 -->
-            <div class="card bg-base-100 shadow-lg">
+            <div class="card bg-base-100">
               <div class="card-body">
                 <h3 class="text-lg font-medium mb-3 flex items-center gap-2">
                   <Zap class="w-5 h-5 text-primary" />
@@ -1395,7 +1396,7 @@ watch(currentUserId, async (newId) => {
             </div>
 
             <!-- 难度清除统计 -->
-            <div class="card bg-base-100 shadow-lg">
+            <div class="card bg-base-100">
               <div class="card-body">
                 <h3 class="text-lg font-medium mb-3 flex items-center gap-2">
                   <Music class="w-5 h-5 text-primary" />
@@ -1445,7 +1446,7 @@ watch(currentUserId, async (newId) => {
           <div class="space-y-6">
             <template v-if="profileTab === 'basic'">
               <!-- MULTI LIVE -->
-              <div class="card bg-base-100 shadow-lg">
+              <div class="card bg-base-100">
                 <div class="card-body">
                   <h3 class="text-lg font-medium mb-3 flex items-center gap-2">
                     <Trophy class="w-5 h-5 text-primary" />
@@ -1465,7 +1466,7 @@ watch(currentUserId, async (newId) => {
               </div>
 
               <!-- CHALLENGE LIVE -->
-              <div class="card bg-base-100 shadow-lg">
+              <div class="card bg-base-100">
                 <div class="card-body">
                   <h3 class="text-lg font-medium mb-3 flex items-center gap-2">
                     <Star class="w-5 h-5 text-primary" />
@@ -1527,7 +1528,7 @@ watch(currentUserId, async (newId) => {
       </template>
 
       <!-- 已有账号但尚无缓存资料 -->
-      <div v-else-if="accounts.length > 0" class="card bg-base-100 shadow-lg">
+      <div v-else-if="accounts.length > 0" class="card bg-base-100">
         <div class="card-body items-center text-center py-12 gap-3">
           <User class="w-10 h-10 text-base-content/20" />
           <p class="font-medium">当前账号还没有缓存资料</p>

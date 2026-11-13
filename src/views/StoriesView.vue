@@ -450,13 +450,13 @@ onMounted(async () => {
       <div class="rounded-xl bg-base-100 border border-base-200 px-3 py-2"><p class="text-[11px] text-base-content/45">收录话数</p><p class="font-bold text-lg text-primary">{{ storyStats.episodes }}</p></div>
     </section>
 
-    <div role="tablist" class="tabs tabs-box bg-base-100 border border-base-200 w-full sm:w-fit p-1">
+    <div role="tablist" class="tabs tabs-box w-full sm:w-fit p-1">
       <button role="tab" class="tab flex-1 sm:flex-none gap-1.5" :class="{ 'tab-active': activeTab === 'event' }" @click="setTab('event')"><Sparkles class="w-4 h-4" />活动 <span class="hidden sm:inline">{{ storyStats.events }}</span></button>
       <button role="tab" class="tab flex-1 sm:flex-none gap-1.5" :class="{ 'tab-active': activeTab === 'unit' }" @click="setTab('unit')"><Library class="w-4 h-4" />主线 <span class="hidden sm:inline">{{ storyStats.unitChapters }}</span></button>
       <button v-for="(label, tab) in extraLabels" :key="tab" role="tab" class="tab flex-1 sm:flex-none text-xs sm:text-sm" :class="{ 'tab-active': activeTab === tab }" @click="setTab(tab)">{{ label }}</button>
     </div>
 
-    <section class="card bg-base-100 border border-base-200 shadow-sm">
+    <section class="card bg-base-100 border border-base-200">
       <div class="card-body p-3 md:p-4 grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_240px] gap-3">
         <label class="input input-bordered flex items-center gap-2">
           <Search class="w-4 h-4 opacity-50" /><input v-model="searchQuery" class="grow min-w-0" placeholder="搜索故事或章节标题…" />
@@ -537,9 +537,11 @@ onMounted(async () => {
           @next="navigateEpisode(1)"
           @play="trackEvent('story-play', { kind: selectedStory.kind })"
         />
-        <template v-else>
+        <!-- 横幅、简介、搜索和章节列表在同一个滚动区里，关闭按钮停在右上角 -->
+        <div v-else class="story-scroll">
+          <div class="modal-x modal-x-flush"><button class="btn btn-sm btn-circle" aria-label="关闭" @click="closeStory"><X class="w-4 h-4" /></button></div>
           <div v-if="selectedStoryBannerUrl" class="relative aspect-[122/36] max-h-48 overflow-hidden bg-base-200"><AssetImage :src="selectedStoryBannerUrl" :alt="selectedStory.title" class="w-full h-full object-cover" /><div class="absolute inset-0 bg-gradient-to-t from-base-100 via-transparent to-transparent"></div></div>
-          <header class="p-5 border-b border-base-200 flex items-start gap-3" :class="selectedStoryBannerUrl ? '-mt-8 relative z-10 pt-0' : ''">
+          <header class="p-5 pr-12 border-b border-base-200 flex items-start gap-3" :class="selectedStoryBannerUrl ? '-mt-8 relative z-10 pt-0' : ''">
             <div class="min-w-0 flex-1">
               <div class="flex flex-wrap items-center gap-2 mb-2">
                 <span class="badge badge-primary">{{ selectedStory.kind === 'event' ? '活动故事' : selectedStory.kind === 'unit' ? '组合主线' : extraLabels[selectedStory.kind] }}</span>
@@ -548,10 +550,9 @@ onMounted(async () => {
               <h2 class="font-bold text-xl"><ZhText :text="selectedStory.title" v-bind="STORY_TITLE_ZH[selectedStory.kind]" sub-class="text-base" /></h2>
               <p v-if="selectedStory.outline" class="text-sm leading-6 text-base-content/65 mt-2 whitespace-pre-line"><ZhText :text="selectedStory.outline" v-bind="OUTLINE_ZH[selectedStory.kind] || {}" sub-class="mt-2 text-[0.95em]" /></p>
             </div>
-            <button class="btn btn-sm btn-circle btn-ghost" aria-label="关闭" @click="closeStory"><X class="w-4 h-4" /></button>
           </header>
           <div class="p-4 border-b border-base-200 bg-base-100"><label class="input input-sm input-bordered flex items-center gap-2"><Search class="w-4 h-4 opacity-40" /><input v-model="episodeSearch" class="grow" placeholder="搜索本篇章节标题或剧本 ID…" /><button v-if="episodeSearch" class="btn btn-xs btn-circle btn-ghost" @click="episodeSearch = ''"><X class="w-3 h-3" /></button></label></div>
-          <div class="p-3 md:p-4 max-h-[58vh] overflow-y-auto space-y-2 bg-base-200/50">
+          <div class="p-3 md:p-4 space-y-2 bg-base-200/50">
             <StorySummaryPanel :story-key="selectedStoryKey" :fallback-scenario-id="selectedStory.episodes.length === 1 ? selectedStory.episodes[0]?.scenarioId : ''" class="mb-3" />
             <div v-for="episode in selectedStoryEpisodes" :key="episode.id" class="episode-card bg-base-100 border border-base-200 rounded-xl hover:border-primary/50 hover:shadow-sm transition-all">
               <button class="group w-full flex items-center gap-3 p-2.5 text-left" @click="openEpisode(episode)">
@@ -573,7 +574,7 @@ onMounted(async () => {
             </div>
             <div v-if="selectedStoryEpisodes.length === 0" class="py-16 text-center text-sm text-base-content/45">没有匹配的章节</div>
           </div>
-        </template>
+        </div>
       </div>
       <form method="dialog" class="modal-backdrop"><button @click="closeStory">关闭</button></form>
     </dialog>
@@ -583,7 +584,9 @@ onMounted(async () => {
 <style scoped>
 /* 剧情弹窗：桌面居中；手机贴顶并让出安全区，弹窗比可视区域高时也不会把关闭按钮推到屏幕外
    （底部地址栏的浏览器、不支持 dvh/svh 的内嵌浏览器都会出现这种情况） */
-.story-modal .modal-box { max-height:94vh; max-height:94svh; }
+.story-modal .modal-box { max-height:94vh; max-height:94svh; overflow:hidden; }
+/* 章节列表页：整块内容一起滚动，高度与弹窗的上限一致 */
+.story-scroll { max-height:94vh; max-height:94svh; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; }
 .episode-synopsis {
   display:block; width:calc(100% - 1.25rem); margin:-.25rem .625rem .625rem; padding:.5rem .75rem;
   border-radius:.625rem; text-align:left; font-size:.8rem; line-height:1.65;
@@ -606,6 +609,10 @@ onMounted(async () => {
   .story-modal { align-items:start; }
   .story-modal .modal-box {
     margin-top:calc(.5rem + env(safe-area-inset-top));
+    max-height:calc(100vh - 1rem);
+    max-height:calc(100svh - 1rem - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  }
+  .story-scroll {
     max-height:calc(100vh - 1rem);
     max-height:calc(100svh - 1rem - env(safe-area-inset-top) - env(safe-area-inset-bottom));
   }

@@ -756,13 +756,13 @@ watch(() => route.params.id, loadData)
     <!-- 活动详情 -->
     <div v-else class="space-y-6">
       <!-- 头部 -->
-      <div class="card bg-base-100 shadow-lg">
+      <div class="card bg-base-100">
         <div class="card-body">
           <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
             <div class="flex flex-wrap items-center gap-2 sm:gap-4">
-              <button type="button" class="btn btn-ghost btn-sm" @click="goBack">
+              <button type="button" class="back-link" @click="goBack">
                 <ChevronLeft class="w-4 h-4" />
-                返回列表
+                返回活动列表
               </button>
               <span class="badge badge-lg">#{{ event.id }}</span>
               <span 
@@ -848,7 +848,7 @@ watch(() => route.params.id, loadData)
       </div>
 
       <!-- Cheerful Carnival 阵营 -->
-      <div v-if="cheerfulSummary && cheerfulTeams.length === 2" class="card bg-base-100 shadow-lg">
+      <div v-if="cheerfulSummary && cheerfulTeams.length === 2" class="card bg-base-100">
         <div class="card-body gap-4">
           <div class="flex flex-wrap items-start justify-between gap-3">
             <div class="min-w-0">
@@ -898,7 +898,7 @@ watch(() => route.params.id, loadData)
       </div>
 
       <!-- 图片轮播 -->
-      <div class="card bg-base-100 shadow-lg">
+      <div class="card bg-base-100">
         <div class="card-body">
           <h3 class="text-lg font-medium mb-3">活动视觉</h3>
           <div class="relative">
@@ -951,7 +951,7 @@ watch(() => route.params.id, loadData)
       </div>
 
       <!-- 本期卡牌 -->
-      <div class="card bg-base-100 shadow-lg">
+      <div class="card bg-base-100">
         <div class="card-body">
           <h3 class="text-lg font-medium mb-3 flex items-center gap-2">
             <CreditCard class="w-5 h-5" />
@@ -976,7 +976,7 @@ watch(() => route.params.id, loadData)
       </div>
 
       <!-- 加成信息 -->
-      <div class="card bg-base-100 shadow-lg">
+      <div class="card bg-base-100">
         <div class="card-body">
           <h3 class="text-lg font-medium mb-3 flex items-center gap-2">
             <Sparkles class="w-5 h-5" />
@@ -1031,7 +1031,7 @@ watch(() => route.params.id, loadData)
 
 
       <!-- 活动歌曲 -->
-      <div v-if="eventMusicList.length > 0" class="card bg-base-100 shadow-lg">
+      <div v-if="eventMusicList.length > 0" class="card bg-base-100">
         <div class="card-body">
           <h3 class="text-lg font-medium mb-3 flex items-center gap-2">
             <Music class="w-5 h-5" />
@@ -1063,7 +1063,7 @@ watch(() => route.params.id, loadData)
       </div>
 
       <!-- 活动兑换规划 -->
-      <div v-if="exchangeSummary" class="card bg-base-100 shadow-lg">
+      <div v-if="exchangeSummary" class="card bg-base-100">
         <div class="card-body gap-5">
           <div class="flex flex-wrap items-start justify-between gap-3">
             <div>
@@ -1131,7 +1131,7 @@ watch(() => route.params.id, loadData)
     </div>
 
     <!-- 排名牌子 -->
-    <div v-if="rankingHonors.length > 0" class="card bg-base-100 shadow-lg mt-6">
+    <div v-if="rankingHonors.length > 0" class="card bg-base-100 mt-6">
       <div class="card-body">
         <h3 class="text-lg font-medium mb-3 flex items-center gap-2">
           <Trophy class="w-5 h-5" />

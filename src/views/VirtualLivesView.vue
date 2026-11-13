@@ -217,7 +217,7 @@ onMounted(async () => {
       </template>
     </PageHeader>
 
-    <div class="flex flex-col gap-3 rounded-xl border border-base-200 bg-base-100 p-3 shadow-sm sm:flex-row sm:items-center">
+    <div class="flex flex-col gap-3 rounded-xl border border-base-300 bg-base-100 p-3 sm:flex-row sm:items-center">
       <label class="input input-sm input-bordered flex min-w-0 flex-1 items-center gap-2">
         <Search class="h-4 w-4 opacity-45" />
         <input v-model="searchQuery" type="text" class="grow min-w-0" placeholder="搜索 Live 名称或 ID…" />
@@ -238,7 +238,7 @@ onMounted(async () => {
         v-for="vlive in paginatedVlives" 
         :key="vlive.id"
         :to="'/vlives/' + vlive.id"
-        class="group block overflow-hidden rounded-xl border border-base-200 bg-base-100 shadow-sm transition hover:border-primary/35 hover:shadow-md"
+        class="group block overflow-hidden rounded-xl border border-base-300 bg-base-100 transition hover:border-primary/35 hover:shadow-md"
       >
         <figure class="relative bg-base-200 aspect-[122/52]">
           <AssetImage 

@@ -176,7 +176,7 @@ onMounted(async () => {
   <div class="max-w-7xl mx-auto space-y-6">
     <PageHeader title="表情贴图图鉴" description="按名称、角色、类型与来源检索游戏贴图，并下载透明 PNG 原图。"><template #icon><Smile class="w-8 h-8 text-primary" /></template></PageHeader>
 
-    <section class="card bg-base-100 border border-base-200 shadow-sm">
+    <section class="card bg-base-100 border border-base-200">
       <div class="card-body p-4 gap-4">
         <div class="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_220px_220px] gap-3">
           <label class="input input-bordered flex items-center gap-2">

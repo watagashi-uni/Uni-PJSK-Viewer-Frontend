@@ -4,7 +4,8 @@ import { useMasterStore } from '@/stores/master'
 import SekaiCard from '@/components/SekaiCard.vue'
 import SekaiProfileHonor from '@/components/SekaiProfileHonor.vue'
 import LazyMount from '@/components/LazyMount.vue'
-import { RefreshCw } from 'lucide-vue-next'
+import { BarChart3, RefreshCw } from 'lucide-vue-next'
+import PageHeader from '@/components/PageHeader.vue'
 import { request } from '@/utils/request'
 import type { EventData, CardData } from '@/types/master'
 import { useCharacterName } from '@/composables/useCharacterName'
@@ -269,37 +270,29 @@ function getHonor(honors: any[], seq: number) {
 
 <template>
   <div class="space-y-6">
-    <!-- Header -->
-    <div class="bg-base-100 p-6 rounded-xl shadow-sm relative">
-      <div class="flex flex-col items-center justify-center text-center gap-1">
-        <h1 class="text-2xl font-bold flex items-center justify-center gap-2">
-          <template v-if="eventId">
-            <span class="text-primary">#{{ eventId }}</span> <ZhText :text="eventName" table="events" path="name" layout="inline" />
-          </template>
-          <template v-else>{{ isLoading ? '加载中...' : '实时榜况' }}</template>
-        </h1>
-        <p class="text-base-content/60 text-sm flex items-center justify-center gap-2">
-          <span>实时榜况</span>
-          <span v-if="lastUpdate">
-            更新于 {{ new Date(lastUpdate).toLocaleTimeString('zh-CN', { hour12: false }) }}
-          </span>
-        </p>
-      </div>
-      
-      <div class="mt-4 flex justify-center md:mt-0 md:absolute md:right-6 md:top-1/2 md:-translate-y-1/2">
-        <button 
-          class="btn btn-primary btn-sm gap-2" 
-          :disabled="isLoading" 
+    <PageHeader
+      :title="eventId ? `#${eventId} ${eventName}` : (isLoading ? '加载中' : '实时榜线')"
+      :description="lastUpdate ? `实时榜线，更新于 ${new Date(lastUpdate).toLocaleTimeString('zh-CN', { hour12: false })}` : '当期活动的排名和分数线'"
+    >
+      <template #icon><BarChart3 /></template>
+      <template v-if="eventId" #title>
+        <span class="num mr-2 text-primary">#{{ eventId }}</span>
+        <ZhText :text="eventName" table="events" path="name" layout="inline" />
+      </template>
+      <template #actions>
+        <button
+          class="btn btn-primary btn-sm w-full gap-2 sm:w-auto"
+          :disabled="isLoading"
           @click="eventId ? refreshData() : initData()"
         >
           <RefreshCw class="w-4 h-4" :class="{ 'animate-spin': isLoading }" />
           刷新
         </button>
-      </div>
-    </div>
+      </template>
+    </PageHeader>
 
     <!-- Tabs -->
-    <div role="tablist" class="tabs tabs-box bg-base-100 p-2">
+    <div role="tablist" class="tabs tabs-box p-1">
       <button 
         type="button"
         role="tab" 
@@ -323,7 +316,7 @@ function getHonor(honors: any[], seq: number) {
     </div>
 
     <!-- World Link character rankings -->
-    <div v-if="isWorldBloomEvent" class="bg-base-100 p-3 rounded-xl shadow-sm">
+    <div v-if="isWorldBloomEvent" class="bg-base-100 p-3 rounded-xl border border-base-300">
       <div class="flex gap-2 overflow-x-auto pb-1">
         <button
           class="btn btn-sm h-auto min-h-12 shrink-0 gap-2 px-3"
@@ -371,7 +364,7 @@ function getHonor(honors: any[], seq: number) {
     </div>
 
     <!-- Unified Table View -->
-    <div class="bg-base-100 rounded-xl shadow-sm overflow-hidden min-h-[300px]">
+    <div class="bg-base-100 rounded-xl overflow-hidden min-h-[300px] border border-base-300">
       <!-- Init Error State -->
       <div v-if="initError && !isLoading" class="p-8 text-center text-base-content/60">
         <p :class="{ 'text-error': initError !== '暂无可显示的活动' }">{{ initError }}</p>
@@ -398,7 +391,7 @@ function getHonor(honors: any[], seq: number) {
         <div 
           v-for="row in rankingRows" 
           :key="`${selectedWorldBloomCharacterId || 'overall'}-${row.rank}`" 
-          class="bg-base-100 p-3 rounded-lg border border-base-200 shadow-sm"
+          class="bg-base-100 p-3 rounded-lg border border-base-300"
         >
           <!-- Top Row: Rank & Score -->
           <div class="flex justify-between items-center mb-2 pb-2 border-b border-base-100">

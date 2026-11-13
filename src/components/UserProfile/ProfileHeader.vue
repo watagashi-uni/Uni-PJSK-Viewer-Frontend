@@ -34,7 +34,7 @@ const leaderCard = computed(() => {
 </script>
 
 <template>
-  <div class="card bg-base-100 shadow-lg">
+  <div class="card bg-base-100">
     <div class="card-body">
       <div class="flex items-center gap-4 mb-4">
         <!-- Leader Avatar based on first deck card -->

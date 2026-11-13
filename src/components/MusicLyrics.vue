@@ -46,8 +46,8 @@ const BROWSE_RESUME_MS = 4000
 const ROW_STAGGER_MS = 30
 /** Rows further down than this all start together with the last of them. */
 const ROW_STAGGER_ROWS = 6
-/** How long the rows take to glide into place. */
-const ROW_GLIDE_MS = 760
+/** How firmly a row is pulled to its resting place, per second. */
+const GLIDE_RATE = 10
 /**
  * A line counts as started this much before its cue. A seek lands on the cue itself, and the
  * audio clock may read back a hair earlier, which would otherwise leave the line above current.
@@ -103,8 +103,6 @@ let resizeObserver: ResizeObserver | undefined
 interface Painted { el: HTMLElement; fill?: Fill; under?: { painted: Painted; weight: number }[]; value?: string }
 /** Filling elements of the rows being sung, kept so each frame only touches those. */
 const painted = new Map<number, Painted[]>()
-/** A row's glide into place, and how long it waits before it starts to move. */
-const rowMotion = new WeakMap<HTMLElement, { animation: Animation; delay: number }>()
 /** Portrait keys last reported through `singing`, so a frame only reports a change. */
 let singingKey: string | null = null
 
@@ -429,13 +427,67 @@ function reducedMotion(): boolean {
   return matchMedia('(prefers-reduced-motion: reduce)').matches
 }
 
-/** Where a row is in its glide: how far it still sits from its resting place, and whether it is already moving. */
-function settling(row: HTMLElement): { offset: number; wait: number } | null {
-  const motion = rowMotion.get(row)
-  if (!motion || motion.animation.playState !== 'running') return null
-  const transform = getComputedStyle(row).transform
-  const offset = transform && transform !== 'none' ? new DOMMatrixReadOnly(transform).m42 : 0
-  return { offset, wait: Math.max(0, motion.delay - Number(motion.animation.currentTime ?? 0)) }
+/** A row on its way to its resting place. */
+interface Glide {
+  /** How far it sits from its resting place now, in px, and its speed, in px per second. */
+  y: number
+  v: number
+  /** When it starts to move, on the clock of `performance.now()`. Until then it waits where it is. */
+  hold: number
+}
+/**
+ * Rows in motion. The rows are moved here, frame by frame, and where each one is follows
+ * from what is kept here; nothing is read back from the page. Handed to the browser as an
+ * animation, a row on iOS Safari could keep the offset it started from instead of moving,
+ * so each line came to rest a line too low, or, where that offset was read back and built
+ * on, lower with every line until the current line sank out of view.
+ */
+const glides = new Map<HTMLElement, Glide>()
+let glideFrame = 0
+/** When the rows were last moved. */
+let glideTime = 0
+
+/**
+ * A row is pulled to rest like a critically damped spring, which settles without
+ * overshooting: where it is and how fast it moves `seconds` later. Exact for any step,
+ * so a long frame (or a tab coming back from the background) just lands further along.
+ */
+function springAt(y: number, v: number, seconds: number): [number, number] {
+  const decay = Math.exp(-GLIDE_RATE * seconds)
+  const pull = v + GLIDE_RATE * y
+  return [(y + pull * seconds) * decay, (v - GLIDE_RATE * pull * seconds) * decay]
+}
+
+function place(row: HTMLElement, y: number) {
+  row.style.transform = `translate3d(0, ${y.toFixed(2)}px, 0)`
+}
+
+/** Move every gliding row on to where it is at `time`. */
+function advanceGlides(time: number) {
+  for (const [row, state] of glides) {
+    const from = Math.max(glideTime, state.hold)
+    if (time > from) [state.y, state.v] = springAt(state.y, state.v, (time - from) / 1000)
+    if (!row.isConnected || (time >= state.hold && Math.abs(state.y) < 0.2 && Math.abs(state.v) < 5)) {
+      row.style.removeProperty('transform')
+      glides.delete(row)
+    }
+  }
+  glideTime = time
+}
+
+function glideStep() {
+  const time = performance.now()
+  advanceGlides(time)
+  for (const [row, state] of glides) place(row, state.y)
+  glideFrame = glides.size ? requestAnimationFrame(glideStep) : 0
+}
+
+/** Put every row at rest at once. */
+function stopGlides() {
+  cancelAnimationFrame(glideFrame)
+  glideFrame = 0
+  for (const row of glides.keys()) row.style.removeProperty('transform')
+  glides.clear()
 }
 
 /** Rows (not the credits in front of them) in document order. */
@@ -445,16 +497,14 @@ function rowElements(list: HTMLElement): HTMLElement[] {
 
 /**
  * Bring the current line to its resting place. The container jumps there at once;
- * each visible row then glides from where it was, the rows below starting a beat
- * later than the one above, which gives the list its elastic, flowing motion
- * (on wide screens; see rowStagger).
+ * each visible row is shifted back by the same amount, so nothing moves yet, and then
+ * glides to rest (see springAt), the rows below starting a beat later than the one above, which gives
+ * the list its flowing motion (on wide screens; see rowStagger).
  *
- * Lines often change again before the rows have settled. Every row still gliding is then
- * picked up from where it is, wherever it lies (one left out would jump by the whole
- * scroll). A row never waits longer than it already had to: one already moving keeps
- * moving, and one waiting its turn is not sent to the back again. Otherwise, with lines
- * coming quickly, the lower rows would keep stopping and starting, or stay behind and
- * then catch up all at once.
+ * Lines often change again before the rows have settled. A row still gliding simply has
+ * further to go and carries on at the speed it has; one waiting its turn is not sent to
+ * the back again. Otherwise, with lines coming quickly, the lower rows would keep stopping
+ * and starting, or stay behind and then catch up all at once.
  */
 function follow(animate: boolean) {
   const box = viewport.value
@@ -465,35 +515,38 @@ function follow(animate: boolean) {
   const lead = box.clientHeight * ANCHOR_RATIO[props.variant]
   const target = Math.max(0, Math.min(box.scrollHeight - box.clientHeight, anchor.value < 0 ? 0 : row.offsetTop - lead))
   const before = box.scrollTop
-  if (Math.abs(target - before) < 0.5) return
-  const rows = rowElements(list)
   if (!animate || reducedMotion()) {
-    for (const el of rows) rowMotion.get(el)?.animation.cancel()
-    box.scrollTop = target
+    stopGlides()
+    if (Math.abs(target - before) >= 0.5) box.scrollTop = target
     return
   }
-  const top = Math.min(before, target) - 120
-  const bottom = Math.max(before, target) + box.clientHeight + 120
-  const moving: { row: HTMLElement; index: number; offset: number; wait?: number }[] = []
-  rows.forEach((el, index) => {
-    const state = settling(el)
-    if (!state && (el.offsetTop + el.offsetHeight < top || el.offsetTop > bottom)) return
-    moving.push({ row: el, index, offset: state?.offset ?? 0, wait: state?.wait })
-  })
+  if (Math.abs(target - before) < 0.5) return
   box.scrollTop = target
   // The scroll position snaps to the pixel grid: move the rows by what it actually moved.
-  const delta = box.scrollTop - before
+  const after = box.scrollTop
+  const delta = after - before
+  if (!delta) return
+  const top = Math.min(before, after) - 120
+  const bottom = Math.max(before, after) + box.clientHeight + 120
+  const time = performance.now()
+  // Bring the rows still gliding up to now, so each carries on from where it is on screen.
+  advanceGlides(time)
   const stagger = rowStagger()
-  for (const { row: el, index, offset, wait } of moving) {
-    rowMotion.get(el)?.animation.cancel()
-    const turn = Math.max(0, Math.min(ROW_STAGGER_ROWS, index - anchor.value + 1)) * stagger
-    const delay = wait === undefined ? turn : Math.min(turn, wait)
-    const animation = el.animate(
-      [{ transform: `translate3d(0, ${offset + delta}px, 0)` }, { transform: 'translate3d(0, 0, 0)' }],
-      { duration: ROW_GLIDE_MS, delay, easing: 'cubic-bezier(0.2, 0.95, 0.25, 1)', fill: 'backwards' },
-    )
-    rowMotion.set(el, { animation, delay })
-  }
+  rowElements(list).forEach((el, index) => {
+    const turn = time + Math.max(0, Math.min(ROW_STAGGER_ROWS, index - anchor.value + 1)) * stagger
+    const state = glides.get(el)
+    if (state) {
+      // Already moving: it keeps its speed. Still waiting: no later than it had to.
+      state.y += delta
+      state.hold = Math.min(state.hold, turn)
+    } else if (el.offsetTop + el.offsetHeight >= top && el.offsetTop <= bottom) {
+      glides.set(el, { y: delta, v: 0, hold: turn })
+    } else {
+      return
+    }
+    place(el, glides.get(el)!.y)
+  })
+  if (!glideFrame && glides.size) glideFrame = requestAnimationFrame(glideStep)
 }
 
 watch(anchor, () => {
@@ -507,7 +560,8 @@ watch(following, (value) => {
 // Layout changed under the current line: put it back without a flourish.
 watch([translated, rubied, romanized, items, expanded, live, headRows], async () => {
   await nextTick()
-  if (live.value && following.value) follow(false)
+  if (!live.value) stopGlides()
+  else if (following.value) follow(false)
 }, { flush: 'post' })
 
 function remember(key: string, value: boolean) {
@@ -579,6 +633,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   request++
   cancelAnimationFrame(frame)
+  stopGlides()
   clearTimeout(resumeTimer)
   resizeObserver?.disconnect()
 })

@@ -2,7 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
-  ChevronDown, Info, ListMusic, Loader2, MicVocal, Pause, Play, Repeat, Repeat1, SkipBack, SkipForward, Volume1, Volume2,
+  Check, ChevronDown, Info, ListMusic, Loader2, MicVocal, Pause, Play, Repeat, Repeat1, SkipBack, SkipForward, Volume1, Volume2,
 } from 'lucide-vue-next'
 import { usePlayerStore } from '@/stores/player'
 import { useSingerAvatars } from '@/composables/useSingerAvatars'
@@ -12,6 +12,7 @@ import PlayerScrubber from '@/components/player/PlayerScrubber.vue'
 import SingerAvatars from '@/components/player/SingerAvatars.vue'
 import ZhText from '@/components/ZhText.vue'
 import { drawBackdrop, paintBackdrop } from '@/utils/blurredCover'
+import type { PlayerTrackInfo } from '@/utils/playerTracks'
 
 const route = useRoute()
 const router = useRouter()
@@ -82,6 +83,33 @@ watch([glowA, glowB, () => player.isPlaying], ([a, b, playing]) => {
   }
 }, { flush: 'post', immediate: true })
 
+// 同一首歌的其他演唱版本：切换时保留进度，和歌曲页一样
+const renditions = ref<PlayerTrackInfo[]>([])
+const vocalMenuOpen = ref(false)
+let renditionRequest = 0
+watch([() => track.value?.musicId, open], async ([musicId, isOpen]) => {
+  vocalMenuOpen.value = false
+  if (!isOpen || musicId === undefined) return
+  if (renditions.value[0]?.musicId === musicId) return
+  const serial = ++renditionRequest
+  renditions.value = []
+  try {
+    const list = await player.renditionsOf(musicId)
+    if (serial === renditionRequest) renditions.value = list
+  } catch {
+    // 没拿到版本列表就只显示当前版本，不影响播放
+  }
+}, { immediate: true })
+
+function renditionSingers(info: PlayerTrackInfo): string {
+  return trackAvatars(info.singers).map(s => s.name).filter(Boolean).join('・')
+}
+
+function chooseRendition(info: PlayerTrackInfo) {
+  vocalMenuOpen.value = false
+  player.switchRendition(info)
+}
+
 function togglePanel(name: 'lyrics' | 'queue') {
   player.nowPlayingPanel = player.nowPlayingPanel === name ? 'none' : name
 }
@@ -108,7 +136,8 @@ function onVolumeInput(event: Event) {
 function onKeydown(event: KeyboardEvent) {
   if (event.key === 'Escape') {
     event.stopPropagation()
-    close()
+    if (vocalMenuOpen.value) vocalMenuOpen.value = false
+    else close()
   } else if (event.key === ' ' && event.target === root.value) {
     event.preventDefault()
     player.toggle()
@@ -171,7 +200,38 @@ onBeforeUnmount(() => { document.documentElement.style.overflow = '' })
               </div>
               <div class="np-meta">
                 <h2 class="np-title"><ZhText :text="track.title" table="musics" path="title" main-class="np-line" sub-class="np-line np-title-sub" /></h2>
-                <p class="np-caption"><ZhText :text="track.caption" table="musicVocals" path="caption" layout="inline" /></p>
+                <div v-if="renditions.length > 1" class="np-vocal">
+                  <button
+                    class="np-caption np-caption--button"
+                    aria-haspopup="listbox"
+                    :aria-expanded="vocalMenuOpen"
+                    title="切换演唱版本"
+                    @click="vocalMenuOpen = !vocalMenuOpen"
+                  >
+                    <span class="truncate"><ZhText :text="track.caption" table="musicVocals" path="caption" layout="inline" /></span>
+                    <span class="np-vocal-count">{{ renditions.length }} 个版本</span>
+                    <ChevronDown class="h-3.5 w-3.5 shrink-0 transition-transform" :class="{ 'rotate-180': vocalMenuOpen }" />
+                  </button>
+                  <div v-if="vocalMenuOpen" class="np-vocal-scrim" @click="vocalMenuOpen = false"></div>
+                  <ul v-if="vocalMenuOpen" class="np-vocal-menu" role="listbox" aria-label="演唱版本">
+                    <li v-for="info in renditions" :key="info.vocalId">
+                      <button
+                        class="np-vocal-item"
+                        role="option"
+                        :aria-selected="info.vocalId === track.vocalId"
+                        :class="{ on: info.vocalId === track.vocalId }"
+                        @click="chooseRendition(info)"
+                      >
+                        <span class="min-w-0 flex-1">
+                          <span class="block truncate font-semibold"><ZhText :text="info.caption" table="musicVocals" path="caption" layout="inline" /></span>
+                          <span v-if="renditionSingers(info)" class="block truncate text-xs opacity-65">{{ renditionSingers(info) }}</span>
+                        </span>
+                        <Check v-if="info.vocalId === track.vocalId" class="h-4 w-4 shrink-0" />
+                      </button>
+                    </li>
+                  </ul>
+                </div>
+                <p v-else class="np-caption"><ZhText :text="track.caption" table="musicVocals" path="caption" layout="inline" /></p>
                 <div v-if="avatars.length" class="np-singers">
                   <SingerAvatars :singers="avatars" :size="34" :max="8" :active-keys="litSingers" />
                   <span class="np-singer-names">{{ singerNames }}</span>
@@ -458,6 +518,81 @@ onBeforeUnmount(() => { document.documentElement.style.overflow = '' })
   white-space: nowrap;
 }
 
+.np-vocal {
+  position: relative;
+}
+
+.np-caption--button {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  gap: 0.375rem;
+  margin-left: -0.5rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background-color 0.15s, opacity 0.15s;
+}
+
+.np-caption--button:hover,
+.np-caption--button[aria-expanded="true"] {
+  background: rgb(255 255 255 / 0.12);
+  opacity: 1;
+}
+
+.np-vocal-count {
+  flex-shrink: 0;
+  padding: 0 0.375rem;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.14);
+  font-size: 0.6875rem;
+  line-height: 1.25rem;
+}
+
+.np-vocal-scrim {
+  position: fixed;
+  z-index: 4;
+  inset: 0;
+}
+
+.np-vocal-menu {
+  position: absolute;
+  z-index: 5;
+  top: calc(100% + 0.375rem);
+  left: -0.5rem;
+  width: min(20rem, calc(100vw - 2rem));
+  max-height: min(50vh, 22rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0.375rem;
+  border: 1px solid rgb(255 255 255 / 0.12);
+  border-radius: 1rem;
+  background: rgb(24 26 34 / 0.92);
+  box-shadow: 0 20px 50px -12px rgb(0 0 0 / 0.7);
+  backdrop-filter: blur(24px) saturate(1.4);
+}
+
+.np-vocal-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.75rem;
+  font-size: 0.875rem;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.np-vocal-item:hover {
+  background: rgb(255 255 255 / 0.1);
+}
+
+.np-vocal-item.on {
+  background: rgb(255 255 255 / 0.16);
+}
+
 .np-singers {
   display: flex;
   align-items: center;
@@ -598,6 +733,11 @@ onBeforeUnmount(() => { document.documentElement.style.overflow = '' })
 
   .np:not(.np--none) .np-caption {
     font-size: 0.75rem;
+  }
+
+  .np:not(.np--none) .np-caption--button {
+    margin-left: -0.375rem;
+    padding: 0.0625rem 0.375rem;
   }
 
   .np:not(.np--none) .np-singers {

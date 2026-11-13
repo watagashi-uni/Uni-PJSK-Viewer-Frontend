@@ -8,6 +8,11 @@ export function isTestEvent(event: EventAssets): boolean {
     && /^event_cheerfutest\d*_\d{4}$/.test(event.assetbundleName)
 }
 
+export function getEventLogoUrl(event: EventAssets, assetsHost: string): string {
+  if (!event.assetbundleName) return ''
+  return `${assetsHost}/ondemand/event/${event.assetbundleName}/logo/logo.png`
+}
+
 export function getEventBannerUrl(event: EventAssets, assetsHost: string): string {
   if (isTestEvent(event) || !event.assetbundleName) return ''
   const bundle = event.assetbundleName

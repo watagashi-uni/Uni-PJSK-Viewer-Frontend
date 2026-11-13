@@ -136,7 +136,7 @@ function onBondCharacterFilterChange(e: Event) {
           <div
             v-for="group in powerBonusCharacterGroupRows"
             :key="`bonus-group-${group.unit}`"
-            class="rounded-xl border border-base-300 bg-base-100 p-3 shadow-sm"
+            class="rounded-xl border border-base-300 bg-base-100 p-3"
           >
             <div class="mb-2 flex items-center gap-2">
               <img :src="getUnitLogo(group.unit)" class="h-5 w-auto object-contain" />
@@ -164,7 +164,7 @@ function onBondCharacterFilterChange(e: Event) {
         </div>
 
         <div class="grid grid-cols-1 gap-3 xl:grid-cols-2">
-          <div class="rounded-xl border border-base-300 bg-base-100 p-3 shadow-sm">
+          <div class="rounded-xl border border-base-300 bg-base-100 p-3">
             <p class="text-sm font-semibold">组合总加成</p>
             <div class="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
               <div
@@ -184,7 +184,7 @@ function onBondCharacterFilterChange(e: Event) {
             </div>
           </div>
 
-          <div class="rounded-xl border border-base-300 bg-base-100 p-3 shadow-sm">
+          <div class="rounded-xl border border-base-300 bg-base-100 p-3">
             <p class="text-sm font-semibold">属性总加成</p>
             <div class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
               <div
@@ -305,7 +305,7 @@ function onBondCharacterFilterChange(e: Event) {
           <div
             v-for="row in leaderCountRows"
             :key="row.characterId"
-            class="rounded-2xl border border-base-300 bg-base-100 px-3 py-2.5 shadow-sm"
+            class="rounded-2xl border border-base-300 bg-base-100 px-3 py-2.5"
           >
             <div class="flex items-center gap-2.5 mb-2.5">
               <div class="w-10 h-10 rounded-full overflow-hidden border-2 flex-shrink-0" :style="{ borderColor: getCharaPillColor(row.characterId) }">

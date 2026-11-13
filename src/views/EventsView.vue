@@ -178,7 +178,7 @@ onMounted(loadData)
         v-for="event in paginatedEvents" 
         :key="event.id"
         :to="`/events/${event.id}`"
-        class="card bg-base-100 shadow-sm hover:shadow-md transition-shadow overflow-hidden relative group"
+        class="card bg-base-100 hover:shadow-md transition-shadow overflow-hidden relative group"
       >
         <!-- Banner 图片 -->
         <figure class="relative">

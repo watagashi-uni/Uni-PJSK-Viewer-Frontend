@@ -4,7 +4,8 @@ import { useSettingsStore } from '@/stores/settings'
 import { useMasterStore } from '@/stores/master'
 import { useNotificationStore } from '@/stores/notification'
 import { useTranslationStore } from '@/stores/translations'
-import { Settings, Trash2, Database, Eye, Palette, RefreshCw, Languages, Mic, Bell, AlertTriangle, MonitorSmartphone, Send } from 'lucide-vue-next'
+import { Settings, Trash2, Database, Eye, Palette, RefreshCw, Languages, Mic, Bell, AlertTriangle, MonitorSmartphone, Send, Check } from 'lucide-vue-next'
+import { themeOptions } from '@/utils/themes'
 import { clearAllCache } from '@/utils/masterDB'
 import PageHeader from '@/components/PageHeader.vue'
 
@@ -64,14 +65,6 @@ async function toggleTopic(topic: string) {
 
 const isClearing = ref(false)
 const isClearingTranslation = ref(false)
-
-const themes = [
-  { value: 'light', label: '浅色' },
-  { value: 'dark', label: '深色' },
-  { value: 'moe', label: 'Moe' },
-  { value: 'jirai', label: '地雷' },
-  { value: 'auto', label: '跟随系统' },
-]
 
 const translationModeOptions = [
   { value: 'both', label: '日文 + 中文' },
@@ -135,7 +128,7 @@ async function handleClearTranslationCache() {
 
     <div class="space-y-6">
       <!-- 显示设置 -->
-      <div class="card bg-base-100 shadow-lg">
+      <div class="card bg-base-100">
         <div class="card-body">
           <h2 class="card-title text-lg mb-4">
             <Eye class="w-5 h-5" />
@@ -163,7 +156,7 @@ async function handleClearTranslationCache() {
       </div>
 
       <!-- 中文译名 -->
-      <div class="card bg-base-100 shadow-lg">
+      <div class="card bg-base-100">
         <div class="card-body">
           <h2 class="card-title text-lg mb-4">
             <Languages class="w-5 h-5" />
@@ -218,29 +211,45 @@ async function handleClearTranslationCache() {
       </div>
 
       <!-- 主题设置 -->
-      <div class="card bg-base-100 shadow-lg">
+      <div class="card bg-base-100">
         <div class="card-body">
           <h2 class="card-title text-lg mb-4">
             <Palette class="w-5 h-5" />
             主题设置
           </h2>
           
-          <div class="flex flex-wrap gap-2">
-            <button 
-              v-for="theme in themes"
+          <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <button
+              v-for="theme in themeOptions"
               :key="theme.value"
-              class="btn btn-sm"
-              :class="settingsStore.theme === theme.value ? 'btn-primary' : 'btn-ghost'"
-              @click="settingsStore.setTheme(theme.value as 'light' | 'dark' | 'auto' | 'moe' | 'jirai')"
+              type="button"
+              class="theme-option"
+              :class="{ 'is-active': settingsStore.theme === theme.value }"
+              :aria-pressed="settingsStore.theme === theme.value"
+              @click="settingsStore.setTheme(theme.value)"
             >
-              {{ theme.label }}
+              <!-- 预览直接套用对应主题的颜色变量，主题改了这里也跟着变 -->
+              <span class="theme-option__preview" aria-hidden="true">
+                <span v-for="name in theme.preview" :key="name" :data-theme="name" class="theme-option__half">
+                  <span class="theme-option__panel">
+                    <i class="bg-primary"></i>
+                    <i class="bg-base-content/30"></i>
+                    <i class="bg-secondary"></i>
+                  </span>
+                </span>
+              </span>
+              <span class="flex items-center justify-between gap-2">
+                <span class="text-sm font-semibold">{{ theme.label }}</span>
+                <Check v-if="settingsStore.theme === theme.value" class="h-4 w-4 text-primary" />
+              </span>
+              <span class="text-xs text-base-content/55">{{ theme.description }}</span>
             </button>
           </div>
         </div>
       </div>
 
       <!-- 音频设置 -->
-      <div class="card bg-base-100 shadow-lg">
+      <div class="card bg-base-100">
         <div class="card-body">
           <h2 class="card-title text-lg mb-4">
             <Mic class="w-5 h-5" />
@@ -264,7 +273,7 @@ async function handleClearTranslationCache() {
       </div>
 
       <!-- 资源源站：未开放国内源时没有可选项 -->
-      <div v-if="settingsStore.cnAssetsAllowed" class="card bg-base-100 shadow-lg">
+      <div v-if="settingsStore.cnAssetsAllowed" class="card bg-base-100">
         <div class="card-body">
           <h2 class="card-title text-lg mb-4">
             <Database class="w-5 h-5" />
@@ -290,7 +299,7 @@ async function handleClearTranslationCache() {
       </div>
 
       <!-- 推送通知设置 -->
-      <div v-if="notificationStore.isSupported || notificationStore.isIOS" class="card bg-base-100 shadow-lg border-2 border-primary/20">
+      <div v-if="notificationStore.isSupported || notificationStore.isIOS" class="card bg-base-100 border-2 border-primary/20">
         <div class="card-body">
           <h2 class="card-title text-lg mb-2 flex items-center gap-2 text-primary">
             <Bell class="w-5 h-5" />
@@ -391,7 +400,7 @@ async function handleClearTranslationCache() {
       </div>
 
       <!-- 缓存管理 -->
-      <div class="card bg-base-100 shadow-lg">
+      <div class="card bg-base-100">
         <div class="card-body">
           <h2 class="card-title text-lg mb-4">
             <Database class="w-5 h-5" />
@@ -416,3 +425,67 @@ async function handleClearTranslationCache() {
     </div>
   </div>
 </template>
+
+<style scoped>
+.theme-option {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  padding: 0.5rem;
+  border: 1px solid var(--color-base-300);
+  border-radius: var(--radius-box);
+  text-align: left;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.theme-option:hover {
+  border-color: color-mix(in oklab, var(--color-primary) 50%, var(--color-base-300));
+}
+
+.theme-option.is-active {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 1px var(--color-primary);
+}
+
+.theme-option__preview {
+  display: flex;
+  height: 3.75rem;
+  border: 1px solid color-mix(in oklab, var(--color-base-content) 12%, transparent);
+  border-radius: calc(var(--radius-box) - 0.375rem);
+  overflow: hidden;
+}
+
+/* 每一半都带 data-theme，里面的颜色类取的是那个主题的值 */
+.theme-option__half {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem;
+  background-color: var(--color-base-200);
+  /* daisyUI 会给带 data-theme 的元素铺一层底色渐变，去掉后才是页面底色 */
+  background-image: none;
+}
+
+.theme-option__panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  width: 100%;
+  max-width: 5rem;
+  padding: 0.375rem;
+  border: 1px solid var(--color-base-300);
+  border-radius: var(--radius-selector);
+  background-color: var(--color-base-100);
+}
+
+.theme-option__panel i {
+  display: block;
+  height: 0.25rem;
+  border-radius: 999px;
+}
+
+.theme-option__panel i:nth-child(1) { width: 70%; }
+.theme-option__panel i:nth-child(2) { width: 100%; }
+.theme-option__panel i:nth-child(3) { width: 45%; }
+</style>

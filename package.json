@@ -14,12 +14,14 @@
     "test:costume-preview:browser": "node tests/costume-preview-browser.mjs",
     "test:costume-preview:legacy": "node tests/costume-preview-legacy-browser.mjs",
     "test:player": "node --test tests/player.test.mjs tests/lyrics.test.mjs",
+    "test:search": "node --test tests/globalSearch.test.mjs",
     "test:story": "node --test tests/storyPlayback.test.mjs tests/storyPlayerAssets.test.mjs",
     "test:story:browser": "node tests/story-player-browser.mjs",
     "test:translations": "node --test tests/translations.test.mjs"
   },
   "dependencies": {
     "@breezystack/lamejs": "^1.2.7",
+    "@fontsource-variable/outfit": "^5.3.0",
     "@msgpack/msgpack": "^3.1.3",
     "@unhead/vue": "^2.1.4",
     "axios": "^1.13.2",

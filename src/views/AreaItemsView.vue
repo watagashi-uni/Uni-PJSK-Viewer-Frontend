@@ -292,7 +292,7 @@ onMounted(async () => {
   <div class="max-w-7xl mx-auto space-y-6">
     <PageHeader title="区域道具" description="快速查看道具加成，并按账号等级精确计算升级素材与金币。"><template #icon><Wrench class="w-8 h-8 text-primary" /></template></PageHeader>
 
-    <section class="card bg-base-100 border border-base-200 shadow-sm">
+    <section class="card bg-base-100 border border-base-200">
       <div class="card-body p-4 gap-4">
         <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-[minmax(220px,1fr)_210px_180px_220px] gap-3">
           <label class="input input-bordered flex items-center gap-2"><Search class="w-4 h-4 opacity-50" /><input v-model="searchQuery" class="grow min-w-0" placeholder="搜索道具、区域或加成对象…" /><button v-if="searchQuery" class="btn btn-xs btn-circle btn-ghost" aria-label="清空" @click="searchQuery = ''"><X class="w-3 h-3" /></button></label>

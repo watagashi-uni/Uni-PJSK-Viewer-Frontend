@@ -46,7 +46,7 @@ onMounted(async () => {
 
 <template>
   <div class="max-w-xl mx-auto p-6">
-    <div v-if="loading" class="card bg-base-100 shadow-lg">
+    <div v-if="loading" class="card bg-base-100">
       <div class="card-body items-center text-center gap-4">
         <span class="loading loading-spinner loading-lg text-primary"></span>
         <h2 class="text-xl font-semibold">正在完成授权</h2>
@@ -54,7 +54,7 @@ onMounted(async () => {
       </div>
     </div>
 
-    <div v-else-if="errorMsg" class="card bg-base-100 shadow-lg">
+    <div v-else-if="errorMsg" class="card bg-base-100">
       <div class="card-body gap-4">
         <h2 class="text-xl font-semibold text-error">授权失败</h2>
         <p class="text-sm break-words">{{ errorMsg }}</p>
@@ -64,7 +64,7 @@ onMounted(async () => {
       </div>
     </div>
 
-    <div v-else-if="successMsg" class="card bg-base-100 shadow-lg">
+    <div v-else-if="successMsg" class="card bg-base-100">
       <div class="card-body items-center text-center gap-3">
         <h2 class="text-xl font-semibold text-success">授权成功</h2>
         <p class="text-sm text-base-content/70">{{ successMsg }}</p>

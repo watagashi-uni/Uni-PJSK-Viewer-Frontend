@@ -18,7 +18,7 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <div class="card bg-base-100 shadow-lg">
+  <div class="card bg-base-100">
     <div class="card-body">
       <!-- Tab 切换 -->
       <div class="flex flex-wrap gap-2 mb-4">

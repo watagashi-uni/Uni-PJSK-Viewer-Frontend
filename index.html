@@ -10,7 +10,22 @@
   <link rel="preconnect" href="https://assets.unipjsk.com" crossorigin />
   <link rel="preconnect" href="https://assets-esa.unipjsk.com" crossorigin />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="theme-color" content="#34DDFF" />
+  <meta name="theme-color" content="#ffffff" />
+  <script>
+    // 在样式加载前就写好主题，避免首屏先闪一下浅色。逻辑与 src/utils/themes.ts 一致
+    (() => {
+      try {
+        const saved = localStorage.getItem('settings_theme') || 'auto'
+        const dark = window.matchMedia('(prefers-color-scheme: dark)').matches
+        const theme = saved === 'dark' || saved === 'moe' || saved === 'jirai'
+          ? saved
+          : saved === 'light' ? 'unipjsk' : (dark ? 'dark' : 'unipjsk')
+        const colors = { unipjsk: '#ffffff', dark: '#1b1f27', moe: '#fffbfc', jirai: '#221a24' }
+        document.documentElement.setAttribute('data-theme', theme)
+        document.querySelector('meta[name="theme-color"]').setAttribute('content', colors[theme])
+      } catch (error) { /* 存储不可用时用默认主题 */ }
+    })()
+  </script>
   <meta name="description" content="Uni PJSK Viewer - Project SEKAI 资源查看器" />
   <title>Uni PJSK Viewer</title>
 </head>
@@ -30,7 +45,7 @@
         rendered = true
 
         const panel = document.createElement('main')
-        panel.style.cssText = 'max-width:36rem;margin:12vh auto;padding:2rem;font-family:system-ui,sans-serif;text-align:center;color:#593d48'
+        panel.style.cssText = 'max-width:36rem;margin:12vh auto;padding:2rem;font-family:system-ui,sans-serif;text-align:center'
         const title = document.createElement('h1')
         title.textContent = '页面暂时无法启动'
         title.style.cssText = 'font-size:1.5rem;margin:0 0 1rem'
@@ -40,7 +55,7 @@
         const retry = document.createElement('button')
         retry.type = 'button'
         retry.textContent = '重新加载'
-        retry.style.cssText = 'border:0;border-radius:.75rem;padding:.75rem 1.25rem;background:#ff85a1;color:white;font-weight:700;cursor:pointer'
+        retry.style.cssText = 'border:0;border-radius:.625rem;padding:.75rem 1.25rem;background:#087f94;color:white;font-weight:600;cursor:pointer'
         retry.addEventListener('click', () => window.location.reload())
         panel.append(title, description, retry)
         app.replaceChildren(panel)

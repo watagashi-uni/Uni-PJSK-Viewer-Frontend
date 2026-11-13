@@ -255,7 +255,7 @@ onMounted(() => {
     </PageHeader>
 
     <!-- 角色选择 -->
-    <div class="card bg-base-100 shadow-sm">
+    <div class="card bg-base-100">
       <div class="card-body p-4">
         <div class="text-xs font-bold text-base-content/60 mb-2">选择角色</div>
         <div class="flex flex-wrap gap-2">
@@ -288,7 +288,7 @@ onMounted(() => {
 
     <template v-else>
       <!-- 筛选工具栏 -->
-      <div class="card bg-base-100 shadow-sm">
+      <div class="card bg-base-100">
         <div class="card-body p-4 space-y-3">
           <div class="flex flex-wrap gap-4 items-center">
             <div class="join">
@@ -344,7 +344,7 @@ onMounted(() => {
           :to="`/costumes/${item.group.representativeId}`"
           class="group animate-fade-in-up"
         >
-          <div class="bg-base-100 rounded-xl p-3 shadow-md border border-base-200 hover:shadow-lg hover:border-primary/30 transition-all relative overflow-hidden h-full flex flex-col">
+          <div class="bg-base-100 rounded-xl p-3 border border-base-300 hover:shadow-lg hover:border-primary/30 transition-all relative overflow-hidden h-full flex flex-col">
             <div v-if="isLeak(item.group)" class="absolute top-1 right-1 z-40 badge badge-warning badge-xs">
               剧透
             </div>

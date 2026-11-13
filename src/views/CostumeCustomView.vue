@@ -500,8 +500,8 @@ onBeforeUnmount(() => {
   <div class="space-y-6 pb-12">
     <div class="flex flex-wrap items-center justify-between gap-3">
       <div>
-        <RouterLink to="/costumes" class="btn btn-ghost btn-sm gap-1 -ml-3 mb-1">
-          <ArrowLeft class="w-4 h-4" /> 返回衣装一览
+        <RouterLink to="/costumes" class="back-link mb-2">
+          <ArrowLeft class="w-4 h-4" /> 返回衣装列表
         </RouterLink>
         <PageHeader title="衣装自由搭配" description="自由组合服装、发饰与发型；选中一个部件后，同套部件会排到其他栏最前。">
           <template #icon><Dices /></template>
@@ -514,7 +514,7 @@ onBeforeUnmount(() => {
     </div>
 
     <template v-else>
-      <section class="card bg-base-100 shadow-sm">
+      <section class="card bg-base-100">
         <div class="card-body p-4">
           <h2 class="text-sm font-bold text-base-content/65 mb-1">1. 选择角色</h2>
           <div class="flex flex-wrap gap-2">
@@ -551,7 +551,7 @@ onBeforeUnmount(() => {
       </div>
 
       <template v-else>
-        <section class="card border border-secondary/30 bg-secondary/5 shadow-sm">
+        <section class="card border border-secondary/30 bg-secondary/5">
           <div class="card-body p-4 gap-3">
             <div class="flex flex-wrap items-center justify-between gap-3">
               <div>
@@ -612,7 +612,7 @@ onBeforeUnmount(() => {
             :class="{ 'pointer-events-none select-none opacity-45': roleTransitionVisible }"
             :aria-busy="roleTransitionActive || runtimeLoading"
           >
-            <div role="tablist" class="tabs tabs-box bg-base-100 shadow-sm p-1">
+            <div role="tablist" class="tabs tabs-box p-1">
               <button
                 v-for="partType in pickerParts"
                 :key="partType"
@@ -627,7 +627,7 @@ onBeforeUnmount(() => {
               </button>
             </div>
 
-            <section class="card bg-base-100 shadow-sm border border-base-300 overflow-hidden">
+            <section class="card bg-base-100 border border-base-300 overflow-hidden">
               <div class="card-body p-0 gap-0">
                 <div class="p-3 sm:p-4 border-b border-base-200">
                   <div class="flex flex-wrap items-center justify-between gap-2">
@@ -751,7 +751,7 @@ onBeforeUnmount(() => {
           </Transition>
         </div>
 
-        <section class="card bg-base-100 shadow-sm">
+        <section class="card bg-base-100">
           <div class="card-body p-4 sm:p-6">
             <h2 class="font-bold mb-1">3. 预览自由搭配</h2>
             <p class="text-xs text-base-content/50 mb-3">

@@ -280,15 +280,15 @@ onMounted(async () => {
       <div v-if="refreshError" class="alert alert-error"><AlertTriangle class="w-5 h-5" /><span>同步数据失败：{{ refreshError }}</span></div>
 
       <div class="grid grid-cols-2 lg:grid-cols-5 gap-3">
-        <div class="stat bg-base-100 shadow-sm rounded-xl p-4 lg:col-span-1"><div class="stat-title text-xs">卡片收集</div><div class="stat-value text-2xl text-primary">{{ hasCardData ? collectionSummary.owned : '—' }} / {{ collectionSummary.total }}</div><div class="stat-desc"><template v-if="hasCardData">{{ formatPercent(collectionSummary.collectionRate) }}<template v-if="collectionSummary.unmapped"> · 上传数据 {{ collectionSummary.suiteTotal }} 张，{{ collectionSummary.unmapped }} 张暂未收录</template></template><template v-else>资料库共收录</template></div></div>
-        <div class="stat bg-base-100 shadow-sm rounded-xl p-4"><div class="stat-title text-xs">完成特训</div><div class="stat-value text-2xl">{{ hasCardData ? `${collectionSummary.trained} / ${collectionSummary.trainable}` : '—' }}</div><div class="stat-desc">已拥有的 3★ / 4★</div></div>
-        <div class="stat bg-base-100 shadow-sm rounded-xl p-4"><div class="stat-title text-xs">剧情已读</div><div class="stat-value text-2xl text-secondary">{{ hasCardData ? `${collectionSummary.storyRead} / ${collectionSummary.storyTotal}` : '—' }}</div><div class="stat-desc">前篇与后篇</div></div>
-        <div class="stat bg-base-100 shadow-sm rounded-xl p-4"><div class="stat-title text-xs">突破 / 技能双满</div><div class="stat-value text-2xl">{{ hasCardData ? collectionSummary.maxed : '—' }}</div><div class="stat-desc">突破 5 · 技能 4</div></div>
-        <div class="stat bg-base-100 shadow-sm rounded-xl p-4 col-span-2 lg:col-span-1"><div class="stat-title text-xs">当前角色</div><div class="stat-value text-xl truncate">{{ selectedCharacterId ? characterName(selectedCharacterStats?.character) : '全部角色' }}</div><div class="stat-desc">{{ selectedCharacterStats ? `${hasCardData ? selectedCharacterStats.owned : '—'} / ${selectedCharacterStats.total}${hasCardData ? ` · 未读 ${selectedCharacterStats.unread}` : ''}` : `${filteredCards.length} 张结果` }}</div></div>
+        <div class="stat bg-base-100 rounded-xl p-4 lg:col-span-1"><div class="stat-title text-xs">卡片收集</div><div class="stat-value text-2xl text-primary">{{ hasCardData ? collectionSummary.owned : '—' }} / {{ collectionSummary.total }}</div><div class="stat-desc"><template v-if="hasCardData">{{ formatPercent(collectionSummary.collectionRate) }}<template v-if="collectionSummary.unmapped"> · 上传数据 {{ collectionSummary.suiteTotal }} 张，{{ collectionSummary.unmapped }} 张暂未收录</template></template><template v-else>资料库共收录</template></div></div>
+        <div class="stat bg-base-100 rounded-xl p-4"><div class="stat-title text-xs">完成特训</div><div class="stat-value text-2xl">{{ hasCardData ? `${collectionSummary.trained} / ${collectionSummary.trainable}` : '—' }}</div><div class="stat-desc">已拥有的 3★ / 4★</div></div>
+        <div class="stat bg-base-100 rounded-xl p-4"><div class="stat-title text-xs">剧情已读</div><div class="stat-value text-2xl text-secondary">{{ hasCardData ? `${collectionSummary.storyRead} / ${collectionSummary.storyTotal}` : '—' }}</div><div class="stat-desc">前篇与后篇</div></div>
+        <div class="stat bg-base-100 rounded-xl p-4"><div class="stat-title text-xs">突破 / 技能双满</div><div class="stat-value text-2xl">{{ hasCardData ? collectionSummary.maxed : '—' }}</div><div class="stat-desc">突破 5 · 技能 4</div></div>
+        <div class="stat bg-base-100 rounded-xl p-4 col-span-2 lg:col-span-1"><div class="stat-title text-xs">当前角色</div><div class="stat-value text-xl truncate">{{ selectedCharacterId ? characterName(selectedCharacterStats?.character) : '全部角色' }}</div><div class="stat-desc">{{ selectedCharacterStats ? `${hasCardData ? selectedCharacterStats.owned : '—'} / ${selectedCharacterStats.total}${hasCardData ? ` · 未读 ${selectedCharacterStats.unread}` : ''}` : `${filteredCards.length} 张结果` }}</div></div>
       </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-[17rem_minmax(0,1fr)] gap-5 items-start">
-        <aside class="card bg-base-100 shadow-sm border border-base-200 lg:sticky lg:top-20">
+        <aside class="card bg-base-100 border border-base-200 lg:sticky lg:top-20">
           <div class="card-body p-4 gap-3">
             <div class="flex items-center justify-between"><h2 class="font-bold">角色收藏</h2><button class="btn btn-xs btn-ghost" :class="{ 'btn-active': selectedCharacterId === 0 }" @click="selectedCharacterId = 0">全部</button></div>
             <div class="grid grid-cols-5 lg:grid-cols-4 gap-2 max-h-72 lg:max-h-[68vh] overflow-y-auto pr-1">
@@ -302,7 +302,7 @@ onMounted(async () => {
         </aside>
 
         <main class="space-y-4 min-w-0">
-          <div class="card bg-base-100 shadow-sm border border-base-200">
+          <div class="card bg-base-100 border border-base-200">
             <div class="card-body p-4 gap-3">
               <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-[minmax(12rem,1fr)_auto_auto] gap-3">
                 <label class="input input-bordered input-sm flex items-center gap-2"><Search class="w-4 h-4 opacity-50" /><input v-model="search" class="grow min-w-0" placeholder="搜索卡片名、角色或 ID…" /></label>
@@ -324,7 +324,7 @@ onMounted(async () => {
                 <p class="text-xs text-base-content/50"><template v-if="hasCardData">拥有 {{ group.owned }} / </template>筛选结果 {{ group.total }}</p>
               </div>
               <div class="grid grid-cols-4 sm:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 gap-2.5">
-                <RouterLink v-for="card in group.cards" :key="card.id" :to="`/cards/${card.id}`" class="group card bg-base-100 border border-base-200 shadow-sm overflow-hidden hover:border-primary/40 hover:shadow-md transition-all">
+                <RouterLink v-for="card in group.cards" :key="card.id" :to="`/cards/${card.id}`" class="group card bg-base-100 border border-base-200 overflow-hidden hover:border-primary/40 hover:shadow-md transition-all">
                   <div class="relative">
                     <SekaiCard :card="card" :trained="isTrained(card)" :master-rank="userCardsMap.get(card.id)?.masterRank || 0" class="transition-transform group-hover:scale-[1.02]" :class="{ 'grayscale opacity-40': hasCardData && !userCardsMap.has(card.id) }" />
                     <span class="absolute top-1 left-1 badge badge-xs bg-base-100/85 border-0">#{{ card.id }}</span>
