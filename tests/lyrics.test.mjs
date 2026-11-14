@@ -340,12 +340,12 @@ test('a row a rendition sings with other words shows them, on the default timing
     romajiLines: [{ cueStart: 5, text: 'Jump（みのり）', romaji: 'jump minori' }],
     wordLines: [{ cueStart: 5, text: 'Jump（みのり）', start: 5.2, end: 8, words: [{ from: 0, to: 4, start: 5.2, end: 6 }] }],
     versions: [{ vocalId: 2, assetbundle: 'b', duration: 60, source: 'A', performers: [], singers: [
-      { row: 0, text: 'Jump（ミクさん）', translation: 'Jump（MIKU姐）', segments: [{ text: 'Jump（ミクさん）', performerIds: ['m'] }] },
+      { row: 0, text: 'Jump（ミクさん）', translation: 'Jump（MIKU桑）', romaji: 'Jump (Miku-san)', segments: [{ text: 'Jump（ミクさん）', performerIds: ['m'] }] },
       { row: 1, text: '', performerIds: ['m'] },
     ] }],
   }
   const [line, next] = lyricsForVocal(data, { vocalId: 2 }).lyrics.lines
-  assert.deepEqual(line, { start: 5.2, end: 8, text: 'Jump（ミクさん）', translation: 'Jump（MIKU姐）', segments: [{ text: 'Jump（ミクさん）', performerIds: ['m'] }] })
+  assert.deepEqual(line, { start: 5.2, end: 8, text: 'Jump（ミクさん）', translation: 'Jump（MIKU桑）', romaji: 'Jump (Miku-san)', segments: [{ text: 'Jump（ミクさん）', performerIds: ['m'] }] })
   // an empty override changes nothing; the default rendition keeps its words
   assert.deepEqual([next.text, next.performerIds], ['次', ['m']])
   const own = lyricsForVocal(data, { vocalId: 1 }).lyrics.lines[0]

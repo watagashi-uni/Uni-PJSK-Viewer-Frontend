@@ -42,9 +42,10 @@ export interface LyricSingers {
   row: number
   segments?: { text: string; performerIds: string[] }[]
   performerIds?: string[]
-  /** Words this rendition sings on the row instead of the default ones (reviewed), with their translation. */
+  /** Words this rendition sings on the row instead of the default ones (reviewed), with their translation and romaji. */
   text?: string
   translation?: string
+  romaji?: string
 }
 /**
  * Another rendition of the song. Every rendition is sung to the same backing track, so it
@@ -180,6 +181,7 @@ export function normalizeLyrics(data: LyricsPayload, version?: LyricVersion | nu
         delete line.words
         if (typeof entry.translation === 'string' && entry.translation) line.translation = entry.translation
         else delete line.translation
+        if (typeof entry.romaji === 'string' && entry.romaji) line.romaji = entry.romaji
       }
     }
     if (data.format !== 'lrc') return line
