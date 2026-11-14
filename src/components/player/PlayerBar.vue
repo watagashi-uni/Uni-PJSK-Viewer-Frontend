@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import {
-  ChevronUp, ListMusic, Loader2, MicVocal, Pause, Play, Power, Repeat, Repeat1, SkipBack, SkipForward, Volume2, VolumeX, X,
+  ChevronUp, ListMusic, Loader2, LetterText, Pause, Play, Power, Repeat, Repeat1, SkipBack, SkipForward, Volume2, VolumeX, X,
 } from 'lucide-vue-next'
 import { usePlayerStore } from '@/stores/player'
 import { useSingerAvatars } from '@/composables/useSingerAvatars'
@@ -110,7 +110,7 @@ function closePlayer() {
             :aria-pressed="player.lyricsSidebarShown"
             @click="player.toggleLyrics()"
           >
-            <MicVocal class="h-4 w-4" />
+            <LetterText class="h-4 w-4" />
           </button>
           <button
             class="player-btn"

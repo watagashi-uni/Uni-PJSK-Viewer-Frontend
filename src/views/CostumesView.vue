@@ -1,6 +1,7 @@
 <script lang="ts">
 import type { CostumeGroup } from '@/types/costume'
 import PageHeader from '@/components/PageHeader.vue'
+import CharacterPicker from '@/components/CharacterPicker.vue'
 
 // RouterView 以 path 为 key，query 变化不会重建视图，但离开再返回列表时会重建；
 // costume3ds 有 11 万+ 条目，用模块作用域缓存聚合结果避免每次重建都重新聚合
@@ -12,7 +13,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
-import { Shirt, Search, CreditCard, Dices } from 'lucide-vue-next'
+import { ArrowDownUp, Shirt, Search, CreditCard, Dices } from 'lucide-vue-next'
 import Pagination from '@/components/Pagination.vue'
 import CostumeThumb from '@/components/CostumeThumb.vue'
 import { buildCostumeGroups, COSTUME_PART_LABELS } from '@/utils/costume'
@@ -89,16 +90,6 @@ function getCharaName(characterId: number | null): string {
   if (!chara) return ''
   return characterName(chara)
 }
-
-const characterOptions = computed(() => {
-  return [...characters.value]
-    .sort((a, b) => a.id - b.id)
-    .map(chara => ({
-      value: chara.id,
-      label: characterName(chara),
-      icon: `/img/chr_ts/chr_ts_90_${chara.id}.png`,
-    }))
-})
 
 // 当前角色下、按剧透设置可见的衣装（用于计算各 tab 数量）
 const visibleBaseGroups = computed(() => {
@@ -185,8 +176,8 @@ function pushQuery(patch: Record<string, string | undefined>, page: string = '1'
   else router.replace({ query })
 }
 
-function selectCharacter(id: number) {
-  if (selectedCharaId.value === id) return
+function selectCharacter(id: number | number[] | null) {
+  if (typeof id !== 'number' || selectedCharaId.value === id) return
   pushQuery({ charaId: String(id) })
 }
 
@@ -255,24 +246,8 @@ onMounted(() => {
     </PageHeader>
 
     <!-- 角色选择 -->
-    <div class="card bg-base-100">
-      <div class="card-body p-4">
-        <div class="text-xs font-bold text-base-content/60 mb-2">选择角色</div>
-        <div class="flex flex-wrap gap-2">
-          <button
-            v-for="chara in characterOptions"
-            :key="chara.value"
-            class="btn btn-sm h-9 min-h-9 gap-1.5 pl-1.5 pr-2"
-            :class="selectedCharaId === chara.value ? 'btn-primary' : 'btn-outline'"
-            @click="selectCharacter(chara.value)"
-          >
-            <span class="h-6 w-6 overflow-hidden rounded-full bg-base-200 ring-1 ring-base-300">
-              <img :src="chara.icon" :alt="chara.label" class="h-full w-full object-cover" />
-            </span>
-            {{ chara.label }}
-          </button>
-        </div>
-      </div>
+    <div class="panel p-3 sm:p-4">
+      <CharacterPicker :model-value="selectedCharaId" @update:model-value="selectCharacter" />
     </div>
 
     <!-- 加载中 -->
@@ -288,52 +263,55 @@ onMounted(() => {
 
     <template v-else>
       <!-- 筛选工具栏 -->
-      <div class="card bg-base-100">
-        <div class="card-body p-4 space-y-3">
-          <div class="flex flex-wrap gap-4 items-center">
-            <div class="join">
-              <button
-                v-for="tab in partTabs"
-                :key="tab.value"
-                class="join-item btn btn-sm"
-                :class="selectedPart === tab.value ? 'btn-primary' : 'btn-outline'"
-                @click="selectPart(tab.value)"
-              >
-                {{ tab.label }}
-                <span class="text-[10px] opacity-60">{{ partCounts.get(tab.value) || 0 }}</span>
-              </button>
-            </div>
-
-            <div class="flex flex-wrap gap-1">
-              <button
-                v-for="tab in sourceTabs"
-                :key="tab.value"
-                class="btn btn-sm"
-                :class="selectedSource === tab.value ? 'btn-primary' : 'btn-outline'"
-                @click="selectSource(tab.value)"
-              >
-                {{ tab.label }}
-              </button>
-            </div>
-
-            <button class="btn btn-sm btn-ghost" @click="toggleSort">
-              {{ sortOrder === 'desc' ? '最新优先' : '最早优先' }}
-            </button>
-
-            <form class="flex-1 min-w-[200px]" @submit.prevent="applySearch">
-              <label class="input input-bordered input-sm flex items-center gap-2">
-                <Search class="w-4 h-4 opacity-50" />
-                <input
-                  v-model="searchInput"
-                  type="text"
-                  placeholder="搜索衣装名称（日文）..."
-                  class="grow"
-                  @blur="applySearch"
-                />
-              </label>
-            </form>
-          </div>
+      <div class="toolbar">
+        <div class="flex gap-1.5" role="group" aria-label="部位">
+          <button
+            v-for="tab in partTabs"
+            :key="tab.value"
+            type="button"
+            class="chip"
+            :class="{ 'is-active': selectedPart === tab.value }"
+            :aria-pressed="selectedPart === tab.value"
+            @click="selectPart(tab.value)"
+          >
+            {{ tab.label }}
+            <span class="chip__count">{{ partCounts.get(tab.value) || 0 }}</span>
+          </button>
         </div>
+
+        <span class="hidden h-5 w-px bg-base-300 sm:block" aria-hidden="true"></span>
+
+        <div class="flex flex-wrap gap-1.5" role="group" aria-label="来源">
+          <button
+            v-for="tab in sourceTabs"
+            :key="tab.value"
+            type="button"
+            class="chip"
+            :class="{ 'is-active': selectedSource === tab.value }"
+            :aria-pressed="selectedSource === tab.value"
+            @click="selectSource(tab.value)"
+          >
+            {{ tab.label }}
+          </button>
+        </div>
+
+        <button type="button" class="chip" @click="toggleSort">
+          <ArrowDownUp class="h-3.5 w-3.5" />
+          {{ sortOrder === 'desc' ? '最新优先' : '最早优先' }}
+        </button>
+
+        <form class="min-w-[12rem] flex-1 sm:max-w-xs" @submit.prevent="applySearch">
+          <label class="input input-bordered input-sm flex h-9 w-full items-center gap-2">
+            <Search class="w-4 h-4 opacity-50" />
+            <input
+              v-model="searchInput"
+              type="text"
+              placeholder="搜索衣装名称（日文）"
+              class="grow"
+              @blur="applySearch"
+            />
+          </label>
+        </form>
       </div>
 
       <!-- 衣装网格 -->

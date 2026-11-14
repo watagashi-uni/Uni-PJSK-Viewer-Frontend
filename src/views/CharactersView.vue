@@ -5,6 +5,7 @@ import { ArrowLeft, CreditCard, Search, Smile, Sparkles, UserRound, Users } from
 import AccountSelector from '@/components/AccountSelector.vue'
 import AssetImage from '@/components/AssetImage.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import { characterSdUrl, characterSelectUrl, characterTrimUrl } from '@/utils/units'
 import { useBackToList } from '@/composables/useBackToList'
 import { readQueryString, replaceListQuery } from '@/utils/routeQuery'
 import { useAccountStore } from '@/stores/account'
@@ -263,9 +264,12 @@ function getUnitBadgeStyle(unit: string) {
   }
 }
 
-function getStandingUrl(character: GameCharacterData): string {
-  const resourceId = String(character.resourceId).padStart(3, '0')
-  return `${assetsHost.value}/startapp/character/member_cutout_trm/res${resourceId}_no001/normal.png`
+function getSelectUrl(character: GameCharacterData): string {
+  return characterSelectUrl(character.id, assetsHost.value)
+}
+
+function getTrimUrl(character: GameCharacterData): string {
+  return characterTrimUrl(character.id, assetsHost.value)
 }
 
 function cleanText(value?: string): string {
@@ -389,11 +393,12 @@ onMounted(async () => {
           :style="{ background: `linear-gradient(160deg, ${getUnitColor(selectedCharacter.unit)}25, transparent 55%), var(--color-base-100)` }"
         >
           <div class="absolute inset-x-0 bottom-0 h-3/4 bg-gradient-to-t from-base-200/70 to-transparent"></div>
+          <!-- 大立绘是 4:3 的横图，人物在中间：竖框里按高度铺满、左右裁掉 -->
           <AssetImage
-            :src="getStandingUrl(selectedCharacter)"
+            :src="getTrimUrl(selectedCharacter)"
             :alt="getCharacterName(selectedCharacter)"
             :lazy="false"
-            class="absolute inset-0 w-full h-full object-contain object-bottom p-3"
+            class="absolute inset-0 h-full w-full object-cover object-center"
           />
           <div class="absolute left-5 top-5">
             <span class="badge border" :style="getUnitBadgeStyle(selectedCharacter.unit)">
@@ -404,10 +409,14 @@ onMounted(async () => {
 
         <section class="card bg-base-100 border border-base-200">
           <div class="card-body p-6 md:p-8 gap-6">
-            <header>
-              <p class="text-sm tracking-[0.18em] text-base-content/45 uppercase">{{ getEnglishName(selectedCharacter) }}</p>
-              <h1 class="text-3xl md:text-4xl font-bold mt-1">{{ getCharacterName(selectedCharacter) }}<span v-if="jpName(selectedCharacter) !== getCharacterName(selectedCharacter)" class="ml-3 text-lg font-medium text-base-content/55" lang="ja">{{ jpName(selectedCharacter) }}</span></h1>
-              <p v-if="selectedProfile?.characterVoice" class="text-sm text-base-content/60 mt-2">CV：<ZhText :text="selectedProfile.characterVoice" table="characterProfiles" path="characterVoice" layout="inline" /></p>
+            <header class="flex items-end justify-between gap-3">
+              <div class="min-w-0">
+                <p class="text-sm tracking-[0.18em] text-base-content/45 uppercase">{{ getEnglishName(selectedCharacter) }}</p>
+                <h1 class="text-3xl md:text-4xl font-bold mt-1">{{ getCharacterName(selectedCharacter) }}<span v-if="jpName(selectedCharacter) !== getCharacterName(selectedCharacter)" class="ml-3 text-lg font-medium text-base-content/55" lang="ja">{{ jpName(selectedCharacter) }}</span></h1>
+                <p v-if="selectedProfile?.characterVoice" class="text-sm text-base-content/60 mt-2">CV：<ZhText :text="selectedProfile.characterVoice" table="characterProfiles" path="characterVoice" layout="inline" /></p>
+              </div>
+              <!-- Q 版小人 -->
+              <img :src="characterSdUrl(selectedCharacter.id, assetsHost)" alt="" class="-mb-1 h-20 w-auto shrink-0 md:h-24" loading="lazy" crossorigin="anonymous" />
             </header>
 
             <p v-if="selectedProfile?.introduction" class="leading-7 text-base-content/80 whitespace-pre-line">
@@ -533,8 +542,8 @@ onMounted(async () => {
         </template>
       </PageHeader>
 
-      <div v-if="isLoading" class="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div v-for="index in 12" :key="index" class="skeleton h-72 rounded-xl"></div>
+      <div v-if="isLoading" class="grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <div v-for="index in 6" :key="index" class="skeleton h-72 rounded-xl"></div>
       </div>
 
       <div v-else-if="loadError" class="alert alert-error">角色资料加载失败：{{ loadError }}</div>
@@ -543,50 +552,115 @@ onMounted(async () => {
         <div class="hero-content text-center"><p class="font-bold">没有匹配的角色</p></div>
       </div>
 
-      <section v-for="group in groupedCharacters" :key="group.unit" class="space-y-3">
-        <div class="flex items-center gap-3">
-          <span class="h-7 w-1.5 rounded-full border border-base-300" :style="{ backgroundColor: getUnitColor(group.unit) }"></span>
-          <div>
-            <h2 class="text-xl font-bold"><ZhText :text="group.profile?.unitName || getUnitName(group.unit)" table="unitProfiles" path="unitName" layout="inline" /></h2>
-            <p class="text-[11px] text-base-content/45">{{ group.items.length }} 名角色</p>
+      <!-- 每个团体一块：成员用游戏里选人界面的立牌图（名字已经印在图上），一排等高排开 -->
+      <div class="grid grid-cols-1 gap-x-6 gap-y-7 xl:grid-cols-2">
+        <section v-for="group in groupedCharacters" :key="group.unit" class="min-w-0 space-y-2.5">
+          <div class="flex items-center gap-2.5">
+            <span class="h-6 w-1.5 rounded-full" :style="{ backgroundColor: getUnitColor(group.unit) }"></span>
+            <h2 class="text-lg font-bold"><ZhText :text="group.profile?.unitName || getUnitName(group.unit)" table="unitProfiles" path="unitName" layout="inline" /></h2>
+            <span class="text-xs text-base-content/45">{{ group.items.length }} 人</span>
           </div>
-        </div>
 
-        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 gap-2.5">
-          <button
-            v-for="character in group.items"
-            :key="character.id"
-            type="button"
-            class="card bg-base-100 border border-base-200 hover:shadow-lg transition-all overflow-hidden text-left group"
-            @click="openCharacter(character)"
-          >
-            <figure
-              class="relative h-40 sm:h-44 overflow-hidden"
-              :style="{ background: `linear-gradient(150deg, ${getUnitColor(character.unit)}30, transparent 65%), var(--color-base-200)` }"
+          <div class="chara-row">
+            <button
+              v-for="character in group.items"
+              :key="character.id"
+              type="button"
+              class="chara-tile group"
+              :class="{ 'is-slim': character.id > 20 }"
+              :title="getCharacterName(character)"
+              @click="openCharacter(character)"
             >
-              <AssetImage
-                :src="getStandingUrl(character)"
-                :alt="getCharacterName(character)"
-                class="w-full h-full object-contain object-bottom pt-2 transition-transform duration-300"
-              />
-              <span
-                v-if="userCharacterMap.get(character.id)"
-                class="absolute left-2 top-2 badge badge-sm border-0 bg-black/65 text-white shadow-sm"
-              >
-                Rank {{ getUserCharacterRank(userCharacterMap.get(character.id)!) }}
+              <span class="chara-tile__art" :style="{ backgroundColor: `${getUnitColor(character.unit)}22` }">
+                <AssetImage
+                  :src="getSelectUrl(character)"
+                  :alt="getCharacterName(character)"
+                  class="h-full w-full object-cover object-top transition-transform duration-300 group-hover:scale-[1.03]"
+                />
+                <span v-if="userCharacterMap.get(character.id)" class="chara-tile__rank num">
+                  Rank {{ getUserCharacterRank(userCharacterMap.get(character.id)!) }}
+                </span>
               </span>
-              <span class="absolute top-2 right-2 badge badge-sm bg-base-100/80 border-0">#{{ character.id }}</span>
-            </figure>
-            <div class="card-body p-2.5 gap-0">
-              <h3 class="font-bold truncate">{{ getCharacterName(character) }}</h3>
-              <p class="text-[11px] text-base-content/55 mt-2">{{ cardCounts.get(character.id) || 0 }} 卡牌 · {{ stampCounts.get(character.id) || 0 }} 贴图</p>
-              <p v-if="liveUsageMap.get(character.id)" class="text-[10px] text-base-content/45 mt-1 truncate">
-                队长 {{ formatCount(liveUsageMap.get(character.id)!.leader) }} · 成员 {{ formatCount(liveUsageMap.get(character.id)!.member) }}
-              </p>
-            </div>
-          </button>
-        </div>
-      </section>
+              <span class="chara-tile__info">
+                <span class="block truncate text-xs font-semibold sm:text-sm">{{ getCharacterName(character) }}</span>
+                <span class="num block truncate text-[10px] text-base-content/50 sm:text-[11px]">{{ cardCounts.get(character.id) || 0 }} 卡 · {{ stampCounts.get(character.id) || 0 }} 贴图</span>
+                <span v-if="liveUsageMap.get(character.id)" class="num hidden truncate text-[10px] text-base-content/40 sm:block">
+                  队长 {{ formatCount(liveUsageMap.get(character.id)!.leader) }} · 成员 {{ formatCount(liveUsageMap.get(character.id)!.member) }}
+                </span>
+              </span>
+            </button>
+          </div>
+        </section>
+      </div>
     </template>
   </div>
 </template>
+
+<style scoped>
+/* 一个团体的成员排成一排、等高：普通成员的立牌是 376×840，虚拟歌手是 240×840，
+   宽度按各自比例分，六个虚拟歌手和四个普通成员排出来差不多一样宽 */
+.chara-row {
+  display: flex;
+  gap: 0.375rem;
+}
+
+@media (min-width: 640px) {
+  .chara-row {
+    gap: 0.625rem;
+  }
+}
+
+.chara-tile {
+  display: flex;
+  flex: 376 1 0;
+  flex-direction: column;
+  min-width: 0;
+  border: 1px solid var(--color-base-300);
+  border-radius: var(--radius-box);
+  background-color: var(--color-base-100);
+  /* 搜索后只剩一两个人时，不让一张立牌撑满整排 */
+  max-width: 26%;
+  text-align: left;
+  overflow: hidden;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.chara-tile.is-slim {
+  flex-grow: 240;
+  max-width: 17%;
+}
+
+.chara-tile:hover {
+  border-color: color-mix(in oklab, var(--color-primary) 55%, var(--color-base-300));
+  box-shadow: 0 8px 22px -12px rgb(var(--shadow-rgb) / 0.4);
+}
+
+.chara-tile__art {
+  position: relative;
+  display: block;
+  aspect-ratio: 376 / 840;
+  overflow: hidden;
+}
+
+.chara-tile.is-slim .chara-tile__art {
+  aspect-ratio: 240 / 840;
+}
+
+.chara-tile__rank {
+  position: absolute;
+  top: 0.375rem;
+  left: 0.375rem;
+  padding: 0.0625rem 0.375rem;
+  border-radius: 999px;
+  background-color: rgb(0 0 0 / 0.62);
+  color: #fff;
+  font-size: 0.625rem;
+  font-weight: 600;
+}
+
+.chara-tile__info {
+  display: block;
+  min-width: 0;
+  padding: 0.375rem 0.5rem 0.5rem;
+}
+</style>

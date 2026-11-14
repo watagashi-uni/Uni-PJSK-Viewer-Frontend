@@ -4,9 +4,9 @@ import { useRoute, useRouter } from 'vue-router'
 import { pushListPage, readQueryPage, readQueryString, replaceListQuery } from '@/utils/routeQuery'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
-import { Calendar, Gift, Search, EyeOff } from 'lucide-vue-next'
+import { ArrowDownUp, Calendar, Gift, Search, EyeOff } from 'lucide-vue-next'
 import Pagination from '@/components/Pagination.vue'
-import AssetImage from '@/components/AssetImage.vue'
+import GachaBanner from '@/components/GachaBanner.vue'
 
 import type { Gacha } from '@/types/gacha'
 import PageHeader from '@/components/PageHeader.vue'
@@ -24,6 +24,14 @@ const router = useRouter()
 // 搜索、排序与页码写在 URL 里，从卡池详情返回时保持不变
 const searchQuery = ref(readQueryString(route.query, 'q'))
 const sortOrder = ref<'desc' | 'asc'>(readQueryString(route.query, 'sort') === 'asc' ? 'asc' : 'desc')
+type StatusFilter = '' | 'active' | 'ended'
+const statusOptions: { value: StatusFilter; label: string }[] = [
+  { value: '', label: '全部' },
+  { value: 'active', label: '进行中' },
+  { value: 'ended', label: '已结束' },
+]
+const initialStatus = readQueryString(route.query, 'status')
+const statusFilter = ref<StatusFilter>(initialStatus === 'active' || initialStatus === 'ended' ? initialStatus : '')
 const currentPage = computed(() => readQueryPage(route.query))
 const itemsPerPage = 12
 
@@ -43,7 +51,10 @@ const filteredGachas = computed(() => {
     const now = Date.now()
     result = result.filter(g => g.startAt <= now)
   }
-  
+
+  if (statusFilter.value === 'active') result = result.filter(g => getGachaStatus(g) === 'active')
+  else if (statusFilter.value === 'ended') result = result.filter(g => getGachaStatus(g) === 'ended')
+
   result.sort((a, b) => sortOrder.value === 'desc' ? b.startAt - a.startAt : a.startAt - b.startAt)
   return result
 })
@@ -56,10 +67,11 @@ const paginatedGachas = computed(() => {
 })
 
 // 搜索/排序变化时同步到 URL 并回到第一页
-watch([searchQuery, sortOrder], () => {
+watch([searchQuery, sortOrder, statusFilter], () => {
   void replaceListQuery(router, route, {
     q: searchQuery.value.trim(),
     sort: sortOrder.value === 'asc' ? 'asc' : null,
+    status: statusFilter.value || null,
   })
 })
 
@@ -68,25 +80,9 @@ watch(totalPages, (total) => {
   if (total > 0 && currentPage.value > total) void pushListPage(router, route, total)
 })
 
-// 卡池小图优先用首页 banner，加载失败回退 logo（logo 按 assetbundleName 必然存在），再失败显示占位。
-// 复用其他卡池 assetbundleName 的池（复刻/常驻等）一定没有自己的 banner，直接从 logo 开始
-const gachaImgStage = ref<Record<number, number>>({})
-
-function gachaImgCandidates(gacha: Gacha): string[] {
-  const urls: string[] = []
-  if (gacha.assetbundleName === `ab_gacha_${gacha.id}`) {
-    urls.push(`${assetsHost.value}/startapp/home/banner/banner_gacha${gacha.id}/banner_gacha${gacha.id}.png`)
-  }
-  urls.push(`${assetsHost.value}/ondemand/gacha/${gacha.assetbundleName}/logo/logo.png`)
-  return urls
-}
-
-function gachaImgSrc(gacha: Gacha): string | undefined {
-  return gachaImgCandidates(gacha)[gachaImgStage.value[gacha.id] ?? 0]
-}
-
-function onGachaImgError(gacha: Gacha) {
-  gachaImgStage.value[gacha.id] = (gachaImgStage.value[gacha.id] ?? 0) + 1
+/** 结束时间在几十年后的是常驻卡池 */
+function isPermanent(gacha: Gacha): boolean {
+  return gacha.endAt - Date.now() > 10 * 365 * 86_400_000
 }
 
 function formatDate(timestamp: number): string {
@@ -129,36 +125,43 @@ onMounted(loadData)
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="space-y-5">
     <!-- 标题 -->
-    <PageHeader title="卡池"><template #icon><Gift /></template></PageHeader>
+    <PageHeader title="卡池" description="历次招募卡池、出现率和模拟抽卡。"><template #icon><Gift /></template></PageHeader>
 
     <!-- 搜索和筛选 -->
-    <div class="card bg-base-100">
-      <div class="card-body p-4">
-        <div class="flex flex-wrap gap-4 items-center">
-          <div class="flex-1 min-w-[200px]">
-            <label class="input input-bordered flex items-center gap-2">
-              <Search class="w-4 h-4 opacity-50" />
-              <input 
-                v-model="searchQuery" 
-                type="text"
-                placeholder="搜索卡池名称..." 
-                class="grow"
-              />
-            </label>
-          </div>
-          <select v-model="sortOrder" class="select select-bordered select-sm">
-            <option value="desc">最新优先</option>
-            <option value="asc">最早优先</option>
-          </select>
-        </div>
+    <div class="toolbar">
+      <label class="input input-bordered input-sm flex h-9 min-w-[12rem] flex-1 items-center gap-2 sm:max-w-xs">
+        <Search class="h-4 w-4 opacity-50" />
+        <input v-model="searchQuery" type="text" placeholder="搜索卡池名称" class="grow" />
+      </label>
+      <div class="flex gap-1.5" role="group" aria-label="卡池状态">
+        <button
+          v-for="option in statusOptions"
+          :key="option.value"
+          type="button"
+          class="chip"
+          :class="{ 'is-active': statusFilter === option.value }"
+          :aria-pressed="statusFilter === option.value"
+          @click="statusFilter = option.value"
+        >
+          {{ option.label }}
+        </button>
       </div>
+      <button
+        type="button"
+        class="chip ml-auto"
+        :title="sortOrder === 'desc' ? '现在是最新的排在前面' : '现在是最早的排在前面'"
+        @click="sortOrder = sortOrder === 'desc' ? 'asc' : 'desc'"
+      >
+        <ArrowDownUp class="h-3.5 w-3.5" />
+        {{ sortOrder === 'desc' ? '最新优先' : '最早优先' }}
+      </button>
     </div>
 
     <!-- 加载状态 -->
-    <div v-if="isLoading" class="flex justify-center py-20">
-      <span class="loading loading-spinner loading-lg text-primary"></span>
+    <div v-if="isLoading" class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div v-for="index in 9" :key="index" class="skeleton h-52 rounded-box"></div>
     </div>
 
     <!-- 加载失败 -->
@@ -169,52 +172,32 @@ onMounted(loadData)
 
     <template v-else>
       <!-- 卡池列表 -->
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <router-link
           v-for="gacha in paginatedGachas"
           :key="gacha.id"
           :to="`/gachas/${gacha.id}`"
-          class="card bg-base-100 hover:shadow-lg transition-all group overflow-hidden relative"
+          class="tile flex flex-col overflow-hidden"
         >
-          <figure class="relative aspect-[7/2] bg-base-200 overflow-hidden flex items-center justify-center">
-            <AssetImage
-              v-if="gachaImgSrc(gacha)"
-              :src="gachaImgSrc(gacha)!"
-              :alt="gacha.name"
-              class="h-full object-contain transition-transform"
-              @error="onGachaImgError(gacha)"
-            />
-            <Gift v-else class="w-10 h-10 text-base-content/20" />
-            
-            <!-- 简单角标 -->
-            <div class="absolute top-2 right-2 flex gap-1">
-              <span v-if="isLeak(gacha)" class="badge badge-warning badge-sm gap-1 font-bold shadow-md">
-                <EyeOff class="w-3 h-3" /> 即将开始
-              </span>
-              <span 
-                v-else
-                class="badge badge-sm"
-                :class="{
-                  'badge-success': getGachaStatus(gacha) === 'active',
-                  'badge-ghost': getGachaStatus(gacha) === 'ended'
-                }"
-              >
-                {{ getGachaStatus(gacha) === 'active' ? '进行中' : '已结束' }}
-              </span>
-            </div>
-          </figure>
-          <div class="card-body p-3">
-            <h2 class="font-medium text-sm line-clamp-2"><ZhText :text="gacha.name" table="gachas" path="name" sub-class="text-xs font-normal" /></h2>
-            <div class="text-xs text-base-content/60 flex items-center gap-1">
-              <Calendar class="w-3 h-3" />
-              {{ formatDate(gacha.startAt) }} ~ {{ formatDate(gacha.endAt) }}
+          <GachaBanner :gacha="gacha" :assets-host="assetsHost">
+            <span v-if="isLeak(gacha)" class="gacha-status bg-warning text-warning-content">
+              <EyeOff class="h-3 w-3" /> 即将开始
+            </span>
+            <span v-else-if="getGachaStatus(gacha) === 'active'" class="gacha-status bg-success text-success-content">进行中</span>
+          </GachaBanner>
+          <div class="flex flex-1 flex-col gap-1.5 p-3">
+            <h2 class="line-clamp-2 text-sm font-semibold leading-snug"><ZhText :text="gacha.name" table="gachas" path="name" sub-class="text-xs font-normal" /></h2>
+            <div class="mt-auto flex items-center gap-1.5 pt-1 text-xs text-base-content/55">
+              <Calendar class="h-3 w-3" />
+              <span class="num">{{ formatDate(gacha.startAt) }} – {{ isPermanent(gacha) ? '常驻' : formatDate(gacha.endAt) }}</span>
+              <span class="num ml-auto text-base-content/40">#{{ gacha.id }}</span>
             </div>
           </div>
         </router-link>
       </div>
 
       <!-- 分页 -->
-      <Pagination 
+      <Pagination
         v-if="totalPages > 1"
         :current-page="currentPage"
         :total-pages="totalPages"
@@ -223,10 +206,27 @@ onMounted(loadData)
       />
 
       <!-- 空状态 -->
-      <div v-if="filteredGachas.length === 0" class="text-center py-20 text-base-content/50">
-        <Gift class="w-16 h-16 mx-auto mb-4 opacity-30" />
+      <div v-if="filteredGachas.length === 0" class="empty-state">
+        <Gift />
         <p>没有找到匹配的卡池</p>
       </div>
     </template>
   </div>
 </template>
+
+<style scoped>
+.gacha-status {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  height: 1.375rem;
+  padding: 0 0.5rem;
+  border-radius: 999px;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.25);
+  font-size: 0.6875rem;
+  font-weight: 700;
+}
+</style>

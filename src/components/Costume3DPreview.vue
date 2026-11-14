@@ -7,7 +7,7 @@ let preconnectAdded = false
 /**
  * Costume3DPreview - 衣装 3D 预览
  *
- * 引擎按需加载。日常使用转换资源版 Haruki，本地原包预览使用 ALONE 公共 kernel。
+ * 引擎按需加载。日常使用转换资源版 Haruki 3D Engine；本地开发可以切到原包预览用的 kernel。
  *
  * 相机交互（拖动旋转 / 滚轮及双指缩放）通过 internal 入口的 Haruki3DEngine
  * controlsFactory 注入 three 的 OrbitControls 实现（公开 kernel 不暴露相机）。
@@ -21,12 +21,13 @@ let preconnectAdded = false
 import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { Box, RotateCcw, Maximize2, Minimize2 } from 'lucide-vue-next'
 import type { Haruki3DKernel } from 'haruki-3d-engine'
-import type { Haruki3DEngine as Haruki3DEngineType } from 'haruki-3d-engine/internal'
+import type { FaceMotionSet, Haruki3DEngine as Haruki3DEngineType } from 'haruki-3d-engine/internal'
 import { useMasterStore } from '@/stores/master'
 import { HARUKI_ORIGINAL_ENABLED, PJSK_3D_ASSETS_BASE_URL, PJSK_3D_BASIS_PATH, isWebGL2Supported } from '@/utils/haruki3d'
 import {
   findRuntimePart,
   loadRuntimeRoleData,
+  loadRuntimeRoleMotion,
   runtimePartSlot,
 } from '@/utils/haruki3dRegistry'
 import type { CostumePart, CostumeColorVariant } from '@/types/costume'
@@ -58,6 +59,11 @@ const props = defineProps<{
     hair?: CostumeColorVariant | null
   }
   bodyRole?: {
+    characterId: number
+    unit: string
+  } | null
+  /** 展示动作改用这个角色的（身体动作 + 表情）；不传就是当前角色自己的 */
+  motionRole?: {
     characterId: number
     unit: string
   } | null
@@ -111,6 +117,9 @@ let recipeLoadGeneration = 0
 let initializing = false
 let disposed = false
 let viewYaw = 0
+// 当前模型上播的是不是别的角色的动作（换回自己的动作时要让引擎重新套一次默认动作）
+let motionOverridden = false
+const motionError = ref('')
 let dragPointer: { id: number; startX: number; yaw: number } | null = null
 
 const assetsRoot = new URL(PJSK_3D_ASSETS_BASE_URL, window.location.href)
@@ -217,7 +226,51 @@ async function buildRecipe() {
     headCostume3dId,
     hairCostume3dId: hair?.costume3dId ?? defaults.hairCostume3dId,
     headOptionalCostume3dId,
-    ...(HARUKI_ORIGINAL_ENABLED ? { motionRoleId: selectedMotionRole.value || null } : {}),
+    ...(HARUKI_ORIGINAL_ENABLED
+      ? { motionRoleId: selectedMotionRole.value || (props.motionRole ? `${props.motionRole.characterId}:${props.motionRole.unit}` : null) }
+      : {}),
+  }
+}
+
+/**
+ * 套用别的角色的展示动作。
+ *
+ * 引擎每次装配完模型都会播当前角色自己的动作，所以这一步要跟在 load 之后；
+ * 各角色的动作轨道用的是同一套骨骼路径，绑定表以当前模型为准，可以直接互换。
+ * 动作加载失败只提示，不影响模型显示（继续播自己的动作）。
+ */
+async function applyMotionRole(recipe: Awaited<ReturnType<typeof buildRecipe>>, isCurrent: () => boolean) {
+  const engine = engineInstance
+  if (!engine) return
+  motionError.value = ''
+  const role = props.motionRole
+  const restoreDefault = async () => {
+    if (!motionOverridden) return
+    // 模型没变时引擎不会重新装配，只会重新套一次默认动作
+    await engine.loadRenderRecipe({ ...recipe, baseUrl: PJSK_3D_ASSETS_BASE_URL })
+    motionOverridden = false
+  }
+  if (!role || `${role.characterId}:${role.unit}` === recipe.roleId) {
+    await restoreDefault()
+    return
+  }
+  try {
+    const motion = await loadRuntimeRoleMotion(role.characterId, role.unit)
+    if (!isCurrent()) return
+    motionOverridden = true
+    engine.setFaceMotionSet(motion.faceMotion as FaceMotionSet | null, 'face', 'face_loop')
+    const snapshot = await engine.setAnimationSelection({
+      motionUrl: motion.motionUrl,
+      motionKind: 'unity-json',
+      loopUrl: motion.motionUrl,
+      loopKind: 'unity-json',
+    })
+    if (snapshot.error) throw new Error(snapshot.error)
+  } catch (error) {
+    if (!isCurrent()) return
+    console.error('展示动作加载失败:', error)
+    motionError.value = `展示动作加载失败，已换回当前角色的动作：${error instanceof Error ? error.message : String(error)}`
+    await restoreDefault()
   }
 }
 
@@ -262,6 +315,10 @@ async function applyRecipe() {
     if (generation !== recipeLoadGeneration || kernel !== activeKernel) return
     await activeKernel.load(recipe)
     if (generation !== recipeLoadGeneration || kernel !== activeKernel) return
+    if (!HARUKI_ORIGINAL_ENABLED) {
+      await applyMotionRole(recipe, () => generation === recipeLoadGeneration && kernel === activeKernel)
+      if (generation !== recipeLoadGeneration || kernel !== activeKernel) return
+    }
     syncPlayState()
   } catch (error) {
     if (
@@ -362,6 +419,7 @@ async function releaseViewer() {
   const activeEngine = engineInstance
   kernel = null
   engineInstance = null
+  motionOverridden = false
   dragPointer = null
   backgroundBusy.value = false
   if (activeKernel) await activeKernel.destroy()
@@ -563,6 +621,8 @@ watch(
     props.selection?.body?.costume3dId,
     props.selection?.head?.costume3dId,
     props.selection?.hair?.costume3dId,
+    props.motionRole?.characterId,
+    props.motionRole?.unit,
   ],
   async ([characterId], previous) => {
     if (!kernel) return
@@ -648,6 +708,7 @@ onBeforeUnmount(() => {
         </template>
       </div>
       <p v-if="backgroundError" role="status" class="text-xs text-error mb-3">{{ backgroundError }}</p>
+      <p v-if="motionError" role="status" class="text-xs text-warning mb-3">{{ motionError }}</p>
 
       <!-- 画布。CSS 全屏时 Teleport 到 body：详情页卡片的入场动画会在祖先留下
            transform，fixed 定位会被它劫持导致盖不住页面 header（Safari 尤其明显） -->

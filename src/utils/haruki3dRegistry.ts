@@ -131,3 +131,52 @@ export function findRuntimePart(
             && isUsableRuntimePart(entry)
     })
 }
+
+/** 一个角色的展示动作：身体动作包的地址，加上内嵌在角色运行时包里的表情动作 */
+export interface RuntimeRoleMotion {
+    motionUrl: string
+    faceMotion: unknown
+}
+
+const roleMotionCache = new Map<string, Promise<RuntimeRoleMotion>>()
+
+/**
+ * 读取某个角色的展示动作，用来套到另一个角色的模型上。
+ * 地址拼法和引擎内部一致（角色运行时包旁边的相对路径 + masterVersion），
+ * 这样和引擎自己请求的是同一个 URL，可以共用浏览器缓存。
+ */
+export async function loadRuntimeRoleMotion(characterId: number, unit: string): Promise<RuntimeRoleMotion> {
+    const key = roleKey(characterId, unit)
+    const cached = roleMotionCache.get(key)
+    if (cached) return cached
+
+    const request = (async () => {
+        const { masterVersion } = await loadRuntimeRoleData(characterId, unit)
+        const version = `masterVersion=${encodeURIComponent(masterVersion)}`
+        const root = `${PJSK_3D_ASSETS_BASE_URL}roles/${characterId}/${unit}`
+        const runtime = await decodeBrotliMessagePack(
+            await fetch(`${root}/role-runtime.msgpack.br?${version}`)
+        ) as { motionPackage?: { unityMotionJson?: string | null; faceMotion?: unknown } | null }
+        const motionPath = runtime.motionPackage?.unityMotionJson
+        if (!motionPath) {
+            throw new Error(`该角色（${key}）暂无展示动作`)
+        }
+        const motionUrl = new URL(
+            /^[a-z][a-z0-9+.-]*:/i.test(motionPath) || motionPath.startsWith('/')
+                ? motionPath
+                : `${root}/${motionPath.replace(/^\/+/, '')}`,
+            window.location.href,
+        )
+        motionUrl.searchParams.set('masterVersion', masterVersion)
+        return {
+            motionUrl: motionUrl.toString(),
+            faceMotion: runtime.motionPackage?.faceMotion ?? null,
+        }
+    })()
+
+    roleMotionCache.set(key, request)
+    void request.catch(() => {
+        if (roleMotionCache.get(key) === request) roleMotionCache.delete(key)
+    })
+    return request
+}

@@ -13,7 +13,7 @@ import {
   Play, Pause, BarChart2, Eye, Download, ChevronLeft, ChevronDown,
   Disc3, Sparkles, Volume2, VolumeX, SkipBack, SkipForward,
   PlayCircle, Zap, X, FileImage, Loader2, ZoomIn, ZoomOut, Maximize,
-  Activity, CheckCircle2, LockKeyhole, ExternalLink, ListPlus, ListStart, Maximize2, Check, Info, MicVocal
+  Activity, CheckCircle2, LockKeyhole, ExternalLink, ListPlus, ListStart, Maximize2, Check, Info, LetterText
 } from 'lucide-vue-next'
 import AssetImage from '@/components/AssetImage.vue'
 import MusicLyrics from '@/components/MusicLyrics.vue'
@@ -1591,7 +1591,7 @@ const isExpired = computed(() => {
 
           <!-- 歌词：独立一栏，宽屏时固定在右侧随页面滚动 -->
           <aside v-if="showLyricsColumn" class="music-lyrics" aria-label="歌词">
-            <h2 class="music-lyrics-title"><MicVocal class="w-4 h-4" /> 歌词</h2>
+            <h2 class="music-lyrics-title"><LetterText class="w-4 h-4" /> 歌词</h2>
             <MusicLyrics
               variant="sidebar"
               :music-id="musicId"

@@ -4,6 +4,7 @@ import { AlertTriangle, BookOpen, CheckCircle2, RefreshCw, Search, Sparkles } fr
 import confetti from 'canvas-confetti'
 import AccountSelector from '@/components/AccountSelector.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import { UNITS, unitOfCharacter } from '@/utils/units'
 import Pagination from '@/components/Pagination.vue'
 import SekaiCard from '@/components/SekaiCard.vue'
 import { useAccountStore } from '@/stores/account'
@@ -192,6 +193,10 @@ const paginatedCardGroups = computed(() => rarityOrder.map(rarity => {
     owned: allCards.filter(card => userCardsMap.value.has(card.id)).length,
   }
 }).filter(group => group.cards.length > 0))
+const characterGroups = computed(() => UNITS.map(unit => ({
+  unit,
+  rows: characterStats.value.filter(row => unitOfCharacter(row.character.id) === unit.value),
+})).filter(group => group.rows.length > 0))
 const selectedCharacterStats = computed(() => characterStats.value.find(row => row.character.id === selectedCharacterId.value))
 const isSelectedFullCollection = computed(() => Boolean(
   hasCardData.value &&
@@ -291,12 +296,20 @@ onMounted(async () => {
         <aside class="card bg-base-100 border border-base-200 lg:sticky lg:top-20">
           <div class="card-body p-4 gap-3">
             <div class="flex items-center justify-between"><h2 class="font-bold">角色收藏</h2><button class="btn btn-xs btn-ghost" :class="{ 'btn-active': selectedCharacterId === 0 }" @click="selectedCharacterId = 0">全部</button></div>
-            <div class="grid grid-cols-5 lg:grid-cols-4 gap-2 max-h-72 lg:max-h-[68vh] overflow-y-auto pr-1">
-              <button v-for="row in characterStats" :key="row.character.id" class="relative rounded-xl border p-1.5 transition-colors" :class="selectedCharacterId === row.character.id ? 'border-primary bg-primary/10' : 'border-base-200 hover:border-primary/40'" :title="`${characterName(row.character)} ${row.owned}/${row.total}`" @click="selectedCharacterId = row.character.id">
-                <img :src="characterIcon(row.character.id)" :alt="characterName(row.character)" class="w-full aspect-square rounded-full bg-base-200" loading="lazy" />
-                <span class="block mt-1 text-[10px] font-bold tabular-nums">{{ hasCardData ? row.owned : '—' }}/{{ row.total }}</span>
-                <span v-if="hasCardData && row.unread" class="absolute top-0 right-0 badge badge-secondary badge-xs px-1">{{ row.unread }}</span>
-              </button>
+            <!-- 按团体分组：每个团体一行小标题 + 成员头像 -->
+            <div class="max-h-80 space-y-2.5 overflow-y-auto pr-1 lg:max-h-[68vh]">
+              <section v-for="group in characterGroups" :key="group.unit.value">
+                <h3 class="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold text-base-content/55">
+                  <span class="h-3 w-1 rounded-full" :style="{ backgroundColor: group.unit.color }"></span>{{ group.unit.label }}
+                </h3>
+                <div class="grid grid-cols-6 gap-1.5 lg:grid-cols-4 lg:gap-2">
+                  <button v-for="row in group.rows" :key="row.character.id" class="relative rounded-xl border p-1 transition-colors lg:p-1.5" :class="selectedCharacterId === row.character.id ? 'border-primary bg-primary/10' : 'border-base-200 hover:border-primary/40'" :title="`${characterName(row.character)} ${row.owned}/${row.total}`" @click="selectedCharacterId = row.character.id">
+                    <img :src="characterIcon(row.character.id)" :alt="characterName(row.character)" class="w-full aspect-square rounded-full bg-base-200" loading="lazy" />
+                    <span class="block mt-1 text-[10px] font-bold tabular-nums">{{ hasCardData ? row.owned : '—' }}/{{ row.total }}</span>
+                    <span v-if="hasCardData && row.unread" class="absolute top-0 right-0 badge badge-secondary badge-xs px-1">{{ row.unread }}</span>
+                  </button>
+                </div>
+              </section>
             </div>
           </div>
         </aside>

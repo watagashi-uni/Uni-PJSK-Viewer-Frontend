@@ -10,7 +10,8 @@ import {
 } from 'lucide-vue-next'
 import { useGlobalSearch } from '@/composables/useGlobalSearch'
 import AssetImage from '@/components/AssetImage.vue'
-import EventBanner from '@/components/EventBanner.vue'
+import ThemeMenu from '@/components/ThemeMenu.vue'
+import GachaBanner from '@/components/GachaBanner.vue'
 import StoryPlayerPromo from '@/components/StoryPlayerPromo.vue'
 import type { EventData, MusicData } from '@/types/master'
 
@@ -118,6 +119,10 @@ const ongoingGachas = computed(() => {
     .filter(g => now.value >= g.startAt && now.value <= g.endAt && g.endAt < permanentThreshold)
     .sort((a, b) => a.endAt - b.endAt || b.startAt - a.startAt)
 })
+
+// 活动主视觉加载失败（没有背景图的测试活动等）时退回纯色横幅
+const eventArtFailed = ref(false)
+const eventLogoFailed = ref(false)
 
 const GACHA_PREVIEW_COUNT = 6
 const showAllGachas = ref(false)
@@ -327,29 +332,32 @@ onMounted(async () => {
         </h1>
         <p class="mt-0.5 text-sm text-base-content/55">{{ todayLabel }}</p>
       </div>
-      <RouterLink
-        v-if="currentUserProfile"
-        to="/profile"
-        class="flex shrink-0 items-center gap-2.5 rounded-full border border-base-300 bg-base-100 py-1 pl-1 pr-3 transition-colors hover:border-primary/50"
-        title="查看个人信息"
-      >
-        <span class="h-9 w-9 shrink-0 overflow-hidden rounded-full bg-base-300">
-          <AssetImage
-            v-if="leaderCard"
-            :src="`${assetsHost}/startapp/thumbnail/chara/${leaderCard.assetbundleName}_${cardImageVariant(leaderCard, leaderCard.userCardInfo.defaultImage === 'training')}.png`"
-            :alt="currentUserProfile.name"
-            class="h-full w-full object-cover"
-          />
-          <User v-else class="m-2 h-5 w-5 text-base-content/40" />
-        </span>
-        <span class="hidden text-sm sm:block">
-          <span class="text-base-content/55">等级</span>
-          <span class="ml-1 font-semibold">{{ currentUserProfileData?.user?.rank || currentUserSuite?.user?.rank || '—' }}</span>
-        </span>
-      </RouterLink>
-      <RouterLink v-else to="/profile" class="btn btn-sm btn-primary btn-soft shrink-0">
-        <User class="h-4 w-4" /> 绑定账号
-      </RouterLink>
+      <div class="flex shrink-0 items-center gap-2">
+        <ThemeMenu />
+        <RouterLink
+          v-if="currentUserProfile"
+          to="/profile"
+          class="flex shrink-0 items-center gap-2.5 rounded-full border border-base-300 bg-base-100 py-1 pl-1 pr-3 transition-colors hover:border-primary/50"
+          title="查看个人信息"
+        >
+          <span class="h-9 w-9 shrink-0 overflow-hidden rounded-full bg-base-300">
+            <AssetImage
+              v-if="leaderCard"
+              :src="`${assetsHost}/startapp/thumbnail/chara/${leaderCard.assetbundleName}_${cardImageVariant(leaderCard, leaderCard.userCardInfo.defaultImage === 'training')}.png`"
+              :alt="currentUserProfile.name"
+              class="h-full w-full object-cover"
+            />
+            <User v-else class="m-2 h-5 w-5 text-base-content/40" />
+          </span>
+          <span class="hidden text-sm sm:block">
+            <span class="text-base-content/55">等级</span>
+            <span class="ml-1 font-semibold">{{ currentUserProfileData?.user?.rank || currentUserSuite?.user?.rank || '—' }}</span>
+          </span>
+        </RouterLink>
+        <RouterLink v-else to="/profile" class="btn btn-primary btn-soft h-11 shrink-0 rounded-full px-4">
+          <User class="h-4 w-4" /> 绑定账号
+        </RouterLink>
+      </div>
     </header>
 
     <!-- 全站搜索：点开之后才加载搜索用的数据 -->
@@ -392,37 +400,58 @@ onMounted(async () => {
             <RouterLink to="/events" class="text-sm text-base-content/55 hover:text-primary">全部活动</RouterLink>
           </div>
 
-          <div v-if="isLoading" class="skeleton h-56 w-full rounded-box"></div>
-          <article v-else-if="currentEvent" class="overflow-hidden rounded-box border border-base-300 bg-base-100 md:grid md:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
-            <RouterLink :to="`/events/${currentEvent.id}`" class="block self-center bg-base-200 md:m-3 md:overflow-hidden md:rounded-lg" :aria-label="currentEvent.name">
-              <EventBanner :event="currentEvent" :assets-host="assetsHost" />
-            </RouterLink>
-            <div class="flex flex-col gap-3 p-4 md:pl-1">
-              <div class="flex flex-wrap items-center gap-2 text-xs">
-                <span class="badge badge-sm badge-outline">{{ eventTypeMap[currentEvent.eventType]?.label || currentEvent.eventType }}</span>
-                <span class="text-base-content/55">{{ formatDate(currentEvent.startAt) }} – {{ formatDate(currentEvent.aggregateAt) }}</span>
-              </div>
-              <RouterLink :to="`/events/${currentEvent.id}`" class="block text-lg font-bold leading-snug hover:text-primary">
+          <div v-if="isLoading" class="skeleton h-64 w-full rounded-box"></div>
+          <!-- 活动主视觉：整块可以点进详情，按钮单独可点 -->
+          <article v-else-if="currentEvent" class="kv home-event" :class="{ 'kv--plain': eventArtFailed }">
+            <img
+              v-if="!eventArtFailed"
+              :key="currentEvent.assetbundleName"
+              :src="`${assetsHost}/ondemand/event/${currentEvent.assetbundleName}/screen/bg.png`"
+              alt=""
+              class="kv__art"
+              crossorigin="anonymous"
+              @error="eventArtFailed = true"
+            />
+            <RouterLink :to="`/events/${currentEvent.id}`" class="absolute inset-0" :aria-label="currentEvent.name"></RouterLink>
+            <div class="kv__body pointer-events-none relative">
+              <img
+                v-if="!eventLogoFailed"
+                :src="`${assetsHost}/ondemand/event/${currentEvent.assetbundleName}/logo/logo.png`"
+                :alt="currentEvent.name"
+                class="kv__logo"
+                crossorigin="anonymous"
+                @error="eventLogoFailed = true"
+              />
+              <h3 class="kv__title home-event__title">
                 <ZhText :text="currentEvent.name" table="events" path="name" sub-class="text-sm font-medium" />
-              </RouterLink>
-
-              <div v-if="currentEvent.status === 'ongoing'">
-                <div class="mb-1 flex items-center justify-between text-sm">
-                  <span class="flex items-center gap-1.5 text-base-content/70"><Clock class="h-4 w-4" />距离结束</span>
-                  <span class="font-semibold tabular-nums">{{ durationText(currentEvent.aggregateAt - now) }}</span>
-                </div>
-                <progress class="progress progress-primary h-1.5 w-full" :value="eventProgress" max="100" :aria-label="`活动进度 ${Math.round(eventProgress)}%`"></progress>
+              </h3>
+              <div class="kv__meta">
+                <span v-if="currentEvent.status === 'ongoing'" class="kv-chip kv-chip--live">
+                  <Clock class="h-3.5 w-3.5" /> 剩 {{ durationText(currentEvent.aggregateAt - now) }}
+                </span>
+                <span v-else class="kv-chip">已结束</span>
+                <span class="kv-chip">{{ eventTypeMap[currentEvent.eventType]?.label || currentEvent.eventType }}</span>
+                <span class="kv-chip font-normal">{{ formatDate(currentEvent.startAt) }} – {{ formatDate(currentEvent.aggregateAt) }}</span>
               </div>
-              <p v-else class="text-sm text-base-content/55">已于 {{ formatDate(currentEvent.aggregateAt) }} 结束</p>
-
-              <div class="mt-auto flex flex-wrap gap-2 pt-1">
-                <RouterLink v-if="currentEvent.status === 'ongoing'" to="/ranking" class="btn btn-sm btn-primary">
+              <div class="pointer-events-auto flex flex-wrap gap-2 pt-0.5">
+                <RouterLink v-if="currentEvent.status === 'ongoing'" to="/ranking" class="kv-chip kv-chip--solid">
                   <BarChart3 class="h-4 w-4" /> 实时榜线
                 </RouterLink>
-                <RouterLink :to="`/events/${currentEvent.id}`" class="btn btn-sm btn-ghost border-base-300">
+                <RouterLink :to="`/events/${currentEvent.id}`" class="kv-chip">
                   活动详情 <ChevronRight class="h-4 w-4" />
                 </RouterLink>
               </div>
+            </div>
+            <div
+              v-if="currentEvent.status === 'ongoing'"
+              class="kv__progress"
+              role="progressbar"
+              :aria-valuenow="Math.round(eventProgress)"
+              aria-valuemin="0"
+              aria-valuemax="100"
+              :aria-label="`活动进度 ${Math.round(eventProgress)}%`"
+            >
+              <i :style="{ width: `${eventProgress}%` }"></i>
             </div>
           </article>
           <p v-else class="rounded-box border border-dashed border-base-300 py-10 text-center text-sm text-base-content/55">暂时没有活动数据</p>
@@ -437,7 +466,7 @@ onMounted(async () => {
             <RouterLink to="/gachas" class="text-sm text-base-content/55 hover:text-primary">全部卡池</RouterLink>
           </div>
           <div v-if="isLoading" class="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <div v-for="i in 3" :key="i" class="skeleton aspect-[2/1] rounded-box"></div>
+            <div v-for="i in 3" :key="i" class="skeleton aspect-[122/72] rounded-box"></div>
           </div>
           <div v-else class="grid grid-cols-2 gap-3 sm:grid-cols-3">
             <RouterLink
@@ -446,13 +475,7 @@ onMounted(async () => {
               :to="`/gachas/${gacha.id}`"
               class="group flex min-w-0 flex-col overflow-hidden rounded-box border border-base-300 bg-base-100 transition-colors hover:border-primary/50"
             >
-              <span class="flex aspect-[2/1] items-center justify-center p-2">
-                <AssetImage
-                  :src="`${assetsHost}/ondemand/gacha/${gacha.assetbundleName}/logo/logo.png`"
-                  :alt="gacha.name"
-                  class="h-full w-full object-contain"
-                />
-              </span>
+              <GachaBanner :gacha="gacha" :assets-host="assetsHost" />
               <span class="border-t border-base-300 px-2.5 py-1.5">
                 <span class="block truncate text-xs font-medium group-hover:text-primary" :title="gacha.name"><ZhText :text="gacha.name" table="gachas" path="name" sub-class="font-normal" /></span>
                 <span class="block text-xs text-base-content/50">剩 {{ durationText(gacha.endAt - now) }}</span>
@@ -543,6 +566,22 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+@media (min-width: 768px) {
+  .home-event {
+    min-height: clamp(15rem, 21vw, 18rem);
+  }
+}
+
+.home-event__title {
+  font-size: 1.25rem;
+}
+
+@media (min-width: 768px) {
+  .home-event__title {
+    font-size: 1.5rem;
+  }
+}
+
 .home-search {
   display: flex;
   align-items: center;

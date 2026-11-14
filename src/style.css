@@ -468,6 +468,357 @@ select option {
     transform: translate(-0.75rem, 0.75rem);
   }
 
+  /* 筛选项：圆角小胶囊，选中后填品牌色。类型、状态、分类这些“点一下就筛”的选项都用它 */
+  .chip {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 0.375rem;
+    height: 2rem;
+    padding: 0 0.75rem;
+    border: 1px solid var(--color-base-300);
+    border-radius: 999px;
+    background-color: var(--color-base-100);
+    color: color-mix(in oklab, var(--color-base-content) 78%, transparent);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    line-height: 1;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+  }
+
+  .chip:hover {
+    border-color: color-mix(in oklab, var(--color-primary) 55%, var(--color-base-300));
+    color: var(--color-base-content);
+  }
+
+  .chip.is-active {
+    border-color: var(--color-primary);
+    background-color: var(--color-primary);
+    color: var(--color-primary-content);
+    font-weight: 600;
+  }
+
+  .chip.is-off {
+    opacity: 0.5;
+  }
+
+  .chip > img {
+    height: 1.125rem;
+    width: auto;
+  }
+
+  /* 团体 logo 做筛选项：logo 多是深色字，固定垫白底；选中时描品牌色边 */
+  .chip.chip--logo {
+    padding: 0 0.625rem;
+    border-color: color-mix(in oklab, var(--color-base-content) 16%, transparent);
+    background-color: #fff;
+  }
+
+  .chip.chip--logo > img {
+    height: 1.25rem;
+    max-width: 5.5rem;
+    object-fit: contain;
+  }
+
+  .chip.chip--logo.is-active {
+    border-color: var(--color-primary);
+    background-color: #fff;
+    box-shadow: 0 0 0 2px var(--color-primary);
+  }
+
+  .chip__count {
+    font-family: var(--font-display);
+    font-size: 0.6875rem;
+    font-variant-numeric: tabular-nums;
+    opacity: 0.6;
+  }
+
+  /* 筛选面板里的一行：左边是小标题，右边是一排 .chip */
+  .filter-label {
+    margin-bottom: 0.5rem;
+    color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+
+  /* 数量步进器：− 数字 +。数字可以直接输入，浏览器自带的上下箭头隐藏掉 */
+  .stepper {
+    display: inline-flex;
+    flex: none;
+    align-items: stretch;
+    height: 2rem;
+    border: 1px solid var(--color-base-300);
+    border-radius: 999px;
+    background-color: var(--color-base-100);
+    overflow: hidden;
+    transition: border-color 0.12s ease;
+  }
+
+  .stepper:focus-within {
+    border-color: var(--color-primary);
+  }
+
+  .stepper > button {
+    display: grid;
+    place-items: center;
+    width: 2rem;
+    color: color-mix(in oklab, var(--color-base-content) 70%, transparent);
+    transition: background-color 0.12s ease, color 0.12s ease;
+  }
+
+  .stepper > button:hover:not(:disabled) {
+    background-color: color-mix(in oklab, var(--color-primary) 13%, transparent);
+    color: var(--color-primary);
+  }
+
+  .stepper > button:disabled {
+    opacity: 0.28;
+  }
+
+  .stepper > input {
+    width: 2.75rem;
+    min-width: 0;
+    border: 0;
+    outline: none;
+    background: transparent;
+    font-family: var(--font-display);
+    font-size: 0.875rem;
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    text-align: center;
+    appearance: textfield;
+    -moz-appearance: textfield;
+  }
+
+  .stepper > input::-webkit-inner-spin-button,
+  .stepper > input::-webkit-outer-spin-button {
+    margin: 0;
+    -webkit-appearance: none;
+  }
+
+  /* 主视觉横幅：详情页（活动、卡池）和首页当期活动的顶部，背景是游戏里的大图。
+     图上压一层由下往上的深色渐变，文字固定用白色，所以四套主题下都一样。
+       <section class="kv">
+         <img class="kv__art" …>            ← 可选，没有图时是品牌色渐变
+         <div class="kv__top">…</div>        ← 可选，返回和操作按钮
+         <div class="kv__body">…</div>
+       </section> */
+  .kv {
+    position: relative;
+    isolation: isolate;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    min-height: 15rem;
+    padding-top: 34%;
+    border-radius: var(--radius-box);
+    background-color: #131824;
+    background-image: linear-gradient(120deg, #123540, #1b2040 55%, #3a1b3c);
+    color: #fff;
+    overflow: hidden;
+  }
+
+  @media (min-width: 768px) {
+    .kv {
+      min-height: clamp(18rem, 32vw, 25rem);
+      padding-top: 0;
+    }
+  }
+
+  /* 没有大图时不留那么高 */
+  .kv.kv--plain {
+    min-height: 0;
+    padding-top: 3.25rem;
+  }
+
+  .kv__art {
+    position: absolute;
+    inset: 0;
+    z-index: -2;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center 22%;
+  }
+
+  .kv::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background-image:
+      linear-gradient(to top, rgb(9 12 19 / 0.94) 0%, rgb(9 12 19 / 0.7) 32%, rgb(9 12 19 / 0.12) 68%, rgb(9 12 19 / 0) 100%),
+      linear-gradient(to bottom, rgb(9 12 19 / 0.5) 0%, rgb(9 12 19 / 0) 22%);
+  }
+
+  .kv.kv--plain::before {
+    background-image: none;
+  }
+
+  .kv__top {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    left: 0.75rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+
+  .kv__body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+    min-width: 0;
+    padding: 1rem;
+  }
+
+  @media (min-width: 768px) {
+    .kv__top {
+      top: 1rem;
+      right: 1.25rem;
+      left: 1.25rem;
+    }
+
+    .kv__body {
+      padding: 1.5rem;
+    }
+  }
+
+  .kv__logo {
+    width: auto;
+    max-width: min(60%, 17rem);
+    height: 4.5rem;
+    object-fit: contain;
+    object-position: left bottom;
+    filter: drop-shadow(0 2px 10px rgb(0 0 0 / 0.45));
+  }
+
+  @media (min-width: 768px) {
+    .kv__logo {
+      height: 6.5rem;
+    }
+  }
+
+  .kv__title {
+    font-family: var(--font-display);
+    font-size: 1.375rem;
+    font-weight: 800;
+    line-height: 1.25;
+    letter-spacing: -0.01em;
+    text-shadow: 0 1px 12px rgb(0 0 0 / 0.5);
+  }
+
+  @media (min-width: 768px) {
+    .kv__title {
+      font-size: 1.875rem;
+    }
+  }
+
+  .kv__meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.375rem;
+  }
+
+  /* 压在图上的半透明小标签 / 按钮 */
+  .kv-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    min-height: 1.625rem;
+    padding: 0.125rem 0.625rem;
+    border: 1px solid rgb(255 255 255 / 0.2);
+    border-radius: 999px;
+    background-color: rgb(20 24 34 / 0.5);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1.2;
+  }
+
+  :is(a, button).kv-chip {
+    min-height: 2rem;
+    padding: 0.25rem 0.75rem;
+    font-size: 0.8125rem;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+  }
+
+  :is(a, button).kv-chip:hover:not(:disabled) {
+    border-color: rgb(255 255 255 / 0.5);
+    background-color: rgb(20 24 34 / 0.72);
+  }
+
+  :is(a, button).kv-chip:disabled {
+    opacity: 0.45;
+  }
+
+  .kv-chip--solid {
+    border-color: transparent;
+    background-color: var(--color-primary);
+    color: var(--color-primary-content);
+  }
+
+  :is(a, button).kv-chip--solid:hover:not(:disabled) {
+    border-color: transparent;
+    background-color: color-mix(in oklab, var(--color-primary) 86%, #fff);
+  }
+
+  .kv-chip--live {
+    border-color: transparent;
+    background-color: #1faa59;
+  }
+
+  .kv-chip--soon {
+    border-color: transparent;
+    background-color: #e08a00;
+  }
+
+  /* 横幅底边的进度条（活动进行到哪了） */
+  .kv__progress {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    height: 3px;
+    background-color: rgb(255 255 255 / 0.18);
+  }
+
+  .kv__progress > i {
+    display: block;
+    height: 100%;
+    background-image: linear-gradient(90deg, var(--color-primary), var(--color-secondary));
+  }
+
+  /* 横幅图的画框：首页横幅是 488×208，活动和卡池共用这个比例 */
+  .banner-frame {
+    position: relative;
+    display: block;
+    aspect-ratio: 122 / 52;
+    width: 100%;
+    background-color: color-mix(in oklab, var(--color-base-content) 5%, var(--color-base-100));
+    overflow: hidden;
+  }
+
+  .banner-frame > img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  /* logo 是透明底的不规则图形：完整显示，四周留一点空 */
+  .banner-frame > img.is-logo {
+    padding: 0.625rem 1rem;
+    object-fit: contain;
+  }
+
   /* 详情页顶部的返回链接 */
   .back-link {
     display: inline-flex;

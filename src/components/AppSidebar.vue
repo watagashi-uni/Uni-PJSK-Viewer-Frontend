@@ -1,17 +1,15 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { User, Settings, Info, Github, Palette, RefreshCw, Check, Search } from 'lucide-vue-next'
+import { User, Settings, Info, Github, RefreshCw, Search } from 'lucide-vue-next'
 import AccountSelector from '@/components/AccountSelector.vue'
+import ThemeMenu from '@/components/ThemeMenu.vue'
 import { useAccountStore } from '@/stores/account'
-import { useSettingsStore } from '@/stores/settings'
 import { useGlobalSearch } from '@/composables/useGlobalSearch'
 import { navGroups, resolveActiveNav } from '@/utils/navigation'
-import { themeOptions } from '@/utils/themes'
 
 const route = useRoute()
 const accountStore = useAccountStore()
-const settingsStore = useSettingsStore()
 const search = useGlobalSearch()
 
 const activePath = computed(() => resolveActiveNav(route.path))
@@ -24,11 +22,6 @@ function closeDrawer() {
 function openSearch() {
   closeDrawer()
   search.open()
-}
-
-function selectTheme(value: string) {
-  settingsStore.setTheme(value)
-  if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
 }
 
 const refreshError = ref('')
@@ -152,28 +145,7 @@ const suiteAge = computed(() => {
         >
           <Settings class="h-[1.05rem] w-[1.05rem] shrink-0" /> 设置
         </RouterLink>
-        <div class="dropdown dropdown-top static">
-          <button tabindex="0" class="btn btn-ghost btn-sm btn-square" title="切换主题" aria-label="切换主题">
-            <Palette class="h-4 w-4" />
-          </button>
-          <!-- 相对整行底栏定位，宽度和侧边栏一致，窄屏上也不会被裁掉 -->
-          <ul tabindex="0" class="dropdown-content inset-x-0 z-30 mb-2 rounded-box border border-base-300 bg-base-100 p-1.5">
-            <li v-for="t in themeOptions" :key="t.value">
-              <button
-                type="button"
-                class="flex w-full items-center gap-2.5 rounded-field px-2 py-1.5 text-left text-sm hover:bg-base-content/7"
-                :class="{ 'font-semibold text-primary': settingsStore.theme === t.value }"
-                @click="selectTheme(t.value)"
-              >
-                <span class="theme-dot" :class="{ 'is-split': t.preview.length > 1 }" aria-hidden="true">
-                  <i v-for="name in t.preview" :key="name" :data-theme="name"></i>
-                </span>
-                <span class="flex-1">{{ t.label }}</span>
-                <Check v-if="settingsStore.theme === t.value" class="h-3.5 w-3.5" />
-              </button>
-            </li>
-          </ul>
-        </div>
+        <ThemeMenu variant="sidebar" />
         <RouterLink
           to="/about"
           class="btn btn-ghost btn-sm btn-square"
@@ -339,29 +311,6 @@ const suiteAge = computed(() => {
   gap: 0.5rem;
   padding: 0.75rem;
   border-top: 1px solid var(--color-base-300);
-  background-color: var(--color-base-100);
-}
-
-/* 主题菜单里的色点：每一格带 data-theme，取的是那个主题自己的主色 */
-.theme-dot {
-  display: flex;
-  flex: none;
-  width: 1rem;
-  height: 1rem;
-  border-radius: 999px;
-  overflow: hidden;
-  box-shadow: 0 0 0 1px color-mix(in oklab, var(--color-base-content) 22%, transparent);
-}
-
-/* daisyUI 会给带 data-theme 的元素铺一层底色渐变，要去掉才看得到下面的颜色 */
-.theme-dot i {
-  display: block;
-  flex: 1;
-  background-color: var(--color-primary);
-  background-image: none;
-}
-
-.theme-dot.is-split i {
   background-color: var(--color-base-100);
 }
 

@@ -7,7 +7,7 @@ import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
 import { useAccountStore } from '@/stores/account'
 import { 
-  Calendar, Clock, Trophy, Music, CreditCard, BookOpen,
+  Calendar, Trophy, Music, CreditCard, BookOpen,
   Sparkles, ChevronLeft, ChevronRight, BarChart3, ShoppingBasket, Minus, Plus, RotateCcw, Swords
 } from 'lucide-vue-next'
 import SekaiCard from '@/components/SekaiCard.vue'
@@ -17,7 +17,7 @@ import SekaiHonor from '@/components/SekaiHonor.vue'
 import AccountSelector from '@/components/AccountSelector.vue'
 import type { EventData } from '@/types/master'
 import { cardImageVariant } from '@/utils/card'
-import { getEventBannerUrl, isTestEvent } from '@/utils/event'
+import { getEventBannerUrl, getEventLogoUrl, isTestEvent } from '@/utils/event'
 import ZhText from '@/components/ZhText.vue'
 import { useResourceZh } from '@/composables/useResourceZh'
 import StorySummaryPanel from '@/components/StorySummaryPanel.vue'
@@ -350,6 +350,15 @@ const eventImages = computed(() => {
   ]
 })
 
+// 顶部主视觉：活动界面的背景大图；加载失败（很早期的活动或测试活动）时退回纯色横幅
+const heroArtFailed = ref(false)
+const heroLogoFailed = ref(false)
+const heroArtUrl = computed(() => {
+  if (!event.value?.assetbundleName || heroArtFailed.value) return ''
+  return `${assetsHost.value}/ondemand/event/${event.value.assetbundleName}/screen/bg.png`
+})
+const heroLogoUrl = computed(() => (event.value ? getEventLogoUrl(event.value, assetsHost.value) : ''))
+
 const availableEventImages = computed(() => eventImages.value.filter(img => !failedImageUrls.value.has(img.url)))
 const currentImage = computed(() => availableEventImages.value.find(img => img.label === selectedImageLabel.value)
   ?? availableEventImages.value[0])
@@ -357,6 +366,8 @@ const currentImage = computed(() => availableEventImages.value.find(img => img.l
 watch([() => event.value?.id, assetsHost], () => {
   selectedImageLabel.value = 'Logo'
   failedImageUrls.value = new Set()
+  heroArtFailed.value = false
+  heroLogoFailed.value = false
 })
 
 function markEventImageFailed(error: Event) {
@@ -755,91 +766,78 @@ watch(() => route.params.id, loadData)
 
     <!-- 活动详情 -->
     <div v-else class="space-y-6">
-      <!-- 头部 -->
-      <div class="card bg-base-100">
-        <div class="card-body">
-          <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
-            <div class="flex flex-wrap items-center gap-2 sm:gap-4">
-              <button type="button" class="back-link" @click="goBack">
-                <ChevronLeft class="w-4 h-4" />
-                返回活动列表
-              </button>
-              <span class="badge badge-lg">#{{ event.id }}</span>
-              <span 
-                class="badge badge-lg"
-                :class="eventTypeMap[event.eventType]?.color || 'badge-ghost'"
-              >
-                {{ eventTypeMap[event.eventType]?.label || event.eventType }}
-              </span>
-            </div>
-            
-            <div class="flex flex-wrap items-center gap-2">
-              <RouterLink v-if="eventStoryLink" :to="eventStoryLink" class="btn btn-sm btn-outline gap-2">
-                <BookOpen class="w-4 h-4" />
-                查看剧情
-              </RouterLink>
+      <!-- 头部：活动主视觉 -->
+      <section class="kv" :class="{ 'kv--plain': !heroArtUrl }">
+        <img
+          v-if="heroArtUrl"
+          :key="heroArtUrl"
+          :src="heroArtUrl"
+          alt=""
+          class="kv__art"
+          crossorigin="anonymous"
+          @error="heroArtFailed = true"
+        />
+        <div class="kv__top">
+          <button type="button" class="kv-chip" @click="goBack">
+            <ChevronLeft class="h-4 w-4" />
+            活动列表
+          </button>
+          <div class="flex flex-wrap items-center gap-2">
+            <RouterLink v-if="eventStoryLink" :to="eventStoryLink" class="kv-chip">
+              <BookOpen class="h-4 w-4" />
+              剧情
+            </RouterLink>
+            <!-- 榜线按钮 (仅正在进行时显示) -->
+            <RouterLink v-if="eventStatus.status === 'ongoing'" to="/ranking" class="kv-chip kv-chip--solid">
+              <BarChart3 class="h-4 w-4" />
+              实时榜线
+            </RouterLink>
+          </div>
+        </div>
+        <div class="kv__body">
+          <img
+            v-if="!heroLogoFailed"
+            :src="heroLogoUrl"
+            :alt="event.name"
+            class="kv__logo"
+            crossorigin="anonymous"
+            @error="heroLogoFailed = true"
+          />
+          <h1 class="kv__title"><ZhText :text="event.name" table="events" path="name" sub-class="text-base md:text-lg mt-0.5" /></h1>
+          <div class="kv__meta">
+            <span class="kv-chip num">#{{ event.id }}</span>
+            <span class="kv-chip">{{ eventTypeMap[event.eventType]?.label || event.eventType }}</span>
+            <span
+              class="kv-chip"
+              :class="{ 'kv-chip--live': eventStatus.status === 'ongoing', 'kv-chip--soon': eventStatus.status === 'upcoming' }"
+            >
+              {{ eventStatus.label }}
+            </span>
+            <span class="kv-chip font-normal">
+              <Calendar class="h-3.5 w-3.5" />
+              {{ formatDateTime(event.startAt) }} – {{ formatDateTime(event.aggregateAt) }}
+            </span>
+          </div>
+        </div>
+        <div
+          v-if="eventStatus.status === 'ongoing'"
+          class="kv__progress"
+          role="progressbar"
+          :aria-valuenow="Math.round(eventStatus.progress)"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          aria-label="活动进度"
+        >
+          <i :style="{ width: `${eventStatus.progress}%` }"></i>
+        </div>
+      </section>
 
-              <!-- 榜线按钮 (仅正在进行时显示) -->
-              <RouterLink 
-                v-if="eventStatus.status === 'ongoing'"
-                to="/ranking"
-                class="btn btn-sm btn-primary gap-2"
-              >
-                <BarChart3 class="w-4 h-4" />
-                查看榜线
-              </RouterLink>
-            </div>
-          </div>
-          
-          <h1 class="text-2xl font-bold mb-4"><ZhText :text="event.name" table="events" path="name" sub-class="text-lg mt-1" /></h1>
-          <p v-if="eventOutline" class="text-sm leading-6 text-base-content/70 mb-4 whitespace-pre-line text-left"><ZhText :text="eventOutline" table="eventStories" path="outline" sub-class="mt-2" /></p>
-          <StorySummaryPanel v-if="eventStoryId" :story-key="`event_${eventStoryId}`" heading="活动剧情总结" :to="eventStoryLink" link-text="阅读活动剧情" class="mb-4 text-left" />
-          
-          <!-- 活动状态进度条 -->
-          <div class="mb-4">
-            <div class="flex justify-center text-sm mb-1">
-              <span 
-                class="font-medium"
-                :class="{
-                  'text-success': eventStatus.status === 'ongoing',
-                  'text-warning': eventStatus.status === 'upcoming',
-                  'text-base-content/60': eventStatus.status === 'ended'
-                }"
-              >
-                {{ eventStatus.label }}
-              </span>
-            </div>
-            <progress 
-              class="progress w-full"
-              :class="{
-                'progress-success': eventStatus.status === 'ongoing',
-                'progress-warning': eventStatus.status === 'upcoming',
-                '': eventStatus.status === 'ended'
-              }"
-              :value="eventStatus.progress" 
-              max="100"
-            ></progress>
-          </div>
-          
-          <!-- 基本信息 -->
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-            <div class="flex items-center gap-2">
-              <Calendar class="w-4 h-4 text-primary" />
-              <span class="text-base-content/60">开始:</span>
-              <span>{{ formatDateTime(event.startAt) }}</span>
-            </div>
-            <div class="flex items-center gap-2">
-              <Clock class="w-4 h-4 text-primary" />
-              <span class="text-base-content/60">结束:</span>
-              <span>{{ formatDateTime(event.aggregateAt) }}</span>
-            </div>
-            <div class="flex items-center gap-2">
-              <Trophy class="w-4 h-4 text-primary" />
-              <span class="text-base-content/60">类型:</span>
-              <span>{{ eventTypeMap[event.eventType]?.label || event.eventType }}</span>
-            </div>
-          </div>
-          <div v-if="accountEventResult" class="mt-4 rounded-xl bg-primary/10 border border-primary/20 px-4 py-3 flex flex-wrap gap-x-6 gap-y-1 text-sm">
+      <!-- 简介、剧情总结、账号成绩 -->
+      <div v-if="eventOutline || eventStoryId || accountEventResult" class="card bg-base-100">
+        <div class="card-body gap-4">
+          <p v-if="eventOutline" class="text-sm leading-6 text-base-content/70 whitespace-pre-line text-left"><ZhText :text="eventOutline" table="eventStories" path="outline" sub-class="mt-2" /></p>
+          <StorySummaryPanel v-if="eventStoryId" :story-key="`event_${eventStoryId}`" heading="活动剧情总结" :to="eventStoryLink" link-text="阅读活动剧情" class="text-left" />
+          <div v-if="accountEventResult" class="rounded-xl bg-primary/10 border border-primary/20 px-4 py-3 flex flex-wrap gap-x-6 gap-y-1 text-sm">
             <span class="font-medium text-primary">账号活动成绩</span>
             <span>活动点数：<strong>{{ formatNumber(Number(accountEventResult.eventPoint ?? accountEventResult.event_point ?? 0)) }}</strong></span>
             <span v-if="accountEventResult.rank">排名：<strong>#{{ formatNumber(Number(accountEventResult.rank)) }}</strong></span>
@@ -1076,53 +1074,92 @@ watch(() => route.params.id, loadData)
             </div>
           </div>
 
-          <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
-            <div class="stat bg-base-200 rounded-xl p-4">
-              <div class="stat-title text-xs">已选兑换次数</div>
-              <div class="stat-value text-2xl">{{ formatNumber(selectedRewardCount) }}</div>
-              <div class="stat-desc">共 {{ exchangeRows.length }} 种奖励</div>
+          <!-- 汇总：已选、所需、当前、结果 -->
+          <div class="exchange-summary">
+            <div class="exchange-summary__cell">
+              <span class="exchange-summary__label">已选</span>
+              <span class="exchange-summary__value num">{{ formatNumber(selectedRewardCount) }}<small>次</small></span>
+              <span class="exchange-summary__hint">共 {{ exchangeRows.length }} 种奖励</span>
             </div>
-            <div class="stat bg-base-200 rounded-xl p-4">
-              <div class="stat-title text-xs">所需徽章</div>
-              <div class="stat-value text-2xl text-primary">{{ formatNumber(selectedExchangeCost) }}</div>
-              <div class="stat-desc">有限项目全换：{{ formatNumber(limitedFullCost) }}</div>
+            <div class="exchange-summary__cell">
+              <span class="exchange-summary__label">所需徽章</span>
+              <span class="exchange-summary__value num text-primary"><AssetImage :src="eventBadgeIcon()" alt="" class="h-6 w-6 object-contain" />{{ formatNumber(selectedExchangeCost) }}</span>
+              <span class="exchange-summary__hint">有限项目全换 {{ formatNumber(limitedFullCost) }}</span>
             </div>
-            <div class="stat bg-base-200 rounded-xl p-4">
-              <div class="stat-title text-xs">当前徽章</div>
-              <div v-if="accountBadgeCount !== null" class="stat-value text-2xl">{{ formatNumber(accountBadgeCount) }}</div>
-              <input v-else v-model.number="manualBadgeCount" type="number" min="0" class="input input-bordered input-sm mt-1 w-full max-w-40" aria-label="手动输入当前活动徽章" />
-              <div class="stat-desc">{{ accountBadgeCount !== null ? '来自账号 suite' : '可手动输入预算' }}</div>
+            <div class="exchange-summary__cell">
+              <span class="exchange-summary__label">当前徽章</span>
+              <span v-if="accountBadgeCount !== null" class="exchange-summary__value num">{{ formatNumber(accountBadgeCount) }}</span>
+              <input
+                v-else
+                v-model.number="manualBadgeCount"
+                type="number"
+                min="0"
+                inputmode="numeric"
+                placeholder="0"
+                class="exchange-summary__input num"
+                aria-label="手动输入当前活动徽章"
+              />
+              <span class="exchange-summary__hint">{{ accountBadgeCount !== null ? '来自账号数据' : '手动填写预算' }}</span>
             </div>
-            <div class="stat rounded-xl p-4" :class="badgeDeficit ? 'bg-error/10' : 'bg-success/10'">
-              <div class="stat-title text-xs">预算结果</div>
-              <div class="stat-value text-2xl" :class="badgeDeficit ? 'text-error' : 'text-success'">{{ badgeDeficit ? `缺 ${formatNumber(badgeDeficit)}` : '足够' }}</div>
-              <div class="stat-desc">计划后剩余 {{ formatNumber(Math.max(0, badgeBudget - selectedExchangeCost)) }}</div>
+            <div class="exchange-summary__cell" :class="badgeDeficit ? 'is-short' : 'is-enough'">
+              <span class="exchange-summary__label">预算结果</span>
+              <span class="exchange-summary__value num">{{ badgeDeficit ? `缺 ${formatNumber(badgeDeficit)}` : '足够' }}</span>
+              <span class="exchange-summary__hint">换完剩余 {{ formatNumber(Math.max(0, badgeBudget - selectedExchangeCost)) }}</span>
             </div>
           </div>
 
           <div class="flex flex-wrap items-center gap-2">
-            <button class="btn btn-sm btn-primary" @click="selectAllLimited">有限项目全部选满</button>
-            <button class="btn btn-sm btn-secondary" @click="selectCardRewards">只追加活动成员</button>
-            <button class="btn btn-sm btn-ghost gap-1" @click="resetExchangePlan"><RotateCcw class="w-4 h-4" />清空</button>
-            <div class="ml-auto min-w-52"><AccountSelector v-if="accountStore.accounts.length" v-model="selectedUserId" /></div>
+            <button type="button" class="chip" @click="selectAllLimited">有限项目全部选满</button>
+            <button type="button" class="chip" @click="selectCardRewards">只加活动成员</button>
+            <button type="button" class="chip" :disabled="selectedRewardCount === 0" :class="{ 'is-off': selectedRewardCount === 0 }" @click="resetExchangePlan"><RotateCcw class="h-3.5 w-3.5" />清空</button>
+            <div v-if="accountStore.accounts.length" class="ml-auto w-full min-w-52 sm:w-auto"><AccountSelector v-model="selectedUserId" /></div>
           </div>
 
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div v-for="row in exchangeRows" :key="row.id" class="flex min-w-0 items-center gap-3 rounded-xl border border-base-200 bg-base-200/35 p-3">
-              <RouterLink v-if="row.reward.resourceType === 'card'" :to="`/cards/${row.reward.resourceId}`" class="w-16 h-16 rounded-lg overflow-hidden bg-base-200 shrink-0 transition-transform"><AssetImage :src="resourceIcon(row.reward)" :alt="resourceName(row.reward)" class="w-full h-full object-cover" /></RouterLink>
-              <div v-else class="w-16 h-16 rounded-lg bg-base-200 p-2 shrink-0"><AssetImage :src="resourceIcon(row.reward)" :alt="resourceName(row.reward)" class="w-full h-full object-contain" /></div>
+          <div class="grid grid-cols-1 gap-2.5 md:grid-cols-2">
+            <div
+              v-for="row in exchangeRows"
+              :key="row.id"
+              class="exchange-row"
+              :class="{ 'is-picked': getExchangeQuantity(row.id) > 0 }"
+            >
+              <RouterLink v-if="row.reward.resourceType === 'card'" :to="`/cards/${row.reward.resourceId}`" class="exchange-row__icon"><AssetImage :src="resourceIcon(row.reward)" :alt="resourceName(row.reward)" class="h-full w-full object-cover" /></RouterLink>
+              <div v-else class="exchange-row__icon p-1.5"><AssetImage :src="resourceIcon(row.reward)" :alt="resourceName(row.reward)" class="h-full w-full object-contain" /></div>
               <div class="min-w-0 flex-1">
-                <p class="font-medium text-sm truncate"><ZhText :text="resourceName(row.reward)" :zh="resourceDisplayZh(row.reward.resourceType, resourceName(row.reward)) ?? null" main-class="block truncate" sub-class="text-xs" /></p>
-                <p class="text-xs text-base-content/55">每次 ×{{ formatNumber(row.reward.resourceQuantity || 1) }} · 单价 {{ formatNumber(row.cost.resourceQuantity) }}</p>
-                <p class="text-[11px] text-base-content/45">{{ row.exchangeLimit ? `限兑 ${row.exchangeLimit} 次` : '无限兑换' }}</p>
+                <p class="text-sm font-medium"><ZhText :text="resourceName(row.reward)" :zh="resourceDisplayZh(row.reward.resourceType, resourceName(row.reward)) ?? null" main-class="block truncate" sub-class="text-xs" /></p>
+                <p class="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-base-content/55">
+                  <span>每次 ×<span class="num">{{ formatNumber(row.reward.resourceQuantity || 1) }}</span></span>
+                  <span class="inline-flex items-center gap-0.5"><AssetImage :src="eventBadgeIcon()" alt="单价" class="h-3.5 w-3.5 object-contain" /><span class="num">{{ formatNumber(row.cost.resourceQuantity) }}</span></span>
+                  <span>{{ row.exchangeLimit ? `限 ${row.exchangeLimit} 次` : '不限次数' }}</span>
+                </p>
               </div>
-              <div class="shrink-0 flex flex-col items-end gap-1">
-                <div class="join">
-                  <button class="join-item btn btn-xs" :disabled="getExchangeQuantity(row.id) <= 0" aria-label="减少兑换数量" @click="adjustExchangeQuantity(row, -1)"><Minus class="w-3 h-3" /></button>
-                  <input v-model.number="exchangeQuantities[row.id]" type="number" min="0" :max="row.exchangeLimit || 999" class="join-item input input-bordered input-xs w-14 text-center px-1" @change="setExchangeQuantity(row, exchangeQuantities[row.id] || 0)" />
-                  <button class="join-item btn btn-xs" :disabled="getExchangeQuantity(row.id) >= (row.exchangeLimit || 999)" aria-label="增加兑换数量" @click="adjustExchangeQuantity(row, 1)"><Plus class="w-3 h-3" /></button>
+              <div class="exchange-row__ctl">
+                <div class="stepper">
+                  <button type="button" :disabled="getExchangeQuantity(row.id) <= 0" aria-label="减少兑换数量" @click="adjustExchangeQuantity(row, -1)"><Minus class="h-3.5 w-3.5" /></button>
+                  <input
+                    v-model.number="exchangeQuantities[row.id]"
+                    type="number"
+                    inputmode="numeric"
+                    min="0"
+                    :max="row.exchangeLimit || 999"
+                    placeholder="0"
+                    :aria-label="`${resourceName(row.reward)} 兑换数量`"
+                    @change="setExchangeQuantity(row, exchangeQuantities[row.id] || 0)"
+                  />
+                  <button type="button" :disabled="getExchangeQuantity(row.id) >= (row.exchangeLimit || 999)" aria-label="增加兑换数量" @click="adjustExchangeQuantity(row, 1)"><Plus class="h-3.5 w-3.5" /></button>
                 </div>
-                <div class="flex items-center gap-1 text-xs font-medium text-primary"><AssetImage :src="eventBadgeIcon()" alt="活动徽章" class="w-5 h-5 object-contain" />{{ formatNumber(getExchangeQuantity(row.id) * row.cost.resourceQuantity) }}</div>
+                <div class="flex items-center gap-2 text-xs">
+                  <button
+                    v-if="row.exchangeLimit && getExchangeQuantity(row.id) < row.exchangeLimit"
+                    type="button"
+                    class="font-medium text-primary hover:underline"
+                    @click="setExchangeQuantity(row, row.exchangeLimit)"
+                  >
+                    选满
+                  </button>
+                  <span class="num inline-flex items-center gap-0.5 font-semibold" :class="getExchangeQuantity(row.id) > 0 ? 'text-primary' : 'text-base-content/35'">
+                    <AssetImage :src="eventBadgeIcon()" alt="活动徽章" class="h-4 w-4 object-contain" />{{ formatNumber(getExchangeQuantity(row.id) * row.cost.resourceQuantity) }}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
@@ -1168,3 +1205,153 @@ watch(() => route.params.id, loadData)
     </div>
   </div>
 </template>
+
+<style scoped>
+/* 兑换规划的汇总条：四格连在一起，中间用细线分开 */
+.exchange-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border: 1px solid var(--color-base-300);
+  border-radius: var(--radius-box);
+  overflow: hidden;
+}
+
+@media (min-width: 1024px) {
+  .exchange-summary {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.exchange-summary__cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  min-width: 0;
+  padding: 0.75rem 1rem;
+  /* 用外描边当分隔线：格子换行后也不会多出或缺少线 */
+  box-shadow: 0 0 0 0.5px var(--color-base-300);
+}
+
+.exchange-summary__label {
+  color: color-mix(in oklab, var(--color-base-content) 55%, transparent);
+  font-size: 0.75rem;
+}
+
+.exchange-summary__value {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-height: 2rem;
+  font-size: 1.375rem;
+  font-weight: 700;
+  line-height: 2rem;
+}
+
+.exchange-summary__value small {
+  margin-left: 0.125rem;
+  color: color-mix(in oklab, var(--color-base-content) 50%, transparent);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.exchange-summary__hint {
+  overflow: hidden;
+  color: color-mix(in oklab, var(--color-base-content) 45%, transparent);
+  font-size: 0.6875rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.exchange-summary__input {
+  width: 100%;
+  max-width: 9rem;
+  height: 2rem;
+  padding: 0 0.625rem;
+  border: 1px solid var(--color-base-300);
+  border-radius: var(--radius-field);
+  outline: none;
+  background-color: var(--color-base-100);
+  font-size: 1rem;
+  font-weight: 700;
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.exchange-summary__input:focus {
+  border-color: var(--color-primary);
+}
+
+.exchange-summary__input::-webkit-inner-spin-button,
+.exchange-summary__input::-webkit-outer-spin-button {
+  margin: 0;
+  -webkit-appearance: none;
+}
+
+.exchange-summary__cell.is-enough {
+  background-color: color-mix(in oklab, var(--color-success) 9%, transparent);
+}
+
+.exchange-summary__cell.is-enough .exchange-summary__value {
+  color: var(--color-success);
+}
+
+.exchange-summary__cell.is-short {
+  background-color: color-mix(in oklab, var(--color-error) 9%, transparent);
+}
+
+.exchange-summary__cell.is-short .exchange-summary__value {
+  color: var(--color-error);
+}
+
+/* 一条可兑换的奖励：选了数量的那几条描品牌色 */
+.exchange-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid var(--color-base-300);
+  border-radius: var(--radius-box);
+  background-color: var(--color-base-100);
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.exchange-row.is-picked {
+  border-color: color-mix(in oklab, var(--color-primary) 55%, var(--color-base-300));
+  background-color: color-mix(in oklab, var(--color-primary) 5%, var(--color-base-100));
+}
+
+/* 数量和小计：宽屏靠右竖排；手机上单独占一行，小计在左、步进器在右，名字就不会被挤成省略号 */
+.exchange-row__ctl {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.25rem;
+}
+
+@media (max-width: 639px) {
+  .exchange-row {
+    flex-wrap: wrap;
+    row-gap: 0.5rem;
+  }
+
+  .exchange-row__ctl {
+    flex-direction: row-reverse;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding-left: 4rem;
+  }
+}
+
+.exchange-row__icon {
+  display: block;
+  flex: none;
+  width: 3.25rem;
+  height: 3.25rem;
+  border-radius: 0.625rem;
+  background-color: color-mix(in oklab, var(--color-base-content) 6%, transparent);
+  overflow: hidden;
+}
+</style>

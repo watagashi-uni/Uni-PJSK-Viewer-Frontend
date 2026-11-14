@@ -5,6 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { Download, ImageDown, Search, Smile, X } from 'lucide-vue-next'
 import AssetImage from '@/components/AssetImage.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import CharacterPicker from '@/components/CharacterPicker.vue'
 import Pagination from '@/components/Pagination.vue'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
@@ -44,26 +45,14 @@ const typeOptions = [
   { value: 'non_character_illustration', label: '其他插画' },
 ]
 
-const unitOrder: Record<string, number> = {
-  light_sound: 1,
-  idol: 2,
-  street: 3,
-  theme_park: 4,
-  school_refusal: 5,
-  piapro: 6,
-}
-
 const characterMap = computed(() => new Map(characters.value.map(character => [character.id, character])))
 
-const characterOptions = computed(() => {
+const characterCounts = computed(() => {
   const counts = new Map<number, number>()
   for (const stamp of stamps.value) {
     if (stamp.characterId1) counts.set(stamp.characterId1, (counts.get(stamp.characterId1) || 0) + 1)
   }
-  return [...characters.value]
-    .filter(character => counts.has(character.id))
-    .sort((a, b) => (unitOrder[a.unit] || 99) - (unitOrder[b.unit] || 99) || a.seq - b.seq)
-    .map(character => ({ ...character, count: counts.get(character.id) || 0 }))
+  return counts
 })
 
 const filteredStamps = computed(() => {
@@ -187,12 +176,15 @@ onMounted(async () => {
             </button>
           </label>
 
-          <select v-model="selectedCharacterId" class="select select-bordered w-full">
-            <option value="">全部角色</option>
-            <option v-for="character in characterOptions" :key="character.id" :value="String(character.id)">
-              {{ characterName(character) }}（{{ character.count }}）
-            </option>
-          </select>
+          <CharacterPicker
+            dropdown
+            clearable
+            hide-empty
+            align="end"
+            :model-value="selectedCharacterId ? Number(selectedCharacterId) : null"
+            :counts="characterCounts"
+            @update:model-value="value => selectedCharacterId = typeof value === 'number' ? String(value) : ''"
+          />
 
           <select v-model="selectedType" class="select select-bordered w-full">
             <option value="">全部类型</option>

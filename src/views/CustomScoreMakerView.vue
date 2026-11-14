@@ -1080,28 +1080,28 @@ function selectTab(tab: FeedTab) {
       </div>
     </div>
 
-    <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
-      <PageHeader title="谱面 Maker" description="浏览游戏内自制谱面">
-        <template #icon><PenLine /></template>
-      </PageHeader>
-      
-      <div class="flex items-center gap-2 w-full lg:w-auto">
-        <input
-          v-model="searchScoreId"
-          type="text"
-          placeholder="输入投稿 ID 搜索..."
-          class="input input-bordered input-sm w-full sm:w-64 focus:ring-2 focus:ring-primary/20 transition-all"
-          @keydown.enter="searchById"
-        />
-        <button
-          class="btn btn-sm btn-primary shadow-sm px-3"
-          :disabled="isLoading || isMasterLoading || !searchScoreId.trim()"
-          @click="searchById"
-        >
-          <Search class="w-4 h-4" />
-        </button>
-      </div>
-    </div>
+    <PageHeader title="谱面 Maker" description="浏览游戏内自制谱面">
+      <template #icon><PenLine /></template>
+      <template #actions>
+        <div class="flex items-center gap-2">
+          <input
+            v-model="searchScoreId"
+            type="text"
+            placeholder="输入投稿 ID 搜索..."
+            class="input input-bordered input-sm w-full sm:w-64 focus:ring-2 focus:ring-primary/20 transition-all"
+            @keydown.enter="searchById"
+          />
+          <button
+            class="btn btn-sm btn-primary shadow-sm px-3"
+            aria-label="按投稿 ID 搜索"
+            :disabled="isLoading || isMasterLoading || !searchScoreId.trim()"
+            @click="searchById"
+          >
+            <Search class="w-4 h-4" />
+          </button>
+        </div>
+      </template>
+    </PageHeader>
 
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-1.5 bg-base-200/50 p-1.5 rounded-xl shadow-inner border border-base-200">
       <button

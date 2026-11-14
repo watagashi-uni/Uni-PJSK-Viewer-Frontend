@@ -5,7 +5,7 @@ import { useBackToList } from '@/composables/useBackToList'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
 import { 
-  ChevronLeft, Gift, Calendar, Clock, Percent, 
+  ChevronLeft, Gift, Calendar, Percent, Image as ImageIcon,
   Dices, RotateCcw, CreditCard, Sparkles, EyeOff, Target, X
 } from 'lucide-vue-next'
 import SekaiCard from '@/components/SekaiCard.vue'
@@ -34,6 +34,12 @@ const gacha = ref<Gacha | null>(null)
 useSpoilerWatermark(() => !!gacha.value && gacha.value.startAt > Date.now())
 const cards = ref<Card[]>([])
 const isLoading = ref(true)
+
+const gachaPhase = computed<'upcoming' | 'active' | 'ended'>(() => {
+  const now = Date.now()
+  if (!gacha.value || now > gacha.value.endAt) return 'ended'
+  return now < gacha.value.startAt ? 'upcoming' : 'active'
+})
 type BgType = 'chr' | 'normal_n' | 'normal_single' | 'none'
 
 const hasBanner = ref(false)
@@ -502,8 +508,8 @@ watch(() => route.params.id, loadData)
 
 <template>
   <div class="space-y-6">
-    <!-- 返回按钮 -->
-    <button type="button" class="back-link" @click="goBack">
+    <!-- 返回按钮：有卡池内容时，返回放在主视觉左上角 -->
+    <button v-if="isLoading || shouldHideContent || !gacha" type="button" class="back-link" @click="goBack">
       <ChevronLeft class="w-4 h-4" />
       返回卡池列表
     </button>
@@ -526,125 +532,83 @@ watch(() => route.params.id, loadData)
     </div>
 
     <template v-else-if="gacha">
-      <!-- 卡池信息卡片 -->
-      <div class="card bg-base-100">
-        <div class="card-body">
-          <div class="flex items-center gap-2 mb-2">
-            <span class="badge badge-lg">#{{ gacha.id }}</span>
-          </div>
-          
-          <div class="flex items-start justify-between mb-4">
-            <h1 class="text-2xl font-bold"><ZhText :text="gacha.name" table="gachas" path="name" sub-class="text-lg mt-1" /></h1>
-            <button 
+      <!-- 头部：卡池背景作主视觉，logo、时间和概率压在图上 -->
+      <section class="kv" :class="{ 'kv--plain': bgType === 'none' }">
+        <img
+          v-if="bgType !== 'none'"
+          :key="currentBgUrl"
+          :src="currentBgUrl"
+          alt=""
+          class="kv__art gacha-kv-art"
+          crossorigin="anonymous"
+        />
+        <div class="kv__top">
+          <button type="button" class="kv-chip" @click="goBack">
+            <ChevronLeft class="h-4 w-4" />
+            卡池列表
+          </button>
+          <div class="ml-auto flex flex-wrap items-center justify-end gap-2">
+            <button
               v-if="gacha.gachaInformation?.summary || gacha.gachaInformation?.description"
-              class="btn btn-outline btn-sm font-normal"
+              type="button"
+              class="kv-chip"
               @click="infoOpened = true; infoModal?.showModal()"
             >
               {{ zhGachas.enabled.value ? '卡池介绍' : '卡池介绍（日文）' }}
             </button>
-          </div>
-
-          <!-- 时间信息 -->
-          <div class="flex flex-wrap gap-6 text-sm mb-4">
-            <div class="flex items-center gap-2">
-              <Calendar class="w-4 h-4 text-primary" />
-              <span class="opacity-60">开始:</span>
-              <span>{{ formatDateTime(gacha.startAt) }}</span>
+            <!-- 背景有多张时可以翻看 -->
+            <div v-if="bgType === 'chr' || bgType === 'normal_n'" class="flex items-center gap-1">
+              <button type="button" class="kv-chip px-2!" aria-label="上一张背景" :disabled="currentBgIndex <= 1" @click="goPrevBg">
+                <ChevronLeft class="h-4 w-4" />
+              </button>
+              <span class="kv-chip num" aria-live="polite">{{ currentBgIndex }}</span>
+              <button
+                type="button"
+                class="kv-chip px-2!"
+                aria-label="下一张背景"
+                :disabled="(!hasNextBg && currentBgIndex >= maxValidBgIndex) || isCheckingNext"
+                @click="goNextBg"
+              >
+                <ChevronLeft class="h-4 w-4 rotate-180" />
+              </button>
             </div>
-            <div class="flex items-center gap-2">
-              <Clock class="w-4 h-4 text-primary" />
-              <span class="opacity-60">结束:</span>
-              <span>{{ formatDateTime(gacha.endAt) }}</span>
-            </div>
+            <a v-if="bgType !== 'none'" :href="currentBgUrl" target="_blank" rel="noopener noreferrer" class="kv-chip" title="在新标签页打开背景原图">
+              <ImageIcon class="h-4 w-4" /> 原图
+            </a>
           </div>
-
-          <!-- 概率信息 -->
-          <div class="flex items-center gap-2 flex-wrap">
-            <Percent class="w-4 h-4 text-primary" />
-            <span 
-              v-for="rate in (gacha.gachaCardRarityRates || []).filter(r => r.rate > 0)" 
+        </div>
+        <div class="kv__body">
+          <div class="flex items-end justify-between gap-4">
+            <AssetImage v-if="hasLogo" :src="logoUrl" :alt="gacha.name" class="kv__logo" />
+            <AssetImage v-if="hasBanner" :src="bannerUrl" alt="" class="gacha-kv-banner" />
+          </div>
+          <h1 class="kv__title"><ZhText :text="gacha.name" table="gachas" path="name" sub-class="text-base md:text-lg mt-0.5" /></h1>
+          <div class="kv__meta">
+            <span class="kv-chip num">#{{ gacha.id }}</span>
+            <span class="kv-chip" :class="{ 'kv-chip--live': gachaPhase === 'active', 'kv-chip--soon': gachaPhase === 'upcoming' }">
+              {{ gachaPhase === 'active' ? '进行中' : gachaPhase === 'upcoming' ? '未开始' : '已结束' }}
+            </span>
+            <span class="kv-chip font-normal">
+              <Calendar class="h-3.5 w-3.5" />
+              {{ formatDateTime(gacha.startAt) }} – {{ formatDateTime(gacha.endAt) }}
+            </span>
+          </div>
+          <div class="kv__meta">
+            <span class="kv-chip font-normal"><Percent class="h-3.5 w-3.5" /> 出现率</span>
+            <span
+              v-for="rate in (gacha.gachaCardRarityRates || []).filter(r => r.rate > 0)"
               :key="rate.id"
-              class="badge"
+              class="kv-chip num"
               :class="{
-                'badge-warning': rarityTypeToNum[rate.cardRarityType] === 4,
-                'badge-secondary': rarityTypeToNum[rate.cardRarityType] === 3,
-                'badge-ghost': (rarityTypeToNum[rate.cardRarityType] ?? 0) <= 2
+                'gacha-rate-4': rarityTypeToNum[rate.cardRarityType] === 4,
+                'gacha-rate-3': rarityTypeToNum[rate.cardRarityType] === 3,
               }"
             >
               {{ getRateDisplay(rate) }}
             </span>
           </div>
         </div>
-      </div>
-
-      <!-- Logo和Banner展示 -->
-      <div v-if="hasLogo || hasBanner" class="card bg-base-100">
-        <div class="card-body p-3 sm:p-5">
-          <h2 class="text-base font-medium mb-1 opacity-80">
-            展示图
-          </h2>
-          <div class="flex flex-row flex-wrap justify-center items-end gap-6">
-            <div v-if="hasLogo" class="flex flex-col items-center gap-1">
-              <span class="text-[10px] font-bold opacity-40 uppercase tracking-wider">Logo</span>
-              <AssetImage 
-                :src="logoUrl" 
-                alt="Logo"
-                class="h-20 sm:h-28 object-contain"
-              />
-            </div>
-            
-            <div v-if="hasBanner" class="flex flex-col items-center gap-1">
-              <span class="text-[10px] font-bold opacity-40 uppercase tracking-wider">Banner</span>
-              <AssetImage 
-                :src="bannerUrl" 
-                alt="Banner"
-                class="h-20 sm:h-24 object-contain rounded-lg shadow-sm"
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 背景展示 -->
-      <div v-if="bgType !== 'none'" class="card bg-base-100 overflow-hidden">
-        <div class="px-5 pt-3 pb-2 border-b border-base-200">
-          <h2 class="text-base font-medium opacity-80">
-            卡池背景
-          </h2>
-        </div>
-        <figure class="relative bg-base-300">
-          <AssetImage 
-            :src="currentBgUrl" 
-            :alt="gacha.name + ' 背景'"
-            class="w-full object-cover max-h-[600px]"
-          />
-        </figure>
-        
-        <div v-if="bgType === 'chr' || bgType === 'normal_n'" class="card-body py-3 border-t border-base-200">
-          <div class="flex items-center justify-between">
-            <button 
-              class="btn btn-sm sm:btn-md"
-              :class="{ 'btn-disabled': currentBgIndex <= 1 }"
-              :disabled="currentBgIndex <= 1"
-              @click="goPrevBg"
-            >
-              <ChevronLeft class="w-5 h-5 mr-1" /> 上一张
-            </button>
-            <span class="text-sm font-medium opacity-70">
-              第 {{ currentBgIndex }} 张
-            </span>
-            <button 
-              class="btn btn-sm sm:btn-md"
-              :class="{ 'btn-disabled': (!hasNextBg && currentBgIndex >= maxValidBgIndex) || isCheckingNext }"
-              :disabled="(!hasNextBg && currentBgIndex >= maxValidBgIndex) || isCheckingNext"
-              @click="goNextBg"
-            >
-              {{ isCheckingNext ? '检查中...' : '下一张' }}
-              <ChevronLeft class="w-5 h-5 ml-1 inline-block rotate-180" />
-            </button>
-          </div>
-        </div>
-      </div>
+      </section>
 
       <!-- 本期角色 -->
       <div v-if="featuredCards.length > 0" class="card bg-base-100">
@@ -846,3 +810,36 @@ watch(() => route.params.id, loadData)
     </dialog>
   </div>
 </template>
+
+<style scoped>
+/* 卡池背景上半部分是角色，下半是说明文字，取中间偏上 */
+.gacha-kv-art {
+  object-position: center 30%;
+}
+
+/* 首页横幅：桌面端放在主视觉右下角，手机上宽度不够就不显示 */
+.gacha-kv-banner {
+  display: none;
+  width: auto;
+  height: 5.5rem;
+  margin-left: auto;
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 18px rgb(0 0 0 / 0.4);
+}
+
+@media (min-width: 768px) {
+  .gacha-kv-banner {
+    display: block;
+  }
+}
+
+.gacha-rate-4 {
+  border-color: transparent;
+  background-color: #e08a00;
+}
+
+.gacha-rate-3 {
+  border-color: transparent;
+  background-color: #cf3a78;
+}
+</style>

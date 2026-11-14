@@ -8,6 +8,7 @@ import SekaiHonor from '@/components/SekaiHonor.vue'
 import SekaiHonorBonds from '@/components/SekaiHonorBonds.vue'
 import AccountSelector from '@/components/AccountSelector.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import CharacterPicker from '@/components/CharacterPicker.vue'
 import OwnedOnlyToggle from '@/components/OwnedOnlyToggle.vue'
 import { useMasterStore } from '@/stores/master'
 import { useAccountStore } from '@/stores/account'
@@ -217,7 +218,6 @@ const paginatedHonors = computed(() => filteredHonors.value.slice(
   normalPage.value * normalPageSize,
 ))
 
-const characterOptions = computed(() => [...characters.value].sort((a, b) => a.seq - b.seq))
 
 const filteredBondsHonors = computed(() => {
   const query = bondsSearch.value.trim().toLocaleLowerCase()
@@ -452,10 +452,12 @@ onMounted(async () => {
               <input v-model="bondsSearch" class="grow min-w-0" placeholder="搜索角色、牵绊文字或 ID…" />
               <button v-if="bondsSearch" class="btn btn-ghost btn-xs btn-circle" aria-label="清空" @click="bondsSearch = ''"><X class="w-3 h-3" /></button>
             </label>
-            <select v-model.number="selectedBondsCharacter" class="select select-bordered w-full min-w-0 max-w-full">
-              <option :value="0">全部角色</option>
-              <option v-for="character in characterOptions" :key="character.id" :value="character.id">{{ characterName(character) }}</option>
-            </select>
+            <CharacterPicker
+              dropdown
+              clearable
+              :model-value="selectedBondsCharacter || null"
+              @update:model-value="value => selectedBondsCharacter = typeof value === 'number' ? value : 0"
+            />
             <select v-model="selectedBondsRarity" class="select select-bordered w-full min-w-0 max-w-full">
               <option value="">全部稀有度</option>
               <option v-for="option in rarityOptions" :key="option.value" :value="option.value">{{ option.label }}</option>

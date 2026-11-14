@@ -27,6 +27,7 @@ import type {
   CostumePart,
 } from '@/types/costume'
 import PageHeader from '@/components/PageHeader.vue'
+import CharacterPicker from '@/components/CharacterPicker.vue'
 import { useZh } from '@/composables/useZh'
 import { useCharacterName } from '@/composables/useCharacterName'
 import ZhText from '@/components/ZhText.vue'
@@ -159,10 +160,6 @@ async function finishRoleTransition(generation = roleTransitionGeneration) {
     roleTransitionVisible.value = false
   }
 }
-
-const sortedCharacters = computed(() =>
-  [...characters.value].filter(character => character.id <= 26).sort((a, b) => a.id - b.id)
-)
 
 const selectedCharacter = computed(() =>
   characters.value.find(character => character.id === selectedCharacterId.value) ?? null
@@ -443,6 +440,18 @@ const previewSelection = computed(() => ({
   hair: selectedHair.value?.variant ?? null,
 }))
 
+// 展示动作：默认用当前角色自己的，也可以借别的角色的
+const motionCharacterId = ref<number | null>(null)
+const previewMotionRole = computed(() => {
+  const characterId = motionCharacterId.value
+  if (characterId === null || characterId === selectedCharacterId.value) return null
+  const unit = unitsFor(characterId)[0]
+  return unit ? { characterId, unit } : null
+})
+const motionCharacter = computed(() => previewMotionRole.value
+  ? characters.value.find(entry => entry.id === previewMotionRole.value?.characterId)
+  : undefined)
+
 const previewBodyRole = computed(() => {
   if (!crossBodyEnabled.value || effectiveBodyCharacterId.value === null) return null
   return {
@@ -498,15 +507,13 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="space-y-6 pb-12">
-    <div class="flex flex-wrap items-center justify-between gap-3">
-      <div>
-        <RouterLink to="/costumes" class="back-link mb-2">
-          <ArrowLeft class="w-4 h-4" /> 返回衣装列表
-        </RouterLink>
-        <PageHeader title="衣装自由搭配" description="自由组合服装、发饰与发型；选中一个部件后，同套部件会排到其他栏最前。">
-          <template #icon><Dices /></template>
-        </PageHeader>
-      </div>
+    <div>
+      <RouterLink to="/costumes" class="back-link mb-2">
+        <ArrowLeft class="w-4 h-4" /> 返回衣装列表
+      </RouterLink>
+      <PageHeader title="衣装自由搭配" description="自由组合服装、发饰与发型；选中一个部件后，同套部件会排到其他栏最前。">
+        <template #icon><Dices /></template>
+      </PageHeader>
     </div>
 
     <div v-if="isLoading" class="flex justify-center py-24">
@@ -517,24 +524,10 @@ onBeforeUnmount(() => {
       <section class="card bg-base-100">
         <div class="card-body p-4">
           <h2 class="text-sm font-bold text-base-content/65 mb-1">1. 选择角色</h2>
-          <div class="flex flex-wrap gap-2">
-            <button
-              v-for="character in sortedCharacters"
-              :key="character.id"
-              class="btn btn-sm h-10 min-h-10 gap-1.5 pl-1.5 pr-2"
-              :class="selectedCharacterId === character.id ? 'btn-primary' : 'btn-outline'"
-              @click="chooseCharacter(character.id)"
-            >
-              <span class="h-7 w-7 overflow-hidden rounded-full bg-base-200">
-                <img
-                  :src="`/img/chr_ts/chr_ts_90_${character.id}.png`"
-                  :alt="characterName(character)"
-                  class="h-full w-full object-cover"
-                />
-              </span>
-              {{ characterName(character) }}
-            </button>
-          </div>
+          <CharacterPicker
+            :model-value="selectedCharacterId"
+            @update:model-value="value => { if (typeof value === 'number') chooseCharacter(value) }"
+          />
           <select
             v-if="selectedCharacterId !== null && mainUnitOptions.length > 1"
             v-model="selectedUnit"
@@ -573,23 +566,13 @@ onBeforeUnmount(() => {
             </div>
 
             <template v-if="crossBodyEnabled">
-              <div class="flex flex-wrap gap-2 pt-2 border-t border-secondary/20">
-                <button
-                  v-for="character in sortedCharacters"
-                  :key="character.id"
-                  class="btn btn-xs h-9 min-h-9 gap-1 pl-1 pr-2"
-                  :class="effectiveBodyCharacterId === character.id ? 'btn-secondary' : 'btn-outline'"
-                  @click="chooseBodyCharacter(character.id)"
+              <div class="pt-3 border-t border-secondary/20">
+                <CharacterPicker
+                  :model-value="effectiveBodyCharacterId"
+                  @update:model-value="value => { if (typeof value === 'number') chooseBodyCharacter(value) }"
                 >
-                  <span class="h-6 w-6 overflow-hidden rounded-full bg-base-200">
-                    <img
-                      :src="`/img/chr_ts/chr_ts_90_${character.id}.png`"
-                      :alt="characterName(character)"
-                      class="h-full w-full object-cover"
-                    />
-                  </span>
-                  {{ characterName(character) }}
-                </button>
+                  <template #label>身体来自</template>
+                </CharacterPicker>
               </div>
               <select
                 v-if="bodyUnitOptions.length > 1"
@@ -757,11 +740,27 @@ onBeforeUnmount(() => {
             <p class="text-xs text-base-content/50 mb-3">
               不可用或源文件缺失的已选部件会显示“暂无”，不会替换为默认部件。
             </p>
+            <div class="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2">
+              <span class="filter-label">展示动作</span>
+              <CharacterPicker
+                dropdown
+                clearable
+                all-label="当前角色"
+                :model-value="previewMotionRole?.characterId ?? null"
+                @update:model-value="value => motionCharacterId = typeof value === 'number' ? value : null"
+              />
+              <span class="text-xs text-base-content/50">
+                {{ motionCharacter
+                  ? `正在用 ${characterName(motionCharacter)} 的动作和表情`
+                  : '可以换成其他角色的动作和表情' }}
+              </span>
+            </div>
             <Costume3DPreview
               :character-id="selectedCharacterId"
               :unit="selectedUnit"
               :selection="previewSelection"
               :body-role="previewBodyRole"
+              :motion-role="previewMotionRole"
             />
           </div>
         </section>

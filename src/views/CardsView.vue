@@ -16,6 +16,7 @@ import { useAccountStore } from '@/stores/account'
 import Pagination from '@/components/Pagination.vue'
 import SekaiCard from '@/components/SekaiCard.vue'
 import AccountSelector from '@/components/AccountSelector.vue'
+import CharacterPicker from '@/components/CharacterPicker.vue'
 import ZhText from '@/components/ZhText.vue'
 import { useCharacterName } from '@/composables/useCharacterName'
 
@@ -126,16 +127,6 @@ watch(showUserCards, (show) => {
   if (!show && filterOwnedOnly.value) pushQuery({ owned: undefined })
 })
 
-// 组合列表
-const unitList = [
-  { value: 'light_sound', label: 'Leo/need', image: '/img/logo/logo_light_sound.png' },
-  { value: 'idol', label: 'MORE MORE JUMP!', image: '/img/logo/logo_idol.png' },
-  { value: 'street', label: 'Vivid BAD SQUAD', image: '/img/logo/logo_street.png' },
-  { value: 'theme_park', label: 'Wonderlands x Showtime', image: '/img/logo/logo_theme_park.png' },
-  { value: 'school_refusal', label: '25-ji, Nightcord de.', image: '/img/logo/logo_school_refusal.png' },
-  { value: 'piapro', label: 'VIRTUAL SINGER', image: '/img/logo/logo_piapro.png' },
-]
-
 // 属性列表
 const attrList = ['cute', 'cool', 'pure', 'happy', 'mysterious']
 
@@ -197,32 +188,22 @@ const visibleBaseCards = computed(() => {
   return cards.value.filter(c => c.releaseAt <= now)
 })
 
-const unitOptions = computed(() => {
+const unitCounts = computed(() => {
   const counts = new Map<string, number>()
   for (const card of visibleBaseCards.value) {
     for (const unit of getCardUnits(card)) {
       counts.set(unit, (counts.get(unit) || 0) + 1)
     }
   }
-  return unitList
-    .map(option => ({ ...option, count: counts.get(option.value) || 0 }))
-    .filter(option => option.count > 0)
+  return counts
 })
 
-const characterOptions = computed(() => {
+const characterCounts = computed(() => {
   const counts = new Map<number, number>()
   for (const card of visibleBaseCards.value) {
     counts.set(card.characterId, (counts.get(card.characterId) || 0) + 1)
   }
-  return [...characters.value]
-    .sort((a, b) => a.id - b.id)
-    .map(chara => ({
-      value: chara.id,
-      label: characterName(chara),
-      icon: `/img/chr_ts/chr_ts_90_${chara.id}.png`,
-      count: counts.get(chara.id) || 0,
-    }))
-    .filter(option => option.count > 0)
+  return counts
 })
 
 const attrOptions = computed(() => {
@@ -365,12 +346,13 @@ function toggleListValue(key: string, value: string) {
   pushQuery({ [key]: current.length > 0 ? current.join(',') : undefined })
 }
 
-function toggleCharacter(id: number) {
-  toggleListValue('charaIds', String(id))
+function setCharacters(value: number | number[] | null) {
+  const ids = Array.isArray(value) ? value : value ? [value] : []
+  pushQuery({ charaIds: ids.length > 0 ? ids.join(',') : undefined })
 }
 
-function toggleUnit(value: string) {
-  toggleListValue('units', value)
+function setUnits(value: string[]) {
+  pushQuery({ units: value.length > 0 ? value.join(',') : undefined })
 }
 
 function toggleAttr(value: string) {
@@ -498,88 +480,71 @@ onMounted(() => {
         </button>
       </div>
 
-      <div v-if="isFilterPanelOpen" class="border-t border-base-200 p-3 space-y-4">
-        <div>
-          <div class="text-xs font-bold text-base-content/60 mb-2">组合</div>
-          <div class="flex flex-wrap gap-2">
-            <button
-              v-for="unit in unitOptions"
-              :key="unit.value"
-              class="btn btn-sm min-h-9 h-9 px-3"
-              :class="selectedUnits.includes(unit.value) ? 'btn-primary' : 'btn-outline'"
-              :title="unit.label"
-              @click="toggleUnit(unit.value)"
-            >
-              <img :src="unit.image" :alt="unit.label" class="h-4 max-w-[86px] object-contain" />
-              <span class="text-[10px] opacity-60">{{ unit.count }}</span>
-            </button>
-          </div>
-        </div>
+      <div v-if="isFilterPanelOpen" class="border-t border-base-300 p-3 space-y-4">
+        <CharacterPicker
+          multiple
+          hide-empty
+          :model-value="selectedCharaIds"
+          :counts="characterCounts"
+          :units="selectedUnits"
+          :unit-counts="unitCounts"
+          @update:model-value="setCharacters"
+          @update:units="setUnits"
+        >
+          <template #label>角色 / 团体（点 logo 按团体筛选，可多选）</template>
+        </CharacterPicker>
 
         <div>
-          <div class="text-xs font-bold text-base-content/60 mb-2">角色</div>
-          <div class="flex flex-wrap gap-2">
-            <button
-              v-for="chara in characterOptions"
-              :key="chara.value"
-              class="btn btn-sm h-9 min-h-9 gap-1.5 pl-1.5 pr-2"
-              :class="selectedCharaIds.includes(chara.value) ? 'btn-primary' : 'btn-outline'"
-              @click="toggleCharacter(chara.value)"
-            >
-              <span class="h-6 w-6 overflow-hidden rounded-full bg-base-200 ring-1 ring-base-300">
-                <img :src="chara.icon" :alt="chara.label" class="h-full w-full object-cover" />
-              </span>
-              {{ chara.label }}
-              <span class="text-[10px] opacity-60">{{ chara.count }}</span>
-            </button>
-          </div>
-        </div>
-
-        <div>
-          <div class="text-xs font-bold text-base-content/60 mb-2">属性</div>
+          <div class="filter-label">属性</div>
           <div class="flex flex-wrap gap-2">
             <button
               v-for="attr in attrOptions"
               :key="attr.value"
-              class="btn btn-sm h-9 min-h-9 gap-1 px-2.5"
-              :class="selectedAttrs.includes(attr.value) ? 'btn-primary' : 'btn-outline'"
+              type="button"
+              class="chip"
+              :class="{ 'is-active': selectedAttrs.includes(attr.value) }"
+              :aria-pressed="selectedAttrs.includes(attr.value)"
               :title="attr.value"
               @click="toggleAttr(attr.value)"
             >
               <img :src="attr.icon" :alt="attr.value" class="h-5 w-5 object-contain" />
-              <span class="text-[10px] opacity-60">{{ attr.count }}</span>
+              <span class="chip__count">{{ attr.count }}</span>
             </button>
           </div>
         </div>
 
         <div>
-          <div class="text-xs font-bold text-base-content/60 mb-2">稀有度</div>
+          <div class="filter-label">稀有度</div>
           <div class="flex flex-wrap gap-2">
             <button
               v-for="rarity in rarityOptions"
               :key="rarity.value"
-              class="btn btn-sm h-8 min-h-8"
-              :class="selectedRarities.includes(rarity.value) ? 'btn-primary' : 'btn-outline'"
+              type="button"
+              class="chip"
+              :class="{ 'is-active': selectedRarities.includes(rarity.value) }"
+              :aria-pressed="selectedRarities.includes(rarity.value)"
               @click="toggleRarity(rarity.value)"
             >
               {{ rarity.label }}
-              <span class="text-[10px] opacity-60">{{ rarity.count }}</span>
+              <span class="chip__count">{{ rarity.count }}</span>
             </button>
           </div>
         </div>
 
         <div>
-          <div class="text-xs font-bold text-base-content/60 mb-2">技能类型</div>
+          <div class="filter-label">技能类型</div>
           <div class="flex flex-wrap gap-2">
             <button
               v-for="skillType in skillTypeOptions"
               :key="skillType.value"
-              class="btn btn-sm h-8 min-h-8"
-              :class="selectedSkillTypes.includes(skillType.value) ? 'btn-primary' : 'btn-outline'"
+              type="button"
+              class="chip"
+              :class="{ 'is-active': selectedSkillTypes.includes(skillType.value) }"
+              :aria-pressed="selectedSkillTypes.includes(skillType.value)"
               @click="toggleSkillType(skillType.value)"
             >
               {{ skillType.label }}
-              <span class="text-[10px] opacity-60">{{ skillType.count }}</span>
+              <span class="chip__count">{{ skillType.count }}</span>
             </button>
           </div>
         </div>

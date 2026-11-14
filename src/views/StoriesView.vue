@@ -232,9 +232,19 @@ const scenarioUrls = computed(() => {
   return []
 })
 
-const selectedStoryBannerUrl = computed(() => selectedStory.value?.kind === 'event'
-  ? `${assetsHost.value}/startapp/home/banner/${selectedStory.value.assetbundleName}/${selectedStory.value.assetbundleName}.png`
+// 活动故事详情的头图：活动界面的背景大图 + logo（资源名和活动相同）
+const storyArtFailed = ref(false)
+const storyLogoFailed = ref(false)
+const selectedStoryArtUrl = computed(() => selectedStory.value?.kind === 'event' && selectedStory.value.assetbundleName
+  ? `${assetsHost.value}/ondemand/event/${selectedStory.value.assetbundleName}/screen/bg.png`
   : '')
+const selectedStoryLogoUrl = computed(() => selectedStory.value?.kind === 'event'
+  ? `${assetsHost.value}/ondemand/event/${selectedStory.value.assetbundleName}/logo/logo.png`
+  : '')
+watch(selectedStoryArtUrl, () => {
+  storyArtFailed.value = false
+  storyLogoFailed.value = false
+})
 
 const selectedStoryEpisodes = computed(() => {
   if (!selectedStory.value) return []
@@ -457,16 +467,27 @@ onMounted(async () => {
     </div>
 
     <section class="card bg-base-100 border border-base-200">
-      <div class="card-body p-3 md:p-4 grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_240px] gap-3">
-        <label class="input input-bordered flex items-center gap-2">
+      <div class="card-body gap-3 p-3 md:p-4">
+        <label class="input input-bordered flex w-full items-center gap-2 md:max-w-md">
           <Search class="w-4 h-4 opacity-50" /><input v-model="searchQuery" class="grow min-w-0" placeholder="搜索故事或章节标题…" />
           <button v-if="searchQuery" class="btn btn-xs btn-circle btn-ghost" aria-label="清空" @click="searchQuery = ''"><X class="w-3 h-3" /></button>
         </label>
-        <select v-if="activeTab === 'event' || activeTab === 'unit'" v-model="selectedUnit" class="select select-bordered w-full">
-          <option value="">全部组合</option>
-          <option v-for="unit in unitOptions" :key="unit.value" :value="unit.value">{{ unit.label }}</option>
-        </select>
-        <p class="md:col-span-2 text-xs text-base-content/45">阅读进度保存在当前浏览器，不影响游戏账号。部分剧本没有配音，仍可阅读原文。</p>
+        <div v-if="activeTab === 'event' || activeTab === 'unit'" class="hide-scrollbar -mx-3 flex gap-1.5 overflow-x-auto px-3 py-0.5 md:mx-0 md:flex-wrap md:px-0.5" role="group" aria-label="按团体筛选">
+          <button type="button" class="chip" :class="{ 'is-active': selectedUnit === '' }" :aria-pressed="selectedUnit === ''" @click="selectedUnit = ''">全部团体</button>
+          <button
+            v-for="unit in unitOptions"
+            :key="unit.value"
+            type="button"
+            class="chip chip--logo"
+            :class="{ 'is-active': selectedUnit === unit.value }"
+            :aria-pressed="selectedUnit === unit.value"
+            :title="unit.label"
+            @click="selectedUnit = selectedUnit === unit.value ? '' : unit.value"
+          >
+            <img :src="unit.logo" :alt="unit.label" />
+          </button>
+        </div>
+        <p class="text-xs text-base-content/45">阅读进度保存在当前浏览器，不影响游戏账号。部分剧本没有配音，仍可阅读原文。</p>
       </div>
     </section>
 
@@ -540,17 +561,27 @@ onMounted(async () => {
         <!-- 横幅、简介、搜索和章节列表在同一个滚动区里，关闭按钮停在右上角 -->
         <div v-else class="story-scroll">
           <div class="modal-x modal-x-flush"><button class="btn btn-sm btn-circle" aria-label="关闭" @click="closeStory"><X class="w-4 h-4" /></button></div>
-          <div v-if="selectedStoryBannerUrl" class="relative aspect-[122/36] max-h-48 overflow-hidden bg-base-200"><AssetImage :src="selectedStoryBannerUrl" :alt="selectedStory.title" class="w-full h-full object-cover" /><div class="absolute inset-0 bg-gradient-to-t from-base-100 via-transparent to-transparent"></div></div>
-          <header class="p-5 pr-12 border-b border-base-200 flex items-start gap-3" :class="selectedStoryBannerUrl ? '-mt-8 relative z-10 pt-0' : ''">
-            <div class="min-w-0 flex-1">
-              <div class="flex flex-wrap items-center gap-2 mb-2">
-                <span class="badge badge-primary">{{ selectedStory.kind === 'event' ? '活动故事' : selectedStory.kind === 'unit' ? '组合主线' : extraLabels[selectedStory.kind] }}</span>
-                <span v-if="selectedStory.unit" class="badge badge-ghost">{{ getUnitLabel(selectedStory.unit) }}</span>
+          <!-- 活动故事：活动主视觉大图作头部，logo 和标题压在图上（首页横幅太小，放大了发糊） -->
+          <div v-if="selectedStoryArtUrl" class="kv story-kv" :class="{ 'kv--plain': storyArtFailed }">
+            <img v-if="!storyArtFailed" :key="selectedStoryArtUrl" :src="selectedStoryArtUrl" alt="" class="kv__art" crossorigin="anonymous" @error="storyArtFailed = true" />
+            <div class="kv__body">
+              <img v-if="!storyLogoFailed" :src="selectedStoryLogoUrl" :alt="selectedStory.title" class="kv__logo" crossorigin="anonymous" @error="storyLogoFailed = true" />
+              <h2 class="kv__title"><ZhText :text="selectedStory.title" v-bind="STORY_TITLE_ZH[selectedStory.kind]" sub-class="text-base mt-0.5" /></h2>
+              <div class="kv__meta">
+                <span class="kv-chip kv-chip--solid">活动故事</span>
+                <span v-if="selectedStory.unit" class="kv-chip">{{ getUnitLabel(selectedStory.unit) }}</span>
+                <span class="kv-chip font-normal">{{ selectedStory.episodes.length }} 话</span>
               </div>
-              <h2 class="font-bold text-xl"><ZhText :text="selectedStory.title" v-bind="STORY_TITLE_ZH[selectedStory.kind]" sub-class="text-base" /></h2>
-              <p v-if="selectedStory.outline" class="text-sm leading-6 text-base-content/65 mt-2 whitespace-pre-line"><ZhText :text="selectedStory.outline" v-bind="OUTLINE_ZH[selectedStory.kind] || {}" sub-class="mt-2 text-[0.95em]" /></p>
             </div>
+          </div>
+          <header v-else class="p-5 pr-12 border-b border-base-200">
+            <div class="flex flex-wrap items-center gap-2 mb-2">
+              <span class="badge badge-primary">{{ selectedStory.kind === 'unit' ? '组合主线' : selectedStory.kind === 'event' ? '活动故事' : extraLabels[selectedStory.kind] }}</span>
+              <span v-if="selectedStory.unit" class="badge badge-ghost">{{ getUnitLabel(selectedStory.unit) }}</span>
+            </div>
+            <h2 class="font-bold text-xl"><ZhText :text="selectedStory.title" v-bind="STORY_TITLE_ZH[selectedStory.kind]" sub-class="text-base" /></h2>
           </header>
+          <p v-if="selectedStory.outline" class="border-b border-base-200 px-5 py-4 text-sm leading-6 text-base-content/70 whitespace-pre-line"><ZhText :text="selectedStory.outline" v-bind="OUTLINE_ZH[selectedStory.kind] || {}" sub-class="mt-2 text-[0.95em]" /></p>
           <div class="p-4 border-b border-base-200 bg-base-100"><label class="input input-sm input-bordered flex items-center gap-2"><Search class="w-4 h-4 opacity-40" /><input v-model="episodeSearch" class="grow" placeholder="搜索本篇章节标题或剧本 ID…" /><button v-if="episodeSearch" class="btn btn-xs btn-circle btn-ghost" @click="episodeSearch = ''"><X class="w-3 h-3" /></button></label></div>
           <div class="p-3 md:p-4 space-y-2 bg-base-200/50">
             <StorySummaryPanel :story-key="selectedStoryKey" :fallback-scenario-id="selectedStory.episodes.length === 1 ? selectedStory.episodes[0]?.scenarioId : ''" class="mb-3" />
@@ -586,6 +617,9 @@ onMounted(async () => {
    （底部地址栏的浏览器、不支持 dvh/svh 的内嵌浏览器都会出现这种情况） */
 .story-modal .modal-box { max-height:94vh; max-height:94svh; overflow:hidden; }
 /* 章节列表页：整块内容一起滚动，高度与弹窗的上限一致 */
+/* 弹窗里的活动主视觉：四角由弹窗裁切，高度比详情页矮 */
+.story-kv { border-radius:0; }
+@media (min-width: 768px) { .story-kv { min-height:15.5rem; } }
 .story-scroll { max-height:94vh; max-height:94svh; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; }
 .episode-synopsis {
   display:block; width:calc(100% - 1.25rem); margin:-.25rem .625rem .625rem; padding:.5rem .75rem;

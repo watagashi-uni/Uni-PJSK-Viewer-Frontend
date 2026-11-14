@@ -25,7 +25,7 @@ function isEditable(target: EventTarget | null): boolean {
 
 /** Ctrl/⌘ + K 随时打开；不在输入框里时按 / 也能打开 */
 function onKeydown(event: KeyboardEvent): void {
-  if (event.defaultPrevented || event.isComposing) return
+  if (event.defaultPrevented || event.isComposing || event.keyCode === 229) return
   const key = event.key.toLowerCase()
   if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && key === 'k') {
     event.preventDefault()

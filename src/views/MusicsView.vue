@@ -1409,73 +1409,190 @@ watch(totalPages, (pages) => {
       </template>
     </PageHeader>
 
-    <!-- 第一行：搜索框 + 排序 -->
-    <div class="toolbar mb-3">
-      <div class="relative w-full sm:w-72">
-        <input 
-          ref="searchInputRef"
-          v-model="searchText"
-          type="search"
-          placeholder="歌名 / 译名 / 作曲 / 读音"
-          aria-label="搜索歌曲"
-          class="input input-bordered w-full pl-10 input-sm"
-          @input="clearArtistFilter"
-        />
-        <Search class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-base-content/40" />
-      </div>
-
-      <button
-        v-if="selectedArtist"
-        type="button"
-        class="btn btn-primary btn-sm max-w-full gap-2 rounded-full"
-        :title="`清除 artist 筛选：${selectedArtist}`"
-        @click="clearArtistFilter"
-      >
-        <span class="text-xs opacity-75">Artist</span>
-        <span class="truncate max-w-[12rem]">{{ selectedArtist }}</span>
-        <span class="text-base leading-none">×</span>
-      </button>
-
-      <div class="flex w-full min-w-0 flex-wrap items-center gap-2 sm:w-auto">
-        <div class="join shrink-0">
-          <button 
-            class="join-item btn btn-sm"
-            :class="{ 'btn-primary': sortKey === 'publishedAt' }"
-            @click="toggleSort('publishedAt')"
-          >
-            时间
-            <ArrowUpDown v-if="sortKey === 'publishedAt'" class="w-3 h-3 ml-1" :class="{ 'rotate-180': sortOrder === 'asc' }" />
-          </button>
-          <button 
-            class="join-item btn btn-sm"
-            :class="{ 'btn-primary': sortKey === 'id' }"
-            @click="toggleSort('id')"
-          >
-            ID
-            <ArrowUpDown v-if="sortKey === 'id'" class="w-3 h-3 ml-1" :class="{ 'rotate-180': sortOrder === 'asc' }" />
-          </button>
-          <button 
-            class="join-item btn btn-sm"
-            :class="{ 'btn-primary': sortKey === 'level' }"
-            @click="toggleSort('level')"
-          >
-            定数
-            <ArrowUpDown v-if="sortKey === 'level'" class="w-3 h-3 ml-1" :class="{ 'rotate-180': sortOrder === 'asc' }" />
-          </button>
+    <!-- 第一行：搜索 + 排序 + 筛选开关在同一条里；手机上放不下时搜索框独占一行 -->
+    <div class="panel mb-3">
+      <div class="flex flex-wrap items-center gap-x-3 gap-y-2 p-3">
+        <div class="relative w-full sm:w-72">
+          <input 
+            ref="searchInputRef"
+            v-model="searchText"
+            type="search"
+            placeholder="歌名 / 译名 / 作曲 / 读音"
+            aria-label="搜索歌曲"
+            class="input input-bordered w-full pl-10 input-sm"
+            @input="clearArtistFilter"
+          />
+          <Search class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-base-content/40" />
         </div>
 
-        <select 
-          v-if="sortKey === 'level' || viewMode === 'level'"
-          v-model="selectedDiffType"
-          class="select select-bordered select-sm shrink-0 w-auto max-w-[100px]"
+        <button
+          v-if="selectedArtist"
+          type="button"
+          class="btn btn-primary btn-sm max-w-full gap-2 rounded-full"
+          :title="`清除 artist 筛选：${selectedArtist}`"
+          @click="clearArtistFilter"
         >
-          <option value="easy">Easy</option>
-          <option value="normal">Normal</option>
-          <option value="hard">Hard</option>
-          <option value="expert">Expert</option>
-          <option value="master">Master</option>
-          <option value="append">Append</option>
-        </select>
+          <span class="text-xs opacity-75">Artist</span>
+          <span class="truncate max-w-[12rem]">{{ selectedArtist }}</span>
+          <span class="text-base leading-none">×</span>
+        </button>
+
+        <div class="flex min-w-0 flex-wrap items-center gap-2">
+          <div class="join shrink-0">
+            <button 
+              class="join-item btn btn-sm"
+              :class="{ 'btn-primary': sortKey === 'publishedAt' }"
+              @click="toggleSort('publishedAt')"
+            >
+              时间
+              <ArrowUpDown v-if="sortKey === 'publishedAt'" class="w-3 h-3 ml-1" :class="{ 'rotate-180': sortOrder === 'asc' }" />
+            </button>
+            <button 
+              class="join-item btn btn-sm"
+              :class="{ 'btn-primary': sortKey === 'id' }"
+              @click="toggleSort('id')"
+            >
+              ID
+              <ArrowUpDown v-if="sortKey === 'id'" class="w-3 h-3 ml-1" :class="{ 'rotate-180': sortOrder === 'asc' }" />
+            </button>
+            <button 
+              class="join-item btn btn-sm"
+              :class="{ 'btn-primary': sortKey === 'level' }"
+              @click="toggleSort('level')"
+            >
+              定数
+              <ArrowUpDown v-if="sortKey === 'level'" class="w-3 h-3 ml-1" :class="{ 'rotate-180': sortOrder === 'asc' }" />
+            </button>
+          </div>
+
+          <select 
+            v-if="sortKey === 'level' || viewMode === 'level'"
+            v-model="selectedDiffType"
+            class="select select-bordered select-sm shrink-0 w-auto max-w-[100px]"
+          >
+            <option value="easy">Easy</option>
+            <option value="normal">Normal</option>
+            <option value="hard">Hard</option>
+            <option value="expert">Expert</option>
+            <option value="master">Master</option>
+            <option value="append">Append</option>
+          </select>
+        </div>
+
+        <div class="ml-auto flex items-center gap-1">
+          <button class="btn btn-sm btn-ghost gap-2" :aria-expanded="isFilterPanelOpen" @click="isFilterPanelOpen = !isFilterPanelOpen">
+            <SlidersHorizontal class="w-4 h-4" />
+            筛选
+            <span v-if="activeExtraFilterCount > 0" class="badge badge-primary badge-sm">{{ activeExtraFilterCount }}</span>
+            <ChevronDown class="w-4 h-4 transition-transform" :class="{ 'rotate-180': isFilterPanelOpen }" />
+          </button>
+
+          <button
+            v-if="hasExtraFilters"
+            class="btn btn-ghost btn-sm gap-1"
+            @click="resetExtraFilters"
+          >
+            <FilterX class="w-4 h-4" />
+            清空
+          </button>
+        </div>
+      </div>
+
+      <div v-if="isFilterPanelOpen" class="border-t border-base-200 p-3 space-y-4">
+        <div>
+          <div class="text-xs font-bold text-base-content/60 mb-2">歌曲标签</div>
+          <div class="flex flex-wrap gap-2">
+            <button
+              v-for="tag in visibleMusicTagOptions"
+              :key="tag.value"
+              class="btn btn-sm min-h-9 h-9 px-3"
+              :class="selectedMusicTags.has(tag.value) ? 'btn-primary' : 'btn-outline'"
+              :title="tag.label"
+              @click="toggleMusicTag(tag.value)"
+            >
+              <img v-if="tag.image" :src="tag.image" :alt="tag.label" class="h-4 max-w-[86px] object-contain" />
+              <span v-else>{{ tag.shortLabel || tag.label }}</span>
+              <span class="text-[10px] opacity-60">{{ tag.count }}</span>
+            </button>
+          </div>
+        </div>
+
+        <div v-if="visibleCollaborationOptions.length">
+          <div class="text-xs font-bold text-base-content/60 mb-2">合作企划</div>
+          <div class="flex flex-wrap gap-2">
+            <button
+              v-for="collaboration in visibleCollaborationOptions"
+              :key="collaboration.id"
+              class="btn btn-sm h-8 min-h-8"
+              :class="selectedCollaborationIds.has(collaboration.id) ? 'btn-secondary' : 'btn-outline'"
+              @click="toggleCollaboration(collaboration.id)"
+            >
+              {{ collaboration.label }}
+              <span class="text-[10px] opacity-60">{{ collaboration.count }}</span>
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <div class="text-xs font-bold text-base-content/60 mb-2">MV类型</div>
+          <div class="flex flex-wrap gap-2">
+            <button
+              v-for="mvType in visibleMvTypeOptions"
+              :key="mvType.value"
+              class="btn btn-sm h-8 min-h-8"
+              :class="selectedMvTypes.has(mvType.value) ? 'btn-primary' : 'btn-outline'"
+              @click="toggleMvType(mvType.value)"
+            >
+              {{ mvType.label }}
+              <span class="text-[10px] opacity-60">{{ mvType.count }}</span>
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <div class="text-xs font-bold text-base-content/60 mb-2">Vocal角色</div>
+          <div class="flex flex-wrap gap-2 max-h-44 overflow-y-auto custom-scrollbar pr-1">
+            <button
+              v-for="character in gameCharacterOptions"
+              :key="character.value"
+              class="btn btn-sm h-9 min-h-9 gap-1.5 pl-1.5 pr-2"
+              :class="selectedVocalCharacters.has(character.value) ? 'btn-primary' : 'btn-outline'"
+              @click="toggleVocalCharacter(character.value)"
+            >
+              <span class="h-6 w-6 overflow-hidden rounded-full bg-base-200 ring-1 ring-base-300">
+                <img :src="character.icon" :alt="character.label" class="h-full w-full object-cover" />
+              </span>
+              {{ character.label }}
+              <span class="text-[10px] opacity-60">{{ character.count }}</span>
+            </button>
+            <button
+              v-for="character in outsideCharacterOptions"
+              :key="character.value"
+              class="btn btn-sm h-8 min-h-8"
+              :class="selectedVocalCharacters.has(character.value) ? 'btn-primary' : 'btn-outline'"
+              @click="toggleVocalCharacter(character.value)"
+            >
+              {{ character.label }}
+              <span class="text-[10px] opacity-60">{{ character.count }}</span>
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <div class="text-xs font-bold text-base-content/60 mb-2">乐曲获取方式</div>
+          <div class="flex flex-wrap gap-2 max-h-36 overflow-y-auto custom-scrollbar pr-1">
+            <button
+              v-for="condition in releaseConditionOptions"
+              :key="condition.value"
+              class="btn btn-sm h-auto min-h-8 py-1 text-left justify-start"
+              :class="selectedReleaseConditionIds.has(condition.value) ? 'btn-primary' : 'btn-outline'"
+              @click="toggleReleaseCondition(condition.value)"
+            >
+              <span>{{ condition.label }}</span>
+              <span class="text-[10px] opacity-60">{{ condition.count }}</span>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -1581,124 +1698,6 @@ watch(totalPages, (pages) => {
         <button class="join-item btn btn-sm" :class="viewMode === 'level' ? 'btn-primary' : 'btn-ghost'" title="定数表" @click="viewMode = 'level'">
           <Layers class="w-4 h-4" />
         </button>
-      </div>
-    </div>
-
-    <!-- 第三行：歌曲资料筛选 -->
-    <div class="panel mb-4">
-      <div class="flex flex-wrap items-center gap-2 p-2">
-        <button class="btn btn-sm btn-ghost gap-2" @click="isFilterPanelOpen = !isFilterPanelOpen">
-          <SlidersHorizontal class="w-4 h-4" />
-          筛选
-          <span v-if="activeExtraFilterCount > 0" class="badge badge-primary badge-sm">{{ activeExtraFilterCount }}</span>
-          <ChevronDown class="w-4 h-4 transition-transform" :class="{ 'rotate-180': isFilterPanelOpen }" />
-        </button>
-
-        <button
-          v-if="hasExtraFilters"
-          class="btn btn-ghost btn-sm gap-1"
-          @click="resetExtraFilters"
-        >
-          <FilterX class="w-4 h-4" />
-          清空
-        </button>
-      </div>
-
-      <div v-if="isFilterPanelOpen" class="border-t border-base-200 p-3 space-y-4">
-        <div>
-          <div class="text-xs font-bold text-base-content/60 mb-2">歌曲标签</div>
-          <div class="flex flex-wrap gap-2">
-            <button
-              v-for="tag in visibleMusicTagOptions"
-              :key="tag.value"
-              class="btn btn-sm min-h-9 h-9 px-3"
-              :class="selectedMusicTags.has(tag.value) ? 'btn-primary' : 'btn-outline'"
-              :title="tag.label"
-              @click="toggleMusicTag(tag.value)"
-            >
-              <img v-if="tag.image" :src="tag.image" :alt="tag.label" class="h-4 max-w-[86px] object-contain" />
-              <span v-else>{{ tag.shortLabel || tag.label }}</span>
-              <span class="text-[10px] opacity-60">{{ tag.count }}</span>
-            </button>
-          </div>
-        </div>
-
-        <div v-if="visibleCollaborationOptions.length">
-          <div class="text-xs font-bold text-base-content/60 mb-2">合作企划</div>
-          <div class="flex flex-wrap gap-2">
-            <button
-              v-for="collaboration in visibleCollaborationOptions"
-              :key="collaboration.id"
-              class="btn btn-sm h-8 min-h-8"
-              :class="selectedCollaborationIds.has(collaboration.id) ? 'btn-secondary' : 'btn-outline'"
-              @click="toggleCollaboration(collaboration.id)"
-            >
-              {{ collaboration.label }}
-              <span class="text-[10px] opacity-60">{{ collaboration.count }}</span>
-            </button>
-          </div>
-        </div>
-
-        <div>
-          <div class="text-xs font-bold text-base-content/60 mb-2">MV类型</div>
-          <div class="flex flex-wrap gap-2">
-            <button
-              v-for="mvType in visibleMvTypeOptions"
-              :key="mvType.value"
-              class="btn btn-sm h-8 min-h-8"
-              :class="selectedMvTypes.has(mvType.value) ? 'btn-primary' : 'btn-outline'"
-              @click="toggleMvType(mvType.value)"
-            >
-              {{ mvType.label }}
-              <span class="text-[10px] opacity-60">{{ mvType.count }}</span>
-            </button>
-          </div>
-        </div>
-
-        <div>
-          <div class="text-xs font-bold text-base-content/60 mb-2">Vocal角色</div>
-          <div class="flex flex-wrap gap-2 max-h-44 overflow-y-auto custom-scrollbar pr-1">
-            <button
-              v-for="character in gameCharacterOptions"
-              :key="character.value"
-              class="btn btn-sm h-9 min-h-9 gap-1.5 pl-1.5 pr-2"
-              :class="selectedVocalCharacters.has(character.value) ? 'btn-primary' : 'btn-outline'"
-              @click="toggleVocalCharacter(character.value)"
-            >
-              <span class="h-6 w-6 overflow-hidden rounded-full bg-base-200 ring-1 ring-base-300">
-                <img :src="character.icon" :alt="character.label" class="h-full w-full object-cover" />
-              </span>
-              {{ character.label }}
-              <span class="text-[10px] opacity-60">{{ character.count }}</span>
-            </button>
-            <button
-              v-for="character in outsideCharacterOptions"
-              :key="character.value"
-              class="btn btn-sm h-8 min-h-8"
-              :class="selectedVocalCharacters.has(character.value) ? 'btn-primary' : 'btn-outline'"
-              @click="toggleVocalCharacter(character.value)"
-            >
-              {{ character.label }}
-              <span class="text-[10px] opacity-60">{{ character.count }}</span>
-            </button>
-          </div>
-        </div>
-
-        <div>
-          <div class="text-xs font-bold text-base-content/60 mb-2">乐曲获取方式</div>
-          <div class="flex flex-wrap gap-2 max-h-36 overflow-y-auto custom-scrollbar pr-1">
-            <button
-              v-for="condition in releaseConditionOptions"
-              :key="condition.value"
-              class="btn btn-sm h-auto min-h-8 py-1 text-left justify-start"
-              :class="selectedReleaseConditionIds.has(condition.value) ? 'btn-primary' : 'btn-outline'"
-              @click="toggleReleaseCondition(condition.value)"
-            >
-              <span>{{ condition.label }}</span>
-              <span class="text-[10px] opacity-60">{{ condition.count }}</span>
-            </button>
-          </div>
-        </div>
       </div>
     </div>
 

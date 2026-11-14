@@ -2,7 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
-  Check, ChevronDown, Info, ListMusic, Loader2, MicVocal, Pause, Play, Repeat, Repeat1, SkipBack, SkipForward, Volume1, Volume2,
+  Check, ChevronDown, Info, ListMusic, Loader2, LetterText, Pause, Play, Repeat, Repeat1, SkipBack, SkipForward, Volume1, Volume2,
 } from 'lucide-vue-next'
 import { usePlayerStore } from '@/stores/player'
 import { useSingerAvatars } from '@/composables/useSingerAvatars'
@@ -184,7 +184,7 @@ onBeforeUnmount(() => { document.documentElement.style.overflow = '' })
           </button>
           <div class="np-tabs">
             <button class="np-tab" :class="{ on: player.nowPlayingPanel === 'lyrics' }" :aria-pressed="player.nowPlayingPanel === 'lyrics'" @click="togglePanel('lyrics')">
-              <MicVocal class="h-4 w-4" /> 歌词
+              <LetterText class="h-4 w-4" /> 歌词
             </button>
             <button class="np-tab" :class="{ on: player.nowPlayingPanel === 'queue' }" :aria-pressed="player.nowPlayingPanel === 'queue'" @click="togglePanel('queue')">
               <ListMusic class="h-4 w-4" /> 队列

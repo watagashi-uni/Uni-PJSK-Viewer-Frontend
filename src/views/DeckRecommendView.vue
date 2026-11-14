@@ -22,6 +22,7 @@ const assetsHost = computed(() => settingsStore.assetsHost)
 // ==================== 类型定义 ====================
 import type { EventData, MusicData, CardData } from '@/types/master'
 import PageHeader from '@/components/PageHeader.vue'
+import CharacterPicker from '@/components/CharacterPicker.vue'
 import { difficultyStyle } from '@/utils/difficulty'
 import { trackEvent } from '@/utils/analytics'
 import { useCharacterName } from '@/composables/useCharacterName'
@@ -594,17 +595,24 @@ const rarityList = [
           <!-- 角色选择(挑战) -->
           <div v-if="mode === '1'">
             <label class="label"><span class="font-medium text-base-content">角色</span></label>
-            <select v-model.number="selectedCharacterId" class="select select-bordered w-full max-w-md">
-              <option v-for="c in characters" :key="c.id" :value="c.id">{{ getCharacterName(c) }}</option>
-            </select>
+            <div class="max-w-3xl rounded-box border border-base-300 p-3">
+              <CharacterPicker
+                :model-value="selectedCharacterId"
+                @update:model-value="value => { if (typeof value === 'number') selectedCharacterId = value }"
+              />
+            </div>
           </div>
 
           <!-- 支援角色(WL) -->
           <div v-if="showSupportCharacter">
             <label class="label"><span class="font-medium text-base-content">支援角色（队长）</span></label>
-            <select v-model.number="selectedSupportCharacterId" class="select select-bordered w-full max-w-md">
-              <option v-for="c in supportCharacters" :key="c.id" :value="c.id">{{ getCharacterName(c) }}</option>
-            </select>
+            <div class="max-w-3xl rounded-box border border-base-300 p-3">
+              <CharacterPicker
+                :model-value="selectedSupportCharacterId"
+                :ids="supportCharacters.map(c => c.id)"
+                @update:model-value="value => { if (typeof value === 'number') selectedSupportCharacterId = value }"
+              />
+            </div>
           </div>
 
           <!-- Live类型 -->

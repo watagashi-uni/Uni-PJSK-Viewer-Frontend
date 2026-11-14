@@ -276,9 +276,29 @@ function activate(row: Row | undefined): void {
   if (entry.path) void router.push(entry.path)
 }
 
+// 输入法组字状态。只看 event.isComposing 不够：Safari 先发 compositionend 再发 keydown，
+// 用回车把拼音字母直接上屏时，那次回车的 isComposing 已经是 false，会被当成“打开第一条”
+let composing = false
+let compositionEndedAt = 0
+
+function onCompositionStart(): void {
+  composing = true
+}
+
+function onCompositionEnd(): void {
+  composing = false
+  compositionEndedAt = performance.now()
+}
+
+function isImeKeydown(event: KeyboardEvent): boolean {
+  // keyCode 229 是输入法正在处理这次按键的标记，各浏览器都保留了它
+  if (event.isComposing || composing || event.keyCode === 229) return true
+  return performance.now() - compositionEndedAt < 80
+}
+
 function onInputKeydown(event: KeyboardEvent): void {
-  // 输入法选字时的回车、方向键不处理
-  if (event.isComposing) return
+  // 输入法选字、确认时的回车和方向键不处理
+  if (isImeKeydown(event)) return
   if (event.key === 'ArrowDown') {
     event.preventDefault()
     move(1)
@@ -306,6 +326,7 @@ watch(
     debounced.value = search.initialQuery.value.trim()
     activeKind.value = 'all'
     activeIndex.value = 0
+    composing = false
     recent.value = readRecent()
     // 点开搜索才开始加载数据
     index.ensureBasics()
@@ -387,6 +408,8 @@ function sourceNames(sources: readonly SearchSource[]): string {
           aria-controls="gs-list"
           aria-autocomplete="list"
           @keydown="onInputKeydown"
+          @compositionstart="onCompositionStart"
+          @compositionend="onCompositionEnd"
         />
         <button v-if="query" type="button" class="btn btn-ghost btn-xs btn-circle" aria-label="清空" @click="clearQuery">
           <X class="h-4 w-4" />
