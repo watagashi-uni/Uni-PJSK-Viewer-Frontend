@@ -20,7 +20,7 @@ import MusicLyrics from '@/components/MusicLyrics.vue'
 import PlayerScrubber from '@/components/player/PlayerScrubber.vue'
 import SingerAvatars from '@/components/player/SingerAvatars.vue'
 import MusicQueueButton from '@/components/player/MusicQueueButton.vue'
-import { loadSongLyrics } from '@/api/lyrics'
+import { loadSongLyrics, lyricsForVocal } from '@/api/lyrics'
 import { usePlayerStore } from '@/stores/player'
 import { useSingerAvatars } from '@/composables/useSingerAvatars'
 import { buildTrack, type PlayerTrackInfo } from '@/utils/playerTracks'
@@ -336,7 +336,7 @@ const hasLyrics = ref<boolean | null>(null)
 const showLyricsColumn = computed(() => hasLyrics.value !== false && !(player.lyricsSidebarShown && isActiveSong.value))
 onMounted(() => {
   loadSongLyrics(musicId.value)
-    .then((data) => { hasLyrics.value = !!data?.lines.length })
+    .then((data) => { hasLyrics.value = !!data && lyricsForVocal(data, {}).lyrics.lines.length > 0 })
     // 加载失败时保留歌词栏，里面有重试按钮
     .catch(() => { hasLyrics.value = true })
 })

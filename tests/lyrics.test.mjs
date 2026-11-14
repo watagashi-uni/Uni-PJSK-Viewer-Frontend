@@ -43,7 +43,10 @@ test('requests deduplicate, absent songs skip payload, and failed payload retrie
   assert.equal(api.loadSongLyrics(1), api.loadSongLyrics(1))
   await assert.rejects(api.loadSongLyrics(1))
   fail = false
-  assert.equal((await api.loadSongLyrics(1)).lines[0].start, 9)
+  const payload = await api.loadSongLyrics(1)
+  // the resource is kept as published; renditions are derived from it
+  assert.equal(payload.lrc, '[00:09]test')
+  assert.equal(api.normalizeLyrics(payload).lines[0].start, 9)
   assert.equal(await api.loadSongLyrics(2), null)
   assert.equal(calls.length, 3)
 })
@@ -227,4 +230,104 @@ test('romaji is read per line in JSON songs and by the original cue in LRC songs
   assert.deepEqual(json.lines.map(l => l.romaji), ['hana', undefined])
   const merged = mergeSharedCues([{ text: '花', start: 1, end: 4, romaji: 'hana' }, { text: 'Hey', start: 1, end: 4 }, { text: '空', start: 1, end: 4, romaji: 'sora' }])
   assert.equal(merged[0].romaji, 'hana\n\nsora')
+})
+test('LRC translations belong to the row under the same time tag, never to a neighbour', () => {
+  const { normalizeLyrics } = load()
+  // a row under a tag no original row has is dropped, not given to the next row; float noise in the tag is tolerated
+  const song = normalizeLyrics({ format: 'lrc', duration: 80, lrc: '[00:09.0]A\n[00:11.0]B\n[01:02.25]C', translationLrc: '[00:10.0]无主\n[00:11.0000001]乙\n[1:02.250]丙' })
+  assert.deepEqual(song.lines.map(l => l.translation), [undefined, '乙', '丙'])
+  // simultaneous rows: the translation goes to the first of them
+  const both = normalizeLyrics({ format: 'lrc', duration: 30, lrc: '[00:09.0]A\n[00:09.0]B\n[00:12.0]C', translationLrc: '[00:09.0]甲' })
+  assert.deepEqual(both.lines.map(l => [l.text, l.translation]), [['A\nB', '甲'], ['C', undefined]])
+})
+test('LRC line timings apply by the original cue, keep their own end and overlaps, and yield to word timing', () => {
+  const { normalizeLyrics } = load()
+  const ruby = [{ from: 0, to: 1, reading: 'はな' }]
+  const song = normalizeLyrics({
+    format: 'lrc', duration: 60,
+    lrc: '[00:10.0]花\n[00:14.0]空\n[00:20.0]\n[00:30.0]海\n[00:40.0]山',
+    translationLrc: '[00:10.0]花朵\n[00:14.0]天空',
+    rubyLines: [{ cueStart: 10, text: '花', ruby }],
+    romajiLines: [{ cueStart: 14, text: '空', romaji: 'sora', source: 'reviewed' }],
+    lineTimings: [
+      // moves the row and overlaps the next: both kept; extras still matched by the original cue
+      { cueStart: 10, text: '花', start: 10.5, end: 15, source: 'x' },
+      { cueStart: 30, text: '海', start: 30, end: 35 },
+      // word timing has priority over line timing
+      { cueStart: 40, text: '山', start: 40, end: 41 },
+      // names a cue that does not exist
+      { cueStart: 14.5, text: '空', start: 1, end: 2 },
+    ],
+    wordLines: [{ cueStart: 40, text: '山', start: 40.2, end: 43, words: [{ from: 0, to: 1, start: 40.2, end: 43 }] }],
+  })
+  assert.deepEqual(song.lines.map(l => [l.text, l.start, l.end]), [['花', 10.5, 15], ['空', 14, 20], ['海', 30, 35], ['山', 40.2, 43]])
+  assert.deepEqual(song.lines[0].ruby, ruby)
+  assert.equal(song.lines[0].translation, '花朵')
+  assert.deepEqual([song.lines[1].romaji, song.lines[1].romajiSource, song.lines[1].translation], ['sora', 'reviewed', '天空'])
+  assert.ok(song.lines.every(l => !('cueStart' in l)))
+  // an empty tag ends the row before it: nothing is current in the break
+  assert.equal(song.lines[1].end, 20)
+})
+const versioned = () => ({
+  musicId: 7, format: 'bilingual_json', duration: 100, vocalId: 1, assetbundle: 'a_01',
+  performers: [{ performerId: '歌唱者-21', name: 'ミク', characterId: 21 }],
+  credits: { translation: 'default' },
+  lines: [
+    { start: 10, end: 12, text: '花', translation: '花朵', ruby: [{ from: 0, to: 1, reading: 'はな' }], romaji: 'hana', words: [{ from: 0, to: 1, start: 10, end: 11 }], performerIds: ['歌唱者-21'], segments: [{ text: '花', performerIds: ['歌唱者-21'] }] },
+    { start: 12, end: 14, text: '空', performerIds: ['歌唱者-21'] },
+    { start: 20, end: 22, text: '花', performerIds: ['歌唱者-21'] },
+  ],
+  versions: [{
+    vocalId: 2, assetbundle: 'a_02', duration: 101, source: 'A',
+    performers: [{ performerId: '歌唱者-23', name: 'レン', characterId: 23 }],
+    singers: [{ row: 0, segments: [{ text: '花', performerIds: ['歌唱者-23'] }] }, { row: 2, performerIds: ['歌唱者-23'] }, { row: 9, performerIds: ['歌唱者-23'] }],
+  }],
+})
+test('a rendition is picked by vocal id, by audio bundle only without one', () => {
+  const { findVersion } = load()
+  const data = versioned()
+  assert.equal(findVersion(data, { vocalId: 1 }), 'default')
+  assert.equal(findVersion(data, { vocalId: 2 }), data.versions[0])
+  assert.equal(findVersion(data, { vocalId: 3, assetbundle: 'a_01' }), null)
+  assert.equal(findVersion(data, { assetbundle: 'a_02' }), data.versions[0])
+  assert.equal(findVersion(data, { assetbundle: 'a_01' }), 'default')
+  assert.equal(findVersion(data, {}), null)
+  // a default recorded only by its bundle
+  assert.equal(findVersion({ ...data, vocalId: undefined }, { vocalId: 9, assetbundle: 'a_01' }), 'default')
+  // old resources without versions
+  assert.equal(findVersion({ ...data, versions: undefined }, { vocalId: 2 }), null)
+})
+test('every rendition plays on the default timeline; only the singers change', () => {
+  const { lyricsForVocal } = load()
+  const data = versioned()
+  const base = lyricsForVocal(data, { vocalId: 1 })
+  const other = lyricsForVocal(data, { vocalId: 2 })
+  const unknown = lyricsForVocal(data, { vocalId: 3 })
+  const timing = song => song.lyrics.lines.map(l => [l.text, l.start, l.end, l.words, l.translation, l.ruby, l.romaji])
+  assert.deepEqual(timing(other), timing(base))
+  assert.deepEqual(timing(unknown), timing(base))
+  assert.deepEqual([base.singers, other.singers, unknown.singers], [true, true, false])
+  // the rendition's own singers, by default row; rows it does not name have none
+  assert.deepEqual(other.lyrics.lines.map(l => [l.segments, l.performerIds]), [[[{ text: '花', performerIds: ['歌唱者-23'] }], undefined], [undefined, undefined], [undefined, ['歌唱者-23']]])
+  assert.deepEqual(base.lyrics.lines.map(l => l.performerIds), [['歌唱者-21'], ['歌唱者-21'], ['歌唱者-21']])
+  assert.ok(unknown.lyrics.lines.every(l => !l.segments && !l.performerIds))
+  assert.deepEqual([other.lyrics.duration, other.lyrics.vocalId, other.lyrics.performers, other.lyrics.credits], [101, 2, data.versions[0].performers, { translation: 'default' }])
+  assert.equal(unknown.lyrics.performers, undefined)
+  // built once per rendition; the resource is not changed
+  assert.equal(lyricsForVocal(data, { vocalId: 2 }).lyrics, other.lyrics)
+  assert.deepEqual(data, versioned())
+})
+test('singer rows count raw LRC rows: every tag expanded in time order, simultaneous rows kept, empty tags skipped', () => {
+  const { lyricsForVocal } = load()
+  const data = {
+    musicId: 8, format: 'lrc', duration: 60, vocalId: 1,
+    // rows 0-1 share a cue and merge for display; the empty tag takes no index; [00:30] repeats row 2's text as row 4
+    lrc: '[00:05.0]A\n[00:05.0]B\n[00:08.0]\n[00:10.0][00:30.0]C\n[00:20.0]D',
+    versions: [{ vocalId: 2, assetbundle: 'b', duration: 60, source: 'C', performers: [], singers: [{ row: 1, performerIds: ['x'] }, { row: 4, performerIds: ['y'] }] }],
+  }
+  const { lyrics } = lyricsForVocal(data, { vocalId: 2 })
+  assert.deepEqual(lyrics.lines.map(l => [l.text, l.start, l.segments?.map(s => s.performerIds.join()).join('|') ?? l.performerIds?.join()]), [
+    // merged rows keep a segment each: A (no singer), the line break, B (x)
+    ['A\nB', 5, '||x'], ['C', 10, undefined], ['D', 20, undefined], ['C', 30, 'y'],
+  ])
 })

@@ -2,8 +2,8 @@
 import { ref, shallowRef, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { ChevronDown, Languages, LocateFixed, Type } from 'lucide-vue-next'
 import {
-  linePerformerIds, loadSongLyrics, lyricGaps, lyricParts, lyricRuns, pieceProgress, untimedFill, wordProgress,
-  SAME_CUE_SEC, type LyricLine, type LyricWord, type SongLyrics,
+  linePerformerIds, loadSongLyrics, lyricGaps, lyricParts, lyricRuns, lyricsForVocal, pieceProgress, untimedFill, wordProgress,
+  SAME_CUE_SEC, type LyricLine, type LyricsPayload, type LyricWord,
 } from '@/api/lyrics'
 import { useMasterStore } from '@/stores/master'
 import { useSingerAvatars } from '@/composables/useSingerAvatars'
@@ -76,7 +76,8 @@ type Item = LineItem | GapItem
 const { performerAvatar } = useSingerAvatars()
 const master = useMasterStore()
 
-const lyrics = shallowRef<SongLyrics | null>(null)
+/** The song's lyrics resource, holding every rendition recorded for it. */
+const resource = shallowRef<LyricsPayload | null>(null)
 const loading = ref(false)
 const failed = ref(false)
 const expanded = ref(true)
@@ -118,13 +119,13 @@ function readPreference(key: string, initial = true): boolean {
 
 async function load() {
   const serial = ++request
-  lyrics.value = null
+  resource.value = null
   loading.value = true
   failed.value = false
   following.value = true
   try {
     const data = await loadSongLyrics(props.musicId)
-    if (serial === request) lyrics.value = data
+    if (serial === request) resource.value = data
   } catch {
     if (serial === request) failed.value = true
   } finally {
@@ -132,6 +133,15 @@ async function load() {
   }
 }
 watch(() => props.musicId, load, { immediate: true })
+
+/**
+ * The lines for the rendition being heard. Every rendition is sung to the same backing
+ * track and shares one timeline; the singers are shown where they were annotated for it.
+ */
+const selection = computed(() => resource.value && lyricsForVocal(resource.value, { vocalId: props.vocalId, assetbundle: props.assetbundle }))
+const lyrics = computed(() => selection.value?.lyrics ?? null)
+// Another rendition picked: back to the current line.
+watch([() => props.vocalId, () => props.assetbundle], () => resume())
 
 interface CreditRow { id: number; lyricist?: string; composer?: string }
 const credit = shallowRef<CreditRow | null>(null)
@@ -151,23 +161,19 @@ const credits = computed(() => {
   return [['作词', named(row?.lyricist)], ['作曲', named(row?.composer)]].filter(([, name]) => name) as [string, string][]
 })
 /** Children of the track in front of the first row. */
-const headRows = computed(() => (credits.value.length ? 1 : 0))
+const headRows = computed(() => (credits.value.length || untimedNote.value ? 1 : 0))
 /** The Inst. ver. of a song has nothing to sing along to. */
 const instrumental = computed(() => props.vocalType === 'instrumental')
 
-// Singer assignments belong to the annotated rendition, not to every cover.
-// That rendition is named by its vocal id, or by its audio bundle where no id was recorded.
-const showPerformers = computed(() => {
-  const data = lyrics.value
-  if (!data) return false
-  if (data.vocalId != null) return props.vocalId === data.vocalId
-  return !!data.assetbundle && props.assetbundle === data.assetbundle
-})
-// Live recordings and renditions of another length do not share the annotated timing.
+// Singer assignments belong to the rendition they were written for, not to every cover.
+const showPerformers = computed(() => !!selection.value?.singers)
+// Live recordings and audio of another length do not share the annotated timing.
 const mismatched = computed(() => !!lyrics.value && (
   props.vocalType === 'streaming_live'
   || (props.synced && props.duration > 0 && Math.abs(props.duration - lyrics.value.duration) >= 2)
 ))
+/** Shown above the lines when they cannot follow this rendition. */
+const untimedNote = computed(() => (lyrics.value?.lines.length && !instrumental.value && mismatched.value ? '暂无该演唱版本时间轴' : ''))
 /** Lines move with the music. Until the audio length is known the lyrics are shown as plain text. */
 const live = computed(() => props.synced && !instrumental.value && !mismatched.value && props.duration > 0)
 const hasTranslation = computed(() => !!lyrics.value?.lines.some(line => line.translation))
@@ -399,7 +405,12 @@ function loop() {
 watch([live, () => props.playing, expanded, items, rubied], () => {
   cancelAnimationFrame(frame)
   frame = 0
-  // Rows may have been re-rendered: forget the cached word elements.
+  // Rows may have been re-rendered or now show other lines (another rendition): wipe the
+  // fills off the elements kept from before, then forget them.
+  for (const [index, words] of painted) {
+    for (const { el } of words) el.style.removeProperty('--p')
+    rowElement(index)?.style.removeProperty('--gap-progress')
+  }
   painted.clear()
   if (!live.value || !expanded.value) {
     clearPaint()
@@ -645,7 +656,7 @@ onBeforeUnmount(() => {
       <button v-if="variant === 'panel'" class="btn btn-ghost btn-sm gap-1" :aria-expanded="expanded" @click="expanded = !expanded">
         歌词 <ChevronDown class="h-4 w-4 transition-transform" :class="{ 'rotate-180': expanded }" />
       </button>
-      <div v-if="lyrics?.lines.length && expanded && !mismatched && !instrumental" class="ly-actions">
+      <div v-if="lyrics?.lines.length && expanded && !instrumental" class="ly-actions">
         <Transition name="ly-chip">
           <button v-if="live && !following" class="ly-chip" @click="resume">
             <LocateFixed class="h-3.5 w-3.5" /> 回到当前句
@@ -692,7 +703,6 @@ onBeforeUnmount(() => {
       <p v-else-if="loading" class="ly-status" role="status">正在加载歌词…</p>
       <p v-else-if="failed" class="ly-status">歌词加载失败 <button class="ly-chip ml-2" @click="load">重试</button></p>
       <p v-else-if="!lyrics?.lines.length" class="ly-status">暂无歌词</p>
-      <p v-else-if="mismatched" class="ly-status">当前音频版本暂无匹配的歌词</p>
       <template v-else>
         <div
           ref="viewport"
@@ -705,7 +715,8 @@ onBeforeUnmount(() => {
           @keydown="browse"
         >
           <div ref="track" class="ly-track">
-            <div v-if="credits.length" class="ly-head">
+            <div v-if="headRows" class="ly-head">
+              <p v-if="untimedNote" class="ly-note" role="note">{{ untimedNote }}</p>
               <p v-for="[role, name] in credits" :key="role" class="ly-credit">{{ role }}：{{ name }}</p>
             </div>
             <div
@@ -874,6 +885,11 @@ onBeforeUnmount(() => {
 
 .ly-credit {
   overflow-wrap: anywhere;
+}
+
+/* The lines are the default rendition's, read along without timing. */
+.ly-note:not(:last-child) {
+  margin-bottom: 0.4rem;
 }
 
 .ly-viewport {

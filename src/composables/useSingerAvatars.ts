@@ -49,8 +49,11 @@ export function useSingerAvatars() {
   }
 
   /** A singer named in a lyrics file; the cast gets a portrait, guests their initial. */
-  function performerAvatar(performer: { performerId: string; name: string; color?: string }): SingerAvatar {
-    const characterId = performerCharacterId(performer.performerId)
+  function performerAvatar(performer: { performerId: string; name: string; color?: string; characterId?: number | null }): SingerAvatar {
+    // Renditions name the character outright (null for a guest); older files only by the id.
+    const characterId = performer.characterId !== undefined
+      ? performerCharacterId(String(performer.characterId ?? ''))
+      : performerCharacterId(performer.performerId)
     if (characterId === null) return { key: performer.performerId, name: performer.name, src: null, color: performer.color }
     const row = characters.value.find(c => c.id === characterId)
     return {
