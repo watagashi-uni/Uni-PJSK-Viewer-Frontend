@@ -42,10 +42,13 @@ export interface LyricSingers {
   row: number
   segments?: { text: string; performerIds: string[] }[]
   performerIds?: string[]
+  /** Words this rendition sings on the row instead of the default ones (reviewed), with their translation. */
+  text?: string
+  translation?: string
 }
 /**
  * Another rendition of the song. Every rendition is sung to the same backing track, so it
- * shares the default timeline and text; only the singers differ.
+ * shares the default timeline; the singers differ, and on a few rows the words.
  */
 export interface LyricVersion {
   vocalId: number
@@ -168,14 +171,25 @@ export function normalizeLyrics(data: LyricsPayload, version?: LyricVersion | nu
       const entry = singers.get(index)
       if (entry?.segments) line.segments = entry.segments
       if (entry?.performerIds) line.performerIds = entry.performerIds
+      if (typeof entry?.text === 'string' && entry.text) {
+        // Other words on this row: the default readings, romaji and units no longer fit them.
+        line.text = entry.text
+        delete line.ruby
+        delete line.romaji
+        delete line.romajiSource
+        delete line.words
+        if (typeof entry.translation === 'string' && entry.translation) line.translation = entry.translation
+        else delete line.translation
+      }
     }
     if (data.format !== 'lrc') return line
     // Matched by the original tag and text, so one timing never decides which entry another follows.
-    const cued = line as LrcRow
+    // The row as written decides, even where this rendition sings other words on it.
+    const cued = row as LrcRow
     const timing = data.lineTimings?.find(t => sameCue(t, cued))
     const timed = data.wordLines?.find(w => sameCue(w, cued))
     if (timed) {
-      line.words = timed.words
+      if (line.text === row.text) line.words = timed.words
       line.start = timed.start
       line.end = timed.end
     } else if (timing && Number.isFinite(timing.start) && Number.isFinite(timing.end)) {
