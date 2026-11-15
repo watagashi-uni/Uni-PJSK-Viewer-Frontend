@@ -19,7 +19,7 @@ const track = computed(() => player.current)
 const shown = computed(() => prefs.enabled && !!track.value && !player.nowPlayingOpen)
 const {
   timedLyrics, hasTranslation, hasRomaji, showPerformers, note,
-} = useVocalLyrics(() => (prefs.enabled ? track.value : null), () => true)
+} = useVocalLyrics(() => (prefs.enabled ? track.value : null))
 const extra = computed<SubtitleExtra>(() => {
   if (settings.extra === 'translation' && !hasTranslation.value) return 'none'
   if (settings.extra === 'romaji' && !hasRomaji.value) return 'none'

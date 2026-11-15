@@ -176,7 +176,7 @@ watch([currentTime, () => props.active, () => player.isBuffering, () => player.i
 
 const {
   timedLyrics, hasTranslation, hasRomaji, hasRuby, showPerformers, note,
-} = useVocalLyrics(() => props.track, () => props.active)
+} = useVocalLyrics(() => props.track)
 const subtitleLyrics = computed(() => (settings.mode !== 'off' ? timedLyrics.value : null))
 const extra = computed<SubtitleExtra>(() => {
   if (settings.extra === 'translation' && !hasTranslation.value) return 'none'

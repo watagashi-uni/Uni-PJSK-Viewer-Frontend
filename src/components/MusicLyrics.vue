@@ -161,21 +161,18 @@ const credits = computed(() => {
   return [['作词', named(row?.lyricist)], ['作曲', named(row?.composer)]].filter(([, name]) => name) as [string, string][]
 })
 /** Children of the track in front of the first row. */
-const headRows = computed(() => (credits.value.length || untimedNote.value ? 1 : 0))
+const headRows = computed(() => (credits.value.length ? 1 : 0))
 /** The Inst. ver. of a song has nothing to sing along to. */
 const instrumental = computed(() => props.vocalType === 'instrumental')
 
 // Singer assignments belong to the rendition they were written for, not to every cover.
 const showPerformers = computed(() => !!selection.value?.singers)
-// Live recordings and audio of another length do not share the annotated timing.
-const mismatched = computed(() => !!lyrics.value && (
-  props.vocalType === 'streaming_live'
-  || (props.synced && props.duration > 0 && Math.abs(props.duration - lyrics.value.duration) >= 2)
-))
-/** Shown above the lines when they cannot follow this rendition. */
-const untimedNote = computed(() => (lyrics.value?.lines.length && !instrumental.value && mismatched.value ? '暂无该演唱版本时间轴' : ''))
-/** Lines move with the music. Until the audio length is known the lyrics are shown as plain text. */
-const live = computed(() => props.synced && !instrumental.value && !mismatched.value && props.duration > 0)
+/**
+ * Lines move with the music. Every rendition, live recordings and those of another length
+ * included, starts on the same beat, so they all follow the one timeline. Until the audio
+ * length is known the lyrics are shown as plain text.
+ */
+const live = computed(() => props.synced && !instrumental.value && props.duration > 0)
 const hasTranslation = computed(() => !!lyrics.value?.lines.some(line => line.translation))
 const hasRuby = computed(() => !!lyrics.value?.lines.some(line => line.ruby?.length))
 const hasRomaji = computed(() => !!lyrics.value?.lines.some(line => line.romaji))
@@ -716,7 +713,6 @@ onBeforeUnmount(() => {
         >
           <div ref="track" class="ly-track">
             <div v-if="headRows" class="ly-head">
-              <p v-if="untimedNote" class="ly-note" role="note">{{ untimedNote }}</p>
               <p v-for="[role, name] in credits" :key="role" class="ly-credit">{{ role }}：{{ name }}</p>
             </div>
             <div
@@ -890,11 +886,6 @@ onBeforeUnmount(() => {
 
 .ly-credit {
   overflow-wrap: anywhere;
-}
-
-/* The lines are the default rendition's, read along without timing. */
-.ly-note:not(:last-child) {
-  margin-bottom: 0.4rem;
 }
 
 .ly-viewport {
