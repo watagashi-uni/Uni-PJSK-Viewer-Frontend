@@ -6,6 +6,7 @@ import { useSingerAvatars } from '@/composables/useSingerAvatars'
 import MusicLyrics from '@/components/MusicLyrics.vue'
 import SingerAvatars from '@/components/player/SingerAvatars.vue'
 import ZhText from '@/components/ZhText.vue'
+import { drawBackdrop, paintBackdrop } from '@/utils/blurredCover'
 
 // Lyrics in a column beside the page: keep reading along while browsing the rest of the site.
 const player = usePlayerStore()
@@ -26,6 +27,21 @@ const litSingers = computed(() => {
 })
 watch(() => track.value?.uid, () => { singing.value = null })
 
+// The wash is the artwork blurred once into a small bitmap, faded towards its lower edge.
+// A CSS blur on the artwork itself does not fade its edges in Safari on iOS: the colour
+// stopped in a hard line across the column, and parts of it were left unpainted.
+const glow = ref<HTMLCanvasElement>()
+const glowShown = ref(false)
+let glowRequest = 0
+watch([cover, glow], async ([url, canvas]) => {
+  const serial = ++glowRequest
+  if (!url || !canvas) return
+  const bitmap = await paintBackdrop(url)
+  if (serial !== glowRequest) return
+  glowShown.value = !!bitmap
+  if (bitmap) drawBackdrop(canvas, bitmap, 'bottom')
+}, { flush: 'post' })
+
 function seekFromLyrics(time: number) {
   player.seek(time)
   if (!player.isPlaying) player.play()
@@ -36,7 +52,7 @@ function seekFromLyrics(time: number) {
   <Transition name="lyrics-side">
     <aside v-if="player.lyricsSidebarShown && track" class="lyrics-side" aria-label="歌词">
       <!-- A soft wash of the artwork behind the text, so the column takes on the colours of the song. -->
-      <div class="lyrics-side-glow" aria-hidden="true"><img :src="cover" alt="" crossorigin="anonymous" /></div>
+      <div class="lyrics-side-glow" aria-hidden="true"><canvas ref="glow" :class="{ shown: glowShown }"></canvas></div>
 
       <header class="lyrics-side-head">
         <button class="lyrics-side-cover" aria-label="全屏显示" title="全屏显示" @click="player.openNowPlaying('lyrics')">
@@ -103,17 +119,20 @@ function seekFromLyrics(time: number) {
   pointer-events: none;
 }
 
-.lyrics-side-glow img {
+.lyrics-side-glow canvas {
   position: absolute;
   top: -10%;
   left: 50%;
   width: 150%;
   max-width: none;
   aspect-ratio: 1;
-  object-fit: cover;
-  opacity: 0.3;
-  filter: blur(56px) saturate(1.7);
+  opacity: 0;
   transform: translateX(-50%);
+  transition: opacity 0.4s ease;
+}
+
+.lyrics-side-glow canvas.shown {
+  opacity: 0.3;
 }
 
 .lyrics-side-head {

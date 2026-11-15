@@ -104,22 +104,33 @@ function saturate(data: Uint8ClampedArray) {
 }
 
 /**
- * Copy a backdrop bitmap into a visible canvas. `fadeEdges` lets it thin out towards a circle
- * inside its square, for a layer placed off-centre whose edge could otherwise turn into view.
+ * Copy a backdrop bitmap into a visible canvas. `fade` lets it thin out: `'circle'` towards a
+ * circle inside its square, for a layer placed off-centre whose edge could otherwise turn into
+ * view; `'bottom'` towards its lower edge, for a wash that melts into the page below it.
  */
-export function drawBackdrop(canvas: HTMLCanvasElement, bitmap: HTMLCanvasElement, fadeEdges = false) {
+export function drawBackdrop(canvas: HTMLCanvasElement, bitmap: HTMLCanvasElement, fade: 'circle' | 'bottom' | false = false) {
   canvas.width = bitmap.width
   canvas.height = bitmap.height
   const context = canvas.getContext('2d')
   if (!context) return
   context.drawImage(bitmap, 0, 0)
-  if (!fadeEdges) return
-  const half = bitmap.width / 2
-  const fade = context.createRadialGradient(half, half, half * 0.8, half, half, half)
-  fade.addColorStop(0, '#000')
-  fade.addColorStop(1, 'transparent')
+  if (!fade) return
+  const { width, height } = bitmap
+  let mask: CanvasGradient
+  if (fade === 'circle') {
+    const half = width / 2
+    mask = context.createRadialGradient(half, half, half * 0.8, half, half, half)
+    mask.addColorStop(0, '#000')
+    mask.addColorStop(1, 'transparent')
+  } else {
+    mask = context.createLinearGradient(0, 0, 0, height)
+    mask.addColorStop(0, '#000')
+    mask.addColorStop(0.45, '#000')
+    mask.addColorStop(0.75, 'rgb(0 0 0 / 0.35)')
+    mask.addColorStop(1, 'transparent')
+  }
   context.globalCompositeOperation = 'destination-in'
-  context.fillStyle = fade
-  context.fillRect(0, 0, bitmap.width, bitmap.height)
+  context.fillStyle = mask
+  context.fillRect(0, 0, width, height)
   context.globalCompositeOperation = 'source-over'
 }

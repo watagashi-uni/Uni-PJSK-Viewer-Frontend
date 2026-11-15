@@ -51,7 +51,7 @@ watch([cover, glowA, glowB], async ([url, a, b]) => {
   const bitmap = await paintBackdrop(url)
   if (serial !== backdropRequest || !bitmap) return
   drawBackdrop(a, bitmap)
-  drawBackdrop(b, bitmap, true)
+  drawBackdrop(b, bitmap, 'circle')
 }, { flush: 'post' })
 
 // The backdrop turns slowly while the music plays and holds still when it is paused.
