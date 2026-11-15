@@ -15,6 +15,7 @@ import { useNotificationStore } from '@/stores/notification'
 import AppSidebar from '@/components/AppSidebar.vue'
 import PlayerBar from '@/components/player/PlayerBar.vue'
 import NowPlayingView from '@/components/player/NowPlayingView.vue'
+import FloatingLyrics from '@/components/player/FloatingLyrics.vue'
 import PlayerLyricsSidebar from '@/components/player/PlayerLyricsSidebar.vue'
 import { usePlayerStore } from '@/stores/player'
 import { useGlobalSearch } from '@/composables/useGlobalSearch'
@@ -136,6 +137,7 @@ watch(
   </div>
 
   <NowPlayingView />
+  <FloatingLyrics />
 </template>
 
 <style>

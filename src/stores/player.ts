@@ -65,7 +65,7 @@ export const usePlayerStore = defineStore('player', () => {
   const repeat = ref<RepeatMode>('off')
   const nowPlayingOpen = ref(false)
   /** What sits beside the artwork in the full-screen view. */
-  const nowPlayingPanel = ref<'none' | 'lyrics' | 'queue'>('lyrics')
+  const nowPlayingPanel = ref<'none' | 'lyrics' | 'queue' | 'mv'>('lyrics')
   /** The reader wants lyrics in a column beside the page while browsing. */
   const lyricsSidebarOpen = ref(false)
   const wideScreen = ref(false)
@@ -431,7 +431,7 @@ export const usePlayerStore = defineStore('player', () => {
     else openNowPlaying('lyrics')
   }
 
-  function openNowPlaying(panel?: 'none' | 'lyrics' | 'queue') {
+  function openNowPlaying(panel?: 'none' | 'lyrics' | 'queue' | 'mv') {
     if (!current.value) return
     if (panel) nowPlayingPanel.value = panel
     nowPlayingOpen.value = true

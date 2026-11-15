@@ -2,11 +2,13 @@
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
-  Check, ChevronDown, Info, ListMusic, Loader2, LetterText, Pause, Play, Repeat, Repeat1, SkipBack, SkipForward, Volume1, Volume2,
+  Check, ChevronDown, Clapperboard, Info, ListMusic, Loader2, LetterText, Pause, Play, Repeat, Repeat1, SkipBack, SkipForward, Volume1, Volume2,
 } from 'lucide-vue-next'
 import { usePlayerStore } from '@/stores/player'
 import { useSingerAvatars } from '@/composables/useSingerAvatars'
+import { useMusicVideos } from '@/composables/useMusicVideos'
 import MusicLyrics from '@/components/MusicLyrics.vue'
+import MvPlayer from '@/components/player/MvPlayer.vue'
 import PlayerQueue from '@/components/player/PlayerQueue.vue'
 import PlayerScrubber from '@/components/player/PlayerScrubber.vue'
 import SingerAvatars from '@/components/player/SingerAvatars.vue'
@@ -18,6 +20,7 @@ const route = useRoute()
 const router = useRouter()
 const player = usePlayerStore()
 const { trackAvatars } = useSingerAvatars()
+const { sourcesFor } = useMusicVideos()
 
 const root = ref<HTMLElement>()
 const glowA = ref<HTMLCanvasElement>()
@@ -27,6 +30,7 @@ const open = computed(() => player.nowPlayingOpen && !!track.value)
 const cover = computed(() => (track.value ? player.coverUrl(track.value) : ''))
 const avatars = computed(() => (track.value ? trackAvatars(track.value.singers) : []))
 const singerNames = computed(() => avatars.value.map(s => s.name).filter(Boolean).join('・'))
+const hasMv = computed(() => sourcesFor(track.value).length > 0)
 const repeatLabel = computed(() => ({ off: '循环：关', all: '循环：列表', one: '循环：单曲' })[player.repeat])
 
 /** Who the lyrics say is singing this very line. */
@@ -110,7 +114,7 @@ function chooseRendition(info: PlayerTrackInfo) {
   player.switchRendition(info)
 }
 
-function togglePanel(name: 'lyrics' | 'queue') {
+function togglePanel(name: 'lyrics' | 'queue' | 'mv') {
   player.nowPlayingPanel = player.nowPlayingPanel === name ? 'none' : name
 }
 
@@ -188,6 +192,10 @@ onBeforeUnmount(() => { document.documentElement.style.overflow = '' })
             </button>
             <button class="np-tab" :class="{ on: player.nowPlayingPanel === 'queue' }" :aria-pressed="player.nowPlayingPanel === 'queue'" @click="togglePanel('queue')">
               <ListMusic class="h-4 w-4" /> 队列
+            </button>
+            <!-- Every song has this view: its 2D MV, or karaoke over the singers' card art. -->
+            <button class="np-tab" :class="{ on: player.nowPlayingPanel === 'mv' }" :aria-pressed="player.nowPlayingPanel === 'mv'" :title="hasMv ? '观看 2D MV' : 'KTV 模式'" @click="togglePanel('mv')">
+              <Clapperboard class="h-4 w-4" /> {{ hasMv ? 'MV' : 'KTV' }}
             </button>
           </div>
         </header>
@@ -303,6 +311,9 @@ onBeforeUnmount(() => { document.documentElement.style.overflow = '' })
               @seek="seekFromLyrics"
               @singing="singing = $event"
             />
+            <div v-else-if="player.nowPlayingPanel === 'mv'" class="np-mv">
+              <MvPlayer :track="track" active :transport="false" />
+            </div>
             <PlayerQueue v-else class="np-queue" />
           </div>
         </div>
@@ -697,6 +708,15 @@ onBeforeUnmount(() => { document.documentElement.style.overflow = '' })
   min-height: 0;
   flex: 1;
   flex-direction: column;
+}
+
+/* The MV sits in the middle of the panel, as wide as it allows. */
+.np-mv {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .np-queue {

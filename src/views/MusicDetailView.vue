@@ -13,16 +13,18 @@ import {
   Play, Pause, BarChart2, Eye, Download, ChevronLeft, ChevronDown,
   Disc3, Sparkles, Volume2, VolumeX, SkipBack, SkipForward,
   PlayCircle, Zap, X, FileImage, Loader2, ZoomIn, ZoomOut, Maximize,
-  Activity, CheckCircle2, LockKeyhole, ExternalLink, ListPlus, ListStart, Maximize2, Check, Info, LetterText
+  Activity, CheckCircle2, Clapperboard, LockKeyhole, ExternalLink, ListPlus, ListStart, Maximize2, Check, Info, LetterText
 } from 'lucide-vue-next'
 import AssetImage from '@/components/AssetImage.vue'
 import MusicLyrics from '@/components/MusicLyrics.vue'
 import PlayerScrubber from '@/components/player/PlayerScrubber.vue'
 import SingerAvatars from '@/components/player/SingerAvatars.vue'
 import MusicQueueButton from '@/components/player/MusicQueueButton.vue'
+import MvPlayer from '@/components/player/MvPlayer.vue'
 import { loadSongLyrics, lyricsForVocal } from '@/api/lyrics'
 import { usePlayerStore } from '@/stores/player'
 import { useSingerAvatars } from '@/composables/useSingerAvatars'
+import { useMusicVideos } from '@/composables/useMusicVideos'
 import { buildTrack, type PlayerTrackInfo } from '@/utils/playerTracks'
 import { alignFurigana } from '@/utils/furigana'
 import { parseSusBpm, type SusBpmEvent } from '@/utils/susBpm'
@@ -158,6 +160,7 @@ const settingsStore = useSettingsStore()
 const accountStore = useAccountStore()
 const player = usePlayerStore()
 const { trackAvatars } = useSingerAvatars()
+const { sourcesFor } = useMusicVideos()
 
 const musicId = computed(() => Number(route.params.id))
 const music = ref<Music | null>(null)
@@ -366,6 +369,32 @@ function togglePlay() {
   if (isActiveVocal.value) player.toggle()
   else player.playNow(track)
 }
+
+// 2D MV：在页面里播放，视频没有声音，跟着全站播放器的音频走；没有 MV 的歌以角色卡面为背景做 KTV
+const hasMv = computed(() => !!currentTrack.value && sourcesFor(currentTrack.value).length > 0)
+const canKtv = computed(() => !!currentTrack.value && (hasMv.value || hasLyrics.value !== false))
+const mvShown = ref(false)
+const mvSection = ref<HTMLElement | null>(null)
+async function toggleMv() {
+  if (mvShown.value) {
+    mvShown.value = false
+    return
+  }
+  const track = currentTrack.value
+  if (!track) return
+  mvShown.value = true
+  // 还没在播放这个版本时先开始播放
+  if (!isActiveVocal.value) player.playNow(track)
+  await nextTick()
+  mvSection.value?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+}
+function playMvVocal() {
+  const track = currentTrack.value
+  if (track) player.playNow(track)
+}
+// 换了一首歌，或这个版本没有 MV：收起
+watch(musicId, () => { mvShown.value = false })
+watch(canKtv, (value) => { if (!value) mvShown.value = false })
 
 // 加入队列后的短暂确认
 const queuedFeedback = ref<'next' | 'end' | null>(null)
@@ -1287,6 +1316,16 @@ const isExpired = computed(() => {
                   <Play v-else class="w-5 h-5" fill="currentColor" />
                   {{ isPlaying ? '暂停' : isActiveVocal ? '继续播放' : '播放' }}
                 </button>
+                <button
+                  v-if="canKtv"
+                  class="music-action btn btn-ghost btn-sm gap-1.5"
+                  :class="{ 'btn-active': mvShown }"
+                  :aria-pressed="mvShown"
+                  :title="hasMv ? '在页面中播放 2D MV，带 KTV 字幕' : '在页面中以 KTV 字幕播放，背景是演唱角色的卡面'"
+                  @click="toggleMv"
+                >
+                  <Clapperboard class="w-4 h-4" /> {{ mvShown ? (hasMv ? '收起 MV' : '收起 KTV') : (hasMv ? '观看 MV' : 'KTV') }}
+                </button>
                 <button class="music-action btn btn-ghost btn-sm gap-1.5" :disabled="!currentTrack" title="排在当前歌曲之后播放" @click="addToQueue('next')">
                   <Check v-if="queuedFeedback === 'next'" class="w-4 h-4 text-success" />
                   <ListStart v-else class="w-4 h-4" />
@@ -1365,6 +1404,10 @@ const isExpired = computed(() => {
         <div class="music-body" :class="{ 'music-body--single': !showLyricsColumn }">
           <div class="music-main">
             <!-- 演唱版本 -->
+            <section v-if="mvShown && currentTrack" ref="mvSection" class="music-mv" :aria-label="hasMv ? 'MV' : 'KTV'">
+              <MvPlayer :track="currentTrack" :active="isActiveVocal" closable @activate="playMvVocal" @close="mvShown = false" />
+            </section>
+
             <section v-if="vocals.length > 1" class="music-section music-section--vocals">
               <h2 class="music-section-title">
                 <Disc3 class="w-5 h-5 text-primary" /> 演唱版本
@@ -1862,6 +1905,7 @@ const isExpired = computed(() => {
   box-shadow: 0 1px 3px rgb(0 0 0 / 0.06);
 }
 
+.music-mv { order: 0; min-width: 0; scroll-margin: 1rem; }
 .music-section--vocals { order: 1; }
 .music-section--charts { order: 3; }
 .music-section--deck { order: 5; }

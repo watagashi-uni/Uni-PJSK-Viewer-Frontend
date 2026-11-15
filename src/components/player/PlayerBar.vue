@@ -2,10 +2,12 @@
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import {
-  ChevronUp, ListMusic, Loader2, LetterText, Pause, Play, Power, Repeat, Repeat1, SkipBack, SkipForward, Volume2, VolumeX, X,
+  ChevronUp, Clapperboard, ListMusic, Loader2, LetterText, MicVocal, Pause, Play, Power, Repeat, Repeat1, SkipBack, SkipForward, Volume2, VolumeX, X,
 } from 'lucide-vue-next'
 import { usePlayerStore } from '@/stores/player'
 import { useSingerAvatars } from '@/composables/useSingerAvatars'
+import { useMusicVideos } from '@/composables/useMusicVideos'
+import { useFloatingLyrics } from '@/composables/useFloatingLyrics'
 import PlayerQueue from '@/components/player/PlayerQueue.vue'
 import PlayerScrubber from '@/components/player/PlayerScrubber.vue'
 import SingerAvatars from '@/components/player/SingerAvatars.vue'
@@ -14,9 +16,12 @@ import ZhText from '@/components/ZhText.vue'
 const route = useRoute()
 const player = usePlayerStore()
 const { trackAvatars } = useSingerAvatars()
+const { sourcesFor } = useMusicVideos()
+const { prefs: floating, toggle: toggleFloating } = useFloatingLyrics()
 
 const track = computed(() => player.current)
 const queueOpen = ref(false)
+const hasMv = computed(() => sourcesFor(track.value).length > 0)
 const progress = computed(() => (player.duration > 0 ? Math.max(0, Math.min(1, player.currentTime / player.duration)) : 0))
 const repeatLabel = computed(() => ({ off: '循环：关', all: '循环：列表', one: '循环：单曲' })[player.repeat])
 
@@ -101,6 +106,19 @@ function closePlayer() {
           >
             <Repeat1 v-if="player.repeat === 'one'" class="h-4 w-4" />
             <Repeat v-else class="h-4 w-4" />
+          </button>
+          <button
+            class="player-btn"
+            :class="{ on: floating.enabled }"
+            aria-label="悬浮歌词"
+            title="悬浮歌词（卡拉 OK）"
+            :aria-pressed="floating.enabled"
+            @click="toggleFloating"
+          >
+            <MicVocal class="h-4 w-4" />
+          </button>
+          <button class="player-btn" :aria-label="hasMv ? '观看 MV' : 'KTV 模式'" :title="hasMv ? '观看 2D MV' : 'KTV 模式'" @click="player.openNowPlaying('mv')">
+            <Clapperboard class="h-4 w-4" />
           </button>
           <button
             class="player-btn player-btn--wide"
