@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, shallowRef, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
-import { ChevronDown, Languages, LocateFixed, Type } from 'lucide-vue-next'
+import { ChevronDown, Languages, LocateFixed, MessageSquareWarning, Type } from 'lucide-vue-next'
 import {
   linePerformerIds, loadSongLyrics, lyricGaps, lyricParts, lyricRuns, lyricsForVocal, pieceProgress, untimedFill, wordProgress,
   SAME_CUE_SEC, type LyricLine, type LyricsPayload, type LyricWord,
@@ -735,11 +735,16 @@ onBeforeUnmount(() => {
             </div>
           </div>
         </div>
-        <details v-if="Object.keys(lyrics.credits || {}).length || lyrics.sources?.length" class="ly-credits">
-          <summary>歌词来源与译者</summary>
-          <p v-for="(name, role) in lyrics.credits" :key="role">{{ role === 'translation' ? '翻译' : role }}：{{ name }}</p>
-          <p v-for="source in lyrics.sources" :key="source[0]"><a :href="source[0]" target="_blank" rel="noopener noreferrer" class="underline">歌词来源</a><template v-if="source[1]"> · <a v-if="source[2]" :href="source[2]" target="_blank" rel="noopener noreferrer" class="underline">{{ source[1] }}</a><span v-else>{{ source[1] }}</span></template></p>
-        </details>
+        <div class="ly-foot">
+          <details v-if="Object.keys(lyrics.credits || {}).length || lyrics.sources?.length" class="ly-credits">
+            <summary>歌词来源与译者</summary>
+            <p v-for="(name, role) in lyrics.credits" :key="role">{{ role === 'translation' ? '翻译' : role }}：{{ name }}</p>
+            <p v-for="source in lyrics.sources" :key="source[0]"><a :href="source[0]" target="_blank" rel="noopener noreferrer" class="underline">歌词来源</a><template v-if="source[1]"> · <a v-if="source[2]" :href="source[2]" target="_blank" rel="noopener noreferrer" class="underline">{{ source[1] }}</a><span v-else>{{ source[1] }}</span></template></p>
+          </details>
+          <a class="ly-chip ly-report" href="https://github.com/watagashi-uni/sekai-lyrics/issues" target="_blank" rel="noopener noreferrer" title="在 GitHub 上反馈歌词错误">
+            <MessageSquareWarning class="h-3.5 w-3.5" /> 歌词纠错
+          </a>
+        </div>
       </template>
     </template>
   </section>
@@ -1116,8 +1121,17 @@ onBeforeUnmount(() => {
   50% { transform: scale(1.12); }
 }
 
-.ly-credits {
+/* Under the lyrics: where they come from, and a way to report a mistake in them. */
+.ly-foot {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
   padding: 0 1.25rem 0.75rem;
+}
+
+.ly-credits {
+  min-width: 0;
+  flex: 1;
   font-size: 0.75rem;
   opacity: 0.6;
 }
@@ -1130,12 +1144,21 @@ onBeforeUnmount(() => {
   margin-top: 0.5rem;
 }
 
-.ly--immersive .ly-credits {
+.ly-report {
+  flex-shrink: 0;
+  margin-left: auto;
+  backdrop-filter: none;
+}
+
+.ly--immersive .ly-foot {
   padding: 0.5rem clamp(1rem, 3vw, 2.5rem) 0;
+}
+
+.ly--immersive .ly-credits {
   opacity: 0.5;
 }
 
-.ly--sidebar .ly-credits {
+.ly--sidebar .ly-foot {
   padding: 0.5rem 1.25rem 0.75rem;
 }
 
