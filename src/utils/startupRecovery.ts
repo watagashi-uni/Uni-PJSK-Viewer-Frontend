@@ -35,12 +35,52 @@ function clearReloadAttempt() {
   }
 }
 
-function isAssetLoadError(reason: unknown): boolean {
-  const message = reason instanceof Error ? reason.message : String(reason ?? '')
-  return ASSET_ERROR_PATTERN.test(message)
+function errorMessage(reason: unknown): string {
+  return reason instanceof Error ? reason.message : String(reason ?? '')
 }
 
-function renderLoadFailure(message: string) {
+function isAssetLoadError(reason: unknown): boolean {
+  return ASSET_ERROR_PATTERN.test(errorMessage(reason))
+}
+
+/** The file of this site that failed, when the error names it (Safari and Vite both do). */
+function failedAssetUrl(reason: unknown): URL | null {
+  const match = /(?:https?:\/\/[^\s'"`]+?|\/[^\s'"`]+?)\.(?:js|css|wasm)(?=[\s'"`]|$)/i.exec(errorMessage(reason))
+  if (!match) return null
+  try {
+    const url = new URL(match[0], window.location.href)
+    return url.origin === window.location.origin ? url : null
+  } catch {
+    return null
+  }
+}
+
+const ASSET_TYPES: Record<string, RegExp> = {
+  js: /(?:java|ecma)script/,
+  css: /text\/css/,
+  wasm: /application\/wasm/,
+}
+
+/**
+ * Fetch the file again past the browser cache, which also replaces what the cache holds.
+ * A host that answers a missing file with the HTML page (and lets it be cached for hours)
+ * leaves the page broken on every reload otherwise: a file requested in the moments a new
+ * deployment was still spreading stays "missing" long after it has arrived.
+ * True when the file is now really there (informative: the page reloads either way).
+ */
+async function refetchAsset(url: URL): Promise<boolean> {
+  const extension = url.pathname.split('.').pop()?.toLowerCase() ?? ''
+  const expected = ASSET_TYPES[extension]
+  if (!expected) return false
+  try {
+    const response = await fetch(url, { cache: 'reload', credentials: 'same-origin' })
+    return response.ok && expected.test(response.headers.get('content-type')?.toLowerCase() ?? '')
+  } catch {
+    return false
+  }
+}
+
+function renderLoadFailure(message: string, asset: URL | null = null) {
   const app = document.getElementById('app')
   if (!app) return
 
@@ -59,7 +99,11 @@ function renderLoadFailure(message: string) {
   retry.type = 'button'
   retry.textContent = '重新加载'
   retry.style.cssText = 'border:0;border-radius:.75rem;padding:.75rem 1.25rem;background:#ff85a1;color:white;font-weight:700;cursor:pointer'
-  retry.addEventListener('click', () => window.location.reload())
+  retry.addEventListener('click', async () => {
+    retry.disabled = true
+    if (asset) await refetchAsset(asset)
+    window.location.reload()
+  })
 
   panel.append(title, description, retry)
   app.replaceChildren(panel)
@@ -83,13 +127,16 @@ async function recoverFromAssetLoadFailure(reason: unknown) {
     return
   }
 
-  // No newer build: the failure may be transient, so reload once.
+  // No newer build: reload once. The failure may be transient, or the browser cache may hold
+  // a wrong answer for the file, which is fetched again first so the reload does not reuse it.
   if (!readReloadAttempt()) {
     writeReloadAttempt()
+    const url = failedAssetUrl(reason)
+    if (url) await refetchAsset(url)
     window.location.reload()
     return
   }
-  renderLoadFailure('资源仍未加载成功，请检查网络后重新加载。')
+  renderLoadFailure('资源仍未加载成功，请检查网络后重新加载。', failedAssetUrl(reason))
 }
 
 export function installStartupRecovery() {
