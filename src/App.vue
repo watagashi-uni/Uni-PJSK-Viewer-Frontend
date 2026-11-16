@@ -19,6 +19,7 @@ import FloatingLyrics from '@/components/player/FloatingLyrics.vue'
 import PlayerLyricsSidebar from '@/components/player/PlayerLyricsSidebar.vue'
 import { usePlayerStore } from '@/stores/player'
 import { useGlobalSearch } from '@/composables/useGlobalSearch'
+import { frontendVersion } from '@/data/changelog'
 
 // 搜索面板的代码不进首屏包；空闲时预取，第一次按快捷键就能立刻输入。
 // 这里只是组件代码，搜索用的数据仍然等到面板打开才加载
@@ -100,7 +101,10 @@ watch(
 
       <footer class="mt-auto px-4 pb-5 pt-8 text-xs text-base-content/45 sm:px-6 lg:px-8">
         <div class="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-x-4 gap-y-1 border-t border-base-300 pt-4">
-          <span>Uni PJSK Viewer © {{ currentYear }} 綿菓子ウニ</span>
+          <span class="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span>Uni PJSK Viewer © {{ currentYear }} 綿菓子ウニ</span>
+            <RouterLink to="/changelog" class="num hover:text-primary hover:underline" aria-label="查看站点版本和更新日志">v{{ frontendVersion }}</RouterLink>
+          </span>
           <span v-if="masterStore.version" class="num">数据 {{ masterStore.version }}<template v-if="masterStore.assetVersion && masterStore.assetVersion !== masterStore.version"> / 资源 {{ masterStore.assetVersion }}</template></span>
         </div>
       </footer>

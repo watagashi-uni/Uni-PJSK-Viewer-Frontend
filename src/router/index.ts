@@ -226,6 +226,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '谱面预览', fullscreen: true },
     },
     {
+        path: '/changelog',
+        name: 'Changelog',
+        component: () => import('@/views/ChangelogView.vue'),
+        meta: { title: '更新日志' },
+    },
+    {
         path: '/about',
         name: 'About',
         component: () => import('@/views/AboutView.vue'),

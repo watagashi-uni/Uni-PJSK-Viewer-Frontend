@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Code, ExternalLink, Github, Heart, Languages, MessageSquareWarning, Scale } from 'lucide-vue-next'
+import { Code, ExternalLink, Github, Heart, History, Languages, MessageSquareWarning, Scale } from 'lucide-vue-next'
+import { frontendVersion } from '@/data/changelog'
 import { useSettingsStore } from '@/stores/settings'
 import { characterSdUrl } from '@/utils/units'
 
@@ -140,6 +141,9 @@ SOFTWARE.`,
         <h1 class="about-head__title">Uni PJSK Viewer</h1>
         <p class="about-head__lead">Project SEKAI 游戏资料查看与工具站：歌曲、卡片、活动、剧情，还有组队、谱面和衣装这些小工具。</p>
         <div class="mt-4 flex flex-wrap gap-2">
+          <RouterLink to="/changelog" class="btn btn-sm gap-2">
+            <History class="h-4 w-4" /> <span class="num">v{{ frontendVersion }}</span> · 更新日志
+          </RouterLink>
           <a href="https://github.com/watagashi-uni/Uni-PJSK-Viewer-Frontend" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-sm gap-2">
             <Github class="h-4 w-4" /> 查看源码
           </a>

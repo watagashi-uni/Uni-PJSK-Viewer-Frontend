@@ -74,6 +74,7 @@ export const navGroups: NavGroup[] = [
 
 /** 不在主导航里、但搜索面板要能找到的页面 */
 export const extraPages: NavItem[] = [
+  { to: '/changelog', label: '更新日志', icon: History, description: 'Viewer 的版本更新和修复记录', keywords: 'changelog version 版本 更新 日志' },
   { to: '/settings', label: '设置', icon: Settings, description: '剧透、译名、主题、资源线路和通知', keywords: 'settings 配置 剧透 翻译 主题 缓存' },
   { to: '/about', label: '关于', icon: Info, description: '项目说明、数据来源和致谢', keywords: 'about 说明 github 致谢' },
 ]
