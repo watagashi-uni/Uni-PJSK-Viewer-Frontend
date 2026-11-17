@@ -50,6 +50,29 @@ test('requests deduplicate, absent songs skip payload, and failed payload retrie
   assert.equal(await api.loadSongLyrics(2), null)
   assert.equal(calls.length, 3)
 })
+test('a republished song is picked up once the index is revalidated, and a failed revalidation keeps the last index', async (t) => {
+  t.mock.timers.enable({ apis: ['Date'], now: 0 })
+  const calls = []
+  let hash = '0123456789abcdef'
+  let offline = false
+  const api = load(async url => {
+    calls.push(url.replace('https://example.test/lyrics/', ''))
+    if (offline) throw new Error('offline')
+    if (url.endsWith('version.json')) return { ok: true, json: async () => ({ v: 1, songs: { 1: hash } }) }
+    return { ok: true, json: async () => ({ musicId: 1, format: 'lrc', duration: 20, lrc: url }) }
+  })
+  const first = await api.loadSongLyrics(1)
+  hash = 'fedcba9876543210'
+  // within a minute the index is trusted, so the cached resource is reused
+  assert.equal(await api.loadSongLyrics(1), first)
+  t.mock.timers.tick(61_000)
+  const second = await api.loadSongLyrics(1)
+  assert.match(second.lrc, /1\.fedcba9876543210\.json$/)
+  t.mock.timers.tick(61_000)
+  offline = true
+  assert.equal(await api.loadSongLyrics(1), second)
+  assert.deepEqual(calls, ['version.json', '1.0123456789abcdef.json', 'version.json', '1.fedcba9876543210.json', 'version.json'])
+})
 test('word fill clamps, preserves timing gaps, seeks backwards and supports zero-duration units', () => {
   const { wordProgress } = load()
   const word = { start: 10, end: 12 }

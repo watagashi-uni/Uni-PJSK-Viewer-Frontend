@@ -75,12 +75,33 @@ export interface LyricsPayload extends Omit<SongLyrics, 'lines'> {
 }
 interface LyricIndex { v: number; songs: Record<string, string> }
 const base = `${masterApiBaseUrl}/lyrics`
-let indexRequest: Promise<LyricIndex> | undefined
+/** How long the index is trusted before the next song load revalidates it. */
+const INDEX_TTL_MS = 60_000
+let index: { request: Promise<LyricIndex>; at: number } | undefined
 /**
- * Song resources as published, by music id (the index, read once a session, gives each its
- * one content hash). The rendition to play is derived from them on demand.
+ * Song resources as published, by `<musicId>.<hash>` (the index gives each song its one
+ * content hash, so a republished song is a new key). The rendition to play is derived from
+ * them on demand.
  */
-const pending = new Map<number, Promise<LyricsPayload | null>>()
+const pending = new Map<string, Promise<LyricsPayload>>()
+/** Loads still resolving the index, by music id, so concurrent callers share one promise. */
+const lookups = new Map<number, Promise<LyricsPayload | null>>()
+
+/** The index, re-read at most once a minute; a failed re-read keeps the last good one. */
+function loadIndex(): Promise<LyricIndex> {
+  if (index && Date.now() - index.at < INDEX_TTL_MS) return index.request
+  const previous = index
+  const entry = {
+    at: Date.now(),
+    request: fetchJson<LyricIndex>('version.json').catch(error => {
+      if (index === entry) index = previous
+      if (previous) return previous.request
+      throw error
+    }),
+  }
+  index = entry
+  return entry.request
+}
 
 /** An LRC row with the time tag it was written under, kept for matching the extra fields to it. */
 interface LrcRow extends LyricLine { cueStart: number }
@@ -412,23 +433,31 @@ async function fetchJson<T>(path: string): Promise<T> {
 }
 
 /**
- * Small session index, then one immutable content-hashed song resource on demand. The
- * resource is kept as published: each rendition is derived from it (see lyricsForVocal).
+ * Small index (revalidated, see loadIndex), then one immutable content-hashed song resource
+ * on demand. The resource is kept as published: each rendition is derived from it (see
+ * lyricsForVocal).
  */
 export function loadSongLyrics(musicId: number): Promise<LyricsPayload | null> {
-  if (pending.has(musicId)) return pending.get(musicId)!
+  const inflight = lookups.get(musicId)
+  if (inflight) return inflight
   const task = (async () => {
-    indexRequest ??= fetchJson<LyricIndex>('version.json').catch(error => { indexRequest = undefined; throw error })
-    const index = await indexRequest
-    const hash = index.songs[String(musicId)]
+    const hash = (await loadIndex()).songs[String(musicId)]
     if (!hash) return null
     if (!/^[a-f0-9]{16}$/.test(hash)) throw new Error('Invalid lyrics version')
-    const data = await fetchJson<LyricsPayload>(`${musicId}.${hash}.json`)
-    if (data.musicId !== musicId || !Number.isFinite(data.duration)) throw new Error('Invalid lyrics')
-    return data
+    const key = `${musicId}.${hash}`
+    let resource = pending.get(key)
+    if (!resource) {
+      resource = fetchJson<LyricsPayload>(`${key}.json`).then(data => {
+        if (data.musicId !== musicId || !Number.isFinite(data.duration)) throw new Error('Invalid lyrics')
+        return data
+      })
+      pending.set(key, resource)
+      void resource.catch(() => pending.delete(key))
+    }
+    return resource
   })()
-  pending.set(musicId, task)
-  void task.catch(() => pending.delete(musicId))
+  lookups.set(musicId, task)
+  void task.finally(() => lookups.delete(musicId)).catch(() => {})
   return task
 }
 
