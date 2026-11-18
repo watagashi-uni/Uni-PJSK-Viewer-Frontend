@@ -8,6 +8,9 @@ import {
   CalendarDays, Zap, BookOpen,
   Search,
 } from 'lucide-vue-next'
+import { loadInformationIndex, type InformationItem } from '@/api/information'
+import { informationStatus, relativeInformationTime } from '@/utils/information'
+import InformationBadges from '@/components/InformationBadges.vue'
 import { useGlobalSearch } from '@/composables/useGlobalSearch'
 import AssetImage from '@/components/AssetImage.vue'
 import ThemeMenu from '@/components/ThemeMenu.vue'
@@ -26,6 +29,23 @@ const isLoading = ref(true)
 // 每分钟刷新一次，用于倒计时与“今天/明天”判断
 const now = ref(Date.now())
 let nowTimer: ReturnType<typeof setInterval> | undefined
+
+// 最新公告：官方常在开始前几分钟放出，跟着每分钟的计时一起刷新
+const notices = ref<InformationItem[] | null>(null)
+const noticesFailed = ref(false)
+const HOME_NOTICE_COUNT = 5
+const homeNotices = computed(() => (notices.value ?? [])
+  .filter(item => item.type !== 'content' && !item.goneAt && !(item.endAt && item.endAt < now.value))
+  .slice(0, HOME_NOTICE_COUNT))
+
+async function loadNotices(force = false) {
+  try {
+    notices.value = (await loadInformationIndex(force)).items
+    noticesFailed.value = false
+  } catch {
+    if (!notices.value) noticesFailed.value = true
+  }
+}
 
 import type { Gacha } from '@/types/gacha'
 import { cardImageVariant } from '@/utils/card'
@@ -294,7 +314,11 @@ onUnmounted(() => {
 })
 
 onMounted(async () => {
-  nowTimer = setInterval(() => { now.value = Date.now() }, 60_000)
+  nowTimer = setInterval(() => {
+    now.value = Date.now()
+    if (document.visibilityState === 'visible') void loadNotices(true)
+  }, 60_000)
+  void loadNotices()
   try {
     masterStore.checkVersionInBackground()
 
@@ -494,6 +518,33 @@ onMounted(async () => {
       </div>
 
       <aside class="min-w-0 space-y-6">
+        <!-- 最新公告：加载失败时整块不显示，不打扰首页 -->
+        <section v-if="!noticesFailed" aria-labelledby="home-notice-title">
+          <div class="mb-2.5 flex items-center justify-between">
+            <h2 id="home-notice-title" class="section-title">最新公告</h2>
+            <RouterLink to="/information" class="text-sm text-base-content/55 hover:text-primary">全部公告</RouterLink>
+          </div>
+          <div v-if="!notices" class="space-y-2">
+            <div v-for="i in 4" :key="i" class="skeleton h-14 rounded-lg"></div>
+          </div>
+          <ul v-else-if="homeNotices.length" class="divide-y divide-base-300 overflow-hidden rounded-box border border-base-300 bg-base-100">
+            <li v-for="item in homeNotices" :key="item.id">
+              <component
+                :is="item.key && item.page ? 'RouterLink' : 'div'"
+                :to="item.key && item.page ? `/information/${item.key}` : undefined"
+                class="group block px-3 py-2.5 hover:bg-base-200/60"
+              >
+                <span class="flex flex-wrap items-center gap-1.5 text-xs">
+                  <InformationBadges :tag="item.tag" :status="informationStatus(item, now)" />
+                  <span class="text-base-content/50" :title="new Date(item.startAt).toLocaleString('zh-CN')">{{ relativeInformationTime(item.startAt, now) }}</span>
+                </span>
+                <span class="mt-1 line-clamp-2 block text-sm leading-snug group-hover:text-primary" :title="item.title">{{ item.titleZh || item.title }}</span>
+              </component>
+            </li>
+          </ul>
+          <p v-else class="rounded-box border border-dashed border-base-300 py-8 text-center text-sm text-base-content/55">暂时没有公告</p>
+        </section>
+
         <!-- 日程 -->
         <section aria-labelledby="home-schedule-title">
           <div class="mb-2.5 flex items-center justify-between">
