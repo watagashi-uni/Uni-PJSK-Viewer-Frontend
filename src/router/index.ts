@@ -58,6 +58,18 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '首页', spoilerList: true },
     },
     {
+        path: '/information',
+        name: 'Information',
+        component: () => import('@/views/InformationView.vue'),
+        meta: { title: '游戏公告' },
+    },
+    {
+        path: '/information/:key',
+        name: 'InformationDetail',
+        component: () => import('@/views/InformationDetailView.vue'),
+        meta: { title: '公告详情' },
+    },
+    {
         path: '/musics',
         name: 'Musics',
         component: () => import('@/views/MusicsView.vue'),

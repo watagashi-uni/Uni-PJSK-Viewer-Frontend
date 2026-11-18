@@ -3,7 +3,7 @@ import {
   Home, Music, Image, Users, Shirt, Trophy, Smile, Boxes, Wrench, BookOpen,
   Calendar, BarChart3, Gift, Radio, CalendarDays,
   Zap, FileImage, PenLine, Dices,
-  User, History, Layers3, House, Settings, Info,
+  User, History, Layers3, House, Settings, Info, Megaphone,
 } from 'lucide-vue-next'
 
 export interface NavItem {
@@ -26,7 +26,10 @@ export interface NavGroup {
 /** 侧边栏导航，也是搜索面板里「页面」的来源 */
 export const navGroups: NavGroup[] = [
   {
-    items: [{ to: '/', label: '首页', icon: Home, description: '当期活动、卡池和近期日程', keywords: 'home 主页' }],
+    items: [
+      { to: '/', label: '首页', icon: Home, description: '当期活动、卡池和近期日程', keywords: 'home 主页' },
+      { to: '/information', label: '游戏公告', icon: Megaphone, description: '日服游戏内公告的中日对照版，每分钟同步', keywords: 'information notice news お知らせ 公告 通知 维护 不具合' },
+    ],
   },
   {
     title: '图鉴',
