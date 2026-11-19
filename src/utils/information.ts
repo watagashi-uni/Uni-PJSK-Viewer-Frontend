@@ -30,17 +30,25 @@ export function relativeInformationTime(ms: number, now = Date.now()): string {
 
 export type InformationStatus = 'upcoming' | 'new' | 'ended' | 'gone' | null
 
-/** 列表角标：撤下 > 已结束 > 官方提前放出（还没到 startAt） > 24 小时内新出现 */
+/**
+ * 官方提前放出、还没到 startAt 的公告属于剧透：没开剧透时不显示，开了也要标出来。
+ * 列表、首页、详情页都用这一个判断。
+ */
+export function isInformationSpoiler(item: Pick<InformationItem, 'startAt'>, now = Date.now()): boolean {
+  return item.startAt > now
+}
+
+/** 列表角标：官方提前放出（还没到 startAt） > 撤下 > 已结束 > 24 小时内新出现 */
 export function informationStatus(item: InformationItem, now = Date.now()): InformationStatus {
+  if (isInformationSpoiler(item, now)) return 'upcoming'
   if (item.goneAt) return 'gone'
   if (item.endAt && item.endAt < now) return 'ended'
-  if (item.startAt > now) return 'upcoming'
   if (now - Math.max(item.startAt, item.seenAt) < DAY) return 'new'
   return null
 }
 
 export const informationStatusLabels: Record<Exclude<InformationStatus, null>, string> = {
-  upcoming: '提前放出',
+  upcoming: '剧透 · 提前放出',
   new: '新',
   ended: '已结束',
   gone: '已撤下',

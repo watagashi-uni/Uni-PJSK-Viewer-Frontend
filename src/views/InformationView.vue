@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ChevronDown, ExternalLink, Languages, Megaphone, RefreshCw, Search } from 'lucide-vue-next'
+import { ChevronDown, ExternalLink, EyeOff, Languages, Megaphone, RefreshCw, Search } from 'lucide-vue-next'
 import PageHeader from '@/components/PageHeader.vue'
 import InformationBadges from '@/components/InformationBadges.vue'
 import { readQueryString, replaceListQuery } from '@/utils/routeQuery'
+import { useSettingsStore } from '@/stores/settings'
 import {
   informationTagLabel,
   loadInformationIndex,
@@ -14,11 +15,13 @@ import {
 import {
   formatInformationTime,
   informationStatus,
+  isInformationSpoiler,
   relativeInformationTime,
 } from '@/utils/information'
 
 const route = useRoute()
 const router = useRouter()
+const settingsStore = useSettingsStore()
 
 const index = ref<InformationIndex | null>(null)
 const isLoading = ref(true)
@@ -37,7 +40,12 @@ const visibleCount = ref(PAGE_SIZE)
 const TAG_ORDER = ['information', 'event', 'gacha', 'music', 'campaign', 'update', 'bug']
 
 /** 正文类公告（官方网站、Twitter 这种常驻链接另外放在页面底部） */
-const notices = computed(() => (index.value?.items ?? []).filter(item => item.type !== 'content'))
+const allNotices = computed(() => (index.value?.items ?? []).filter(item => item.type !== 'content'))
+/** 官方提前放出、还没到开始时间的公告：没开剧透时整条不显示，也不计入各类数量 */
+const spoilerNotices = computed(() => allNotices.value.filter(item => isInformationSpoiler(item, now.value)))
+const notices = computed(() => (settingsStore.showSpoilers
+  ? allNotices.value
+  : allNotices.value.filter(item => !isInformationSpoiler(item, now.value))))
 const links = computed(() => (index.value?.items ?? []).filter(item => item.type === 'content' && !item.goneAt))
 
 function isEnded(item: InformationItem) {
@@ -163,6 +171,16 @@ onBeforeUnmount(() => {
       </button>
     </div>
 
+    <!-- 提前放出的公告：没开剧透时只说明有内容被隐藏，开了之后提醒这些是剧透 -->
+    <p v-if="spoilerNotices.length && settingsStore.showSpoilers" class="spoiler-note" role="note">
+      <EyeOff class="h-4 w-4 shrink-0" />
+      <span>带「剧透」标记的 {{ spoilerNotices.length }} 条公告官方提前放出，还没到公开时间，请勿转载或截图外传。</span>
+    </p>
+    <p v-else-if="spoilerNotices.length" class="spoiler-note is-hidden" role="note">
+      <EyeOff class="h-4 w-4 shrink-0" />
+      <span>还没到公开时间的公告已隐藏，可在<RouterLink to="/settings" class="link">设置</RouterLink>中开启剧透显示。</span>
+    </p>
+
     <div v-if="isLoading" class="space-y-3">
       <div v-for="i in 8" :key="i" class="skeleton h-20 rounded-box"></div>
     </div>
@@ -179,7 +197,7 @@ onBeforeUnmount(() => {
             :is="linkFor(item) ? 'RouterLink' : 'div'"
             :to="linkFor(item) ?? undefined"
             class="tile info-row"
-            :class="{ 'is-ended': isEnded(item) }"
+            :class="{ 'is-ended': isEnded(item), 'is-spoiler': isInformationSpoiler(item, now) }"
           >
             <img v-if="item.thumb && !brokenThumbs.has(item.id)" :src="item.thumb" alt="" loading="lazy" class="info-row__thumb" @error="brokenThumbs.add(item.id)" />
             <div class="min-w-0 flex-1">
@@ -232,6 +250,32 @@ onBeforeUnmount(() => {
 
 .info-row.is-ended {
   opacity: 0.65;
+}
+
+.info-row.is-spoiler {
+  border-color: color-mix(in oklab, var(--color-warning) 55%, var(--color-base-300));
+}
+
+.spoiler-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid color-mix(in oklab, var(--color-warning) 45%, var(--color-base-300));
+  border-radius: var(--radius-field);
+  background-color: color-mix(in oklab, var(--color-warning) 12%, var(--color-base-100));
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.spoiler-note svg {
+  margin-top: 0.15rem;
+}
+
+.spoiler-note.is-hidden {
+  border-color: var(--color-base-300);
+  background-color: transparent;
+  color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
 }
 
 .info-row__thumb {

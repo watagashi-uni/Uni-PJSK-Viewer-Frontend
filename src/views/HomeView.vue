@@ -9,7 +9,7 @@ import {
   Search,
 } from 'lucide-vue-next'
 import { loadInformationIndex, type InformationItem } from '@/api/information'
-import { informationStatus, relativeInformationTime } from '@/utils/information'
+import { informationStatus, isInformationSpoiler, relativeInformationTime } from '@/utils/information'
 import InformationBadges from '@/components/InformationBadges.vue'
 import { useGlobalSearch } from '@/composables/useGlobalSearch'
 import AssetImage from '@/components/AssetImage.vue'
@@ -34,8 +34,10 @@ let nowTimer: ReturnType<typeof setInterval> | undefined
 const notices = ref<InformationItem[] | null>(null)
 const noticesFailed = ref(false)
 const HOME_NOTICE_COUNT = 5
+// 官方提前放出、还没到开始时间的公告跟其他未公开内容一样，没开剧透时不显示
 const homeNotices = computed(() => (notices.value ?? [])
   .filter(item => item.type !== 'content' && !item.goneAt && !(item.endAt && item.endAt < now.value))
+  .filter(item => settingsStore.showSpoilers || !isInformationSpoiler(item, now.value))
   .slice(0, HOME_NOTICE_COUNT))
 
 async function loadNotices(force = false) {
@@ -117,7 +119,16 @@ const currentEvent = computed<CurrentEventType | null>(() => {
   return { ...latest, status: 'ended', statusLabel: '已结束' } as CurrentEventType
 })
 
-// 最近新曲（前5首，主页严格不显示未发布的歌曲）
+const HOME_MUSIC_COUNT = 6
+
+// 与样式里的 lg 断点一致：桌面端新曲是封面格子，手机端是列表
+const wideQuery = typeof window === 'undefined' ? null : window.matchMedia('(min-width: 1024px)')
+const isWide = ref(wideQuery?.matches ?? false)
+function onWideChange(event: MediaQueryListEvent) {
+  isWide.value = event.matches
+}
+
+// 最近新曲（前 6 首，主页严格不显示未发布的歌曲）
 const recentMusics = computed(() => {
   const list = musics.value.filter(m => m.publishedAt <= now.value)
   
@@ -129,7 +140,7 @@ const recentMusics = computed(() => {
     return b.id - a.id
   })
   
-  return list.slice(0, 5)
+  return list.slice(0, HOME_MUSIC_COUNT)
 })
 
 // 正在进行中的限时卡池：常驻卡池（剩余一年以上）不在首页展示，按结束时间先后排序
@@ -311,9 +322,11 @@ const currentUserProfileData = computed(() => {
 
 onUnmounted(() => {
   if (nowTimer) clearInterval(nowTimer)
+  wideQuery?.removeEventListener('change', onWideChange)
 })
 
 onMounted(async () => {
+  wideQuery?.addEventListener('change', onWideChange)
   nowTimer = setInterval(() => {
     now.value = Date.now()
     if (document.visibilityState === 'visible') void loadNotices(true)
@@ -413,8 +426,9 @@ onMounted(async () => {
       </RouterLink>
     </nav>
 
-    <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
-      <div class="min-w-0 space-y-6 lg:col-span-2">
+    <!-- 手机端两栏拆开成一列；桌面端左栏放图，右栏放列表 -->
+    <div class="home-grid">
+      <div class="home-col lg:col-span-2">
         <!-- 当前活动 -->
         <section aria-labelledby="home-event-title">
           <div class="mb-2.5 flex items-center justify-between">
@@ -481,6 +495,34 @@ onMounted(async () => {
           <p v-else class="rounded-box border border-dashed border-base-300 py-10 text-center text-sm text-base-content/55">暂时没有活动数据</p>
         </section>
 
+        <!-- 新曲：桌面端是一排封面，跟活动图、卡池图同一栏；手机端是带作者和日期的列表 -->
+        <section aria-labelledby="home-music-title">
+          <div class="mb-2.5 flex items-center justify-between">
+            <h2 id="home-music-title" class="section-title">最新歌曲</h2>
+            <RouterLink to="/musics" class="text-sm text-base-content/55 hover:text-primary">全部歌曲</RouterLink>
+          </div>
+          <div v-if="isLoading" class="home-songs">
+            <div v-for="i in HOME_MUSIC_COUNT" :key="i" class="home-song-skeleton skeleton"></div>
+          </div>
+          <ul v-else class="home-songs">
+            <li v-for="music in recentMusics" :key="music.id">
+              <RouterLink :to="`/musics/${music.id}`" class="home-song group">
+                <AssetImage
+                  :src="`${assetsHost}/startapp/music/jacket/${music.assetbundleName}/${music.assetbundleName}.png`"
+                  :alt="music.title"
+                  class="home-song__jacket"
+                />
+                <span class="home-song__text">
+                  <!-- 封面格子比较窄，译名另起一行，不跟原名挤在同一行里被截掉 -->
+                  <span class="block truncate text-sm font-medium group-hover:text-primary" :title="music.title"><ZhText :text="music.title" table="musics" path="title" :layout="isWide ? 'stack' : 'inline'" main-class="truncate" sub-class="truncate" /></span>
+                  <span class="block truncate text-xs text-base-content/50">{{ music.composer }}</span>
+                </span>
+                <span class="home-song__date">{{ scheduleDay(music.publishedAt) }}</span>
+              </RouterLink>
+            </li>
+          </ul>
+        </section>
+
         <!-- 进行中的卡池 -->
         <section v-if="isLoading || ongoingGachas.length" aria-labelledby="home-gacha-title">
           <div class="mb-2.5 flex items-center justify-between">
@@ -517,7 +559,7 @@ onMounted(async () => {
         </section>
       </div>
 
-      <aside class="min-w-0 space-y-6">
+      <aside class="home-col">
         <!-- 最新公告：加载失败时整块不显示，不打扰首页 -->
         <section v-if="!noticesFailed" aria-labelledby="home-notice-title">
           <div class="mb-2.5 flex items-center justify-between">
@@ -574,33 +616,6 @@ onMounted(async () => {
             未来日程已隐藏，可在<RouterLink to="/settings" class="link">设置</RouterLink>中开启剧透显示。
           </p>
         </section>
-
-        <!-- 新曲 -->
-        <section aria-labelledby="home-music-title">
-          <div class="mb-2.5 flex items-center justify-between">
-            <h2 id="home-music-title" class="section-title">最新歌曲</h2>
-            <RouterLink to="/musics" class="text-sm text-base-content/55 hover:text-primary">全部歌曲</RouterLink>
-          </div>
-          <div v-if="isLoading" class="space-y-2">
-            <div v-for="i in 5" :key="i" class="skeleton h-14 rounded-lg"></div>
-          </div>
-          <ul v-else class="divide-y divide-base-300 overflow-hidden rounded-box border border-base-300 bg-base-100">
-            <li v-for="music in recentMusics" :key="music.id">
-              <RouterLink :to="`/musics/${music.id}`" class="group flex items-center gap-3 px-3 py-2 hover:bg-base-200/60">
-                <AssetImage
-                  :src="`${assetsHost}/startapp/music/jacket/${music.assetbundleName}/${music.assetbundleName}.png`"
-                  :alt="music.title"
-                  class="h-11 w-11 shrink-0 rounded-md object-cover"
-                />
-                <span class="min-w-0 flex-1">
-                  <span class="block truncate text-sm font-medium group-hover:text-primary"><ZhText :text="music.title" table="musics" path="title" layout="inline" /></span>
-                  <span class="block truncate text-xs text-base-content/50">{{ music.composer }}</span>
-                </span>
-                <span class="shrink-0 text-xs text-base-content/45">{{ scheduleDay(music.publishedAt) }}</span>
-              </RouterLink>
-            </li>
-          </ul>
-        </section>
       </aside>
     </div>
 
@@ -617,6 +632,160 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+/* 手机端：两栏不单独成块，所有区块排成一列 */
+.home-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.5rem;
+}
+
+.home-col {
+  display: contents;
+}
+
+.home-col > * {
+  min-width: 0;
+}
+
+@media (min-width: 1024px) {
+  .home-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .home-col {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    min-width: 0;
+  }
+}
+
+/* 新曲：手机端是列表 */
+.home-songs {
+  overflow: hidden;
+  border: 1px solid var(--color-base-300);
+  border-radius: var(--radius-box);
+  background-color: var(--color-base-100);
+}
+
+.home-songs > * + * {
+  border-top: 1px solid var(--color-base-300);
+}
+
+.home-songs > :nth-child(n + 6) {
+  display: none;
+}
+
+.home-song {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+}
+
+.home-song:hover {
+  background-color: color-mix(in oklab, var(--color-base-200) 60%, transparent);
+}
+
+.home-song :deep(.home-song__jacket) {
+  flex: none;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 0.375rem;
+  object-fit: cover;
+}
+
+.home-song__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.home-song__date {
+  flex: none;
+  color: color-mix(in oklab, var(--color-base-content) 45%, transparent);
+  font-size: 0.75rem;
+}
+
+.home-song-skeleton {
+  height: 3.75rem;
+  border-radius: 0;
+}
+
+/* 桌面端：一排封面（窄一些的屏幕排成两行） */
+@media (min-width: 1024px) {
+  .home-songs {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.75rem;
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+    background-color: transparent;
+  }
+
+  .home-songs > * + * {
+    border-top: 0;
+  }
+
+  .home-songs > :nth-child(n + 6) {
+    display: block;
+  }
+
+  .home-song {
+    position: relative;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    padding: 0;
+    overflow: hidden;
+    border: 1px solid var(--color-base-300);
+    border-radius: var(--radius-box);
+    background-color: var(--color-base-100);
+    transition: border-color 0.15s ease;
+  }
+
+  .home-song:hover {
+    border-color: color-mix(in oklab, var(--color-primary) 50%, var(--color-base-300));
+    background-color: var(--color-base-100);
+  }
+
+  .home-song :deep(.home-song__jacket) {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1;
+    border-radius: 0;
+  }
+
+  .home-song__text {
+    padding: 0.375rem 0.625rem 0.5rem;
+    border-top: 1px solid var(--color-base-300);
+  }
+
+  .home-song__date {
+    position: absolute;
+    top: 0.375rem;
+    right: 0.375rem;
+    padding: 0.0625rem 0.4rem;
+    border-radius: 999px;
+    background-color: rgb(0 0 0 / 0.55);
+    color: #fff;
+    font-size: 0.6875rem;
+    font-weight: 600;
+  }
+
+  .home-song-skeleton {
+    height: auto;
+    aspect-ratio: 1 / 1.3;
+    border-radius: var(--radius-box);
+  }
+}
+
+@media (min-width: 1280px) {
+  .home-songs {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+
 @media (min-width: 768px) {
   .home-event {
     min-height: clamp(15rem, 21vw, 18rem);

@@ -61,7 +61,7 @@ const routes: RouteRecordRaw[] = [
         path: '/information',
         name: 'Information',
         component: () => import('@/views/InformationView.vue'),
-        meta: { title: '游戏公告' },
+        meta: { title: '游戏公告', spoilerList: true },
     },
     {
         path: '/information/:key',

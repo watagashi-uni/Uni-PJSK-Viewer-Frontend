@@ -10,7 +10,12 @@ defineProps<{
 
 <template>
   <span class="info-tag" :data-tag="tag">{{ informationTagLabel(tag) }}</span>
-  <span v-if="status" class="info-status" :data-status="status">{{ informationStatusLabels[status] }}</span>
+  <span
+    v-if="status"
+    class="info-status"
+    :data-status="status"
+    :title="status === 'upcoming' ? '官方提前放出，还没到公开时间' : undefined"
+  >{{ informationStatusLabels[status] }}</span>
 </template>
 
 <style scoped>

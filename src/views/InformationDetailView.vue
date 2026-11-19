@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ChevronLeft, ExternalLink, Languages, Megaphone } from 'lucide-vue-next'
+import { ChevronLeft, ExternalLink, EyeOff, Languages, Megaphone } from 'lucide-vue-next'
 import { useBackToList } from '@/composables/useBackToList'
+import { useSpoilerWatermark } from '@/composables/useSpoilerWatermark'
+import { useSettingsStore } from '@/stores/settings'
 import InformationBadges from '@/components/InformationBadges.vue'
 import {
   loadInformationIndex,
@@ -14,6 +16,7 @@ import {
 import {
   formatInformationTime,
   informationStatus,
+  isInformationSpoiler,
   relativeInformationTime,
 } from '@/utils/information'
 
@@ -28,6 +31,7 @@ const modes: { value: Mode; label: string }[] = [
 const route = useRoute()
 const router = useRouter()
 const goBack = useBackToList('/information')
+const settingsStore = useSettingsStore()
 
 const key = computed(() => String(route.params.key ?? ''))
 const item = ref<InformationItem | null>(null)
@@ -55,8 +59,14 @@ const titleJa = computed(() => page.value?.title || item.value?.title || '')
 const showJaTitle = computed(() => mode.value !== 'zh' && titleJa.value !== title.value)
 const status = computed(() => (item.value ? informationStatus(item.value, now.value) : null))
 
-watch(title, (value) => {
-  if (value) document.title = `${value} - Uni PJSK Viewer`
+// 官方提前放出、还没到开始时间的公告：没开剧透时不显示标题和正文，开了之后加提示和水印
+const isSpoiler = computed(() => !!item.value && isInformationSpoiler(item.value, now.value))
+const spoilerHidden = computed(() => isSpoiler.value && !settingsStore.showSpoilers)
+useSpoilerWatermark(() => isSpoiler.value && !!page.value)
+
+watch([title, spoilerHidden], ([value, hidden]) => {
+  if (hidden) document.title = '公告详情 - Uni PJSK Viewer'
+  else if (value) document.title = `${value} - Uni PJSK Viewer`
 })
 
 /** 已显示的正文文件；列表里的文件名变了（追记、翻译完成）才重新下载 */
@@ -68,9 +78,14 @@ async function load(force = false) {
     const index = await loadInformationIndex(force)
     if (wanted !== key.value) return
     const found = index.items.find(i => i.key === wanted) ?? null
+    now.value = Date.now()
     item.value = found
     notFound.value = !found?.page
-    if (found?.page && found.page !== currentPage) {
+    // 被剧透设置挡住时不下载正文
+    if (found && isInformationSpoiler(found, now.value) && !settingsStore.showSpoilers) {
+      page.value = null
+      currentPage = ''
+    } else if (found?.page && found.page !== currentPage) {
       const loaded = await loadInformationPage(found.page)
       if (wanted !== key.value) return
       page.value = loaded
@@ -91,6 +106,12 @@ watch(key, () => {
   page.value = null
   isLoading.value = true
   notFound.value = false
+  void load()
+})
+
+// 开关剧透后重新判断要不要显示正文
+watch(() => settingsStore.showSpoilers, () => {
+  if (!page.value) isLoading.value = true
   void load()
 })
 
@@ -139,6 +160,16 @@ function onBodyClick(event: MouseEvent) {
       <button type="button" class="btn btn-sm" @click="load(true)">重试</button>
     </div>
 
+    <!-- 还没到公开时间：标题也不显示 -->
+    <div v-else-if="spoilerHidden" class="panel flex flex-col items-center gap-3 px-6 py-10 text-center">
+      <EyeOff class="h-12 w-12 text-warning opacity-60" />
+      <h1 class="text-lg font-bold">涉及剧透内容</h1>
+      <p class="text-sm text-base-content/60">这条公告官方提前放出，还没到公开时间。根据你的设置，剧透内容已隐藏。</p>
+      <button type="button" class="btn btn-primary btn-outline btn-sm" @click="settingsStore.setSpoilers(true)">
+        允许显示剧透
+      </button>
+    </div>
+
     <div v-else-if="notFound && !page" class="empty-state">
       <Megaphone />
       <p>没有找到这条公告，可能还没有同步或已经很久以前撤下了。</p>
@@ -182,6 +213,11 @@ function onBodyClick(event: MouseEvent) {
           </a>
         </div>
       </header>
+
+      <div v-if="isSpoiler" role="note" class="alert alert-warning text-sm">
+        <EyeOff class="h-4 w-4" />
+        <span>剧透内容：这条公告官方提前放出，{{ item ? formatInformationTime(item.startAt, true) : '' }} 才正式公开，请勿转载或截图外传。</span>
+      </div>
 
       <div v-if="!page.done && mode !== 'ja'" class="alert alert-info text-sm">
         <Languages class="h-4 w-4" />
