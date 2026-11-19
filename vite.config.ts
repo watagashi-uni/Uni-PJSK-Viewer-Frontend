@@ -5,6 +5,11 @@ import { resolve } from 'path'
 import { VitePWA } from 'vite-plugin-pwa'
 import { local3dStore } from './scripts/local3dStore'
 
+// 写进 sw.js 的函数运行在 Service Worker 里，这里的 Node 类型没有 Cache Storage
+interface WorkerGlobal {
+  caches: { match(url: string, options?: { ignoreSearch?: boolean }): Promise<Response | undefined> }
+}
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
@@ -31,8 +36,29 @@ export default defineConfig({
         ],
         // 允许缓存较大的资源文件 (如 masterdata 和 mp3)
         maximumFileSizeToCacheInBytes: 10 * 1024 * 1024,
+        // 页面本身不从预缓存里取（见下面第一条运行时规则），这里关掉插件默认的 index.html 兜底。
+        navigateFallback: null,
+        // 预缓存默认会把 / 当成 /index.html 直接从缓存返回，同样要关掉。
+        directoryIndex: null,
         // 运行时缓存策略
         runtimeCaching: [
+          {
+            // 打开页面时始终向服务器要最新的 index.html。预缓存里的 index.html 属于上一次构建，
+            // 它引用的 chunk 在新版本发布后已经不在服务器上（缺失文件还会被当成 200 的 HTML 返回），
+            // 用它启动就会在每次发布后的第一次打开时报错。预缓存的那份只在离线、请求失败的时候用。
+            // 这里的函数会被序列化进 sw.js，不能引用外部变量。
+            urlPattern: ({ request, url }) => request.mode === 'navigate'
+              && !/^\/(?:assets|img|api|cursors)\/|^\/(?:sw|push-sw|workbox-[^/]+)\.js$/.test(url.pathname),
+            handler: 'NetworkOnly',
+            options: {
+              plugins: [
+                {
+                  handlerDidError: async () => (globalThis as unknown as WorkerGlobal).caches
+                    .match('/index.html', { ignoreSearch: true }),
+                },
+              ],
+            },
+          },
           {
             // 本地应用代码按需缓存。EdgeOne 可能为缺失资源返回 200 HTML，写入前必须同时校验
             // 状态码和 MIME；错误响应仍会触发页面恢复逻辑，但绝不会写入 SW 缓存。
@@ -197,15 +223,6 @@ export default defineConfig({
         ],
         // 清理旧版本缓存
         cleanupOutdatedCaches: true,
-        // 排除对 /img/ 和 /api/ 等路径的 fallback 拦截
-        navigateFallbackDenylist: [
-          /^\/assets\//,
-          /^\/img\//,
-          /^\/api\//,
-          /^\/cursors\//,
-          /^\/(?:sw|push-sw)\.js$/,
-          /^\/workbox-[^/]+\.js$/,
-        ],
       },
       manifest: {
         name: 'Uni PJSK Viewer',

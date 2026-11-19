@@ -34,11 +34,31 @@
   <div id="app"></div>
   <script>
     (() => {
-      // Last-resort fallback so a failed start never leaves a blank page. A
-      // stale build is replaced by the forced service worker update, which
-      // reloads the page by itself; this only shows a manual reload button.
+      // Last-resort fallback so a failed start never leaves a blank page.
+      // When an entry file fails to load, the page first reloads once by itself:
+      // right after a deployment the host can answer a file that has not spread
+      // yet with the HTML page, and the browser keeps that answer for hours, so
+      // the file is fetched again past the cache before reloading. Only when
+      // that did not help is the manual reload button shown.
       const app = document.getElementById('app')
+      const retryKey = 'pwa_asset_reload_attempted'
       let rendered = false
+      let retrying = false
+
+      const retryOnce = (url) => {
+        if (retrying) return true
+        try {
+          if (!navigator.onLine || sessionStorage.getItem(retryKey) === '1') return false
+          sessionStorage.setItem(retryKey, '1')
+        } catch (error) {
+          return false
+        }
+        retrying = true
+        const reload = () => window.location.reload()
+        const refetch = url ? fetch(url, { cache: 'reload', credentials: 'same-origin' }) : Promise.resolve()
+        refetch.then(reload, reload)
+        return true
+      }
 
       const renderFallback = () => {
         if (rendered || !app || app.childElementCount > 0) return
@@ -69,7 +89,7 @@
           (target instanceof HTMLScriptElement && target.type === 'module')
           || (target instanceof HTMLLinkElement && ['stylesheet', 'modulepreload'].includes(target.rel))
         ) {
-          renderFallback()
+          if (!retryOnce(target.src || target.href)) renderFallback()
         }
       }, true)
     })()
