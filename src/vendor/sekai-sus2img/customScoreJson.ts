@@ -491,6 +491,19 @@ export const scoreFromCustomScoreJson = (
         }
     }
 
+    // Skill / fever triggers carried by official compact chart JSON (and mmw's
+    // SUS conversion) as _mmwScoreEvents; labelled like the SUS renderer.
+    const triggerLabels: Record<string, string> = { skill: 'SKILL', 'fever-begin': 'FEVER CHANCE!', 'fever-start': 'SUPER FEVER!!' }
+    const seenTriggers = new Set<string>()
+    for (const trigger of Array.isArray(rawScore?._mmwScoreEvents) ? rawScore._mmwScoreEvents : []) {
+        const text = triggerLabels[String(trigger?.type)]
+        const ticks = toNumber(trigger?.ticks, NaN)
+        const key = `${trigger?.type}:${ticks}`
+        if (!text || !Number.isFinite(ticks) || seenTriggers.has(key)) continue
+        seenTriggers.add(key)
+        score.events.push(new Event({ bar: tickToBar(ticks), text }))
+    }
+
     const notes = [...(rawScore?.NoteList || [])].filter(isRenderableNote).sort(
         (a, b) => toNumber(a.ticks) - toNumber(b.ticks) || toNumber(a.laneStart) - toNumber(b.laneStart) || toNumber(a.id) - toNumber(b.id),
     )

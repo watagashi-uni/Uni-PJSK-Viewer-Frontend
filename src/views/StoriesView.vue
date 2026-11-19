@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { displayImageUrl } from '@/utils/derivedAssets'
 import { useSpoilerWatermark } from '@/composables/useSpoilerWatermark'
 import { computed, onMounted, ref, watch, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -531,7 +532,7 @@ onMounted(async () => {
         <p class="text-sm opacity-60">{{ extraStories.length }} 篇故事 · {{ activeTab === 'card' ? '卡面前篇与后篇' : '仅展示已有可读剧本的特别篇' }}</p>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <button v-for="story in extraStories.slice((extraPage - 1) * 12, extraPage * 12)" :key="story.id" class="card bg-base-100 border border-base-200 hover:border-primary text-left overflow-hidden" @click="selectedStory = story">
-            <AssetImage v-if="story.kind === 'card'" :src="`${assetsHost}/startapp/character/member/${story.assetbundleName}/card_${trainedOnlyStoryCardIds.has(Number(story.id)) ? 'after_training' : 'normal'}.jpg`" :alt="story.title" class="w-full aspect-video object-cover" />
+            <AssetImage v-if="story.kind === 'card'" :src="displayImageUrl(`${assetsHost}/startapp/character/member/${story.assetbundleName}/card_${trainedOnlyStoryCardIds.has(Number(story.id)) ? 'after_training' : 'normal'}.jpg`)" :alt="story.title" class="w-full aspect-video object-cover" />
             <div class="p-5 space-y-2"><span class="text-xs text-primary">{{ extraLabels[activeTab] }} / {{ story.id }}</span><h2 class="font-bold"><ZhText :text="story.title" v-bind="STORY_TITLE_ZH[story.kind]" sub-class="font-medium text-xs" /></h2><p class="text-xs opacity-50">{{ story.episodes.length }} 话 · 点击选集</p></div>
           </button>
         </div>

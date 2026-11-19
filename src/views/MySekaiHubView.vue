@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { displayImageUrl } from '@/utils/derivedAssets'
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useAccountStore } from '@/stores/account'
@@ -1606,7 +1607,7 @@ function getMaterialIcon(materialId: number): string {
 
 function getMusicThumbnailUrl(musicId: number): string {
   const paddedId = musicId.toString().padStart(3, '0')
-  return `${mysekaiAssetsHost.value}/startapp/thumbnail/music_jacket/jacket_s_${paddedId}.png`
+  return displayImageUrl(`${mysekaiAssetsHost.value}/startapp/thumbnail/music_jacket/jacket_s_${paddedId}.png`)
 }
 
 function openFixtureDetail(fixtureId: number) {

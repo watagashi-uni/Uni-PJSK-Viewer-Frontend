@@ -1,3 +1,4 @@
+import { displayImageUrl, originalAudioUrl, playbackAudioUrl } from '@/utils/derivedAssets'
 import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
 import { useSettingsStore } from '@/stores/settings'
@@ -82,12 +83,13 @@ export const usePlayerStore = defineStore('player', () => {
   let uidSeed = 0
   let lastPositionSavedAt = 0
 
+  /** The original MP3 (downloads); playback uses the 192 kbps rendition. */
   function audioUrl(track: PlayerTrackInfo): string {
     return `${settings.assetsHost}${trackAudioPath(track)}`
   }
 
   function coverUrl(track: PlayerTrackInfo): string {
-    return `${settings.assetsHost}${trackCoverPath(track)}`
+    return displayImageUrl(`${settings.assetsHost}${trackCoverPath(track)}`)
   }
 
   function element(): HTMLAudioElement {
@@ -138,6 +140,15 @@ export const usePlayerStore = defineStore('player', () => {
     el.addEventListener('error', () => {
       // Clearing the source also raises an error event; only a failed track counts.
       if (!el.getAttribute('src')) return
+      // A 192 kbps rendition that is not published yet: play the original instead.
+      const original = originalAudioUrl(el.src)
+      if (original) {
+        if (el.currentTime > 0 && pendingSeek === null) pendingSeek = el.currentTime
+        el.src = original
+        el.load()
+        if (isPlaying.value) startPlayback()
+        return
+      }
       switching = false
       hasError.value = true
       isPlaying.value = false
@@ -178,7 +189,7 @@ export const usePlayerStore = defineStore('player', () => {
     currentTime.value = start
     isBuffering.value = autoplay
     switching = autoplay
-    el.src = audioUrl(track)
+    el.src = playbackAudioUrl(audioUrl(track))
     el.load()
     updateMediaMetadata()
     if (autoplay) startPlayback()
@@ -489,7 +500,7 @@ export const usePlayerStore = defineStore('player', () => {
           title: track.title,
           artist: singerText(track) || track.composer,
           album: track.caption,
-          artwork: [{ src: coverUrl(track), sizes: '512x512', type: 'image/png' }],
+          artwork: [{ src: coverUrl(track), sizes: '512x512', type: 'image/webp' }],
         })
       : null
   }

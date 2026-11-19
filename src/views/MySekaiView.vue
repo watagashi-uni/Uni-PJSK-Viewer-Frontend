@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { displayImageUrl } from '@/utils/derivedAssets'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useAccountStore } from '@/stores/account'
 import { useSettingsStore } from '@/stores/settings'
@@ -520,7 +521,7 @@ function getResourceTexture(resourceType: string, resourceId: number): string {
     const musicId = mysekaiMusicRecordMusicIds.value[resourceId]
     const jacketAssetbundleName = musicId ? musicJacketAssetbundleNames.value[musicId] : ''
     if (jacketAssetbundleName) {
-      return `${assetsHost.value}/startapp/music/jacket/${jacketAssetbundleName}/${jacketAssetbundleName}.png`
+      return displayImageUrl(`${assetsHost.value}/startapp/music/jacket/${jacketAssetbundleName}/${jacketAssetbundleName}.png`)
     }
     return MUSIC_RECORD_FALLBACK
   }

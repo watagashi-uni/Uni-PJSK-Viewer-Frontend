@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { displayImageUrl } from '@/utils/derivedAssets'
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useMasterStore } from '@/stores/master'
 import { useAccountStore } from '@/stores/account'
@@ -380,7 +381,7 @@ onMounted(async () => {
           <span class="h-9 w-9 shrink-0 overflow-hidden rounded-full bg-base-300">
             <AssetImage
               v-if="leaderCard"
-              :src="`${assetsHost}/startapp/thumbnail/chara/${leaderCard.assetbundleName}_${cardImageVariant(leaderCard, leaderCard.userCardInfo.defaultImage === 'training')}.png`"
+              :src="displayImageUrl(`${assetsHost}/startapp/thumbnail/chara/${leaderCard.assetbundleName}_${cardImageVariant(leaderCard, leaderCard.userCardInfo.defaultImage === 'training')}.png`)"
               :alt="currentUserProfile.name"
               class="h-full w-full object-cover"
             />
@@ -508,7 +509,7 @@ onMounted(async () => {
             <li v-for="music in recentMusics" :key="music.id">
               <RouterLink :to="`/musics/${music.id}`" class="home-song group">
                 <AssetImage
-                  :src="`${assetsHost}/startapp/music/jacket/${music.assetbundleName}/${music.assetbundleName}.png`"
+                  :src="displayImageUrl(`${assetsHost}/startapp/music/jacket/${music.assetbundleName}/${music.assetbundleName}.png`)"
                   :alt="music.title"
                   class="home-song__jacket"
                 />

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { displayImageUrl } from '@/utils/derivedAssets'
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useSeoMeta, useHead } from '@unhead/vue'
 import { useRoute } from 'vue-router'
@@ -596,7 +597,7 @@ function resourceIcon(resource: ResourceBox['details'][number]): string {
   const id = Number(resource.resourceId || 0)
   if (resource.resourceType === 'card') {
     const card = cardMap.value.get(id)
-    return card?.assetbundleName ? `${assetsHost.value}/startapp/thumbnail/chara/${card.assetbundleName}_${cardImageVariant(card, false)}.png` : ''
+    return card?.assetbundleName ? displayImageUrl(`${assetsHost.value}/startapp/thumbnail/chara/${card.assetbundleName}_${cardImageVariant(card, false)}.png`) : ''
   }
   if (resource.resourceType === 'material') return `${assetsHost.value}/startapp/thumbnail/material/material${id}.png`
   if (resource.resourceType === 'practice_ticket') return `${assetsHost.value}/startapp/thumbnail/practice_ticket/ticket${id}.png`
@@ -1044,7 +1045,7 @@ watch(() => route.params.id, loadData)
             >
               <!-- 歌曲封面 -->
               <AssetImage 
-                :src="`${assetsHost}/startapp/music/jacket/${music?.assetbundleName}/${music?.assetbundleName}.png`"
+                :src="displayImageUrl(`${assetsHost}/startapp/music/jacket/${music?.assetbundleName}/${music?.assetbundleName}.png`)"
                 class="w-16 h-16 rounded shadow"
               />
               <!-- 歌曲信息 -->

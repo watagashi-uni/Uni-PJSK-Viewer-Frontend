@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { displayImageUrl } from '@/utils/derivedAssets'
 import { ref, onMounted, computed } from 'vue'
 import { useSeoMeta, useHead } from '@unhead/vue'
 import { useRoute } from 'vue-router'
@@ -882,7 +883,7 @@ onMounted(loadData)
                   class="block rounded-xl overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 min-w-0 flex-shrink"
                 >
                   <AssetImage 
-                    :src="coverUrl"
+                    :src="displayImageUrl(coverUrl)"
                     :alt="card.prefix"
                     class="max-h-[300px] md:max-h-[400px] w-auto max-w-full object-contain"
                   />
@@ -916,7 +917,7 @@ onMounted(loadData)
                   class="block rounded-xl overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 min-w-0 flex-shrink"
                 >
                   <AssetImage 
-                    :src="trainedCoverUrl"
+                    :src="displayImageUrl(trainedCoverUrl)"
                     :alt="card.prefix + ' (觉醒)'"
                     class="max-h-[300px] md:max-h-[400px] w-auto max-w-full object-contain"
                   />

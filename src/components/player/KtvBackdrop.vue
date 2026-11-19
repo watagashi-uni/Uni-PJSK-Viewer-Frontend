@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { displayImageUrl } from '@/utils/derivedAssets'
 import { computed, onBeforeUnmount, shallowRef, watch } from 'vue'
 import { performerCharacterId, type SongLyrics } from '@/api/lyrics'
 import { useMasterStore } from '@/stores/master'
@@ -87,7 +88,7 @@ const cardsByCharacter = computed(() => {
     if (!wanted.has(card.characterId) || !/^[\w-]+$/.test(card.assetbundleName)) continue
     if (!settings.showSpoilers && card.releaseAt > now) continue
     const name = card.assetbundleName
-    const side = (full: string, cutout: string): CardArt => ({ full: `${host}/member/${name}/${full}.jpg`, cutout: `${host}/member_cutout/${name}/${cutout}.png` })
+    const side = (full: string, cutout: string): CardArt => ({ full: displayImageUrl(`${host}/member/${name}/${full}.jpg`), cutout: `${host}/member_cutout/${name}/${cutout}.png` })
     let list = byCharacter.get(card.characterId)
     if (!list) byCharacter.set(card.characterId, list = [])
     // The illustrated rarities: both sides of a 3★/4★, the one side of a birthday card.

@@ -29,7 +29,9 @@ import { buildTrack, type PlayerTrackInfo } from '@/utils/playerTracks'
 import { alignFurigana } from '@/utils/furigana'
 import { parseSusBpm, type SusBpmEvent } from '@/utils/susBpm'
 import type { EventData } from '@/types/master'
-import { renderSusToSvg, type Sus2ImgFrontendResult } from '@/vendor/sekai-sus2img'
+import { renderCustomScoreJsonToSvg, renderSusToSvg, type Sus2ImgFrontendResult } from '@/vendor/sekai-sus2img'
+import { displayImageUrl } from '@/utils/derivedAssets'
+import { expandCompactChart, isCompactChart } from '@/utils/officialChartJson'
 import ChartJudgmentPreview from '@/components/ChartJudgmentPreview.vue'
 import { DIFFICULTY_COLORS, DIFFICULTY_LABELS, difficultyBackground, difficultyStyle } from '@/utils/difficulty'
 import { trackEvent } from '@/utils/analytics'
@@ -801,24 +803,35 @@ async function openChartSvgPreview(diff: MusicDifficulty) {
 
   try {
     const susUrl = getDownloadUrl(diff.musicDifficulty)
-    const response = await fetch(susUrl)
-    if (!response.ok) {
-      throw new Error(`下载谱面文件失败：HTTP ${response.status}`)
-    }
-    const susText = await response.text()
-
-    const result = await renderSusToSvg({
-      sus: susText,
+    const renderOptions = {
       title: music.value.title,
       artist: music.value.composer || undefined,
       difficulty: difficultyLabels[diff.musicDifficulty] || diff.musicDifficulty.toUpperCase(),
       playlevel: String(diff.playLevel),
       pixel: '240',
-      skin: 'custom01',
-      jacket: coverUrl.value || undefined,
+      skin: 'custom01' as const,
+      jacket: coverUrl.value ? displayImageUrl(coverUrl.value) : undefined,
       isOfficial: true,
       interactiveJudgment: true,
-    })
+    }
+    // 预览用 Sekai 发布的紧凑谱面 JSON（与 SUS 转换结果相同，附带技能/Fever）；缺失时回退 SUS
+    const scoreJson = await fetch(`${susUrl}.v1.json`)
+      .then(async (response) => {
+        if (!response.ok) return null
+        const compact: unknown = await response.json()
+        return isCompactChart(compact) ? expandCompactChart(compact) : null
+      })
+      .catch(() => null)
+    let result: Sus2ImgFrontendResult
+    if (scoreJson) {
+      result = await renderCustomScoreJsonToSvg({ ...renderOptions, scoreJson })
+    } else {
+      const response = await fetch(susUrl)
+      if (!response.ok) {
+        throw new Error(`下载谱面文件失败：HTTP ${response.status}`)
+      }
+      result = await renderSusToSvg({ ...renderOptions, sus: await response.text() })
+    }
 
     chartSvgPreviewResult = result
     chartSvgPreviewImageUrl.value = result.url
@@ -1220,7 +1233,7 @@ const isExpired = computed(() => {
             aria-hidden="true"
             :style="{ '--bleed-left': `${backdropBleed.left}px`, '--bleed-right': `${backdropBleed.right}px` }"
           >
-            <img :src="coverUrl" alt="" crossorigin="anonymous" />
+            <img :src="displayImageUrl(coverUrl)" alt="" crossorigin="anonymous" />
           </div>
 
           <!-- 顶部导航 -->
@@ -1235,7 +1248,7 @@ const isExpired = computed(() => {
             <div class="music-hero-art">
               <a :href="coverUrl" target="_blank" rel="noopener noreferrer" class="block rounded-2xl overflow-hidden shadow-2xl transition-transform duration-300 hover:scale-[1.02]">
                 <AssetImage
-                  :src="coverUrl"
+                  :src="displayImageUrl(coverUrl)"
                   :alt="music.title"
                   :lazy="false"
                   class="w-full h-auto object-cover aspect-square"

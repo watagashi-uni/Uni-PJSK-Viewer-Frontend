@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { displayImageUrl } from '@/utils/derivedAssets'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { BarChart3, Copy, Download, Eye, Heart, Music2, PenLine, Play, PlayCircle, RefreshCw, Search, Sparkles, User, X } from 'lucide-vue-next'
 import { renderCustomScoreJsonToSvg, revokeSus2ImgResult, type Sus2ImgFrontendResult } from '@/vendor/sekai-sus2img'
@@ -757,7 +758,7 @@ async function renderJsonFlatPreview(score: DisplayScore, scoreJson = selectedSc
       songId: score.musicId,
       pixel: '220',
       skin: 'custom01',
-      jacket: getJacketUrl(score),
+      jacket: displayImageUrl(getJacketUrl(score)),
     })
     svgRenderResult = result
     selectedSvg.value = result.svgText
@@ -984,7 +985,7 @@ function getAuthorCardUrl(profile: AuthorProfile | null) {
   const trained = userCard.specialTrainingStatus === 'done'
     || userCard.defaultImage === 'special_training'
     || userCard.defaultImage === 'training'
-  return `${assetsHost.value}/startapp/thumbnail/chara/${card.assetbundleName}_${cardImageVariant(card, trained)}.png`
+  return displayImageUrl(`${assetsHost.value}/startapp/thumbnail/chara/${card.assetbundleName}_${cardImageVariant(card, trained)}.png`)
 }
 
 function closeAuthorOverlay() {
@@ -1228,7 +1229,7 @@ function selectTab(tab: FeedTab) {
                 <li v-for="music in musicSearchResults" :key="music.id">
                   <button type="button" class="py-2.5 px-3 text-sm flex items-center gap-3 hover:bg-base-200 transition-colors text-left" @click="selectSearchMusic(music)">
                     <AssetImage
-                      :src="getMusicJacketUrl(music)"
+                      :src="displayImageUrl(getMusicJacketUrl(music))"
                       class="w-10 h-10 rounded-md shrink-0 object-cover shadow-sm"
                     />
                     <div class="flex flex-col flex-1 min-w-0">
@@ -1260,7 +1261,7 @@ function selectTab(tab: FeedTab) {
 
           <div v-if="searchMode === 'music'" class="flex flex-col sm:flex-row gap-4 items-center justify-between">
             <div v-if="selectedSearchMusic" class="bg-base-200/40 border border-base-200 rounded-xl p-3 flex flex-1 items-center gap-3 min-w-0 w-full animate-in fade-in slide-in-from-top-2 duration-300">
-              <AssetImage :src="getMusicJacketUrl(selectedSearchMusic)" class="w-14 h-14 rounded-lg shadow-sm object-cover ring-1 ring-base-content/5" />
+              <AssetImage :src="displayImageUrl(getMusicJacketUrl(selectedSearchMusic))" class="w-14 h-14 rounded-lg shadow-sm object-cover ring-1 ring-base-content/5" />
               <div class="flex-1 min-w-0">
                 <p class="text-sm font-bold truncate text-base-content"><ZhText :text="selectedSearchMusic.title" table="musics" path="title" layout="inline" /></p>
                 <div class="flex items-center gap-2 mt-1">
@@ -1338,7 +1339,7 @@ function selectTab(tab: FeedTab) {
               <div class="relative shrink-0">
                 <img
                   v-if="getJacketUrl(score)"
-                  :src="getJacketUrl(score)"
+                  :src="displayImageUrl(getJacketUrl(score))"
                   :alt="score.musicTitle"
                   class="w-24 h-24 rounded-xl object-cover shadow-sm transition-transform duration-300"
                   loading="lazy"
@@ -1519,7 +1520,7 @@ function selectTab(tab: FeedTab) {
                 <div class="flex gap-4">
                   <img
                     v-if="getJacketUrl(score)"
-                    :src="getJacketUrl(score)"
+                    :src="displayImageUrl(getJacketUrl(score))"
                     :alt="score.musicTitle"
                     class="h-20 w-20 shrink-0 rounded-lg object-cover shadow-sm"
                     loading="lazy"

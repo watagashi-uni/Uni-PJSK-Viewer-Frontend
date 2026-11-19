@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { displayImageUrl } from '@/utils/derivedAssets'
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useAccountStore } from '@/stores/account'
 import { useMasterStore } from '@/stores/master'
@@ -117,7 +118,7 @@ onUnmounted(() => document.removeEventListener('click', onClickOutside))
           <div class="w-8 h-8 rounded-full overflow-hidden border border-primary/20 bg-base-300 shrink-0 flex items-center justify-center">
             <AssetImage 
               v-if="currentAccount.assetbundleName"
-              :src="`${assetsHost}/startapp/thumbnail/chara/${currentAccount.assetbundleName}_${currentAccount.isTrained ? 'after_training' : 'normal'}.png`"
+              :src="displayImageUrl(`${assetsHost}/startapp/thumbnail/chara/${currentAccount.assetbundleName}_${currentAccount.isTrained ? 'after_training' : 'normal'}.png`)"
               class="w-full h-full object-cover"
             />
             <User v-else class="w-4 h-4 text-base-content/30" />
@@ -164,7 +165,7 @@ onUnmounted(() => document.removeEventListener('click', onClickOutside))
         <div class="w-8 h-8 rounded-full overflow-hidden border border-primary/20 bg-base-300 shrink-0 flex items-center justify-center">
           <AssetImage 
             v-if="getAccountInfo(acc.userId).assetbundleName"
-            :src="`${assetsHost}/startapp/thumbnail/chara/${getAccountInfo(acc.userId).assetbundleName}_${getAccountInfo(acc.userId).isTrained ? 'after_training' : 'normal'}.png`"
+            :src="displayImageUrl(`${assetsHost}/startapp/thumbnail/chara/${getAccountInfo(acc.userId).assetbundleName}_${getAccountInfo(acc.userId).isTrained ? 'after_training' : 'normal'}.png`)"
             class="w-full h-full object-cover"
           />
           <User v-else class="w-4 h-4 text-base-content/30" />

@@ -180,6 +180,28 @@ export default defineConfig({
                     const contentType = response.headers.get('content-type')?.toLowerCase() ?? ''
                     return contentType.startsWith('image/') ? response : null
                   },
+                  // 换成 WebP 之前已缓存的同一张 PNG/JPG 直接沿用，不重新下载。
+                  cachedResponseWillBeUsed: async ({ cacheName, request, cachedResponse }) => {
+                    if (cachedResponse) return cachedResponse
+                    const url = new URL(request.url)
+                    if (!/\.webp$/i.test(url.pathname)) return null
+                    url.hostname = 'assets.unipjsk.com'
+                    // 运行在 Service Worker 里；vite.config 的类型环境没有 DOM 的 caches 声明。
+                    const storage = (globalThis as unknown as { caches: { open(name: string): Promise<{ match(key: string, options?: { ignoreVary?: boolean }): Promise<Response | undefined> }> } }).caches
+                    const cache = await storage.open(cacheName)
+                    for (const extension of ['.png', '.jpg']) {
+                      const hit = await cache.match(url.href.replace(/\.webp$/i, extension), { ignoreVary: true })
+                      if (hit) return hit
+                    }
+                    return null
+                  },
+                  // WebP 尚未发布（新资源还在处理）时取原图；卡面原图为 JPG。
+                  fetchDidSucceed: async ({ request, response }) => {
+                    if (response.status !== 404 || !/\.webp$/i.test(new URL(request.url).pathname)) return response
+                    const extension = /\/startapp\/character\/member\//.test(request.url) ? '.jpg' : '.png'
+                    const original = await fetch(request.url.replace(/\.webp$/i, extension), { mode: 'cors', credentials: 'omit', cache: 'no-cache' })
+                    return original.ok ? original : response
+                  },
                   // 国内源有 Referer 白名单，白名单外会 302 到海外源，而该 302 不带 CORS 头。
                   // CORS 拉取失败时退回页面的原始请求，保持未接入缓存时的表现（不写入缓存）。
                   handlerDidError: async ({ request }) => fetch(request),

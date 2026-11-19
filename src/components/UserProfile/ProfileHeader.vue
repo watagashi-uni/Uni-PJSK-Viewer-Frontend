@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { displayImageUrl } from '@/utils/derivedAssets'
 import { computed } from 'vue'
 import { Eye, EyeOff } from 'lucide-vue-next'
 import type { ProfileData } from '@/types/profile'
@@ -40,7 +41,7 @@ const leaderCard = computed(() => {
         <!-- Leader Avatar based on first deck card -->
         <div v-if="leaderCard" class="w-14 h-14 sm:w-16 sm:h-16 flex-shrink-0 shadow-sm rounded-full overflow-hidden border-2 border-primary/20 bg-base-200">
           <AssetImage
-            :src="`${assetsHost}/startapp/thumbnail/chara/${leaderCard.assetbundleName}_${leaderCard.trained ? 'after_training' : 'normal'}.png`"
+            :src="displayImageUrl(`${assetsHost}/startapp/thumbnail/chara/${leaderCard.assetbundleName}_${leaderCard.trained ? 'after_training' : 'normal'}.png`)"
             class="w-full h-full object-cover"
           />
         </div>

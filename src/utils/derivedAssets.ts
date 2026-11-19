@@ -1,0 +1,70 @@
+// Smaller siblings Sekai publishes next to official game assets: WebP images
+// and 192 kbps MP3s. Pages display/play these; opening, downloading and
+// handing files to other tools keep the original PNG/JPG/MP3 URLs.
+
+const GAME_ASSET = /^(?:https:\/\/assets(?:-[a-z0-9-]+)?\.unipjsk\.com)?\/?startapp\/|^(?:https:\/\/assets(?:-[a-z0-9-]+)?\.unipjsk\.com)?\/?ondemand\//
+
+const WEBP_RULES: [RegExp, string][] = [
+  [/(\/?startapp\/music\/jacket\/[^/?#]+\/[^/?#]+)\.png$/, '$1.webp'],
+  [/(\/?startapp\/thumbnail\/music_jacket\/[^/?#]+)\.png$/, '$1.webp'],
+  [/(\/?startapp\/character\/member\/[^/?#]+\/card_(?:normal|after_training))\.(?:jpg|png)$/, '$1.webp'],
+  [/(\/?startapp\/thumbnail\/chara\/[^/?#]+)\.png$/, '$1.webp'],
+]
+
+// The original each WebP replaced on screen (cards were shown as JPG).
+const FALLBACK_RULES: [RegExp, string][] = [
+  [/(\/?startapp\/music\/jacket\/[^/?#]+\/[^/?#]+)\.webp$/, '$1.png'],
+  [/(\/?startapp\/thumbnail\/music_jacket\/[^/?#]+)\.webp$/, '$1.png'],
+  [/(\/?startapp\/character\/member\/[^/?#]+\/card_(?:normal|after_training))\.webp$/, '$1.jpg'],
+  [/(\/?startapp\/thumbnail\/chara\/[^/?#]+)\.webp$/, '$1.png'],
+]
+
+function rewrite(url: string, rules: [RegExp, string][]): string | null {
+  if (!url || !GAME_ASSET.test(url)) return null
+  for (const [pattern, replacement] of rules) {
+    if (pattern.test(url)) return url.replace(pattern, replacement)
+  }
+  return null
+}
+
+/** WebP for showing a jacket, jacket thumbnail, card or card thumbnail; other URLs unchanged. */
+export function displayImageUrl(url: string): string {
+  return rewrite(url, WEBP_RULES) ?? url
+}
+
+/** The original PNG/JPG behind a displayed WebP, or null. */
+export function fallbackImageUrl(url: string): string | null {
+  return rewrite(url, FALLBACK_RULES)
+}
+
+/** 192 kbps rendition of a full-length song or audition clip for playback. */
+export function playbackAudioUrl(url: string): string {
+  if (!GAME_ASSET.test(url)) return url
+  if (/\/ondemand\/music\/long\/[^/?#]+\/[^/?#]+\.mp3$/.test(url) && !url.endsWith('_192k.mp3')) return url.replace(/\.mp3$/, '_192k.mp3')
+  if (/\/startapp\/music\/short\/[^/?#]+\/[^/?#]+_short\.mp3$/.test(url)) return url.replace(/_short\.mp3$/, '_short_192k.mp3')
+  return url
+}
+
+/** The original MP3 behind a 192 kbps playback URL, or null. */
+export function originalAudioUrl(url: string): string | null {
+  return /_192k\.mp3$/.test(url) && GAME_ASSET.test(url) ? url.replace(/_192k\.mp3$/, '.mp3') : null
+}
+
+/**
+ * A WebP not published yet falls back to its original once. Runs in the capture
+ * phase and stops the event, so component error handlers (which hide the
+ * image) only see a failure of the original as well.
+ */
+export function installDerivedImageFallback(root: Document = document) {
+  root.addEventListener('error', (event) => {
+    const target = event.target
+    let current: string | null = null
+    if (target instanceof HTMLImageElement) current = target.getAttribute('src') ? target.src : null
+    else if (typeof SVGImageElement !== 'undefined' && target instanceof SVGImageElement) current = target.getAttribute('href') ?? target.getAttribute('xlink:href')
+    const fallback = current ? fallbackImageUrl(current) : null
+    if (!fallback) return
+    event.stopPropagation()
+    if (target instanceof HTMLImageElement) target.src = fallback
+    else (target as SVGImageElement).setAttribute('href', fallback)
+  }, true)
+}

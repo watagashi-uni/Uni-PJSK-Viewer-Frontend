@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { displayImageUrl } from '@/utils/derivedAssets'
 import { computed, nextTick, onMounted, ref, type Component } from 'vue'
 import { useModalDialog } from '@/composables/useModalDialog'
 import { Cake, CalendarDays, ChevronLeft, ChevronRight, Gift, Music2, Radio, Sparkles, Trophy, X } from 'lucide-vue-next'
@@ -466,7 +467,7 @@ function resourceIcon(resource: ResourceDetail): string {
   if (resource.resourceType === 'practice_ticket') return `${assetsHost.value}/startapp/thumbnail/practice_ticket/ticket${id}.png`
   if (resource.resourceType === 'skill_practice_ticket') return `${assetsHost.value}/startapp/thumbnail/skill_practice_ticket/ticket${id}.png`
   if (resource.resourceType === 'gacha_ticket' && row?.assetbundleName) return `${assetsHost.value}/startapp/thumbnail/gacha_ticket/${row.assetbundleName}.png`
-  if (resource.resourceType === 'card' && row?.assetbundleName) return `${assetsHost.value}/startapp/thumbnail/chara/${row.assetbundleName}_${cardImageVariant(row, false)}.png`
+  if (resource.resourceType === 'card' && row?.assetbundleName) return displayImageUrl(`${assetsHost.value}/startapp/thumbnail/chara/${row.assetbundleName}_${cardImageVariant(row, false)}.png`)
   if (resource.resourceType === 'stamp' && row?.assetbundleName) return `${assetsHost.value}/startapp/stamp/${row.assetbundleName}/${row.assetbundleName}.png`
   if (resource.resourceType === 'mysekai_material' && row?.iconAssetbundleName) return `${assetsHost.value}/ondemand/mysekai/thumbnail/material/${row.iconAssetbundleName}.png`
   if (resource.resourceType === 'mysekai_tool' && row?.assetbundleName) return `${assetsHost.value}/ondemand/mysekai/thumbnail/tool/${row.assetbundleName}.png`

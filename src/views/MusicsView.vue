@@ -62,6 +62,7 @@ function loadStoredMusicsViewState(): StoredMusicsViewState | null {
 </script>
 
 <script setup lang="ts">
+import { displayImageUrl } from '@/utils/derivedAssets'
 import { ref, shallowRef, computed, onMounted, watch, onUnmounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useMasterStore } from '@/stores/master'
@@ -1185,7 +1186,7 @@ function getMusicTitle(musicId: number): string {
 function getMusicThumbnailUrl(musicId: number): string {
   const paddedId = musicId.toString().padStart(3, '0')
   const host = viewMode.value === 'level' ? 'https://assets.unipjsk.com' : assetsHost.value
-  return `${host}/startapp/thumbnail/music_jacket/jacket_s_${paddedId}.png`
+  return displayImageUrl(`${host}/startapp/thumbnail/music_jacket/jacket_s_${paddedId}.png`)
 }
 
 function isLimitedTime(musicId: number): boolean {

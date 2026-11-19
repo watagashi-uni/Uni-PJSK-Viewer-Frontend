@@ -14,6 +14,15 @@ export interface Release {
  */
 export const releases: Release[] = [
   {
+    version: '2.21.0', date: '2026-11-20', title: '更省流量的图片、音频与谱面预览',
+    // 本次更新
+    changes: [
+      '曲绘、卡面和头像改用 WebP 显示，体积约为原来的一成到四成；点开大图和下载仍是原始 PNG。之前已缓存的图片继续使用，不会重新下载。',
+      '播放歌曲改用 192kbps 音源，加载更快；下载音频仍是原始文件。',
+      '谱面预览改用更小的谱面数据，并在谱面上标出技能和 FEVER 的位置；下载谱面仍是原始 SUS。',
+    ],
+  },
+  {
     version: '2.20.0', date: '2026-11-19', title: '游戏公告',
     // f6b55fb, 7b3c0b4, 1f19eac；本次更新
     changes: [

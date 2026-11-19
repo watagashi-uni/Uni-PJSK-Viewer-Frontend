@@ -1,3 +1,4 @@
+import { displayImageUrl } from '@/utils/derivedAssets'
 import { reactive, shallowReactive, toRaw, watch } from 'vue'
 import { masterApiBaseUrl } from '@/api/masterClient'
 import { useMasterStore } from '@/stores/master'
@@ -237,7 +238,7 @@ async function buildMusics(): Promise<SearchEntry[]> {
       ...titlePair(row.title, zh),
       meta: row.composer && row.composer !== '-' ? row.composer : '',
       path: `/musics/${row.id}`,
-      image: `startapp/thumbnail/music_jacket/jacket_s_${String(row.id).padStart(3, '0')}.png`,
+      image: displayImageUrl(`startapp/thumbnail/music_jacket/jacket_s_${String(row.id).padStart(3, '0')}.png`),
       keys: joinSearchText([row.title, zh, reading, toRomaji(reading)]),
       hay: joinSearchText([row.title, zh, reading, toRomaji(reading), row.composer, row.lyricist, row.arranger]),
       order: Number(row.publishedAt) || 0,
@@ -293,7 +294,7 @@ async function buildCards(): Promise<SearchEntry[]> {
       ...titlePair(row.prefix, zh),
       meta: [rarity, ownerName].filter(Boolean).join(' '),
       path: `/cards/${row.id}`,
-      image: `startapp/thumbnail/chara/${row.assetbundleName}_${cardImageVariant(row, false)}.png`,
+      image: displayImageUrl(`startapp/thumbnail/chara/${row.assetbundleName}_${cardImageVariant(row, false)}.png`),
       keys: joinSearchText([row.prefix, zh]),
       hay: joinSearchText([row.prefix, zh, owner?.jp, owner?.zh, rarity]),
       order: Number(row.releaseAt) || 0,

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { displayImageUrl } from '@/utils/derivedAssets'
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import { ListFilter } from 'lucide-vue-next'
@@ -61,7 +62,7 @@ const availableDifficulties = computed(() => {
 
 // 缩略图 URL
 const coverUrl = computed(() => {
-  return `${props.assetsHost}/startapp/music/jacket/${props.assetbundleName}/${props.assetbundleName}.png`
+  return displayImageUrl(`${props.assetsHost}/startapp/music/jacket/${props.assetbundleName}/${props.assetbundleName}.png`)
 })
 
 function selectArtist() {

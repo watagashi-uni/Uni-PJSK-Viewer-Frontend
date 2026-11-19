@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { displayImageUrl } from '@/utils/derivedAssets'
 import { computed } from 'vue'
 import { useSettingsStore } from '@/stores/settings'
 import { handleSvgImageError } from '@/utils/imageRetry'
@@ -70,7 +71,7 @@ const showTrained = computed(() => !!props.trained || isTrainedOnlyCard(props.ca
 // 卡面 URL
 const cardImageUrl = computed(() => {
   const suffix = showTrained.value ? 'after_training' : 'normal'
-  return `${assetsHost.value}/startapp/thumbnail/chara/${props.card.assetbundleName}_${suffix}.png`
+  return displayImageUrl(`${assetsHost.value}/startapp/thumbnail/chara/${props.card.assetbundleName}_${suffix}.png`)
 })
 
 // 边框 URL
