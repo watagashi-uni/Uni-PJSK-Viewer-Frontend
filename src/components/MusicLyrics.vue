@@ -445,10 +445,9 @@ interface Glide {
 }
 /**
  * Rows in motion. The rows are moved here, frame by frame, and where each one is follows
- * from what is kept here; nothing is read back from the page. Handed to the browser as an
- * animation, a row on iOS Safari could keep the offset it started from instead of moving,
- * so each line came to rest a line too low, or, where that offset was read back and built
- * on, lower with every line until the current line sank out of view.
+ * from what is kept here; nothing is read back from the page. (Lines coming to rest lower
+ * and lower in Safari was not down to how the rows are animated: the browser was scrolling
+ * the list back while they moved. See `overflow-anchor` on `.ly-viewport.live`.)
  */
 const glides = new Map<HTMLElement, Glide>()
 let glideFrame = 0
@@ -912,6 +911,16 @@ onBeforeUnmount(() => {
 
 .ly-track {
   padding: 4.5rem clamp(1.25rem, 4vw, 3rem) 5rem;
+}
+
+/* Following the music, the script alone decides where the list is scrolled to, so the browser
+   must not "correct" the position. Scroll anchoring keeps a row near the top where it is on
+   screen whenever the page lays out, and WebKit (Safari 27) measures that row with its transform:
+   a row gliding into place looked to it like content shifting, and it scrolled back by as much
+   as the row had moved. Every line then came to rest lower than the one before, until the
+   current line was off screen. */
+.ly-viewport.live {
+  overflow-anchor: none;
 }
 
 /* Following the music: room above the first and below the last line so each can reach the resting place. */

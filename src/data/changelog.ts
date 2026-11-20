@@ -14,6 +14,13 @@ export interface Release {
  */
 export const releases: Release[] = [
   {
+    version: '2.21.2', date: '2026-11-21', title: '歌词滚动修复',
+    // 本次更新
+    changes: [
+      '修复 Safari 上滚动歌词越滚越靠下、最后当前句跑出屏幕的问题。',
+    ],
+  },
+  {
     version: '2.21.1', date: '2026-11-20', title: '音频再省流量',
     // 本次更新
     changes: [
