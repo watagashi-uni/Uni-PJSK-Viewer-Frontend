@@ -1,5 +1,5 @@
 // Smaller siblings Sekai publishes next to official game assets: WebP images
-// and 192 kbps MP3s. Pages display/play these; opening, downloading and
+// and 128 kbps AAC (.m4a). Pages display/play these; opening, downloading and
 // handing files to other tools keep the original PNG/JPG/MP3 URLs.
 
 const GAME_ASSET = /^(?:https:\/\/assets(?:-[a-z0-9-]+)?\.unipjsk\.com)?\/?startapp\/|^(?:https:\/\/assets(?:-[a-z0-9-]+)?\.unipjsk\.com)?\/?ondemand\//
@@ -37,17 +37,17 @@ export function fallbackImageUrl(url: string): string | null {
   return rewrite(url, FALLBACK_RULES)
 }
 
-/** 192 kbps rendition of a full-length song or audition clip for playback. */
+/** 128 kbps AAC rendition of a full-length song or audition clip for playback. */
 export function playbackAudioUrl(url: string): string {
   if (!GAME_ASSET.test(url)) return url
-  if (/\/ondemand\/music\/long\/[^/?#]+\/[^/?#]+\.mp3$/.test(url) && !url.endsWith('_192k.mp3')) return url.replace(/\.mp3$/, '_192k.mp3')
-  if (/\/startapp\/music\/short\/[^/?#]+\/[^/?#]+_short\.mp3$/.test(url)) return url.replace(/_short\.mp3$/, '_short_192k.mp3')
+  if (/\/ondemand\/music\/long\/[^/?#]+\/[^/?#]+\.mp3$/.test(url) && !url.endsWith('_192k.mp3')) return url.replace(/\.mp3$/, '_128k.m4a')
+  if (/\/startapp\/music\/short\/[^/?#]+\/[^/?#]+_short\.mp3$/.test(url)) return url.replace(/_short\.mp3$/, '_short_128k.m4a')
   return url
 }
 
-/** The original MP3 behind a 192 kbps playback URL, or null. */
+/** The original MP3 behind a playback rendition (128k AAC, or an earlier 192k MP3), or null. */
 export function originalAudioUrl(url: string): string | null {
-  return /_192k\.mp3$/.test(url) && GAME_ASSET.test(url) ? url.replace(/_192k\.mp3$/, '.mp3') : null
+  return /_(?:128k\.m4a|192k\.mp3)$/.test(url) && GAME_ASSET.test(url) ? url.replace(/_(?:128k\.m4a|192k\.mp3)$/, '.mp3') : null
 }
 
 /**

@@ -140,7 +140,7 @@ export const usePlayerStore = defineStore('player', () => {
     el.addEventListener('error', () => {
       // Clearing the source also raises an error event; only a failed track counts.
       if (!el.getAttribute('src')) return
-      // A 192 kbps rendition that is not published yet: play the original instead.
+      // A smaller rendition that is not published yet (or not playable here): play the original instead.
       const original = originalAudioUrl(el.src)
       if (original) {
         if (el.currentTime > 0 && pendingSeek === null) pendingSeek = el.currentTime

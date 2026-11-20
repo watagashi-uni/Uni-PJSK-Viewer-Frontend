@@ -14,6 +14,13 @@ export interface Release {
  */
 export const releases: Release[] = [
   {
+    version: '2.21.1', date: '2026-11-20', title: '音频再省流量',
+    // 本次更新
+    changes: [
+      '播放歌曲改用 128kbps AAC 音源，比上一版再小约三分之一，音质相近；下载音频仍是原始文件。',
+    ],
+  },
+  {
     version: '2.21.0', date: '2026-11-20', title: '更省流量的图片、音频与谱面预览',
     // 本次更新
     changes: [
