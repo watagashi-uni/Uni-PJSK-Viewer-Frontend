@@ -4,6 +4,7 @@ import { useModalDialog } from '@/composables/useModalDialog'
 import { RouterView, useRoute } from 'vue-router'
 import { isRouteLoading } from '@/router'
 import AppNavbar from '@/components/AppNavbar.vue'
+import LegacyBrowserBanner from '@/components/LegacyBrowserBanner.vue'
 import ToastContainer from '@/components/ToastContainer.vue'
 import SpoilerRulesDialog from '@/components/SpoilerRulesDialog.vue'
 import SpoilerWatermark from '@/components/SpoilerWatermark.vue'
@@ -93,6 +94,7 @@ watch(
     <input id="my-drawer-2" type="checkbox" class="drawer-toggle" />
     
     <div class="drawer-content flex flex-col" :class="{ 'with-lyrics-sidebar': playerStore.lyricsSidebarShown }">
+      <LegacyBrowserBanner />
       <AppNavbar />
       
       <main class="mx-auto w-full max-w-7xl flex-1 px-4 py-5 sm:px-6 lg:px-8 lg:py-7">

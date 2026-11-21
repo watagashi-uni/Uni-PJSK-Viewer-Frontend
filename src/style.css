@@ -974,3 +974,31 @@ select option {
   transform: scaleX(-1);
   pointer-events: none;
 }
+
+/* ==========================================================================
+   不支持 color-mix() 的旧浏览器（Safari 16.2 以前等）
+   Tailwind 给这些浏览器的退路是去掉透明度、直接用原色，soft 按钮和徽章的背景就会和文字
+   同色，整块看不见内容。这里改成浅底，保证至少能读。这类浏览器会在页面顶部看到升级提示。
+   ========================================================================== */
+@supports not (color: color-mix(in lab, red, red)) {
+  .btn-soft:not(.btn-active, :hover, :active:focus, :focus-visible, input:checked:not(.filter .btn), :disabled, [disabled], .btn-disabled) {
+    --btn-bg: var(--color-base-200);
+    --btn-border: var(--color-base-300);
+  }
+
+  .badge-soft {
+    background-color: var(--color-base-200);
+    border-color: var(--color-base-300);
+  }
+
+  /* 浅色调背景（bg-primary/10 之类）退成不透明原色后，上面同色的文字和图标会看不见 */
+  .bg-primary\/5, .bg-primary\/8, .bg-primary\/10, .bg-primary\/12, .bg-primary\/15, .bg-primary\/20,
+  .bg-secondary\/5, .bg-secondary\/8, .bg-secondary\/10, .bg-secondary\/12, .bg-secondary\/15, .bg-secondary\/20,
+  .bg-accent\/5, .bg-accent\/8, .bg-accent\/10, .bg-accent\/12, .bg-accent\/15, .bg-accent\/20,
+  .bg-info\/5, .bg-info\/8, .bg-info\/10, .bg-info\/12, .bg-info\/15, .bg-info\/20,
+  .bg-success\/5, .bg-success\/8, .bg-success\/10, .bg-success\/12, .bg-success\/15, .bg-success\/20,
+  .bg-warning\/5, .bg-warning\/8, .bg-warning\/10, .bg-warning\/12, .bg-warning\/15, .bg-warning\/20,
+  .bg-error\/5, .bg-error\/8, .bg-error\/10, .bg-error\/12, .bg-error\/15, .bg-error\/20 {
+    background-color: var(--color-base-200);
+  }
+}

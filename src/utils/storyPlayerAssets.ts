@@ -1,5 +1,6 @@
 import { sharedVoicePaths, type VoiceCharacter2d, type VoiceGameCharacter, type AssetResolver, type ModelManifestEntry, type ScenarioSceneData } from 'pjsk-scenario-player'
 import { storyAssetUrl, voicePaths } from './storyPlayback'
+import { timeoutSignal } from './abortSignal'
 
 export interface StoryPlayerModel extends ModelManifestEntry {
   modelDir: string
@@ -21,15 +22,15 @@ export interface StoryPlayerIndex {
 }
 
 export async function loadStoryPlayerIndex(signal?: AbortSignal): Promise<StoryPlayerIndex> {
-  const timeout = AbortSignal.timeout(25000)
+  const requestSignal = timeoutSignal(25000, signal)
   const response = await fetch(storyAssetUrl('story-player/index.json'), {
-    signal: signal ? AbortSignal.any([signal, timeout]) : timeout, cache: 'no-cache',
+    signal: requestSignal, cache: 'no-cache',
   })
   if (!response.ok) throw new Error('场景资源目录暂不可用，可切换到文本阅读')
   const index = await response.json() as StoryPlayerIndex
   if (index.version !== 1 || !index.models || !index.motions) throw new Error('场景资源目录格式不支持')
   const sequences = await fetch(storyAssetUrl('story-player/bgm/index.json'), {
-    signal: signal ? AbortSignal.any([signal, timeout]) : timeout, cache: 'no-cache',
+    signal: requestSignal, cache: 'no-cache',
   })
   if (sequences.status !== 404) {
     if (!sequences.ok) throw new Error('分段音乐目录暂不可用，可切换到文本阅读')

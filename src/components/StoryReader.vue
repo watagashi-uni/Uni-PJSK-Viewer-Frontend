@@ -10,6 +10,7 @@ import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
 import { usePlayerStore } from '@/stores/player'
 import ZhText from '@/components/ZhText.vue'
+import { timeoutSignal } from '@/utils/abortSignal'
 
 const props = withDefaults(defineProps<{
   title: string; episodeLabel?: string; scenarioId: string; scenarioUrls: string[]
@@ -196,7 +197,7 @@ async function load() {
   try {
     for (const url of new Set(props.scenarioUrls)) {
       try {
-        const response = await fetch(url, { signal: AbortSignal.any([controller.signal, AbortSignal.timeout(25000)]) })
+        const response = await fetch(url, { signal: timeoutSignal(25000, controller.signal) })
         if (!response.ok) continue
         const data = parsePlayerScenario(await response.json(), props.scenarioId)
         if (!data.Snippets.length) continue

@@ -5,7 +5,7 @@ import ts from 'typescript'
 const compiled = ts.transpileModule(readFileSync(new URL('../src/api/lyrics.ts', import.meta.url), 'utf8'), { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText
 function load(fetcher) {
   const exports = {}
-  new Function('exports', 'require', 'fetch', compiled)(exports, () => ({ masterApiBaseUrl: 'https://example.test' }), fetcher)
+  new Function('exports', 'require', 'fetch', compiled)(exports, () => ({ masterApiBaseUrl: 'https://example.test', timeoutSignal: () => undefined }), fetcher)
   return exports
 }
 test('LRC supports repeated timestamps, simultaneous cues and final duration', () => {

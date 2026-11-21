@@ -7,8 +7,9 @@ const compile = file => ts.transpileModule(readFileSync(new URL(file, import.met
 }).outputText
 const url = source => `data:text/javascript;base64,${Buffer.from(source).toString('base64')}`
 const playback = url(compile('../src/utils/storyPlayback.ts'))
+const abortSignal = url(compile('../src/utils/abortSignal.ts'))
 const sharedVoices = url(compile('../node_modules/pjsk-scenario-player/src/scenario/shared-voices.ts'))
-const source = compile('../src/utils/storyPlayerAssets.ts').replace("'./storyPlayback'", JSON.stringify(playback)).replace("'pjsk-scenario-player'", JSON.stringify(sharedVoices))
+const source = compile('../src/utils/storyPlayerAssets.ts').replace("'./storyPlayback'", JSON.stringify(playback)).replace("'./abortSignal'", JSON.stringify(abortSignal)).replace("'pjsk-scenario-player'", JSON.stringify(sharedVoices))
 const { storyPlayerResolver, parsePlayerScenario, loadStoryPlayerIndex } = await import(url(source))
 const { buildStoryFrames } = await import(playback)
 

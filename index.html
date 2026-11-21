@@ -70,7 +70,18 @@
         title.textContent = '页面暂时无法启动'
         title.style.cssText = 'font-size:1.5rem;margin:0 0 1rem'
         const description = document.createElement('p')
-        description.textContent = '应用资源没有成功加载，请检查网络后重新加载。'
+        // 太旧的浏览器连应用脚本都跑不起来，这时提示升级比提示检查网络更有用
+        let legacy = true
+        try { legacy = !CSS.supports('color', 'color-mix(in lab, red, red)') } catch (error) { /* 没有 CSS.supports 的浏览器同样算旧 */ }
+        const ua = navigator.userAgent
+        const ios = /iPhone|iPad|iPod/i.test(ua) || (/Macintosh/i.test(ua) && navigator.maxTouchPoints > 1)
+        description.textContent = !legacy
+          ? '应用资源没有成功加载，请检查网络后重新加载。'
+          : /Android/i.test(ua)
+            ? '当前浏览器版本过旧，无法打开本站。建议下载并使用最新版 Chrome 浏览器访问。'
+            : ios
+              ? '当前系统的浏览器内核过旧，无法打开本站。请将系统更新到 iOS / iPadOS 16.4 或更高版本。'
+              : '当前浏览器版本过旧，无法打开本站。请更新浏览器，或改用最新版 Chrome、Edge、Firefox。'
         description.style.cssText = 'line-height:1.7;margin:0 0 1.5rem'
         const retry = document.createElement('button')
         retry.type = 'button'
@@ -95,15 +106,16 @@
     })()
   </script>
   <script type="module">
-    import { isQQInAppBrowser, renderUnsupportedBrowserNotice } from '/src/utils/browserSupport'
+    import { detectInAppBrowser, renderUnsupportedBrowserNotice } from '/src/utils/browserSupport'
     import '/src/pwa'
     import { installStartupRecovery } from '/src/utils/startupRecovery'
 
     installStartupRecovery()
 
-    if (isQQInAppBrowser(navigator.userAgent)) {
+    const inAppBrowser = detectInAppBrowser(navigator.userAgent)
+    if (inAppBrowser) {
       window.__markPwaAppStarted?.()
-      renderUnsupportedBrowserNotice()
+      renderUnsupportedBrowserNotice(inAppBrowser)
     } else {
       import('/src/main.ts')
     }

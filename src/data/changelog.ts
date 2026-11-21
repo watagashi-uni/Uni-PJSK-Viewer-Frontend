@@ -14,6 +14,16 @@ export interface Release {
  */
 export const releases: Release[] = [
   {
+    version: '2.21.3', date: '2026-11-22', title: '旧浏览器与 App 内置浏览器',
+    // 本次更新
+    changes: [
+      '修复旧版 Safari（如 iOS 15）上「绑定游戏账号」等按钮和部分标签显示成空白色块的问题。',
+      '浏览器版本过旧时，页面顶部会提示：安卓建议换用最新版 Chrome，iPhone / iPad 建议更新系统。',
+      '修复旧版浏览器上剧情和歌词加载失败的问题。',
+      '微信、企业微信、钉钉、微博、抖音等 App 的内置浏览器不再支持访问，页面提供「复制网址」按钮，方便到浏览器中打开。',
+    ],
+  },
+  {
     version: '2.21.2', date: '2026-11-21', title: '歌词滚动修复',
     // 本次更新
     changes: [

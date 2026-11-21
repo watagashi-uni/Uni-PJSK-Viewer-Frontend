@@ -1,4 +1,5 @@
 import { masterApiBaseUrl } from './masterClient'
+import { timeoutSignal } from '../utils/abortSignal'
 
 export interface LyricWord { from: number; to: number; start: number; end: number }
 /** Reading of `text.slice(from, to)`, in the same UTF-16 offsets as the timed units. */
@@ -427,7 +428,7 @@ function validRuby(ruby: unknown, text: string): LyricRuby[] | undefined {
 }
 
 async function fetchJson<T>(path: string): Promise<T> {
-  const response = await fetch(`${base}/${path}`, { credentials: 'omit', cache: path === 'version.json' ? 'no-cache' : 'default', signal: AbortSignal.timeout(15000) })
+  const response = await fetch(`${base}/${path}`, { credentials: 'omit', cache: path === 'version.json' ? 'no-cache' : 'default', signal: timeoutSignal(15000) })
   if (!response.ok) throw new Error(`Lyrics: ${response.status}`)
   return response.json() as Promise<T>
 }
