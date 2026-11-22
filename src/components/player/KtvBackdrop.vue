@@ -7,6 +7,7 @@ import { usePlayerStore } from '@/stores/player'
 import { useSettingsStore } from '@/stores/settings'
 import type { PlayerTrackInfo } from '@/utils/playerTracks'
 import { castTimeline, cueAt, type CastCue } from '@/utils/singingTimeline'
+import { useSingerAvatars } from '@/composables/useSingerAvatars'
 
 /**
  * The picture behind karaoke lyrics for a song without a 2D MV: card art of the characters
@@ -17,6 +18,10 @@ import { castTimeline, cueAt, type CastCue } from '@/utils/singingTimeline'
  *   before they are due.
  * - Otherwise their cards take turns at a steady pace.
  * Songs sung only by guests get their artwork, blurred, instead.
+ *
+ * As a strip (KTV subtitles): a row of the singers' cards, cut around the character and picked
+ * at random, across the top; whoever is heard now stands out, the others fade back. The rest
+ * is a panel for the lyrics, coloured by a soft reflection of the cards.
  */
 const props = withDefaults(defineProps<{
   track: PlayerTrackInfo | null
@@ -26,7 +31,11 @@ const props = withDefaults(defineProps<{
   showPerformers?: boolean
   currentTime?: number
   clock?: () => number
-}>(), { lyrics: null, showPerformers: false, currentTime: 0, clock: undefined })
+  /** slides: cards filling the picture. strip: a row of cards over a panel for the lyrics. */
+  layout?: 'slides' | 'strip'
+  /** Strip: its height in pixels (the panel takes the rest). */
+  stripHeight?: number
+}>(), { lyrics: null, showPerformers: false, currentTime: 0, clock: undefined, layout: 'slides', stripHeight: 0 })
 
 interface CardRow { id: number; characterId: number; cardRarityType: string; assetbundleName: string; releaseAt: number }
 /**
@@ -48,10 +57,13 @@ const PRELOAD_SECONDS = 40
 const PRELOAD_SCENES = 4
 /** Ways a picture drifts, taken in turn so one slide never moves like the last. */
 const MOTIONS = 4
+/** Cards in the strip. */
+const STRIP_PANELS = 5
 
 const master = useMasterStore()
 const player = usePlayerStore()
 const settings = useSettingsStore()
+const { trackAvatars } = useSingerAvatars()
 
 const cards = shallowRef<CardRow[]>([])
 void master.getMaster<CardRow>('cards').then((rows) => { cards.value = rows }).catch(() => {})
@@ -125,8 +137,8 @@ function picturesFor(characters: number[], cursor: Map<number, number>): string[
 
 interface Scene { time: number; pictures: string[] }
 
-/** Every change of picture over the song, with its pictures, decided in advance. */
-const scenes = computed<Scene[] | null>(() => {
+/** Who is shown when, following the voice; null where the lyrics do not say who sings. */
+const cues = computed<CastCue[] | null>(() => {
   const lyrics = props.lyrics
   if (!props.showPerformers || !lyrics || !cast.value.length) return null
   const characterOf = new Map<string, number>()
@@ -138,14 +150,96 @@ const scenes = computed<Scene[] | null>(() => {
     if (id !== null && cardsByCharacter.value.has(id)) characterOf.set(performer.performerId, id)
   }
   if (!characterOf.size) return null
-  const cues: CastCue[] = castTimeline(lyrics.lines, { cast: cast.value, characterOf: id => characterOf.get(id), maxPanels: MAX_PANELS })
-  if (cues.length < 2) return null
+  const list: CastCue[] = castTimeline(lyrics.lines, { cast: cast.value, characterOf: id => characterOf.get(id), maxPanels: MAX_PANELS })
+  return list.length < 2 ? null : list
+})
+
+/** Every change of picture over the song, with its pictures, decided in advance. */
+const scenes = computed<Scene[] | null>(() => {
+  if (props.layout === 'strip' || !cues.value) return null
   const cursor = new Map<number, number>()
-  return cues.map(cue => ({ time: cue.time, pictures: picturesFor(cue.characters, cursor) }))
+  return cues.value.map(cue => ({ time: cue.time, pictures: picturesFor(cue.characters, cursor) }))
 })
 
 function now(): number {
   return props.clock ? props.clock() : props.currentTime
+}
+
+// ----- the strip -----
+
+interface StripPanel { key: string; characterId: number; url: string; color: string; name: string }
+
+const failedPanels = shallowRef(new Set<string>())
+
+/** Drawn anew for each player, so the same song shows other cards another time. */
+const salt = Math.floor(Math.random() * 2 ** 30)
+
+/**
+ * Five cards cut around the character, at random: the singers take turns, so each of up to
+ * five has one; more than five, and five of them are drawn.
+ */
+const stripPanels = computed<StripPanel[]>(() => {
+  const track = props.track
+  const characters = cast.value
+  if (props.layout !== 'strip' || !track || !characters.length) return []
+  const random = seeded((track.musicId * 7919 + track.vocalId) ^ salt)
+  const avatars = new Map(trackAvatars(track.singers).map(a => [a.key, a]))
+  const order = shuffle([...characters], random)
+  const pools = new Map(order.map(id => [id, shuffle([...new Set(cardsByCharacter.value.get(id)!.map(art => art.cutout))], random)]))
+  // A card whose picture is missing makes way for another.
+  const failed = failedPanels.value
+  for (const [id, pool] of pools) pools.set(id, pool.filter(url => !failed.has(url)))
+  const picked: StripPanel[] = []
+  for (let n = 0; picked.length < STRIP_PANELS && n < STRIP_PANELS * order.length; n++) {
+    const id = order[n % order.length]!
+    const url = pools.get(id)!.shift()
+    const avatar = avatars.get(`game-${id}`)
+    if (url) picked.push({ key: url, characterId: id, url, color: avatar?.color || '#b9b4c8', name: avatar?.name || '' })
+  }
+  return shuffle(picked, random)
+})
+
+const loadedPanels = shallowRef(new Set<string>())
+function onPanelLoad(url: string) {
+  loadedPanels.value = new Set(loadedPanels.value).add(url)
+}
+
+function onPanelError(url: string) {
+  failedPanels.value = new Set(failedPanels.value).add(url)
+}
+
+/** Who is heard now (none: nobody stands out). */
+const heard = shallowRef<number[]>([])
+let stripFrame = 0
+
+function followHeard() {
+  const list = cues.value
+  const index = list ? cueAt(list, now()) : -1
+  const next = index >= 0 && list ? list[index]!.characters : []
+  if (next.join() !== heard.value.join()) heard.value = next
+}
+
+function stripLoop() {
+  followHeard()
+  stripFrame = requestAnimationFrame(stripLoop)
+}
+
+watch([() => props.layout, () => props.playing, cues], ([layout, playing]) => {
+  cancelAnimationFrame(stripFrame)
+  stripFrame = 0
+  if (layout !== 'strip') return
+  followHeard()
+  if (playing && cues.value) stripFrame = requestAnimationFrame(stripLoop)
+}, { immediate: true })
+
+watch(() => props.currentTime, () => {
+  if (props.layout === 'strip' && !stripFrame) followHeard()
+})
+
+/** A card stands out while its character is heard (all of them, when nobody is). */
+function panelState(panel: StripPanel): 'on' | 'off' | '' {
+  if (!heard.value.length || heard.value.length >= cast.value.length) return ''
+  return heard.value.includes(panel.characterId) ? 'on' : 'off'
 }
 
 // ----- the slides -----
@@ -256,7 +350,7 @@ const turnCursor = new Map<number, number>()
 
 function nextTurn() {
   const characters = cast.value
-  if (!characters.length) return
+  if (!characters.length || props.layout === 'strip') return
   turn = (turn + 1) % characters.length
   const pictures = picturesFor([characters[turn]!], turnCursor)
   void show(pictures, false).then(() => {
@@ -303,7 +397,7 @@ watch([cast, scenes], ([characters, list], [oldCharacters, oldList]) => {
   remaining = SLIDE_MS
   turnCursor.clear()
   stopAll()
-  if (!characters.length) return
+  if (!characters.length || props.layout === 'strip') return
   // The cards of the opening scenes load right away, before anything plays.
   if (list) {
     preloadFrom(cueAt(list, now()))
@@ -313,6 +407,7 @@ watch([cast, scenes], ([characters, list], [oldCharacters, oldList]) => {
 }, { immediate: true })
 
 watch(() => props.playing, (playing) => {
+  if (props.layout === 'strip') return
   if (!playing && !scenes.value) remaining = Math.max(1000, remaining - (performance.now() - shownAt))
   start()
 })
@@ -324,12 +419,50 @@ watch(() => props.currentTime, () => {
 
 onBeforeUnmount(() => {
   stopAll()
+  cancelAnimationFrame(stripFrame)
   serial++
 })
 </script>
 
 <template>
-  <div class="kb" :class="{ 'kb--still': !playing }" aria-hidden="true">
+  <div v-if="layout === 'strip'" class="kb kb--strip" :class="{ 'kb--still': !playing }" :style="{ '--kb-strip': `${stripHeight}px` }" aria-hidden="true">
+    <!-- The panel for the lyrics: the cards again, mirrored and blurred, under a pale veil. -->
+    <div class="ks-floor">
+      <img v-if="cover && !stripPanels.length" class="ks-floor-cover" :src="cover" alt="" />
+      <div v-else class="ks-floor-row">
+        <img v-for="panel in stripPanels" :key="panel.key" :src="panel.url" alt="" :class="{ shown: loadedPanels.has(panel.url) }" />
+      </div>
+      <div class="ks-veil"></div>
+      <div class="ks-glints">
+        <i v-for="panel in stripPanels" :key="panel.key" :style="{ '--c': panel.color }" :class="panelState(panel) && `ks-glint--${panelState(panel)}`"></i>
+      </div>
+    </div>
+
+    <div class="ks-strip">
+      <img v-if="cover" class="ks-strip-glow" :src="cover" alt="" />
+      <div v-if="stripPanels.length" class="ks-row">
+        <div
+          v-for="(panel, n) in stripPanels"
+          :key="panel.key"
+          class="ks-cell"
+          :class="[panelState(panel) && `ks-cell--${panelState(panel)}`, { shown: loadedPanels.has(panel.url) }]"
+          :style="{ '--c': panel.color, '--i': n }"
+        >
+          <img class="ks-img" :src="panel.url" alt="" @load="onPanelLoad(panel.url)" @error="onPanelError(panel.url)" />
+          <span class="ks-glow"></span>
+          <span class="ks-frame"></span>
+          <span v-if="panel.name" class="ks-name">{{ panel.name }}</span>
+        </div>
+      </div>
+      <img v-else-if="cover" class="ks-cover" :src="cover" alt="" />
+    </div>
+    <!-- Where the strip meets the panel: a band in the singers' colours. -->
+    <div class="ks-band">
+      <i v-for="panel in stripPanels" :key="panel.key" :style="{ '--c': panel.color }" :class="panelState(panel) && `ks-band--${panelState(panel)}`"></i>
+    </div>
+  </div>
+
+  <div v-else class="kb" :class="{ 'kb--still': !playing }" aria-hidden="true">
     <!-- The song's artwork, blurred, underneath: never a black screen while a card loads. -->
     <img v-if="cover" class="kb-cover-glow" :src="cover" alt="" />
     <img v-if="cover && !cast.length" class="kb-cover" :src="cover" alt="" />
@@ -474,8 +607,337 @@ onBeforeUnmount(() => {
   transform: translateX(-50%);
 }
 
+/* ----- strip ----- */
+
+.kb--strip {
+  --kb-band: max(4px, calc(var(--kb-strip) * 0.028));
+  background: #ece8f3;
+}
+
+.ks-strip {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: var(--kb-strip);
+  overflow: hidden;
+  background: #1a1720;
+}
+
+.ks-strip-glow {
+  position: absolute;
+  inset: -30%;
+  width: 160%;
+  max-width: none;
+  height: 160%;
+  object-fit: cover;
+  opacity: 0.55;
+  filter: blur(30px) saturate(1.2);
+}
+
+.ks-row {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  gap: 2px;
+}
+
+/* Who is heard takes more of the strip, the others give way: widths change smoothly. */
+.ks-cell,
+.ks-band i,
+.ks-glints i {
+  min-width: 0;
+  flex: 1 1 0;
+  transition: flex-grow 0.55s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.45s ease;
+}
+
+.ks-cell--on,
+.ks-band i.ks-band--on,
+.ks-glints i.ks-glint--on {
+  flex-grow: 1.7;
+}
+
+.ks-cell--off,
+.ks-band i.ks-band--off,
+.ks-glints i.ks-glint--off {
+  flex-grow: 0.8;
+}
+
+.ks-cell {
+  position: relative;
+  overflow: hidden;
+  opacity: 0;
+}
+
+.ks-cell.shown {
+  opacity: 1;
+}
+
+.ks-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 28%;
+  transition: filter 0.45s ease;
+  animation: ks-breathe 14s ease-in-out infinite alternate;
+  animation-delay: calc(var(--i) * -2.7s);
+}
+
+.kb--still .ks-img,
+.kb--still .ks-band i::after {
+  animation-play-state: paused;
+}
+
+/* Someone else is heard: this card goes grey and pale, well behind the one singing. */
+.ks-cell::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgb(226 222 236 / 0.45), rgb(236 232 243 / 0.7));
+  opacity: 0;
+  transition: opacity 0.45s ease;
+  pointer-events: none;
+}
+
+.ks-cell--off .ks-img {
+  filter: grayscale(0.85) brightness(0.92) contrast(0.85);
+}
+
+.ks-cell--off::after {
+  opacity: 1;
+}
+
+.ks-cell--on .ks-img {
+  filter: saturate(1.15) brightness(1.05);
+}
+
+/* The one heard: framed in their colour, which also rises from the bottom of the card. */
+.ks-glow,
+.ks-frame {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  pointer-events: none;
+}
+
+.ks-glow {
+  background: linear-gradient(180deg, transparent 50%, var(--c) 130%);
+  mix-blend-mode: screen;
+}
+
+.ks-frame {
+  box-shadow:
+    inset 0 0 0 max(2px, calc(var(--kb-strip) * 0.014)) var(--c),
+    inset 0 0 calc(var(--kb-strip) * 0.12) var(--c);
+}
+
+.ks-cell--on .ks-glow,
+.ks-cell--on .ks-frame {
+  opacity: 1;
+}
+
+/* Their name, on a tag in their colour, slides up into the corner. */
+.ks-name {
+  position: absolute;
+  bottom: max(6px, calc(var(--kb-strip) * 0.05));
+  left: max(6px, calc(var(--kb-strip) * 0.04));
+  max-width: calc(100% - max(12px, calc(var(--kb-strip) * 0.08)));
+  overflow: hidden;
+  padding: 0.25em 0.7em 0.3em;
+  border-radius: 0.35em;
+  background: var(--c);
+  box-shadow: 0 4px 14px -4px rgb(0 0 0 / 0.5), inset 0 0 0 1px rgb(255 255 255 / 0.35);
+  color: #fff;
+  font-size: clamp(10px, calc(var(--kb-strip) * 0.065), 20px);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-shadow: 0 1px 2px rgb(0 0 0 / 0.45);
+  opacity: 0;
+  transform: translateY(60%);
+  transition: opacity 0.3s ease, transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.ks-cell--on .ks-name {
+  opacity: 1;
+  transform: none;
+}
+
+.ks-cover {
+  position: absolute;
+  top: 8%;
+  left: 50%;
+  height: 84%;
+  aspect-ratio: 1;
+  border-radius: 0.5rem;
+  object-fit: cover;
+  box-shadow: 0 14px 40px -14px rgb(0 0 0 / 0.8);
+  transform: translateX(-50%);
+}
+
+.ks-band {
+  position: absolute;
+  z-index: 1;
+  top: var(--kb-strip);
+  right: 0;
+  left: 0;
+  display: flex;
+  gap: 2px;
+  height: var(--kb-band);
+  background: #d9d3e6;
+  box-shadow: 0 6px 18px -6px rgb(40 30 60 / 0.35);
+}
+
+.ks-band i {
+  position: relative;
+  overflow: hidden;
+  background: var(--c);
+  opacity: 0.55;
+}
+
+/* Under whoever is heard: their colour at full strength, a light running along it, and a glow
+   spilling down into the panel. */
+.ks-band i.ks-band--on {
+  overflow: visible;
+  opacity: 1;
+  box-shadow: 0 0 calc(var(--kb-band) * 3) var(--c), 0 calc(var(--kb-band) * 1.5) calc(var(--kb-band) * 5) var(--c);
+}
+
+.ks-band i::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 0%, rgb(255 255 255 / 0.85) 50%, transparent 100%) no-repeat;
+  background-size: 40% 100%;
+  opacity: 0;
+}
+
+.ks-band i.ks-band--on::after {
+  opacity: 1;
+  animation: ks-shine 1.6s ease-in-out infinite;
+}
+
+.ks-band i.ks-band--off {
+  opacity: 0.18;
+}
+
+@keyframes ks-shine {
+  from { background-position: -60% 0; }
+  to { background-position: 160% 0; }
+}
+
+/* The panel: the cards upside down and blurred into washes of colour, under a pale veil with
+   a fine dot screen, so the lyrics sit on something without fighting it. */
+.ks-floor {
+  position: absolute;
+  top: var(--kb-strip);
+  right: 0;
+  bottom: 0;
+  left: 0;
+  overflow: hidden;
+  background: #ece8f3;
+}
+
+.ks-floor-row {
+  position: absolute;
+  inset: -12%;
+  display: flex;
+  transform: scaleY(-1);
+  filter: blur(26px) saturate(1.35);
+}
+
+.ks-floor-row img {
+  min-width: 0;
+  height: 100%;
+  flex: 1;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 0.8s ease;
+}
+
+.ks-floor-row img.shown {
+  opacity: 1;
+}
+
+.ks-floor-cover {
+  position: absolute;
+  inset: -20%;
+  width: 140%;
+  max-width: none;
+  height: 140%;
+  object-fit: cover;
+  filter: blur(36px) saturate(1.3);
+}
+
+.ks-veil {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle, rgb(255 255 255 / 0.5) 0.7px, transparent 1.2px) 0 0 / 7px 7px,
+    linear-gradient(180deg, rgb(244 241 249 / 0.5) 0%, rgb(244 241 249 / 0.7) 55%, rgb(236 232 243 / 0.82) 100%);
+}
+
+/* Soft glows rising from the bottom under each card, brightest under whoever is heard. */
+.ks-glints {
+  position: absolute;
+  inset: 0;
+  display: flex;
+}
+
+.ks-glints i {
+  position: relative;
+}
+
+.ks-glints i::before {
+  content: '';
+  position: absolute;
+  bottom: -30%;
+  left: 50%;
+  width: 130%;
+  height: 70%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, var(--c), transparent);
+  opacity: 0.22;
+  transform: translateX(-50%);
+  transition: opacity 0.5s ease;
+}
+
+/* Under the one heard, its colour also reaches down from the band. */
+.ks-glints i.ks-glint--on::before {
+  opacity: 0.55;
+}
+
+.ks-glints i.ks-glint--on::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 120%;
+  height: 45%;
+  background: radial-gradient(ellipse at top, var(--c), transparent 70%);
+  opacity: 0.35;
+  transform: translateX(-50%);
+}
+
+.ks-glints i.ks-glint--off::before {
+  opacity: 0.06;
+}
+
+@keyframes ks-breathe {
+  from { transform: scale(1.02); }
+  to { transform: scale(1.1) translateY(-1.5%); }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .kb-move {
+  .kb-move,
+  .ks-img,
+  .ks-band i.ks-band--on::after {
     animation: none;
   }
 }

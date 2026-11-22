@@ -154,3 +154,33 @@ test('one voice holding the screen gets new cards; so does the same voice after 
   // The intro already shows the one singer, so the first line changes nothing; the long hold does.
   assert.deepEqual(cues.map(c => c.time), [0, 14, 28, 45])
 })
+
+const ktvRows = load('../src/utils/ktvRows.ts')
+const atomsOf = text => Array.from(text).map(ch => ({ ch, width: ch === ' ' ? 0.5 : /[\x20-\x7e]/.test(ch) ? 0.6 : 1 }))
+const rowTexts = (text, room) => {
+  const chars = Array.from(text)
+  return ktvRows.splitRows(atomsOf(text), room).map(r => chars.slice(r.from, r.to).join(''))
+}
+
+test('a KTV line that fits stays one row', () => {
+  assert.deepEqual(rowTexts('お前やりますねぇスギ', 12), ['お前やりますねぇスギ'])
+})
+
+test('a KTV line too long for its row is cut at its space, which goes', () => {
+  assert.deepEqual(rowTexts('アセンションの時 彼の語録を聞け', 12), ['アセンションの時', '彼の語録を聞け'])
+})
+
+test('without a space, a long line is cut evenly, never before small kana or inside a word', () => {
+  const rows = rowTexts('ずっとずっと君のことを想っているよ', 10)
+  assert.equal(rows.length, 2)
+  assert.ok(rows.every(row => row.length <= 10))
+  assert.ok(!/^[ぁぃぅぇぉっゃゅょー]/.test(rows[1]))
+  const words = rowTexts('Damsel In Distress wa inai', 9)
+  assert.ok(words.length > 1)
+  assert.deepEqual(words.join(' ').split(' '), ['Damsel', 'In', 'Distress', 'wa', 'inai'])
+})
+
+test('a very long line takes at most three rows, and a line break always starts a row', () => {
+  assert.equal(rowTexts('あいうえおかきくけこさしすせそたちつてとなにぬねの', 9).length, 3)
+  assert.deepEqual(rowTexts('はじめ\nおわり', 20), ['はじめ', 'おわり'])
+})

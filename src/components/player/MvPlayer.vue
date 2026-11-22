@@ -55,6 +55,12 @@ const DEFAULT_RATIO = 576 / 328
 const NARROW_PX = 560
 /** Room under the picture (full screen) worth moving the subtitles into. */
 const BELOW_MIN_PX = 100
+/** KTV without a video, on a narrow page: a taller picture, so the lyrics panel has room. */
+const STRIP_NARROW_RATIO = 1.2
+/** Height of the card strip: half the picture, or less where the picture is tall for its width. */
+function stripHeightOf(width: number, height: number): number {
+  return Math.round(Math.min(height * 0.5, width * 0.32))
+}
 
 const root = ref<HTMLElement>()
 const stage = ref<HTMLElement>()
@@ -187,6 +193,9 @@ const extra = computed<SubtitleExtra>(() => {
 const subtitleNote = computed(() => (settings.mode === 'off' ? '' : note.value))
 const sizeScale = computed(() => SUBTITLE_SIZES.find(s => s.value === settings.size)?.scale ?? 1)
 
+/** No 2D MV and KTV subtitles: a strip of cards over a panel that holds the lyrics. */
+const strip = computed(() => videoState.value === 'none' && settings.mode === 'ktv' && !!subtitleLyrics.value)
+
 function cycleSubtitles() {
   const index = SUBTITLE_MODES.findIndex(m => m.value === settings.mode)
   settings.mode = SUBTITLE_MODES[(index + 1) % SUBTITLE_MODES.length]!.value
@@ -243,9 +252,12 @@ const overlaps = ref(false)
 const lift = ref(0)
 const narrow = ref(false)
 /** Where the subtitles are drawn, relative to the stage: over the picture, or in the room under it. */
-const subtitleBox = shallowRef<{ placement: 'over' | 'below'; left: number; top: number; width: number; height: number } | null>(null)
+const subtitleBox = shallowRef<{ placement: 'over' | 'below' | 'panel'; left: number; top: number; width: number; height: number } | null>(null)
 /** In the page on a narrow screen, a band under the picture holds the subtitles. */
-const band = computed(() => !full.value && narrow.value && !!subtitleLyrics.value)
+const band = computed(() => !full.value && narrow.value && !!subtitleLyrics.value && !strip.value)
+/** The strip fills the screen in full screen, and is taller on a narrow page. */
+const frameRatio = computed(() => (strip.value && narrow.value ? STRIP_NARROW_RATIO : strip.value ? DEFAULT_RATIO : ratio.value))
+const stripHeight = ref(0)
 let hideTimer: ReturnType<typeof setTimeout> | undefined
 
 function wake() {
@@ -274,6 +286,12 @@ function measure() {
     overlaps.value = false
     lift.value = 0
   }
+  if (strip.value) {
+    const top = stripHeightOf(picture.width, picture.height)
+    stripHeight.value = top
+    subtitleBox.value = { placement: 'panel', left: picture.left - area.left, top: picture.top - area.top + top, width: picture.width, height: Math.max(0, picture.height - top) }
+    return
+  }
   const room = floor - picture.bottom
   subtitleBox.value = room >= BELOW_MIN_PX
     ? { placement: 'below', left: 0, top: picture.bottom - area.top, width: area.width, height: room }
@@ -288,7 +306,7 @@ onMounted(() => {
   if (stage.value) resizeObserver.observe(stage.value)
   measure()
 })
-watch([full, band, ratio], async () => {
+watch([full, band, frameRatio, strip], async () => {
   await nextTick()
   measure()
 }, { flush: 'post' })
@@ -399,7 +417,7 @@ onBeforeUnmount(() => {
       @pointermove="wake"
     >
       <div ref="stage" class="mvp-stage" @pointerdown="onStagePointerDown" @click="onStageClick" @dblclick="onStageDoubleClick">
-        <div ref="frame" class="mvp-frame" :style="{ '--mv-ratio': ratio }">
+        <div ref="frame" class="mvp-frame" :class="{ 'mvp-frame--fill': strip && full }" :style="{ '--mv-ratio': frameRatio }">
           <video
             v-if="videoUrl"
             ref="video"
@@ -424,6 +442,9 @@ onBeforeUnmount(() => {
           <!-- No 2D MV: karaoke over the singers' card art. -->
           <KtvBackdrop
             v-if="videoState === 'none'"
+            :key="strip ? 'strip' : 'slides'"
+            :layout="strip ? 'strip' : 'slides'"
+            :strip-height="stripHeight"
             :track="track"
             :playing="playing"
             :lyrics="timedLyrics"
@@ -474,7 +495,7 @@ onBeforeUnmount(() => {
             :current-time="currentTime"
             :playing="playing"
             :clock="clock"
-            :style="{ '--mvs-scale': sizeScale, '--mvs-lift': chromeShown && subtitleBox.placement === 'over' ? `${lift}px` : '0px' }"
+            :style="{ '--mvs-scale': sizeScale, '--mvs-lift': chromeShown && subtitleBox.placement !== 'below' ? `${lift}px` : '0px' }"
           />
         </div>
       </div>
@@ -993,6 +1014,12 @@ onBeforeUnmount(() => {
 
 .mvp--full .mvp-frame {
   width: min(100cqw, 100cqh * var(--mv-ratio));
+}
+
+.mvp--full .mvp-frame--fill {
+  width: 100cqw;
+  height: 100cqh;
+  aspect-ratio: auto;
 }
 
 .mvp--idle {
