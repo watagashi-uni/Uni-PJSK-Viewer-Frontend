@@ -14,6 +14,13 @@ export interface Release {
  */
 export const releases: Release[] = [
   {
+    version: '2.21.5', date: '2026-11-22', title: 'KTV 卡面按人数排列',
+    // 本次更新
+    changes: [
+      '没有 2D MV 的 KTV 画面改为每位歌手一张卡面，不再重复补卡：三人及以上排成一排，两人各占一半并显示完整卡面，独唱时整排显示这位角色的卡面并轮流切换。',
+    ],
+  },
+  {
     version: '2.21.4', date: '2026-11-22', title: 'KTV 新画面',
     // 本次更新
     changes: [

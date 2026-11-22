@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { displayImageUrl } from '@/utils/derivedAssets'
-import { computed, onBeforeUnmount, shallowRef, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 import { performerCharacterId, type SongLyrics } from '@/api/lyrics'
 import { useMasterStore } from '@/stores/master'
 import { usePlayerStore } from '@/stores/player'
@@ -19,9 +19,10 @@ import { useSingerAvatars } from '@/composables/useSingerAvatars'
  * - Otherwise their cards take turns at a steady pace.
  * Songs sung only by guests get their artwork, blurred, instead.
  *
- * As a strip (KTV subtitles): a row of the singers' cards, cut around the character and picked
- * at random, across the top; whoever is heard now stands out, the others fade back. The rest
- * is a panel for the lyrics, coloured by a soft reflection of the cards.
+ * As a strip (KTV subtitles): one card per singer across the top, picked at random; whoever is
+ * heard now stands out, the others fade back. Three or more share the strip as cards cut around
+ * the character; one or two get the whole illustration, a solo going through their cards in
+ * turn. The rest is a panel for the lyrics, coloured by a soft reflection of the cards.
  */
 const props = withDefaults(defineProps<{
   track: PlayerTrackInfo | null
@@ -57,8 +58,12 @@ const PRELOAD_SECONDS = 40
 const PRELOAD_SCENES = 4
 /** Ways a picture drifts, taken in turn so one slide never moves like the last. */
 const MOTIONS = 4
-/** Cards in the strip. */
-const STRIP_PANELS = 5
+/** Most cards in the strip (one per singer): more singers, and this many are drawn. */
+const STRIP_MAX_PANELS = 8
+/** Up to this many singers, each slot is wide enough for the whole illustration. */
+const STRIP_WIDE_UP_TO = 2
+/** A solo: the singer's cards take turns, each this long. */
+const SOLO_SLIDE_MS = 12000
 
 const master = useMasterStore()
 const player = usePlayerStore()
@@ -174,30 +179,60 @@ const failedPanels = shallowRef(new Set<string>())
 /** Drawn anew for each player, so the same song shows other cards another time. */
 const salt = Math.floor(Math.random() * 2 ** 30)
 
+/** Which of a solo singer's cards is up. */
+const soloTurn = ref(0)
+
 /**
- * Five cards cut around the character, at random: the singers take turns, so each of up to
- * five has one; more than five, and five of them are drawn.
+ * One card per singer, in the rendition's order, drawn at random from their cards: cut around
+ * the character for three or more, the whole illustration for one or two (their slots are as
+ * wide as it is). A picture that is missing makes way for another card.
  */
-const stripPanels = computed<StripPanel[]>(() => {
+const stripChoices = computed(() => {
   const track = props.track
-  const characters = cast.value
-  if (props.layout !== 'strip' || !track || !characters.length) return []
+  if (props.layout !== 'strip' || !track || !cast.value.length) return []
   const random = seeded((track.musicId * 7919 + track.vocalId) ^ salt)
-  const avatars = new Map(trackAvatars(track.singers).map(a => [a.key, a]))
-  const order = shuffle([...characters], random)
-  const pools = new Map(order.map(id => [id, shuffle([...new Set(cardsByCharacter.value.get(id)!.map(art => art.cutout))], random)]))
-  // A card whose picture is missing makes way for another.
-  const failed = failedPanels.value
-  for (const [id, pool] of pools) pools.set(id, pool.filter(url => !failed.has(url)))
-  const picked: StripPanel[] = []
-  for (let n = 0; picked.length < STRIP_PANELS && n < STRIP_PANELS * order.length; n++) {
-    const id = order[n % order.length]!
-    const url = pools.get(id)!.shift()
-    const avatar = avatars.get(`game-${id}`)
-    if (url) picked.push({ key: url, characterId: id, url, color: avatar?.color || '#b9b4c8', name: avatar?.name || '' })
+  let characters = cast.value
+  if (characters.length > STRIP_MAX_PANELS) {
+    const drawn = new Set(shuffle([...characters], random).slice(0, STRIP_MAX_PANELS))
+    characters = characters.filter(id => drawn.has(id))
   }
-  return shuffle(picked, random)
+  const wide = characters.length <= STRIP_WIDE_UP_TO
+  const avatars = new Map(trackAvatars(track.singers).map(a => [a.key, a]))
+  const failed = failedPanels.value
+  return characters.flatMap((id) => {
+    const urls = [...new Set(cardsByCharacter.value.get(id)!.map(art => (wide ? art.full : art.cutout)))].filter(url => !failed.has(url))
+    if (!urls.length) return []
+    const avatar = avatars.get(`game-${id}`)
+    return [{ characterId: id, urls: shuffle(urls, random), color: avatar?.color || '#b9b4c8', name: avatar?.name || '' }]
+  })
 })
+
+const solo = computed(() => stripChoices.value.length === 1)
+
+const stripPanels = computed<StripPanel[]>(() => stripChoices.value.map((choice) => {
+  const url = solo.value ? choice.urls[soloTurn.value % choice.urls.length]! : choice.urls[0]!
+  return { key: String(choice.characterId), characterId: choice.characterId, url, color: choice.color, name: choice.name }
+}))
+
+// A solo: the next card is loaded before it takes over, and the turns rest while paused.
+let soloTimer: ReturnType<typeof setTimeout> | undefined
+watch([solo, () => props.playing, stripChoices], ([isSolo, playing]) => {
+  clearTimeout(soloTimer)
+  if (!isSolo || !playing) return
+  const turn = () => {
+    soloTimer = setTimeout(() => {
+      const urls = stripChoices.value[0]?.urls
+      if (!urls || urls.length < 2) return
+      const next = soloTurn.value + 1
+      void load(urls[next % urls.length]!).then((ok) => {
+        if (!ok || !solo.value) return
+        soloTurn.value = next
+        turn()
+      })
+    }, SOLO_SLIDE_MS)
+  }
+  turn()
+}, { immediate: true })
 
 const loadedPanels = shallowRef(new Set<string>())
 function onPanelLoad(url: string) {
@@ -238,6 +273,7 @@ watch(() => props.currentTime, () => {
 
 /** A card stands out while its character is heard (all of them, when nobody is). */
 function panelState(panel: StripPanel): 'on' | 'off' | '' {
+  if (solo.value) return 'on'
   if (!heard.value.length || heard.value.length >= cast.value.length) return ''
   return heard.value.includes(panel.characterId) ? 'on' : 'off'
 }
@@ -419,6 +455,7 @@ watch(() => props.currentTime, () => {
 
 onBeforeUnmount(() => {
   stopAll()
+  clearTimeout(soloTimer)
   cancelAnimationFrame(stripFrame)
   serial++
 })
@@ -430,7 +467,7 @@ onBeforeUnmount(() => {
     <div class="ks-floor">
       <img v-if="cover && !stripPanels.length" class="ks-floor-cover" :src="cover" alt="" />
       <div v-else class="ks-floor-row">
-        <img v-for="panel in stripPanels" :key="panel.key" :src="panel.url" alt="" :class="{ shown: loadedPanels.has(panel.url) }" />
+        <img v-for="panel in stripPanels" :key="panel.url" :src="panel.url" alt="" :class="{ shown: loadedPanels.has(panel.url) }" />
       </div>
       <div class="ks-veil"></div>
       <div class="ks-glints">
@@ -445,10 +482,12 @@ onBeforeUnmount(() => {
           v-for="(panel, n) in stripPanels"
           :key="panel.key"
           class="ks-cell"
-          :class="[panelState(panel) && `ks-cell--${panelState(panel)}`, { shown: loadedPanels.has(panel.url) }]"
+          :class="[panelState(panel) && `ks-cell--${panelState(panel)}`, { shown: loadedPanels.has(panel.url), 'ks-cell--solo': solo, 'ks-cell--wide': stripPanels.length <= STRIP_WIDE_UP_TO }]"
           :style="{ '--c': panel.color, '--i': n }"
         >
-          <img class="ks-img" :src="panel.url" alt="" @load="onPanelLoad(panel.url)" @error="onPanelError(panel.url)" />
+          <Transition name="ks-swap">
+            <img :key="panel.url" class="ks-img" :src="panel.url" alt="" @load="onPanelLoad(panel.url)" @error="onPanelError(panel.url)" />
+          </Transition>
           <span class="ks-glow"></span>
           <span class="ks-frame"></span>
           <span v-if="panel.name" class="ks-name">{{ panel.name }}</span>
@@ -686,6 +725,31 @@ onBeforeUnmount(() => {
   animation-delay: calc(var(--i) * -2.7s);
 }
 
+/* One or two singers: the whole illustration, its characters' faces usually in its upper part. */
+.ks-cell--wide .ks-img {
+  object-position: center 22%;
+}
+
+/* A solo's cards hand over slowly; the one going stays whole underneath until covered. */
+.ks-swap-enter-active {
+  z-index: 1;
+  transition: opacity 1.6s ease;
+}
+
+.ks-swap-enter-from {
+  opacity: 0;
+}
+
+.ks-swap-leave-active {
+  animation: kb-hold 1.6s linear;
+}
+
+/* A solo needs no picking out: just the name, and none of the frame. */
+.ks-cell--solo.ks-cell--on .ks-frame,
+.ks-cell--solo.ks-cell--on .ks-glow {
+  opacity: 0;
+}
+
 .kb--still .ks-img,
 .kb--still .ks-band i::after {
   animation-play-state: paused;
@@ -695,6 +759,7 @@ onBeforeUnmount(() => {
 .ks-cell::after {
   content: '';
   position: absolute;
+  z-index: 2;
   inset: 0;
   background: linear-gradient(180deg, rgb(226 222 236 / 0.45), rgb(236 232 243 / 0.7));
   opacity: 0;
@@ -718,6 +783,7 @@ onBeforeUnmount(() => {
 .ks-glow,
 .ks-frame {
   position: absolute;
+  z-index: 2;
   inset: 0;
   opacity: 0;
   transition: opacity 0.4s ease;
@@ -743,6 +809,7 @@ onBeforeUnmount(() => {
 /* Their name, on a tag in their colour, slides up into the corner. */
 .ks-name {
   position: absolute;
+  z-index: 3;
   bottom: max(6px, calc(var(--kb-strip) * 0.05));
   left: max(6px, calc(var(--kb-strip) * 0.04));
   max-width: calc(100% - max(12px, calc(var(--kb-strip) * 0.08)));
