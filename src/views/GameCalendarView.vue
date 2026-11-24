@@ -584,7 +584,7 @@ onMounted(async () => {
             <span class="num font-semibold text-primary">{{ monthAgenda.groups }}</span> 项日程<span class="hidden sm:inline"> · <span class="num font-semibold text-base-content/80">{{ monthAgenda.days }}</span> 天有安排</span>
           </p>
         </div>
-        <div class="hide-scrollbar -mx-3 flex gap-1.5 overflow-x-auto px-3 sm:mx-0 sm:flex-wrap sm:px-0" role="group" aria-label="日程分类">
+        <div class="flex flex-wrap gap-1.5" role="group" aria-label="日程分类">
           <button
             v-for="category in categoryOrder"
             :key="category"
