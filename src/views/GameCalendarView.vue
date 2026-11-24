@@ -2,24 +2,21 @@
 import { displayImageUrl } from '@/utils/derivedAssets'
 import { computed, nextTick, onMounted, ref, type Component } from 'vue'
 import { useModalDialog } from '@/composables/useModalDialog'
-import { Cake, CalendarDays, ChevronLeft, ChevronRight, Gift, Music2, Radio, Sparkles, Trophy, X } from 'lucide-vue-next'
+import { Cake, CalendarDays, CalendarMinus, ChevronDown, ChevronLeft, ChevronRight, Gift, Music2, Radio, Sparkles, Trophy, X } from 'lucide-vue-next'
 import AssetImage from '@/components/AssetImage.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
+import type { EventData, MusicData } from '@/types/master'
 import { cardImageVariant } from '@/utils/card'
+import { getEventBannerUrl } from '@/utils/event'
 import { useCharacterName } from '@/composables/useCharacterName'
 import { SCHEDULE_ZH, useResourceZh } from '@/composables/useResourceZh'
 import ZhText from '@/components/ZhText.vue'
 
 type CalendarCategory = 'event' | 'gacha' | 'music' | 'virtual_live' | 'login_bonus' | 'birthday'
 
-interface EventInfo {
-  id: number
-  name: string
-  startAt: number
-  aggregateAt: number
-}
+type EventInfo = Pick<EventData, 'id' | 'name' | 'startAt' | 'aggregateAt' | 'eventType' | 'assetbundleName'>
 
 interface GachaInfo {
   id: number
@@ -29,11 +26,7 @@ interface GachaInfo {
   isShowPeriod?: boolean
 }
 
-interface MusicInfo {
-  id: number
-  title: string
-  publishedAt: number
-}
+type MusicInfo = Pick<MusicData, 'id' | 'title' | 'publishedAt' | 'assetbundleName'>
 
 interface VirtualLiveSchedule {
   id: number
@@ -108,9 +101,9 @@ interface CalendarEntry {
   category: CalendarCategory
   timestamp: number
   title: string
-  subtitle: string
+  action: '开始' | '结算' | '开放' | '结束' | '发布' | '场次' | '生日'
+  image?: string
   route?: string
-  characterId?: number
   loginBonusId?: number
 }
 
@@ -126,19 +119,21 @@ interface CalendarDay {
   day: number
   currentMonth: boolean
   today: boolean
-  entries: CalendarEntry[]
   groups: EntryGroup[]
   /** 当天出现的分类，手机月历上各画一个色点 */
   categories: CalendarCategory[]
 }
+
+const previewCategoryOrder: CalendarCategory[] = ['event', 'birthday', 'music', 'gacha', 'login_bonus', 'virtual_live']
 
 const { characterName: formatCharacterName } = useCharacterName()
 const masterStore = useMasterStore()
 const settingsStore = useSettingsStore()
 const { resourceDisplayZh } = useResourceZh()
 const today = new Date()
+const todayKey = toDateKey(today)
 const currentMonth = ref(new Date(today.getFullYear(), today.getMonth(), 1))
-const selectedDateKey = ref(toDateKey(today))
+const selectedDateKey = ref(todayKey)
 const isLoading = ref(true)
 const loadError = ref('')
 const events = ref<EventInfo[]>([])
@@ -148,6 +143,8 @@ const virtualLives = ref<VirtualLiveInfo[]>([])
 const characters = ref<CharacterInfo[]>([])
 const characterProfiles = ref<CharacterProfile[]>([])
 const loginBonuses = ref<LoginBonusInfo[]>([])
+const assetsHost = computed(() => settingsStore.assetsHost)
+const failedAgendaImages = ref(new Set<string>())
 const selectedLoginBonusId = ref(0)
 const resourceBoxes = ref<ResourceBox[]>([])
 const resourceMaps = ref(new Map<string, Map<number, NamedResource>>())
@@ -163,13 +160,13 @@ const categoryEnabled = ref<Record<CalendarCategory, boolean>>({
   birthday: true,
 })
 
-const categoryMeta: Record<CalendarCategory, { label: string; dot: string; text: string; content: string }> = {
-  event: { label: '活动', dot: 'bg-primary', text: 'text-primary', content: 'text-primary-content' },
-  gacha: { label: '卡池', dot: 'bg-secondary', text: 'text-secondary', content: 'text-secondary-content' },
-  music: { label: '歌曲', dot: 'bg-info', text: 'text-info', content: 'text-info-content' },
-  virtual_live: { label: 'Virtual Live', dot: 'bg-warning', text: 'text-warning', content: 'text-warning-content' },
-  login_bonus: { label: '登录活动', dot: 'bg-accent', text: 'text-accent', content: 'text-accent-content' },
-  birthday: { label: '生日', dot: 'bg-success', text: 'text-success', content: 'text-success-content' },
+const categoryMeta: Record<CalendarCategory, { label: string; dot: string; text: string }> = {
+  event: { label: '活动', dot: 'bg-primary', text: 'text-primary' },
+  gacha: { label: '卡池', dot: 'bg-secondary', text: 'text-secondary' },
+  music: { label: '歌曲', dot: 'bg-info', text: 'text-info' },
+  virtual_live: { label: 'Virtual Live', dot: 'bg-warning', text: 'text-warning' },
+  login_bonus: { label: '登录活动', dot: 'bg-accent', text: 'text-accent' },
+  birthday: { label: '生日', dot: 'bg-success', text: 'text-success' },
 }
 const categoryIcons: Record<CalendarCategory, Component> = {
   event: Trophy,
@@ -204,29 +201,44 @@ function characterIcon(characterId: number): string {
 const permanentEntries = computed<CalendarEntry[]>(() => {
   const rows: CalendarEntry[] = []
   for (const event of events.value) {
-    rows.push({ key: `event-start-${event.id}`, category: 'event', timestamp: Number(event.startAt), title: event.name, subtitle: '活动开始', route: `/events/${event.id}` })
-    rows.push({ key: `event-end-${event.id}`, category: 'event', timestamp: Number(event.aggregateAt), title: event.name, subtitle: '活动结算', route: `/events/${event.id}` })
+    const shared = {
+      category: 'event' as const,
+      title: event.name,
+      route: `/events/${event.id}`,
+      image: getEventBannerUrl(event, assetsHost.value),
+    }
+    rows.push({ ...shared, key: `event-start-${event.id}`, timestamp: Number(event.startAt), action: '开始' })
+    rows.push({ ...shared, key: `event-end-${event.id}`, timestamp: Number(event.aggregateAt), action: '结算' })
   }
   for (const gacha of gachas.value.filter(row => row.isShowPeriod !== false)) {
-    rows.push({ key: `gacha-start-${gacha.id}`, category: 'gacha', timestamp: Number(gacha.startAt), title: gacha.name, subtitle: '卡池开放', route: `/gachas/${gacha.id}` })
-    rows.push({ key: `gacha-end-${gacha.id}`, category: 'gacha', timestamp: Number(gacha.endAt), title: gacha.name, subtitle: '卡池结束', route: `/gachas/${gacha.id}` })
+    rows.push({ key: `gacha-start-${gacha.id}`, category: 'gacha', timestamp: Number(gacha.startAt), title: gacha.name, action: '开放', route: `/gachas/${gacha.id}` })
+    rows.push({ key: `gacha-end-${gacha.id}`, category: 'gacha', timestamp: Number(gacha.endAt), title: gacha.name, action: '结束', route: `/gachas/${gacha.id}` })
   }
   for (const music of musics.value) {
-    rows.push({ key: `music-${music.id}`, category: 'music', timestamp: Number(music.publishedAt), title: music.title, subtitle: '歌曲发布', route: `/musics/${music.id}` })
+    const bundle = music.assetbundleName
+    rows.push({
+      key: `music-${music.id}`,
+      category: 'music',
+      timestamp: Number(music.publishedAt),
+      title: music.title,
+      action: '发布',
+      route: `/musics/${music.id}`,
+      image: bundle ? displayImageUrl(`${assetsHost.value}/startapp/music/jacket/${bundle}/${bundle}.png`) : undefined,
+    })
   }
   for (const live of virtualLives.value) {
     const schedules = Array.isArray(live.virtualLiveSchedules) ? live.virtualLiveSchedules : []
     if (schedules.length) {
       for (const schedule of schedules) {
-        rows.push({ key: `vlive-${live.id}-${schedule.id}`, category: 'virtual_live', timestamp: Number(schedule.startAt), title: live.name, subtitle: 'Virtual Live 场次', route: `/vlives/${live.id}` })
+        rows.push({ key: `vlive-${live.id}-${schedule.id}`, category: 'virtual_live', timestamp: Number(schedule.startAt), title: live.name, action: '场次', route: `/vlives/${live.id}` })
       }
     } else if (live.startAt) {
-      rows.push({ key: `vlive-${live.id}`, category: 'virtual_live', timestamp: Number(live.startAt), title: live.name, subtitle: 'Virtual Live 开始', route: `/vlives/${live.id}` })
+      rows.push({ key: `vlive-${live.id}`, category: 'virtual_live', timestamp: Number(live.startAt), title: live.name, action: '开始', route: `/vlives/${live.id}` })
     }
   }
   for (const campaign of loginBonuses.value) {
-    rows.push({ key: `login-bonus-start-${campaign.id}`, category: 'login_bonus', timestamp: Number(campaign.startAt), title: campaign.name, subtitle: '登录活动开始', loginBonusId: campaign.id })
-    rows.push({ key: `login-bonus-end-${campaign.id}`, category: 'login_bonus', timestamp: Number(campaign.endAt), title: campaign.name, subtitle: '登录活动结束', loginBonusId: campaign.id })
+    rows.push({ key: `login-bonus-start-${campaign.id}`, category: 'login_bonus', timestamp: Number(campaign.startAt), title: campaign.name, action: '开始', loginBonusId: campaign.id })
+    rows.push({ key: `login-bonus-end-${campaign.id}`, category: 'login_bonus', timestamp: Number(campaign.endAt), title: campaign.name, action: '结束', loginBonusId: campaign.id })
   }
   return rows.filter(row => Number.isFinite(row.timestamp) && row.timestamp > 0)
 })
@@ -242,9 +254,9 @@ const birthdayEntries = computed<CalendarEntry[]>(() => {
       category: 'birthday' as const,
       timestamp,
       title: `${characterName(profile.characterId)}的生日`,
-      subtitle: '角色生日',
+      action: '生日',
       route: `/characters/${profile.characterId}`,
-      characterId: profile.characterId,
+      image: characterIcon(profile.characterId),
     }]
   })
 })
@@ -271,12 +283,16 @@ const entriesByDate = computed(() => {
 function groupEntries(entries: CalendarEntry[]): EntryGroup[] {
   const groups = new Map<string, EntryGroup>()
   for (const entry of entries) {
-    const key = `${entry.category}|${entry.subtitle}|${entry.title}|${entry.route ?? entry.loginBonusId ?? ''}`
+    const key = `${entry.category}|${entry.action}|${entry.title}|${entry.route ?? entry.loginBonusId ?? ''}`
     const group = groups.get(key)
     if (group) group.times.push(timeLabel(entry))
     else groups.set(key, { entry, times: [timeLabel(entry)] })
   }
   return [...groups.values()]
+}
+
+function isEnding(entry: CalendarEntry): boolean {
+  return entry.action === '结束' || entry.action === '结算'
 }
 
 const calendarDays = computed<CalendarDay[]>(() => {
@@ -288,22 +304,66 @@ const calendarDays = computed<CalendarDay[]>(() => {
     const date = new Date(year, month, index - mondayOffset + 1)
     const key = toDateKey(date)
     const entries = entriesByDate.value.get(key) || []
+    const groups = groupEntries(entries)
     return {
       key,
       date,
       day: date.getDate(),
       currentMonth: date.getMonth() === month,
-      today: key === toDateKey(today),
-      entries,
-      groups: groupEntries(entries),
+      today: key === todayKey,
+      groups,
       categories: categoryOrder.filter(category => entries.some(entry => entry.category === category)),
     }
   })
 })
 
-const visibleMonthEntries = computed(() => {
-  const key = monthKey(currentMonth.value)
-  return filteredEntries.value.filter(row => toDateKey(row.timestamp).startsWith(key)).sort((a, b) => a.timestamp - b.timestamp)
+function dayPreviewLabel(group: EntryGroup): string {
+  const { category, action } = group.entry
+  if (category === 'virtual_live') return `演出 · ${group.times.length} 场`
+  if (category === 'birthday') return '角色生日'
+  return `${categoryMeta[category].label}${action}`
+}
+
+const unfilteredAgendaDates = computed(() => new Set(spoilerSafeEntries.value.map(entry => toDateKey(entry.timestamp))))
+const emptyDayLabels = {
+  future: '未来日程已隐藏',
+  filtered: '无匹配日程',
+  empty: '暂无日程',
+}
+
+function emptyAgendaReason(dateKey: string): keyof typeof emptyDayLabels {
+  if (!settingsStore.showSpoilers && dateKey > todayKey) return 'future'
+  return unfilteredAgendaDates.value.has(dateKey) ? 'filtered' : 'empty'
+}
+
+const desktopDays = computed(() => {
+  const days = calendarDays.value
+  const lastInMonth = days.map(day => day.currentMonth).lastIndexOf(true)
+  const cellCount = Math.ceil((lastInMonth + 1) / 7) * 7
+
+  return days.slice(0, cellCount).map((day, index) => {
+    let preview: EntryGroup | undefined
+    if (day.currentMonth) {
+      for (const category of previewCategoryOrder) {
+        preview = day.groups.find(group => group.entry.category === category && !isEnding(group.entry))
+        if (preview) break
+      }
+      preview ??= day.groups[0]
+    }
+    const previewLabel = preview ? dayPreviewLabel(preview) : ''
+    const emptyLabel = day.currentMonth && !day.groups.length ? emptyDayLabels[emptyAgendaReason(day.key)] : ''
+    const accessibleLabel = [
+      `${day.date.getMonth() + 1}月${day.day}日`,
+      emptyLabel || `${day.groups.length} 项日程`,
+      ...(preview ? [`${previewLabel}：${preview.entry.title}`] : []),
+    ].join('，')
+    return { ...day, weekend: index % 7 >= 5, preview, previewLabel, emptyLabel, accessibleLabel }
+  })
+})
+
+const monthAgenda = computed(() => {
+  const days = calendarDays.value.filter(day => day.currentMonth && day.groups.length > 0)
+  return { days: days.length, groups: days.reduce((total, day) => total + day.groups.length, 0) }
 })
 
 const monthCategoryCounts = computed(() => {
@@ -315,18 +375,19 @@ const monthCategoryCounts = computed(() => {
   return result
 })
 
-const activeDays = computed(() => new Set(visibleMonthEntries.value.map(entry => toDateKey(entry.timestamp))).size)
-const selectedGroups = computed(() => groupEntries(entriesByDate.value.get(selectedDateKey.value) || []))
-const isViewingToday = computed(() => (
-  selectedDateKey.value === toDateKey(today) && monthKey(currentMonth.value) === monthKey(today)
-))
+const selectedGroups = computed(() => calendarDays.value.find(day => day.key === selectedDateKey.value)?.groups ?? [])
+const isViewingToday = computed(() => selectedDateKey.value === todayKey)
+const agendaEmptyText = computed(() => {
+  const reason = emptyAgendaReason(selectedDateKey.value)
+  if (reason === 'future') return emptyDayLabels.future
+  return reason === 'filtered' ? '当天有日程，但已被筛选条件隐藏' : '当天没有日程'
+})
 const selectedDateLabel = computed(() => {
   const [year, month, day] = selectedDateKey.value.split('-').map(Number)
   return new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' }).format(new Date(year || 0, (month || 1) - 1, day || 1))
 })
 const monthLabel = computed(() => new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: 'long' }).format(currentMonth.value))
 const canGoNextMonth = computed(() => settingsStore.showSpoilers || monthKey(currentMonth.value) < monthKey(today))
-const assetsHost = computed(() => settingsStore.assetsHost)
 const selectedLoginBonus = computed(() => loginBonuses.value.find(row => row.id === selectedLoginBonusId.value) || null)
 const { onDialogClose: onLoginBonusDialogClose } = useModalDialog('loginBonusDialog', () => !!selectedLoginBonus.value, () => { selectedLoginBonusId.value = 0 })
 const loginBonusBoxMap = computed(() => new Map(resourceBoxes.value
@@ -352,7 +413,7 @@ function setMonth(offset: number) {
 
 function goToday() {
   currentMonth.value = new Date(today.getFullYear(), today.getMonth(), 1)
-  selectedDateKey.value = toDateKey(today)
+  selectedDateKey.value = todayKey
 }
 
 const detailPanelRef = ref<HTMLElement | null>(null)
@@ -512,7 +573,7 @@ onMounted(async () => {
     <template v-else>
       <!-- 月份切换 + 分类筛选 -->
       <div class="panel space-y-3 p-3 sm:p-4">
-        <div class="flex items-center gap-2">
+        <div class="flex flex-wrap items-center gap-2">
           <div class="cal-month">
             <button type="button" class="cal-month__btn" aria-label="上个月" @click="setMonth(-1)"><ChevronLeft class="h-4 w-4" /></button>
             <span class="cal-month__label num" aria-live="polite">{{ monthLabel }}</span>
@@ -520,7 +581,7 @@ onMounted(async () => {
           </div>
           <button type="button" class="chip" :class="{ 'is-off': isViewingToday }" :disabled="isViewingToday" @click="goToday">今天</button>
           <p class="ml-auto text-right text-xs leading-5 text-base-content/55">
-            <span class="num font-semibold text-primary">{{ visibleMonthEntries.length }}</span> 条日程<span class="hidden sm:inline"> · <span class="num font-semibold text-base-content/80">{{ activeDays }}</span> 天有安排</span>
+            <span class="num font-semibold text-primary">{{ monthAgenda.groups }}</span> 项日程<span class="hidden sm:inline"> · <span class="num font-semibold text-base-content/80">{{ monthAgenda.days }}</span> 天有安排</span>
           </p>
         </div>
         <div class="hide-scrollbar -mx-3 flex gap-1.5 overflow-x-auto px-3 sm:mx-0 sm:flex-wrap sm:px-0" role="group" aria-label="日程分类">
@@ -535,23 +596,68 @@ onMounted(async () => {
           >
             <span class="h-2 w-2 rounded-full" :class="categoryMeta[category].dot"></span>
             {{ categoryMeta[category].label }}
-            <span class="chip__count">{{ monthCategoryCounts[category] }}</span>
+            <span class="chip__count">{{ monthCategoryCounts[category] }}{{ category === 'virtual_live' ? ' 场' : '' }}</span>
           </button>
         </div>
         <p v-if="!settingsStore.showSpoilers" class="text-xs text-base-content/45">剧透已关闭，只显示已经发生的日程；可在<RouterLink to="/settings" class="link">设置</RouterLink>中开启未来内容。</p>
       </div>
 
-      <div class="grid grid-cols-1 items-start gap-4 md:gap-5 xl:h-[calc(100dvh-6rem)] xl:min-h-[40rem] xl:max-h-[50rem] xl:grid-cols-[minmax(0,1fr)_20rem] xl:grid-rows-1 xl:items-stretch">
-        <!-- 桌面 / 平板：大月历，格子里直接列出当天的日程 -->
-        <div class="card hidden overflow-hidden border border-base-200 bg-base-100 md:flex md:flex-col xl:min-h-0 xl:self-stretch">
-          <div class="grid grid-cols-7 border-b border-base-200 bg-base-200/55"><div v-for="weekday in weekdayLabels" :key="weekday" class="py-2 text-center text-xs font-bold text-base-content/55">周{{ weekday }}</div></div>
-          <div class="grid flex-1 grid-cols-7 xl:min-h-0 xl:grid-rows-6">
-            <button v-for="day in calendarDays" :key="day.key" class="flex min-h-32 flex-col items-stretch justify-start overflow-hidden border-r border-b border-base-200 p-2 text-left transition-colors xl:min-h-0" :class="[day.currentMonth ? 'bg-base-100 hover:bg-base-200/45' : 'bg-base-200/35 text-base-content/30', selectedDateKey === day.key ? 'ring-2 ring-inset ring-primary' : '']" @click="selectDay(day)">
-              <span class="inline-grid place-items-center w-6 h-6 rounded-full text-xs font-bold" :class="day.today ? 'bg-primary text-primary-content' : ''">{{ day.day }}</span>
-              <div class="mt-1 space-y-1">
-                <div v-for="group in day.groups.slice(0, 3)" :key="group.entry.key" class="flex items-center gap-1 min-w-0 text-[10px] leading-4"><span class="w-1.5 h-1.5 rounded-full shrink-0" :class="categoryMeta[group.entry.category].dot"></span><span class="truncate"><ZhText :text="group.entry.title" v-bind="SCHEDULE_ZH[group.entry.category] || {}" layout="inline" /></span><span v-if="group.times.length > 1" class="num shrink-0 text-base-content/45">×{{ group.times.length }}</span></div>
-                <p v-if="day.groups.length > 3" class="text-[10px] text-primary font-bold">+{{ day.groups.length - 3 }} 项</p>
-              </div>
+      <div class="cal-layout grid grid-cols-1 items-start gap-4 md:gap-5 xl:grid-cols-[minmax(0,1fr)_20rem]">
+        <!-- 桌面月历每天突出一项，其余日程在选中当天后查看。 -->
+        <div class="cal-month-surface card hidden overflow-hidden border border-base-200 bg-base-100 md:block">
+          <div class="grid grid-cols-7 border-b border-base-200">
+            <div
+              v-for="(weekday, index) in weekdayLabels"
+              :key="weekday"
+              class="cal-weekday"
+              :class="{ 'is-weekend': index >= 5 }"
+            >
+              周{{ weekday }}
+            </div>
+          </div>
+          <div class="grid grid-cols-7 gap-px bg-base-200">
+            <button
+              v-for="day in desktopDays"
+              :key="day.key"
+              type="button"
+              class="cal-day"
+              :class="{
+                'is-outside': !day.currentMonth,
+                'is-weekend': day.weekend,
+                'is-selected': selectedDateKey === day.key,
+              }"
+              :aria-label="day.accessibleLabel"
+              :aria-current="day.today ? 'date' : undefined"
+              :aria-pressed="selectedDateKey === day.key"
+              @click="selectDay(day)"
+            >
+              <span class="cal-day__top">
+                <span class="cal-day__number num" :class="{ 'is-today': day.today }">{{ day.day }}</span>
+                <span
+                  v-if="day.preview?.entry.image && !failedAgendaImages.has(day.preview.entry.image)"
+                  class="cal-day__art"
+                  :class="{ 'is-banner': day.preview.entry.category === 'event', 'is-avatar': day.preview.entry.category === 'birthday' }"
+                >
+                  <AssetImage :src="day.preview.entry.image" class="block size-full object-cover" @error="failedAgendaImages.add(day.preview.entry.image)" />
+                </span>
+                <span v-else-if="day.preview" class="cal-day__art is-icon" :class="categoryMeta[day.preview.entry.category].text" aria-hidden="true">
+                  <component :is="categoryIcons[day.preview.entry.category]" class="size-4" />
+                </span>
+              </span>
+              <span v-if="day.preview" class="cal-day__preview">
+                <span class="cal-day__label" :class="isEnding(day.preview.entry) ? 'text-base-content/55' : categoryMeta[day.preview.entry.category].text">
+                  <component :is="categoryIcons[day.preview.entry.category]" aria-hidden="true" class="size-3 shrink-0" />
+                  <span class="truncate">{{ day.previewLabel }}</span>
+                </span>
+                <span class="cal-day__title" :title="day.preview.entry.title">
+                  <ZhText :text="day.preview.entry.title" v-bind="SCHEDULE_ZH[day.preview.entry.category] || {}" layout="inline" />
+                </span>
+              </span>
+              <span v-else-if="day.emptyLabel" class="cal-day__empty">
+                <CalendarMinus aria-hidden="true" class="size-5" />
+                <span>{{ day.emptyLabel }}</span>
+              </span>
+              <span v-if="day.preview && day.groups.length > 1" class="cal-day__more num">另有 {{ day.groups.length - 1 }} 项</span>
             </button>
           </div>
         </div>
@@ -584,46 +690,61 @@ onMounted(async () => {
           </div>
         </div>
 
-        <aside ref="detailPanelRef" class="card border border-base-200 bg-base-100 xl:min-h-0 xl:self-stretch xl:overflow-hidden">
-          <div class="card-body flex flex-col gap-2 p-4 xl:h-full xl:min-h-0 xl:overflow-hidden">
-            <div class="flex shrink-0 items-baseline justify-between gap-2">
-              <h2 class="font-bold">{{ selectedDateLabel }}</h2>
-              <span v-if="selectedGroups.length" class="shrink-0 text-xs text-base-content/50"><span class="num">{{ selectedGroups.length }}</span> 项</span>
-            </div>
-            <div v-if="selectedGroups.length" class="divide-y divide-base-200 xl:min-h-0 xl:flex-1 xl:overflow-y-auto xl:overscroll-contain xl:pr-1 [scrollbar-gutter:stable]">
+        <aside ref="detailPanelRef" class="card min-w-0 border border-base-200 bg-base-100 xl:max-h-full xl:overflow-hidden" aria-labelledby="agenda-heading">
+          <div class="flex shrink-0 flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b border-base-200 px-4 py-3.5">
+            <h2 id="agenda-heading" class="flex items-center gap-2 text-sm font-bold">
+              <CalendarDays aria-hidden="true" class="size-4 shrink-0 text-primary" />
+              <span>{{ selectedDateLabel }}</span>
+            </h2>
+            <span v-if="selectedGroups.length" class="num text-xs text-base-content/60">{{ selectedGroups.length }} 项日程</span>
+          </div>
+          <ul v-if="selectedGroups.length" :key="selectedDateKey" class="divide-y divide-base-200 px-4 xl:min-h-0 xl:overflow-y-auto xl:overscroll-contain">
+            <li v-for="group in selectedGroups" :key="group.entry.key" class="py-3">
               <component
                 :is="group.entry.route ? 'RouterLink' : 'button'"
-                v-for="group in selectedGroups"
-                :key="group.entry.key"
                 :to="group.entry.route || undefined"
                 :type="group.entry.route ? undefined : 'button'"
-                class="group flex w-full gap-3 py-3 text-left"
+                class="group flex w-full items-start gap-3 text-left"
                 @click="group.entry.route ? undefined : openLoginBonus(group.entry.loginBonusId)"
               >
-                <img v-if="group.entry.characterId" :src="characterIcon(group.entry.characterId)" :alt="group.entry.title" class="h-10 w-10 shrink-0 rounded-full bg-base-200" />
-                <span v-else class="cal-entry-icon" :class="[categoryMeta[group.entry.category].dot, categoryMeta[group.entry.category].content]">
-                  <component :is="categoryIcons[group.entry.category]" class="h-[1.125rem] w-[1.125rem]" />
+                <span
+                  v-if="group.entry.image && !failedAgendaImages.has(group.entry.image)"
+                  class="cal-entry-art"
+                  :class="{ 'is-banner': group.entry.category === 'event', 'is-avatar': group.entry.category === 'birthday' }"
+                >
+                  <AssetImage :src="group.entry.image" class="block size-full object-cover" @error="failedAgendaImages.add(group.entry.image)" />
+                </span>
+                <span v-else class="cal-entry-icon" :class="categoryMeta[group.entry.category].text">
+                  <component :is="categoryIcons[group.entry.category]" aria-hidden="true" class="size-[1.125rem]" />
                 </span>
                 <span class="min-w-0 flex-1">
-                  <span class="flex items-center gap-2 text-xs text-base-content/55">
-                    <span class="font-semibold" :class="categoryMeta[group.entry.category].text">{{ group.entry.subtitle }}</span>
-                    <span v-if="group.times.length === 1" class="num">{{ group.times[0] }}</span>
-                    <span v-else class="num">{{ group.times.length }} 场</span>
+                  <span class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-xs">
+                    <span class="font-semibold" :class="isEnding(group.entry) ? 'text-base-content/60' : categoryMeta[group.entry.category].text">
+                      {{ categoryMeta[group.entry.category].label }}<template v-if="group.entry.category !== 'birthday'"> · {{ group.entry.action }}</template>
+                    </span>
+                    <span v-if="group.times.length === 1" class="num text-base-content/65">{{ group.times[0] }}</span>
                   </span>
-                  <span class="mt-0.5 block text-sm font-medium leading-snug group-hover:text-primary"><ZhText :text="group.entry.title" v-bind="SCHEDULE_ZH[group.entry.category] || {}" sub-class="text-xs font-normal" /></span>
-                  <!-- 同一场 Virtual Live 一天开很多场：合成一条，把开场时间列出来 -->
-                  <span v-if="group.times.length > 1" class="mt-1.5 flex flex-wrap gap-1">
-                    <span v-for="time in group.times" :key="time" class="cal-time num">{{ time }}</span>
+                  <span class="mt-1 block text-sm font-medium leading-snug wrap-anywhere group-hover:text-primary">
+                    <ZhText :text="group.entry.title" v-bind="SCHEDULE_ZH[group.entry.category] || {}" sub-class="text-xs font-normal" />
                   </span>
-                  <span v-if="!group.entry.route" class="mt-0.5 block text-xs text-base-content/45">点击查看每日奖励</span>
                 </span>
-                <ChevronRight class="mt-1 h-4 w-4 shrink-0 text-base-content/25 group-hover:text-primary" />
+                <ChevronRight aria-hidden="true" class="mt-1 size-4 shrink-0 text-base-content/35 group-hover:text-primary" />
               </component>
-            </div>
-            <div v-else class="empty-state py-8!">
-              <CalendarDays />
-              <p>这一天没有符合筛选条件的日程</p>
-            </div>
+              <details v-if="group.times.length > 1" class="cal-sessions mt-2">
+                <summary class="flex w-fit cursor-pointer list-none items-center gap-1.5 rounded-md px-2 py-1 text-xs font-semibold hover:bg-base-200">
+                  <ChevronDown aria-hidden="true" class="cal-sessions__chevron size-3.5" />
+                  <span class="num">{{ group.times.length }} 场</span>
+                  <span class="num font-normal text-base-content/65">{{ group.times[0] }} 起</span>
+                </summary>
+                <div class="mt-1.5 flex flex-wrap gap-1 px-2">
+                  <span v-for="(time, index) in group.times" :key="index" class="cal-time num">{{ time }}</span>
+                </div>
+              </details>
+            </li>
+          </ul>
+          <div v-else class="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm text-base-content/65">
+            <p>{{ agendaEmptyText }}</p>
+            <button v-if="!isViewingToday" type="button" class="btn btn-ghost btn-sm text-primary" @click="goToday">返回今天</button>
           </div>
         </aside>
       </div>
@@ -756,14 +877,197 @@ onMounted(async () => {
   border-radius: 999px;
 }
 
-/* 详情列表里每条日程前面的分类图标 */
+@media (min-width: 80rem) {
+  .cal-layout > aside {
+    max-height: clamp(40rem, calc(100dvh - 6rem), 50rem);
+  }
+}
+
+.cal-month-surface {
+  --calendar-weekend: color-mix(in oklab, var(--color-primary) 3%, var(--color-base-100));
+}
+
+.cal-weekday {
+  padding: 0.625rem 0.375rem;
+  color: color-mix(in oklab, var(--color-base-content) 68%, transparent);
+  text-align: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.cal-weekday.is-weekend {
+  background-color: var(--calendar-weekend);
+  color: var(--color-primary);
+}
+
+.cal-day {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  min-height: 6.125rem;
+  grid-template-rows: auto auto 1fr;
+  gap: 0.25rem;
+  padding: 0.5rem clamp(0.375rem, 0.9vw, 0.75rem);
+  background-color: var(--color-base-100);
+  text-align: start;
+  transition: background-color 0.12s ease;
+}
+
+.cal-day.is-weekend {
+  background-color: var(--calendar-weekend);
+}
+
+.cal-day.is-outside {
+  background-color: color-mix(in oklab, var(--color-base-200) 48%, var(--color-base-100));
+  color: color-mix(in oklab, var(--color-base-content) 45%, transparent);
+}
+
+.cal-day:hover {
+  background-color: color-mix(in oklab, var(--color-primary) 6%, var(--color-base-100));
+}
+
+.cal-day.is-selected {
+  background-color: color-mix(in oklab, var(--color-primary) 10%, var(--color-base-100));
+  box-shadow: inset 0 3px 0 var(--color-primary);
+}
+
+.cal-day:focus-visible {
+  outline-offset: -2px;
+}
+
+.cal-day__top {
+  display: flex;
+  min-height: 1.75rem;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.25rem;
+}
+
+.cal-day__number {
+  display: grid;
+  width: 1.625rem;
+  height: 1.625rem;
+  flex: none;
+  place-items: center;
+  border-radius: 50%;
+  color: inherit;
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.cal-day__number.is-today {
+  background-color: var(--color-primary);
+  color: var(--color-primary-content);
+  font-weight: 750;
+}
+
+.cal-day__art {
+  width: 1.75rem;
+  height: 1.75rem;
+  min-width: 0;
+  overflow: hidden;
+  border-radius: var(--radius-field);
+  background-color: var(--color-base-200);
+}
+
+.cal-day__art.is-icon {
+  display: grid;
+  place-items: center;
+  background-color: color-mix(in oklab, currentColor 10%, transparent);
+}
+
+.cal-day__art.is-banner {
+  width: 3.25rem;
+}
+
+.cal-day__art.is-avatar {
+  border-radius: 50%;
+}
+
+.cal-day__preview {
+  display: grid;
+  min-width: 0;
+  gap: 0.125rem;
+}
+
+.cal-day__label {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.625rem;
+  font-weight: 650;
+  line-height: 0.875rem;
+}
+
+.cal-day__title {
+  display: -webkit-box;
+  min-width: 0;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font-size: 0.75rem;
+  font-weight: 580;
+  line-height: 1rem;
+}
+
+.cal-day__empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 0.125rem;
+  padding: 0.25rem;
+  color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+  text-align: center;
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+
+.cal-day__more {
+  align-self: end;
+  color: color-mix(in oklab, var(--color-base-content) 62%, transparent);
+  font-size: 0.625rem;
+  line-height: 0.875rem;
+}
+
+.cal-entry-art,
 .cal-entry-icon {
   display: grid;
   flex: none;
   place-items: center;
   width: 2.5rem;
   height: 2.5rem;
-  border-radius: 0.75rem;
+  overflow: hidden;
+  border-radius: var(--radius-field);
+}
+
+.cal-entry-art {
+  background-color: var(--color-base-200);
+}
+
+.cal-entry-art.is-banner {
+  width: 4rem;
+  height: 2rem;
+}
+
+.cal-entry-art.is-avatar {
+  border-radius: 50%;
+}
+
+.cal-entry-icon {
+  background-color: color-mix(in oklab, currentColor 10%, transparent);
+}
+
+.cal-sessions > summary::-webkit-details-marker {
+  display: none;
+}
+
+.cal-sessions[open] .cal-sessions__chevron {
+  transform: rotate(180deg);
 }
 
 .cal-time {
