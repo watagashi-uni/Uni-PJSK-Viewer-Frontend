@@ -34,7 +34,7 @@ let nowTimer: ReturnType<typeof setInterval> | undefined
 // 最新公告：官方常在开始前几分钟放出，跟着每分钟的计时一起刷新
 const notices = ref<InformationItem[] | null>(null)
 const noticesFailed = ref(false)
-const HOME_NOTICE_COUNT = 5
+const HOME_NOTICE_COUNT = 7
 // 官方提前放出、还没到开始时间的公告跟其他未公开内容一样，没开剧透时不显示
 const homeNotices = computed(() => (notices.value ?? [])
   .filter(item => item.type !== 'content' && !item.goneAt && !(item.endAt && item.endAt < now.value))
@@ -188,14 +188,14 @@ const upcomingScheduleItems = computed(() => {
   return allScheduleItems.value
     .filter(row => row.timestamp > now.value && row.timestamp <= horizon)
     .sort((a, b) => a.timestamp - b.timestamp)
-    .slice(0, 7)
+    .slice(0, 8)
 })
 
 const recentScheduleItems = computed(() => {
   return allScheduleItems.value
     .filter(row => row.timestamp <= now.value)
     .sort((a, b) => b.timestamp - a.timestamp)
-    .slice(0, 7)
+    .slice(0, 8)
 })
 
 const isShowingUpcomingSchedule = computed(() => settingsStore.showSpoilers && upcomingScheduleItems.value.length > 0)
@@ -515,7 +515,7 @@ onMounted(async () => {
                 />
                 <span class="home-song__text">
                   <!-- 封面格子比较窄，译名另起一行，不跟原名挤在同一行里被截掉 -->
-                  <span class="block truncate text-sm font-medium group-hover:text-primary" :title="music.title"><ZhText :text="music.title" table="musics" path="title" :layout="isWide ? 'stack' : 'inline'" main-class="truncate" sub-class="truncate" /></span>
+                  <span class="home-song__name block truncate text-sm font-medium group-hover:text-primary" :title="music.title"><ZhText :text="music.title" table="musics" path="title" :layout="isWide ? 'stack' : 'inline'" main-class="truncate" sub-class="truncate" /></span>
                   <span class="block truncate text-xs text-base-content/50">{{ music.composer }}</span>
                 </span>
                 <span class="home-song__date">{{ scheduleDay(music.publishedAt) }}</span>
@@ -760,6 +760,10 @@ onMounted(async () => {
   .home-song__text {
     padding: 0.375rem 0.625rem 0.5rem;
     border-top: 1px solid var(--color-base-300);
+  }
+  .home-song__name {
+    height: 2.5rem;
+    overflow: hidden;
   }
 
   .home-song__date {
