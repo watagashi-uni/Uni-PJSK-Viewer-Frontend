@@ -9,7 +9,7 @@ import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
 import type { EventData, MusicData } from '@/types/master'
 import { cardImageVariant } from '@/utils/card'
-import { getEventBannerUrl } from '@/utils/event'
+import { getEventLogoUrl } from '@/utils/event'
 import { useCharacterName } from '@/composables/useCharacterName'
 import { SCHEDULE_ZH, useResourceZh } from '@/composables/useResourceZh'
 import ZhText from '@/components/ZhText.vue'
@@ -205,7 +205,7 @@ const permanentEntries = computed<CalendarEntry[]>(() => {
       category: 'event' as const,
       title: event.name,
       route: `/events/${event.id}`,
-      image: getEventBannerUrl(event, assetsHost.value),
+      image: getEventLogoUrl(event, assetsHost.value),
     }
     rows.push({ ...shared, key: `event-start-${event.id}`, timestamp: Number(event.startAt), action: '开始' })
     rows.push({ ...shared, key: `event-end-${event.id}`, timestamp: Number(event.aggregateAt), action: '结算' })
@@ -636,9 +636,9 @@ onMounted(async () => {
                 <span
                   v-if="day.preview?.entry.image && !failedAgendaImages.has(day.preview.entry.image)"
                   class="cal-day__art"
-                  :class="{ 'is-banner': day.preview.entry.category === 'event', 'is-avatar': day.preview.entry.category === 'birthday' }"
+                  :class="{ 'is-event-logo': day.preview.entry.category === 'event', 'is-avatar': day.preview.entry.category === 'birthday' }"
                 >
-                  <AssetImage :src="day.preview.entry.image" class="block size-full object-cover" @error="failedAgendaImages.add(day.preview.entry.image)" />
+                  <AssetImage :src="day.preview.entry.image" class="block size-full" :class="day.preview.entry.category === 'event' ? 'object-contain' : 'object-cover'" @error="failedAgendaImages.add(day.preview.entry.image)" />
                 </span>
                 <span v-else-if="day.preview" class="cal-day__art is-icon" :class="categoryMeta[day.preview.entry.category].text" aria-hidden="true">
                   <component :is="categoryIcons[day.preview.entry.category]" class="size-4" />
@@ -710,9 +710,9 @@ onMounted(async () => {
                 <span
                   v-if="group.entry.image && !failedAgendaImages.has(group.entry.image)"
                   class="cal-entry-art"
-                  :class="{ 'is-banner': group.entry.category === 'event', 'is-avatar': group.entry.category === 'birthday' }"
+                  :class="{ 'is-event-logo': group.entry.category === 'event', 'is-avatar': group.entry.category === 'birthday' }"
                 >
-                  <AssetImage :src="group.entry.image" class="block size-full object-cover" @error="failedAgendaImages.add(group.entry.image)" />
+                  <AssetImage :src="group.entry.image" class="block size-full" :class="group.entry.category === 'event' ? 'object-contain' : 'object-cover'" @error="failedAgendaImages.add(group.entry.image)" />
                 </span>
                 <span v-else class="cal-entry-icon" :class="categoryMeta[group.entry.category].text">
                   <component :is="categoryIcons[group.entry.category]" aria-hidden="true" class="size-[1.125rem]" />
@@ -987,7 +987,13 @@ onMounted(async () => {
   background-color: color-mix(in oklab, currentColor 10%, transparent);
 }
 
-.cal-day__art.is-banner {
+.cal-day__art.is-event-logo,
+.cal-entry-art.is-event-logo {
+  border-radius: 0;
+  background-color: transparent;
+}
+
+.cal-day__art.is-event-logo {
   width: 3.25rem;
 }
 
@@ -1059,7 +1065,7 @@ onMounted(async () => {
   background-color: var(--color-base-200);
 }
 
-.cal-entry-art.is-banner {
+.cal-entry-art.is-event-logo {
   width: 4rem;
   height: 2rem;
 }
