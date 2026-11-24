@@ -19,6 +19,7 @@ import AccountSelector from '@/components/AccountSelector.vue'
 import CharacterPicker from '@/components/CharacterPicker.vue'
 import ZhText from '@/components/ZhText.vue'
 import { useCharacterName } from '@/composables/useCharacterName'
+import { useZh } from '@/composables/useZh'
 
 interface Card {
   id: number
@@ -55,6 +56,15 @@ const router = useRouter()
 const masterStore = useMasterStore()
 const settingsStore = useSettingsStore()
 const accountStore = useAccountStore()
+const zhCards = useZh('cards')
+
+function getCardPrefixTranslation(prefix: string) {
+  const translation = zhCards.entry('prefix', prefix)
+  if (translation || settingsStore.translationMode === 'off') return translation
+  if (/\bHappy\s+Birthday\b/i.test(prefix)) return { text: '生日快乐！！', ai: false }
+  if (/\bHappy\s+Anniversary\b/i.test(prefix)) return { text: '纪念日快乐！！', ai: false }
+  return undefined
+}
 
 // 初始状态由 URL 推导: owned=1 时必须显示拥有状态, 否则“只看已拥有”不生效
 const showUserCards = ref(route.query.owned === '1')
@@ -565,7 +575,7 @@ onMounted(() => {
         class="group animate-fade-in-up"
       >
         <!-- 卡片背景框 -->
-        <div class="bg-base-100 rounded-xl p-2.5 border border-base-300 hover:shadow-lg hover:border-primary/30 transition-all relative overflow-hidden">
+        <div class="h-full bg-base-100 rounded-xl p-2.5 border border-base-300 hover:shadow-lg hover:border-primary/30 transition-all relative overflow-hidden">
           <!-- 简单角标 (替代之前的内部遮罩) -->
           <div v-if="isLeak(card.releaseAt)" class="absolute top-1 right-1 z-40 badge badge-warning badge-xs gap-0.5">
             剧透
@@ -610,7 +620,7 @@ onMounted(() => {
           </div>
 
           <!-- 卡片名称 -->
-          <h3 class="font-semibold text-sm mt-2 line-clamp-3"><ZhText :text="card.prefix" table="cards" path="prefix" sub-class="font-normal text-xs" /></h3>
+          <h3 class="mt-2 h-10 overflow-hidden font-semibold text-sm leading-5"><ZhText :text="card.prefix" table="cards" path="prefix" :zh="getCardPrefixTranslation(card.prefix)?.text" :ai="getCardPrefixTranslation(card.prefix)?.ai" main-class="truncate" sub-class="truncate font-normal text-xs" /></h3>
           <p class="text-xs text-base-content/60">{{ getCharaName(card.characterId) }}</p>
         </div>
       </RouterLink>
