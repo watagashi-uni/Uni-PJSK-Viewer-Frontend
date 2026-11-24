@@ -690,7 +690,7 @@ onMounted(async () => {
           </div>
         </div>
 
-        <aside ref="detailPanelRef" class="card min-w-0 border border-base-200 bg-base-100 xl:max-h-full xl:overflow-hidden" aria-labelledby="agenda-heading">
+        <aside ref="detailPanelRef" class="card min-w-0 border border-base-200 bg-base-100" aria-labelledby="agenda-heading">
           <div class="flex shrink-0 flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b border-base-200 px-4 py-3.5">
             <h2 id="agenda-heading" class="flex items-center gap-2 text-sm font-bold">
               <CalendarDays aria-hidden="true" class="size-4 shrink-0 text-primary" />
@@ -878,8 +878,18 @@ onMounted(async () => {
 }
 
 @media (min-width: 80rem) {
+  .cal-layout {
+    position: relative;
+  }
+
+  /* 月历决定网格行高，议程限制在同一行的右侧网格区域内。 */
   .cal-layout > aside {
-    max-height: clamp(40rem, calc(100dvh - 6rem), 50rem);
+    position: absolute;
+    grid-area: 1 / 2 / 2 / 3;
+    inset-block-start: 0;
+    inset-inline: 0;
+    max-height: 100%;
+    overflow: hidden;
   }
 }
 
