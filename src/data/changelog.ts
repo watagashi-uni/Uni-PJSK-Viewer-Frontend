@@ -14,6 +14,13 @@ export interface Release {
  */
 export const releases: Release[] = [
   {
+    version: '2.21.6', date: '2026-11-24', title: '剧情遮罩与对白音量',
+    changes: [
+      '修复剧情里闭眼等全屏遮罩盖不住画面边缘的问题。',
+      '角色说话时会自动压低背景音乐，台词结束后平滑恢复。',
+    ],
+  },
+  {
     version: '2.21.5', date: '2026-11-22', title: 'KTV 卡面按人数排列',
     // 本次更新
     changes: [
