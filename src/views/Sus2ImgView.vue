@@ -978,7 +978,7 @@ function clearForm() {
               <label class="label">
                 <span class="label-text font-medium">输出格式</span>
               </label>
-              <div class="flex gap-4">
+              <div class="flex flex-col items-start gap-4">
                 <label class="label cursor-pointer gap-2">
                   <input v-model="form.format" type="radio" value="svg" class="radio radio-primary" />
                   <span class="label-text">SVG</span>
@@ -993,7 +993,7 @@ function clearForm() {
               <label class="label">
                 <span class="label-text font-medium">皮肤</span>
               </label>
-              <div class="flex gap-4">
+              <div class="flex flex-col items-start gap-4">
                 <label class="label cursor-pointer gap-2">
                   <input v-model="form.skin" type="radio" value="custom01" class="radio radio-primary" />
                   <span class="label-text">默认</span>
