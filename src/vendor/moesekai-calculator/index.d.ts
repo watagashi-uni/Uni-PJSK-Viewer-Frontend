@@ -202,6 +202,7 @@ interface EventConfig {
 
 interface MysekaiGateBonus {
     unit: string;
+    level: number;
     powerBonusRate: number;
 }
 

@@ -770,7 +770,8 @@ const powerBonusUnitRows = computed<PowerBonusUnitView[]>(() => {
   for (const gate of suiteUserGates.value) {
     const gateId = getNumber(gate.mysekaiGateId, NaN)
     const gateLevel = getNumber(gate.mysekaiGateLevel)
-    if (!Number.isFinite(gateId)) continue
+    // 只有 1–5 号团体大门有综合力加成；6 号「交わるセカイのゲート」不对应团体
+    if (!Number.isFinite(gateId) || gateId < 1 || gateId > 5) continue
     const gateRow = mysekaiGateLevels.value.find(item =>
       getNumber(item.mysekaiGateId) === gateId && getNumber(item.level) === gateLevel)
     if (!gateRow) continue

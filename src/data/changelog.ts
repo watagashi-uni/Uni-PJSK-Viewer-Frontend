@@ -14,6 +14,13 @@ export interface Release {
  */
 export const releases: Release[] = [
   {
+    version: '2.21.7', date: '2026-11-24', title: '组卡兼容新 MYSEKAI 大门',
+    changes: [
+      '修复解锁「交わるセカイのゲート」后自动组卡报“缺少 MYSEKAI 大门等级数据”的问题。',
+      '大门加成按游戏内规则计算：团体卡只看对应团体的大门，纯虚拟歌手卡取等级最高的大门。',
+    ],
+  },
+  {
     version: '2.21.6', date: '2026-11-24', title: '剧情遮罩与对白音量',
     changes: [
       '修复剧情里闭眼等全屏遮罩盖不住画面边缘的问题。',

@@ -548,9 +548,21 @@ class CardPowerCalculator {
     async getGateBonusPower(basePower, userGateBonuses, cardUnits) {
         const isOnlyPiapro = cardUnits.length === 1 && cardUnits[0] === 'piapro';
         let powerBonusRate = 0;
-        for (const bonus of userGateBonuses) {
-            if (isOnlyPiapro || cardUnits.includes(bonus.unit)) {
-                powerBonusRate = Math.max(powerBonusRate, bonus.powerBonusRate);
+        if (isOnlyPiapro) {
+            // 游戏：OrderByDescending(mysekaiGateLevel).FirstOrDefault()，取等级最高的大门
+            // （同级取靠前的，含 shuffle 大门），再用该大门的等级加成；没有加成数据则为 0。
+            let top;
+            for (const bonus of userGateBonuses) {
+                if (top === undefined || bonus.level > top.level)
+                    top = bonus;
+            }
+            powerBonusRate = top?.powerBonusRate ?? 0;
+        }
+        else {
+            for (const bonus of userGateBonuses) {
+                if (cardUnits.includes(bonus.unit)) {
+                    powerBonusRate = Math.max(powerBonusRate, bonus.powerBonusRate);
+                }
             }
         }
         return Math.floor(Math.fround(CardPowerCalculator.sumPower(basePower) *
@@ -872,12 +884,18 @@ class MysekaiService {
         }
         const mysekaiGates = await this.dataProvider.getMasterData('mysekaiGates');
         const mysekaiGateLevels = await this.dataProvider.getMasterData('mysekaiGateLevels');
+        // 与游戏 7.1.0 CardUtility.GetGateBonus 一致：保留玩家全部大门（含等级），
+        // 交わるセカイのゲート（shuffle, unit=none）没有等级加成数据，加成记 0。
         return userMysekaiGates.map(it => {
             const gate = findOrThrow(mysekaiGates, g => g.id === it.mysekaiGateId, `MYSEKAI大门数据（gateId=${it.mysekaiGateId}）`);
-            const level = findOrThrow(mysekaiGateLevels, l => l.mysekaiGateId === it.mysekaiGateId && l.level === it.mysekaiGateLevel, `MYSEKAI大门等级数据（gateId=${it.mysekaiGateId}, level=${it.mysekaiGateLevel}）`);
+            const isUnitGate = gate.mysekaiGateType === undefined || gate.mysekaiGateType === 'unit';
+            const level = isUnitGate
+                ? findOrThrow(mysekaiGateLevels, l => l.mysekaiGateId === it.mysekaiGateId && l.level === it.mysekaiGateLevel, `MYSEKAI大门等级数据（gateId=${it.mysekaiGateId}, level=${it.mysekaiGateLevel}）`)
+                : mysekaiGateLevels.find(l => l.mysekaiGateId === it.mysekaiGateId && l.level === it.mysekaiGateLevel);
             return {
-                unit: gate.unit,
-                powerBonusRate: level.powerBonusRate
+                unit: isUnitGate ? gate.unit : 'none',
+                level: it.mysekaiGateLevel,
+                powerBonusRate: level?.powerBonusRate ?? 0
             };
         });
     }
