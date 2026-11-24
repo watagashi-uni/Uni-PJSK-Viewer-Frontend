@@ -926,6 +926,32 @@ select option {
   cursor: url('/cursors/normal.cur'), auto !important;
 }
 
+/* 标准滚动条配色会覆盖 WebKit 伪元素，Moe 在支持时用伪元素设置滚动条光标。 */
+@supports selector(::-webkit-scrollbar) {
+  @media (any-hover: hover) and (any-pointer: fine) and (forced-colors: none) {
+    [data-theme="moe"] {
+      scrollbar-color: auto;
+    }
+
+    :where([data-theme="moe"], [data-theme="moe"] *)::-webkit-scrollbar,
+    :where([data-theme="moe"], [data-theme="moe"] *)::-webkit-scrollbar-button,
+    :where([data-theme="moe"], [data-theme="moe"] *)::-webkit-scrollbar-track,
+    :where([data-theme="moe"], [data-theme="moe"] *)::-webkit-scrollbar-track-piece,
+    :where([data-theme="moe"], [data-theme="moe"] *)::-webkit-scrollbar-thumb,
+    :where([data-theme="moe"], [data-theme="moe"] *)::-webkit-scrollbar-corner {
+      cursor: url('/cursors/normal.cur'), default;
+    }
+
+    :where([data-theme="moe"], [data-theme="moe"] *)::-webkit-scrollbar-thumb {
+      background-color: color-mix(in oklab, var(--color-base-content) 22%, transparent);
+    }
+
+    :where([data-theme="moe"], [data-theme="moe"] *)::-webkit-scrollbar-thumb:hover {
+      background-color: color-mix(in oklab, var(--color-base-content) 34%, transparent);
+    }
+  }
+}
+
 [data-theme="moe"] a,
 [data-theme="moe"] button,
 [data-theme="moe"] [role="button"],
