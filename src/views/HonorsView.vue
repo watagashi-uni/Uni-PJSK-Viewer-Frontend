@@ -596,13 +596,13 @@ onMounted(async () => {
             </div>
           </div>
         </div>
-        <label class="form-control w-full">
+        <label class="flex w-full flex-col">
           <span class="label-text mb-2">展示等级</span>
           <select v-model.number="selectedHonorLevel" class="select select-bordered w-full min-w-0 max-w-full">
             <option v-for="level in selectedHonor.levels" :key="level.level" :value="level.level">Lv.{{ level.level }}</option>
           </select>
-          <span v-if="levelDescription(selectedHonor.levels, selectedHonorLevel)" class="mt-2 rounded-lg bg-base-200/70 px-3 py-2 text-xs leading-5 text-base-content/65 whitespace-normal break-words"><ZhText :text="levelDescription(selectedHonor.levels, selectedHonorLevel)" table="honors" path="levels.description" /></span>
         </label>
+        <div v-if="levelDescription(selectedHonor.levels, selectedHonorLevel)" class="mt-2 rounded-lg bg-base-200/70 px-3 py-2 text-xs leading-5 text-base-content/65 whitespace-normal break-words"><ZhText :text="levelDescription(selectedHonor.levels, selectedHonorLevel)" table="honors" path="levels.description" /></div>
         <div v-if="selectedHonorStyles.backgrounds.length > 1 || (!selectedHonorSub && selectedHonorStyles.words.length > 1)" class="mt-3 grid gap-3 sm:grid-cols-2">
           <label v-if="selectedHonorStyles.backgrounds.length > 1" class="form-control min-w-0">
             <span class="label-text mb-2">背景</span>
@@ -637,13 +637,15 @@ onMounted(async () => {
           </div>
         </div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <label class="form-control min-w-0">
-            <span class="label-text mb-2">展示等级</span>
-            <select v-model.number="selectedBondsLevel" class="select select-bordered w-full min-w-0 max-w-full">
-              <option v-for="level in selectedBondsHonor.levels" :key="level.level" :value="level.level">Lv.{{ level.level }}</option>
-            </select>
-            <span v-if="levelDescription(selectedBondsHonor.levels, selectedBondsLevel)" class="mt-2 rounded-lg bg-base-200/70 px-3 py-2 text-xs leading-5 text-base-content/65 whitespace-normal break-words"><ZhText :text="levelDescription(selectedBondsHonor.levels, selectedBondsLevel)" table="bondsHonors" path="levels.description" /></span>
-          </label>
+          <div class="min-w-0">
+            <label class="flex flex-col">
+              <span class="label-text mb-2">展示等级</span>
+              <select v-model.number="selectedBondsLevel" class="select select-bordered w-full min-w-0 max-w-full">
+                <option v-for="level in selectedBondsHonor.levels" :key="level.level" :value="level.level">Lv.{{ level.level }}</option>
+              </select>
+            </label>
+            <div v-if="levelDescription(selectedBondsHonor.levels, selectedBondsLevel)" class="mt-2 rounded-lg bg-base-200/70 px-3 py-2 text-xs leading-5 text-base-content/65 whitespace-normal break-words"><ZhText :text="levelDescription(selectedBondsHonor.levels, selectedBondsLevel)" table="bondsHonors" path="levels.description" /></div>
+          </div>
           <label class="form-control min-w-0">
             <span class="label-text mb-2">称号文字</span>
             <select v-model.number="selectedBondsWordId" class="select select-bordered w-full min-w-0 max-w-full">
