@@ -17,6 +17,7 @@ import { readQueryPage, readQueryString, replaceListQuery } from '@/utils/routeQ
 import ZhText from '@/components/ZhText.vue'
 import { useZh } from '@/composables/useZh'
 import { useCharacterName } from '@/composables/useCharacterName'
+import { getHonorStyleOptions, type HonorStyleOption } from '@/utils/honorAppearance'
 
 interface HonorLevel {
   level: number
@@ -85,6 +86,8 @@ const accountStore = useAccountStore()
 
 const honors = ref<HonorData[]>([])
 const honorGroups = ref<HonorGroup[]>([])
+const honorBackgrounds = ref<HonorStyleOption[]>([])
+const honorWords = ref<HonorStyleOption[]>([])
 const bondsHonors = ref<BondsHonor[]>([])
 const bondsHonorWords = ref<BondsHonorWord[]>([])
 const gameCharacterUnits = ref<GameCharacterUnit[]>([])
@@ -101,6 +104,9 @@ const normalPage = ref(readQueryPage(route.query))
 const selectedHonor = ref<HonorData | null>(null)
 const { onDialogClose: onHonorDialogClose } = useModalDialog('honorDialog', () => !!selectedHonor.value, () => { selectedHonor.value = null })
 const selectedHonorLevel = ref(1)
+const selectedHonorBackgroundId = ref<number | null>(null)
+const selectedHonorWordId = ref<number | null>(null)
+const selectedHonorSub = ref(false)
 const normalOwnedOnly = ref(false)
 
 const bondsSearch = ref(readQueryString(route.query, 'bq'))
@@ -244,6 +250,59 @@ const paginatedBondsHonors = computed(() => filteredBondsHonors.value.slice(
   bondsPage.value * bondsPageSize,
 ))
 
+function groupHonorStyles(styles: readonly HonorStyleOption[]) {
+  const groups = new Map<number, HonorStyleOption[]>()
+  for (const style of [...styles].sort((a, b) => a.seq - b.seq)) {
+    const options = groups.get(style.honorGroupId) ?? []
+    options.push(style)
+    groups.set(style.honorGroupId, options)
+  }
+  return groups
+}
+
+const honorBackgroundsByGroup = computed(() => groupHonorStyles(honorBackgrounds.value))
+const honorWordsByGroup = computed(() => groupHonorStyles(honorWords.value))
+
+function honorStyles(honor: HonorData, level: number) {
+  return {
+    backgrounds: getHonorStyleOptions(honorBackgroundsByGroup.value.get(honor.groupId) ?? [], honor.levels, level),
+    words: getHonorStyleOptions(honorWordsByGroup.value.get(honor.groupId) ?? [], honor.levels, level),
+  }
+}
+
+function findHonorStyle(styles: HonorStyleOption[], id?: number | null) {
+  return styles.find(style => style.id === id) ?? styles[styles.length - 1]
+}
+
+function honorStyleProps(styles: ReturnType<typeof honorStyles>, backgroundId?: number | null, wordId?: number | null) {
+  if (styles.backgrounds.length <= 1 && styles.words.length <= 1) return {}
+  const background = findHonorStyle(styles.backgrounds, backgroundId)
+  const word = findHonorStyle(styles.words, wordId)
+  return { backgroundAssetbundleName: background?.assetbundleName, wordAssetbundleName: word?.assetbundleName }
+}
+
+const listHonorStyles = computed(() => new Map(paginatedHonors.value.map(honor => [
+  honor.id, honorStyleProps(honorStyles(honor, normalOwnedMap.value.get(honor.id) || maxLevel(honor.levels))),
+])))
+const selectedHonorStyles = computed(() => selectedHonor.value
+  ? honorStyles(selectedHonor.value, selectedHonorLevel.value)
+  : { backgrounds: [], words: [] })
+
+function honorStyleSelection(kind: keyof ReturnType<typeof honorStyles>, selectedId: typeof selectedHonorBackgroundId) {
+  return computed({
+    get: () => findHonorStyle(selectedHonorStyles.value[kind], selectedId.value)?.id ?? null,
+    set: (id: number | null) => { selectedId.value = id },
+  })
+}
+
+const honorBackgroundSelection = honorStyleSelection('backgrounds', selectedHonorBackgroundId)
+const honorWordSelection = honorStyleSelection('words', selectedHonorWordId)
+const selectedHonorArt = computed(() => honorStyleProps(
+  selectedHonorStyles.value, honorBackgroundSelection.value, honorWordSelection.value,
+))
+const selectedHonorIsCharacter = computed(() => selectedHonor.value &&
+  honorGroupMap.value.get(selectedHonor.value.groupId)?.honorType === 'character')
+
 const selectedBondsWords = computed(() => selectedBondsHonor.value
   ? wordsByBondsGroup.value.get(selectedBondsHonor.value.bondsGroupId) || []
   : [])
@@ -316,6 +375,9 @@ function scrollToTop() {
 function openHonor(honor: HonorData) {
   selectedHonor.value = honor
   selectedHonorLevel.value = normalOwnedMap.value.get(honor.id) || maxLevel(honor.levels)
+  selectedHonorBackgroundId.value = null
+  selectedHonorWordId.value = null
+  selectedHonorSub.value = false
 }
 
 function getCharacterNameByUnitId(unitId: number): string {
@@ -337,16 +399,20 @@ function openBondsHonor(honor: BondsHonor) {
 
 onMounted(async () => {
   try {
-    const [honorData, groupData, bondsData, wordData, unitData, characterData] = await Promise.all([
+    const [honorData, groupData, bondsData, wordData, unitData, characterData, backgroundData, honorWordData] = await Promise.all([
       masterStore.getMaster<HonorData>('honors'),
       masterStore.getMaster<HonorGroup>('honorGroups'),
       masterStore.getMaster<BondsHonor>('bondsHonors'),
       masterStore.getMaster<BondsHonorWord>('bondsHonorWords'),
       masterStore.getMaster<GameCharacterUnit>('gameCharacterUnits'),
       masterStore.getMaster<GameCharacterData>('gameCharacters'),
+      masterStore.getMaster<HonorStyleOption>('honorBackgrounds').catch(() => []),
+      masterStore.getMaster<HonorStyleOption>('honorWords').catch(() => []),
     ])
     honors.value = honorData
     honorGroups.value = groupData
+    honorBackgrounds.value = backgroundData
+    honorWords.value = honorWordData
     bondsHonors.value = bondsData
     bondsHonorWords.value = wordData
     gameCharacterUnits.value = unitData
@@ -419,7 +485,7 @@ onMounted(async () => {
           @click="openHonor(honor)"
         >
           <div class="card-body min-w-0 p-3 gap-2.5">
-            <div class="relative mx-auto w-full min-w-0 max-w-[280px]"><SekaiHonor :honor-id="honor.id" :honor-level="normalOwnedMap.get(honor.id) || maxLevel(honor.levels)" /><span v-if="normalOwnedMap.has(honor.id)" class="absolute -top-1.5 -right-1.5 badge badge-success badge-xs gap-1 shadow-sm"><CheckCircle2 class="w-3 h-3" />Lv.{{ normalOwnedMap.get(honor.id) }}</span></div>
+            <div class="relative mx-auto w-full min-w-0 max-w-[280px]"><SekaiHonor :honor-id="honor.id" :honor-level="normalOwnedMap.get(honor.id) || maxLevel(honor.levels)" v-bind="listHonorStyles.get(honor.id)" /><span v-if="normalOwnedMap.has(honor.id)" class="absolute -top-1.5 -right-1.5 badge badge-success badge-xs gap-1 shadow-sm"><CheckCircle2 class="w-3 h-3" />Lv.{{ normalOwnedMap.get(honor.id) }}</span></div>
             <div class="min-w-0">
               <div class="flex flex-wrap gap-2 mb-1">
                 <span class="badge badge-sm badge-ghost">#{{ honor.id }}</span>
@@ -515,7 +581,21 @@ onMounted(async () => {
         <div class="modal-x"><button class="btn btn-sm btn-circle" aria-label="关闭" @click="selectedHonor = null"><X class="w-4 h-4" /></button></div>
         <h2 class="font-bold text-xl pr-10"><ZhText v-bind="honorTitle(selectedHonor)" sub-class="text-base mt-1" /></h2>
         <p class="text-sm text-base-content/55 mt-1">称号 #{{ selectedHonor.id }} · {{ getTypeLabel(honorGroupMap.get(selectedHonor.groupId)?.honorType) }}<span v-if="normalOwnedMap.has(selectedHonor.id)" class="text-success font-medium"> · 已拥有 Lv.{{ normalOwnedMap.get(selectedHonor.id) }}</span></p>
-        <div class="bg-base-200 rounded-xl p-4 my-5"><div class="mx-auto w-full min-w-0 max-w-[340px]"><SekaiHonor :honor-id="selectedHonor.id" :honor-level="selectedHonorLevel" /></div></div>
+        <div class="my-5 space-y-3">
+          <div v-if="selectedHonorIsCharacter" class="flex justify-center">
+            <div class="join" role="group" aria-label="称号预览类型">
+              <button type="button" class="join-item btn btn-sm" :class="{ 'btn-active': !selectedHonorSub }" :aria-pressed="!selectedHonorSub" @click="selectedHonorSub = false">主牌</button>
+              <button type="button" class="join-item btn btn-sm" :class="{ 'btn-active': selectedHonorSub }" :aria-pressed="selectedHonorSub" @click="selectedHonorSub = true">副牌</button>
+            </div>
+          </div>
+          <div class="bg-base-200 rounded-xl p-4">
+            <div class="mx-auto flex aspect-[19/4] w-full min-w-0 max-w-[340px] items-center justify-center">
+              <div :class="selectedHonorSub ? 'w-[47.368%]' : 'w-full'">
+                <SekaiHonor :honor-id="selectedHonor.id" :honor-level="selectedHonorLevel" :sub="selectedHonorSub" v-bind="selectedHonorArt" />
+              </div>
+            </div>
+          </div>
+        </div>
         <label class="form-control w-full">
           <span class="label-text mb-2">展示等级</span>
           <select v-model.number="selectedHonorLevel" class="select select-bordered w-full min-w-0 max-w-full">
@@ -523,6 +603,20 @@ onMounted(async () => {
           </select>
           <span v-if="levelDescription(selectedHonor.levels, selectedHonorLevel)" class="mt-2 rounded-lg bg-base-200/70 px-3 py-2 text-xs leading-5 text-base-content/65 whitespace-normal break-words"><ZhText :text="levelDescription(selectedHonor.levels, selectedHonorLevel)" table="honors" path="levels.description" /></span>
         </label>
+        <div v-if="selectedHonorStyles.backgrounds.length > 1 || (!selectedHonorSub && selectedHonorStyles.words.length > 1)" class="mt-3 grid gap-3 sm:grid-cols-2">
+          <label v-if="selectedHonorStyles.backgrounds.length > 1" class="form-control min-w-0">
+            <span class="label-text mb-2">背景</span>
+            <select v-model="honorBackgroundSelection" class="select select-bordered w-full min-w-0">
+              <option v-for="style in selectedHonorStyles.backgrounds" :key="style.id" :value="style.id">{{ style.name }}</option>
+            </select>
+          </label>
+          <label v-if="!selectedHonorSub && selectedHonorStyles.words.length > 1" class="form-control min-w-0">
+            <span class="label-text mb-2">字样</span>
+            <select v-model="honorWordSelection" class="select select-bordered w-full min-w-0">
+              <option v-for="style in selectedHonorStyles.words" :key="style.id" :value="style.id">{{ style.name }}</option>
+            </select>
+          </label>
+        </div>
       </div>
       <form method="dialog" class="modal-backdrop"><button @click="selectedHonor = null">关闭</button></form>
     </dialog>
