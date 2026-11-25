@@ -125,6 +125,7 @@ const selectedBondsHonor = ref<BondsHonor | null>(null)
 const { onDialogClose: onBondsHonorDialogClose } = useModalDialog('bondsHonorDialog', () => !!selectedBondsHonor.value, () => { selectedBondsHonor.value = null })
 const selectedBondsLevel = ref(1)
 const selectedBondsWordId = ref(0)
+const selectedBondsSub = ref(false)
 const reverseBonds = ref(false)
 const bondsOwnedOnly = ref(false)
 
@@ -416,6 +417,7 @@ function openBondsHonor(honor: BondsHonor) {
   selectedBondsHonor.value = honor
   selectedBondsLevel.value = bondsOwnedMap.value.get(honor.id) || maxLevel(honor.levels)
   selectedBondsWordId.value = firstWordId(honor)
+  selectedBondsSub.value = false
   reverseBonds.value = false
 }
 
@@ -664,36 +666,45 @@ onMounted(async () => {
         <div class="modal-x"><button class="btn btn-sm btn-circle" aria-label="关闭" @click="selectedBondsHonor = null"><X class="w-4 h-4" /></button></div>
         <h2 class="font-bold text-xl pr-10">{{ getCharacterNameByUnitId(selectedBondsHonor.gameCharacterUnitId1) }} × {{ getCharacterNameByUnitId(selectedBondsHonor.gameCharacterUnitId2) }}</h2>
         <p class="text-sm text-base-content/55 mt-1">牵绊称号 #{{ selectedBondsHonor.id }}<span v-if="bondsOwnedMap.has(selectedBondsHonor.id)" class="text-success font-medium"> · 已拥有 Lv.{{ bondsOwnedMap.get(selectedBondsHonor.id) }}</span></p>
-        <div class="bg-base-200 rounded-xl p-4 my-5">
-          <div class="mx-auto w-full min-w-0 max-w-[340px]">
-            <SekaiHonorBonds
-              :honor-id="selectedBondsHonor.id"
-              :honor-level="selectedBondsLevel"
-              :bonds-honor-word-id="selectedBondsWordId"
-              :bonds-honor-view-type="reverseBonds ? 'reverse' : 'normal'"
-            />
+        <div class="my-5 space-y-3">
+          <div class="flex justify-center">
+            <div class="join" role="group" aria-label="牵绊称号预览类型">
+              <button type="button" class="join-item btn btn-sm" :class="{ 'btn-active': !selectedBondsSub }" :aria-pressed="!selectedBondsSub" @click="selectedBondsSub = false">主牌</button>
+              <button type="button" class="join-item btn btn-sm" :class="{ 'btn-active': selectedBondsSub }" :aria-pressed="selectedBondsSub" @click="selectedBondsSub = true">副牌</button>
+            </div>
+          </div>
+          <div class="bg-base-200 rounded-xl p-4">
+            <div class="mx-auto flex aspect-[19/4] w-full min-w-0 max-w-[340px] items-center justify-center">
+              <div :class="selectedBondsSub ? 'w-[47.368%]' : 'w-full'">
+                <SekaiHonorBonds
+                  :honor-id="selectedBondsHonor.id"
+                  :honor-level="selectedBondsLevel"
+                  :bonds-honor-word-id="selectedBondsWordId"
+                  :bonds-honor-view-type="reverseBonds ? 'reverse' : 'normal'"
+                  :sub="selectedBondsSub"
+                />
+              </div>
+            </div>
           </div>
         </div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div class="min-w-0">
-            <label class="flex flex-col">
-              <span class="label-text mb-2">展示等级</span>
-              <select v-model.number="selectedBondsLevel" class="select select-bordered w-full min-w-0 max-w-full">
-                <option v-for="level in selectedBondsHonor.levels" :key="level.level" :value="level.level">Lv.{{ level.level }}</option>
-              </select>
-            </label>
-            <div v-if="levelDescription(selectedBondsHonor.levels, selectedBondsLevel)" class="mt-2 rounded-lg bg-base-200/70 px-3 py-2 text-xs leading-5 text-base-content/65 whitespace-normal break-words"><ZhText :text="levelDescription(selectedBondsHonor.levels, selectedBondsLevel)" table="bondsHonors" path="levels.description" /></div>
-          </div>
-          <label class="form-control min-w-0">
+          <label class="flex min-w-0 flex-col">
+            <span class="label-text mb-2">展示等级</span>
+            <select v-model.number="selectedBondsLevel" class="select select-bordered w-full min-w-0 max-w-full">
+              <option v-for="level in selectedBondsHonor.levels" :key="level.level" :value="level.level">Lv.{{ level.level }}</option>
+            </select>
+          </label>
+          <label class="flex min-w-0 flex-col">
             <span class="label-text mb-2">称号文字</span>
-            <select v-model.number="selectedBondsWordId" class="select select-bordered w-full min-w-0 max-w-full">
+            <select v-model.number="selectedBondsWordId" class="select select-bordered w-full min-w-0 max-w-full" :disabled="selectedBondsSub">
               <option v-for="word in selectedBondsWords" :key="word.id" :value="word.id">{{ zhBondsWords.inline('name', word.name) }}</option>
             </select>
           </label>
         </div>
-        <label class="label cursor-pointer justify-start gap-3 mt-3">
-          <input v-model="reverseBonds" type="checkbox" class="toggle toggle-secondary" />
-          <span class="label-text">交换左右角色</span>
+        <div v-if="levelDescription(selectedBondsHonor.levels, selectedBondsLevel)" class="mt-2 rounded-lg bg-base-200/70 px-3 py-2 text-xs leading-5 text-base-content/65 whitespace-normal break-words"><ZhText :text="levelDescription(selectedBondsHonor.levels, selectedBondsLevel)" table="bondsHonors" path="levels.description" /></div>
+        <label class="mt-2 inline-flex min-h-10 cursor-pointer select-none items-center gap-2 text-sm">
+          <input v-model="reverseBonds" type="checkbox" class="toggle toggle-sm toggle-primary shrink-0" />
+          <span>交换左右角色</span>
         </label>
       </div>
       <form method="dialog" class="modal-backdrop"><button @click="selectedBondsHonor = null">关闭</button></form>
