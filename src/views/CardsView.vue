@@ -565,7 +565,7 @@ onMounted(() => {
         class="group animate-fade-in-up"
       >
         <!-- 卡片背景框 -->
-        <div class="bg-base-100 rounded-xl p-2.5 border border-base-300 hover:shadow-lg hover:border-primary/30 transition-all relative overflow-hidden">
+        <div class="h-full bg-base-100 rounded-xl p-2.5 border border-base-300 hover:shadow-lg hover:border-primary/30 transition-all relative overflow-hidden">
           <!-- 简单角标 (替代之前的内部遮罩) -->
           <div v-if="isLeak(card.releaseAt)" class="absolute top-1 right-1 z-40 badge badge-warning badge-xs gap-0.5">
             剧透
@@ -610,7 +610,7 @@ onMounted(() => {
           </div>
 
           <!-- 卡片名称 -->
-          <h3 class="font-semibold text-sm mt-2 line-clamp-3"><ZhText :text="card.prefix" table="cards" path="prefix" sub-class="font-normal text-xs" /></h3>
+          <h3 class="mt-2 h-10 overflow-hidden font-semibold text-sm leading-5 [&>.truncate:only-child]:line-clamp-2 [&>.truncate:only-child]:whitespace-normal" :title="card.prefix"><ZhText :text="card.prefix" table="cards" path="prefix" main-class="truncate" sub-class="truncate font-normal text-xs" /></h3>
           <p class="text-xs text-base-content/60">{{ getCharaName(card.characterId) }}</p>
         </div>
       </RouterLink>

@@ -866,7 +866,26 @@ select option {
     line-height: 1.15;
     letter-spacing: 0.02em;
     opacity: 0.5;
-    vertical-align: 0.12em;
+    vertical-align: 0.2em;
+  }
+}
+
+/* 单行截断的译名：省略号只截文字，AI 标记固定在行尾，不会被一起截掉。
+   放在 utilities 层才能盖过同层的 block 等显示类 */
+@layer utilities {
+  .truncate:has(> .zh-ai) {
+    display: flex;
+    align-items: baseline;
+  }
+  .truncate:has(> .zh-ai) > .zh-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .truncate:has(> .zh-ai) > .zh-ai {
+    flex: none;
+    position: relative;
+    top: -0.2em;
   }
 }
 
