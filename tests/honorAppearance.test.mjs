@@ -5,7 +5,7 @@ import ts from 'typescript'
 
 const source = readFileSync(new URL('../src/utils/honorAppearance.ts', import.meta.url), 'utf8')
 const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext } }).outputText
-const { getHonorLevelAppearance, getHonorStyleOptions, resolveProfileHonorStyle } = await import(`data:text/javascript,${encodeURIComponent(compiled)}`)
+const { getHonorLevelAppearance, getHonorStyleOptions, getLiveMasterHonorStarCount, resolveProfileHonorStyle } = await import(`data:text/javascript,${encodeURIComponent(compiled)}`)
 
 test('level dots cycle every ten levels and the medal advances on the next level', () => {
   for (const [level, normalDots, upgradedDots, medalTier] of [
@@ -15,6 +15,12 @@ test('level dots cycle every ten levels and the medal advances on the next level
     assert.deepEqual(getHonorLevelAppearance(level, true), { normalDots, upgradedDots, medalTier })
   }
   assert.deepEqual(getHonorLevelAppearance(11, false), { normalDots: 1, upgradedDots: 0, medalTier: 0 })
+})
+
+test('Live Master stars follow the selected honor level', () => {
+  for (const [level, stars] of [[0, 0], [1, 1], [2, 2], [10, 10], [11, 1], [16, 6], [60, 10]]) {
+    assert.equal(getLiveMasterHonorStarCount(level), stars)
+  }
 })
 
 test('character art stays on the default until the matching level unlocks the alternate', () => {

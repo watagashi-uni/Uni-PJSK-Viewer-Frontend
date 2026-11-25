@@ -18,6 +18,11 @@ export function getHonorLevelAppearance(level: number, isMedalDisplayed: boolean
   }
 }
 
+export function getLiveMasterHonorStarCount(level: number) {
+  if (!Number.isFinite(level) || level < 1) return 0
+  return (Math.floor(level) - 1) % 10 + 1
+}
+
 export function getHonorStyleOptions(
   styles: readonly HonorStyleOption[],
   levels: readonly { level: number; description: string }[],

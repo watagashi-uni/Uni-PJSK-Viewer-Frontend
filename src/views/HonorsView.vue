@@ -31,7 +31,14 @@ interface HonorData {
   honorRarity?: string
   name: string
   assetbundleName?: string
+  honorMissionType?: string
   levels: HonorLevel[]
+}
+
+interface HonorMission {
+  honorMissionType: string
+  seq: number
+  requirement: number
 }
 
 interface HonorGroup {
@@ -86,6 +93,7 @@ const accountStore = useAccountStore()
 
 const honors = ref<HonorData[]>([])
 const honorGroups = ref<HonorGroup[]>([])
+const honorMissions = ref<HonorMission[]>([])
 const honorBackgrounds = ref<HonorStyleOption[]>([])
 const honorWords = ref<HonorStyleOption[]>([])
 const bondsHonors = ref<BondsHonor[]>([])
@@ -368,6 +376,20 @@ function levelDescription(levels: Array<{ level: number; description: string }>,
   return levels.find(item => item.level === level)?.description || ''
 }
 
+const honorMissionRequirements = computed(() => new Map(honorMissions.value.map(mission => [
+  `${mission.honorMissionType}:${mission.seq}`, mission.requirement,
+])))
+
+function honorPreviewProgress(honor: HonorData, level: number): number | undefined {
+  if (honor.assetbundleName || !honor.honorMissionType) return undefined
+  const requirement = honorMissionRequirements.value.get(`${honor.honorMissionType}:${level}`)
+  if (requirement !== undefined) return requirement
+
+  // Older master sources may only include the threshold in the Japanese description.
+  const count = levelDescription(honor.levels, level).match(/([0-9]+)\s*曲/)?.[1]
+  return count === undefined ? undefined : Number(count)
+}
+
 function scrollToTop() {
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
@@ -399,7 +421,7 @@ function openBondsHonor(honor: BondsHonor) {
 
 onMounted(async () => {
   try {
-    const [honorData, groupData, bondsData, wordData, unitData, characterData, backgroundData, honorWordData] = await Promise.all([
+    const [honorData, groupData, bondsData, wordData, unitData, characterData, backgroundData, honorWordData, missionData] = await Promise.all([
       masterStore.getMaster<HonorData>('honors'),
       masterStore.getMaster<HonorGroup>('honorGroups'),
       masterStore.getMaster<BondsHonor>('bondsHonors'),
@@ -408,9 +430,11 @@ onMounted(async () => {
       masterStore.getMaster<GameCharacterData>('gameCharacters'),
       masterStore.getMaster<HonorStyleOption>('honorBackgrounds').catch(() => []),
       masterStore.getMaster<HonorStyleOption>('honorWords').catch(() => []),
+      masterStore.getMaster<HonorMission>('honorMissions').catch(() => []),
     ])
     honors.value = honorData
     honorGroups.value = groupData
+    honorMissions.value = missionData
     honorBackgrounds.value = backgroundData
     honorWords.value = honorWordData
     bondsHonors.value = bondsData
@@ -485,7 +509,15 @@ onMounted(async () => {
           @click="openHonor(honor)"
         >
           <div class="card-body min-w-0 p-3 gap-2.5">
-            <div class="relative mx-auto w-full min-w-0 max-w-[280px]"><SekaiHonor :honor-id="honor.id" :honor-level="normalOwnedMap.get(honor.id) || maxLevel(honor.levels)" v-bind="listHonorStyles.get(honor.id)" /><span v-if="normalOwnedMap.has(honor.id)" class="absolute -top-1.5 -right-1.5 badge badge-success badge-xs gap-1 shadow-sm"><CheckCircle2 class="w-3 h-3" />Lv.{{ normalOwnedMap.get(honor.id) }}</span></div>
+            <div class="relative mx-auto w-full min-w-0 max-w-[280px]">
+              <SekaiHonor
+                :honor-id="honor.id"
+                :honor-level="normalOwnedMap.get(honor.id) || maxLevel(honor.levels)"
+                :progress="honorPreviewProgress(honor, normalOwnedMap.get(honor.id) || maxLevel(honor.levels))"
+                v-bind="listHonorStyles.get(honor.id)"
+              />
+              <span v-if="normalOwnedMap.has(honor.id)" class="absolute -top-1.5 -right-1.5 badge badge-success badge-xs gap-1 shadow-sm"><CheckCircle2 class="w-3 h-3" />Lv.{{ normalOwnedMap.get(honor.id) }}</span>
+            </div>
             <div class="min-w-0">
               <div class="flex flex-wrap gap-2 mb-1">
                 <span class="badge badge-sm badge-ghost">#{{ honor.id }}</span>
@@ -591,7 +623,13 @@ onMounted(async () => {
           <div class="bg-base-200 rounded-xl p-4">
             <div class="mx-auto flex aspect-[19/4] w-full min-w-0 max-w-[340px] items-center justify-center">
               <div :class="selectedHonorSub ? 'w-[47.368%]' : 'w-full'">
-                <SekaiHonor :honor-id="selectedHonor.id" :honor-level="selectedHonorLevel" :sub="selectedHonorSub" v-bind="selectedHonorArt" />
+                <SekaiHonor
+                  :honor-id="selectedHonor.id"
+                  :honor-level="selectedHonorLevel"
+                  :progress="honorPreviewProgress(selectedHonor, selectedHonorLevel)"
+                  :sub="selectedHonorSub"
+                  v-bind="selectedHonorArt"
+                />
               </div>
             </div>
           </div>

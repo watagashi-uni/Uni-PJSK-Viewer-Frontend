@@ -9,7 +9,7 @@ import { ref, watch, computed, onMounted } from 'vue'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
 import { handleSvgImageError } from '@/utils/imageRetry'
-import { getHonorLevelAppearance, resolveProfileHonorStyle, type HonorStyleOption } from '@/utils/honorAppearance'
+import { getHonorLevelAppearance, getLiveMasterHonorStarCount, resolveProfileHonorStyle, type HonorStyleOption } from '@/utils/honorAppearance'
 
 // ---------- Types ----------
 interface HonorLevel {
@@ -91,7 +91,6 @@ const failedCustomImage = ref('')
 const isDrawHonorLevel = ref(true)
 const isWorldLinkDegree = ref(false)
 const isLiveMaster = ref(false)
-const liveMasterProgress = ref(0)
 
 // ---------- Computed ----------
 const viewBoxWidth = computed(() => props.sub ? 180 : 380)
@@ -159,14 +158,13 @@ const starStartX = computed(() => {
   return 50
 })
 
+const liveMasterProgress = computed(() => props.progress ?? props.userHonorMissions?.find(
+  mission => mission.honorMissionType === honor.value?.honorMissionType,
+)?.progress ?? 0)
+
 const liveMasterStars = computed(() => {
   if (!isLiveMaster.value) return []
-  // 这里的算法根据 Python 代码似乎是 (progress // 10) % 10 + 1 ?
-  // Python: star_count = (progress // 10) % 10 + 1
-  // Wait, Python: (progress // 10) % 10 + 1. 
-  // Example: 629 -> 62 // 10 = 6? No. 629 // 10 = 62. 62 % 10 = 2. 2+1=3 stars.
-  // Example: 598 -> 59 % 10 = 9. 9+1=10 stars.
-  const starCount = Math.floor(liveMasterProgress.value / 10) % 10 + 1
+  const starCount = getLiveMasterHonorStarCount(props.honorLevel)
   
   const starsPos = [
     { x: 223, y: 68 - 8 }, { x: 216, y: 56 - 8 }, { x: 208, y: 42 - 8 }, { x: 216, y: 27 - 8 }, { x: 223, y: 13 - 8 },
@@ -202,12 +200,6 @@ async function loadHonor() {
     isLiveMaster.value = !foundHonor.assetbundleName && !!foundHonor.honorMissionType
     
     if (isLiveMaster.value) {
-      if (props.progress !== undefined) {
-        liveMasterProgress.value = props.progress
-      } else {
-        const mission = props.userHonorMissions?.find(m => m.honorMissionType === foundHonor.honorMissionType)
-        liveMasterProgress.value = mission?.progress || 0
-      }
       isDrawHonorLevel.value = false // Live Master 不画普通星星
     } else {
       // 普通称号星星逻辑
@@ -311,7 +303,7 @@ watch([hasProfileHonorStyle, () => props.sub, () => masterStore.cacheRevision], 
   }
 })
 
-watch(() => [props.honorId, props.honorLevel, props.sub, props.userHonorMissions], () => {
+watch(() => [props.honorId, props.honorLevel, props.sub], () => {
   // 重置
   degreeImage.value = ''
   degreeFrameImage.value = ''
