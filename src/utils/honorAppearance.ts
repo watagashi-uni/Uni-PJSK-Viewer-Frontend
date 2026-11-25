@@ -28,3 +28,17 @@ export function getHonorStyleOptions(
     level.level <= previewLevel && level.description === style.description,
   ))
 }
+
+export function resolveProfileHonorStyle(
+  styles: readonly HonorStyleOption[] | undefined,
+  groupId: number,
+  selectedId?: number | null,
+) {
+  let defaultStyle: HonorStyleOption | undefined
+  for (const style of styles ?? []) {
+    if (style.honorGroupId !== groupId) continue
+    if (style.id === selectedId) return style.assetbundleName
+    if (!defaultStyle || style.seq < defaultStyle.seq) defaultStyle = style
+  }
+  return defaultStyle?.assetbundleName
+}

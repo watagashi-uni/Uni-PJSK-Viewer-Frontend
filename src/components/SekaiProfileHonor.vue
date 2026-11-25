@@ -8,16 +8,7 @@
 import SekaiHonor from './SekaiHonor.vue'
 import SekaiHonorBonds from './SekaiHonorBonds.vue'
 import { computed } from 'vue'
-
-export interface ProfileHonorData {
-  bondsHonorViewType: string
-  bondsHonorWordId: number
-  honorId: number
-  honorLevel: number
-  profileHonorType: string
-  seq: number
-  progress?: number // Allow progress in data
-}
+import type { ProfileHonorData } from '@/types/profile'
 
 const props = defineProps<{
   data: ProfileHonorData
@@ -43,6 +34,8 @@ const isSub = computed(() => props.forceSub || props.data.seq !== 1)
     v-else
     :honor-id="data.honorId"
     :honor-level="data.honorLevel"
+    :honor-background-id="data.honorBackgroundId"
+    :honor-word-id="data.honorWordId"
     :sub="isSub"
     :user-honor-missions="userHonorMissions"
     :progress="props.progress ?? data.progress"

@@ -3,6 +3,18 @@ export type ProfileTabKey = 'basic' | AdvancedTabKey
 export type UnitKey = 'light_sound' | 'idol' | 'street' | 'theme_park' | 'school_refusal' | 'piapro'
 export type AttrKey = 'cool' | 'cute' | 'happy' | 'mysterious' | 'pure'
 
+export interface ProfileHonorData {
+    bondsHonorViewType: string
+    bondsHonorWordId: number
+    honorId: number
+    honorLevel: number
+    profileHonorType: string
+    seq: number
+    honorBackgroundId?: number | null
+    honorWordId?: number | null
+    progress?: number
+}
+
 export interface ProfileData {
     totalPower: {
         areaItemBonus: number
@@ -48,14 +60,7 @@ export interface ProfileData {
         userId: number
         word: string
     }
-    userProfileHonors: Array<{
-        bondsHonorViewType: string
-        bondsHonorWordId: number
-        honorId: number
-        honorLevel: number
-        profileHonorType: string
-        seq: number
-    }>
+    userProfileHonors: ProfileHonorData[]
     userMultiLiveTopScoreCount: { mvp: number; superStar: number }
     userHonorMissions: Array<{ honorMissionType: string; progress: number }>
 }

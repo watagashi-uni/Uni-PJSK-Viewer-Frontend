@@ -9,7 +9,7 @@ import { ref, watch, computed, onMounted } from 'vue'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
 import { handleSvgImageError } from '@/utils/imageRetry'
-import { getHonorLevelAppearance } from '@/utils/honorAppearance'
+import { getHonorLevelAppearance, resolveProfileHonorStyle, type HonorStyleOption } from '@/utils/honorAppearance'
 
 // ---------- Types ----------
 interface HonorLevel {
@@ -51,6 +51,8 @@ const props = withDefaults(defineProps<{
   sub?: boolean
   backgroundAssetbundleName?: string
   wordAssetbundleName?: string
+  honorBackgroundId?: number | null
+  honorWordId?: number | null
   userHonorMissions?: Array<{ honorMissionType: string; progress: number }>
   progress?: number
 }>(), {
@@ -96,13 +98,24 @@ const viewBoxWidth = computed(() => props.sub ? 180 : 380)
 const honorRarity = computed(() => honor.value?.honorRarity ||
   honor.value?.levels.find(level => level.level === props.honorLevel)?.honorRarity)
 
+const hasProfileHonorStyle = computed(() => honor.value?.id === props.honorId &&
+  honorGroup.value?.honorType === 'character' &&
+  ((props.honorBackgroundId ?? 0) > 0 || (!props.sub && (props.honorWordId ?? 0) > 0)))
+
 const characterArt = computed(() => {
   const rarity = ['low', 'middle', 'high', 'highest'].indexOf(honorRarity.value ?? '') + 1
-  if (honorGroup.value?.honorType !== 'character' || !props.backgroundAssetbundleName ||
-    (!props.sub && (!rarity || !props.wordAssetbundleName))) return null
+  const group = honorGroup.value
+  if (group?.honorType !== 'character' || honor.value?.id !== props.honorId) return null
+  const backgroundBundle = props.backgroundAssetbundleName ?? (hasProfileHonorStyle.value
+    ? resolveProfileHonorStyle(masterStore.cache.honorBackgrounds, group.id, props.honorBackgroundId)
+    : undefined)
+  const wordBundle = props.wordAssetbundleName ?? (hasProfileHonorStyle.value && !props.sub
+    ? resolveProfileHonorStyle(masterStore.cache.honorWords, group.id, props.honorWordId)
+    : undefined)
+  if (!backgroundBundle || (!props.sub && (!rarity || !wordBundle))) return null
   const root = `${assetsHost.value}/startapp`
-  const background = `${root}/honor_background/${props.backgroundAssetbundleName}/degree_${props.sub ? 'sub' : 'main'}.png`
-  const word = props.sub ? '' : `${root}/honor_word/${props.wordAssetbundleName}_0${rarity}.png`
+  const background = `${root}/honor_background/${backgroundBundle}/degree_${props.sub ? 'sub' : 'main'}.png`
+  const word = props.sub ? '' : `${root}/honor_word/${wordBundle}_0${rarity}.png`
   return { background, word }
 })
 
@@ -287,6 +300,16 @@ function buildLevelIcon(h: HonorInfo, group?: HonorGroup) {
 
 // ---------- Lifecycle ----------
 onMounted(() => loadHonor())
+
+watch([hasProfileHonorStyle, () => props.sub, () => masterStore.cacheRevision], ([hasStyle, sub]) => {
+  if (!hasStyle) return
+  if (!masterStore.cache.honorBackgrounds) {
+    void masterStore.getMaster<HonorStyleOption>('honorBackgrounds').catch(() => {})
+  }
+  if (!sub && !masterStore.cache.honorWords) {
+    void masterStore.getMaster<HonorStyleOption>('honorWords').catch(() => {})
+  }
+})
 
 watch(() => [props.honorId, props.honorLevel, props.sub, props.userHonorMissions], () => {
   // 重置

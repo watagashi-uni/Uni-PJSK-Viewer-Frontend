@@ -5,7 +5,7 @@ import ts from 'typescript'
 
 const source = readFileSync(new URL('../src/utils/honorAppearance.ts', import.meta.url), 'utf8')
 const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext } }).outputText
-const { getHonorLevelAppearance, getHonorStyleOptions } = await import(`data:text/javascript,${encodeURIComponent(compiled)}`)
+const { getHonorLevelAppearance, getHonorStyleOptions, resolveProfileHonorStyle } = await import(`data:text/javascript,${encodeURIComponent(compiled)}`)
 
 test('level dots cycle every ten levels and the medal advances on the next level', () => {
   for (const [level, normalDots, upgradedDots, medalTier] of [
@@ -25,4 +25,17 @@ test('character art stays on the default until the matching level unlocks the al
   assert.deepEqual(getHonorStyleOptions(styles, levels, 16), styles)
   assert.deepEqual(getHonorStyleOptions(styles, [], 16), [styles[0]])
   assert.deepEqual(getHonorStyleOptions([], levels, 11), [])
+})
+
+test('profile honor artwork uses the saved selection and falls back to the group default', () => {
+  const styles = [
+    { id: 12002, seq: 2, honorGroupId: 20, assetbundleName: 'honor_word_20_02' },
+    { id: 12102, seq: 2, honorGroupId: 21, assetbundleName: 'honor_word_21_02' },
+    { id: 12001, seq: 1, honorGroupId: 20, assetbundleName: 'honor_word_20_01' },
+  ]
+  assert.equal(resolveProfileHonorStyle(styles, 20, 12002), 'honor_word_20_02')
+  assert.equal(resolveProfileHonorStyle(styles, 20, null), 'honor_word_20_01')
+  assert.equal(resolveProfileHonorStyle(styles, 20, 12102), 'honor_word_20_01')
+  assert.equal(resolveProfileHonorStyle(styles, 99, 12002), undefined)
+  assert.equal(resolveProfileHonorStyle(undefined, 20, 12002), undefined)
 })
