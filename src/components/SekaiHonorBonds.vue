@@ -51,7 +51,7 @@ const props = withDefaults(defineProps<{
   honorId: number
   honorLevel: number
   bondsHonorWordId?: number
-  bondsHonorViewType?: string  // "normal" | "reverse"
+  bondsHonorViewType?: string
   sub?: boolean
 }>(), {
   bondsHonorWordId: 0,
@@ -116,6 +116,9 @@ function parseColor(code: string | undefined): string {
 
 // ---------- Computed ----------
 const viewBoxWidth = computed(() => props.sub ? 180 : 380)
+const reverseCharacters = computed(() =>
+  props.bondsHonorViewType === 'reverse' || props.bondsHonorViewType === 'reverse_unit_virtual_singer',
+)
 
 const frameImage = computed(() => {
   if (!honor.value) return ''
@@ -125,13 +128,13 @@ const frameImage = computed(() => {
 
 const leftColor = computed(() => {
   if (gameCharas.value.length < 2) return '#333333'
-  const idx = props.bondsHonorViewType === 'normal' ? 0 : 1
+  const idx = reverseCharacters.value ? 1 : 0
   return parseColor(gameCharas.value[idx]?.colorCode)
 })
 
 const rightColor = computed(() => {
   if (gameCharas.value.length < 2) return '#333333'
-  const idx = props.bondsHonorViewType === 'normal' ? 1 : 0
+  const idx = reverseCharacters.value ? 0 : 1
   return parseColor(gameCharas.value[idx]?.colorCode)
 })
 
@@ -207,7 +210,9 @@ async function loadHonor() {
   if (props.bondsHonorWordId) {
     const word = bondsHonorWords.find(w => w.id === props.bondsHonorWordId)
     if (word) {
-      const url = `${assetsHost.value}/startapp/bonds_honor/word/${word.assetbundleName}_01.png`
+      // 游戏按称号稀有度取字样：low/middle/high 对应 _01/_02/_03。
+      const rarityIndex = ['low', 'middle', 'high', 'highest'].indexOf(foundHonor.honorRarity) + 1 || 1
+      const url = `${assetsHost.value}/startapp/bonds_honor/word/${word.assetbundleName}_${String(rarityIndex).padStart(2, '0')}.png`
       wordImage.value = url
       try {
         const size = await getRemoteImageSize(url)
@@ -221,10 +226,8 @@ async function loadHonor() {
 
   // 加载角色 SD 图
   if (chara1 && chara2) {
-    const leftCharaId = props.bondsHonorViewType === 'normal'
-      ? chara1.gameCharacterId : chara2.gameCharacterId
-    const rightCharaId = props.bondsHonorViewType === 'normal'
-      ? chara2.gameCharacterId : chara1.gameCharacterId
+    const leftCharaId = reverseCharacters.value ? chara2.gameCharacterId : chara1.gameCharacterId
+    const rightCharaId = reverseCharacters.value ? chara1.gameCharacterId : chara2.gameCharacterId
 
     const leftUrl = `${assetsHost.value}/startapp/bonds_honor/character/chr_sd_${String(leftCharaId).padStart(2, '0')}_01.png`
     const rightUrl = `${assetsHost.value}/startapp/bonds_honor/character/chr_sd_${String(rightCharaId).padStart(2, '0')}_01.png`
@@ -325,7 +328,7 @@ watch(() => [props.honorId, props.honorLevel, props.bondsHonorWordId, props.bond
       fill-opacity="0"
     />
 
-    <template v-if="sub">
+    <g v-if="sub" class="bonds-portraits">
       <!-- sub 模式下用嵌套 svg 的 viewport 做左右半区裁剪，避免角色越界到另一侧 -->
       <svg :x="subLeftClipX" y="0" :width="subHalfClipWidth" height="80" overflow="hidden">
         <image
@@ -349,8 +352,8 @@ watch(() => [props.honorId, props.honorLevel, props.bondsHonorWordId, props.bond
           @error="handleSvgImageError"
         />
       </svg>
-    </template>
-    <template v-else>
+    </g>
+    <g v-else class="bonds-portraits">
       <!-- 左侧角色 -->
       <image
         v-if="sdLeft"
@@ -371,7 +374,7 @@ watch(() => [props.honorId, props.honorLevel, props.bondsHonorWordId, props.bond
         :width="sdRightWidth"
         @error="handleSvgImageError"
       />
-    </template>
+    </g>
 
     <!-- 台词文字 -->
     <image
@@ -387,7 +390,7 @@ watch(() => [props.honorId, props.honorLevel, props.bondsHonorWordId, props.bond
       v-for="idx in levelStarsNormal"
       :key="'star-' + idx"
       href="/honor/icon_degreeLv.png"
-      :x="50 + (idx - 1) * 16"
+      :x="50 + (idx - 1) * (sub ? 14 : 16)"
       y="64"
       :height="sub ? 14 : 16"
       :width="sub ? 14 : 16"
@@ -397,7 +400,7 @@ watch(() => [props.honorId, props.honorLevel, props.bondsHonorWordId, props.bond
       v-for="idx in levelStarsGold"
       :key="'gold-' + idx"
       href="/honor/icon_degreeLv6.png"
-      :x="50 + (idx - 1) * 16"
+      :x="50 + (idx - 1) * (sub ? 14 : 16)"
       y="64"
       :height="sub ? 14 : 16"
       :width="sub ? 14 : 16"
@@ -421,5 +424,10 @@ watch(() => [props.honorId, props.honorLevel, props.bondsHonorWordId, props.bond
   min-width: 0;
   height: auto;
   display: block;
+}
+
+.bonds-portraits {
+  /* Match the background capsule in SVG coordinates without a URL fragment. */
+  clip-path: inset(0 10px round 40px) view-box;
 }
 </style>

@@ -9,6 +9,7 @@ import { ref, watch, computed, onMounted } from 'vue'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
 import { handleSvgImageError } from '@/utils/imageRetry'
+import { getHonorLevelAppearance, getLiveMasterHonorStarCount, resolveProfileHonorStyle, type HonorStyleOption } from '@/utils/honorAppearance'
 
 // ---------- Types ----------
 interface HonorLevel {
@@ -40,6 +41,7 @@ interface HonorGroup {
   honorType: string
   backgroundAssetbundleName?: string
   frameName?: string
+  isMedalDisplayed?: boolean
 }
 
 // ---------- Props ----------
@@ -47,10 +49,18 @@ const props = withDefaults(defineProps<{
   honorId: number
   honorLevel: number
   sub?: boolean
+  backgroundAssetbundleName?: string
+  wordAssetbundleName?: string
+  honorBackgroundId?: number | null
+  honorWordId?: number | null
   userHonorMissions?: Array<{ honorMissionType: string; progress: number }>
   progress?: number
 }>(), {
   sub: false,
+  backgroundAssetbundleName: undefined,
+  wordAssetbundleName: undefined,
+  honorBackgroundId: null,
+  honorWordId: null,
   userHonorMissions: () => [],
   progress: undefined
 })
@@ -81,13 +91,49 @@ const degreeImage = ref('')
 const degreeFrameImage = ref('')
 const degreeRankImage = ref('')
 const degreeLevelIcon = ref('/honor/icon_degreeLv.png')
+const failedCustomImage = ref('')
 const isDrawHonorLevel = ref(true)
 const isWorldLinkDegree = ref(false)
 const isLiveMaster = ref(false)
-const liveMasterProgress = ref(0)
 
 // ---------- Computed ----------
 const viewBoxWidth = computed(() => props.sub ? 180 : 380)
+const honorRarity = computed(() => honor.value?.honorRarity ||
+  honor.value?.levels.find(level => level.level === props.honorLevel)?.honorRarity)
+
+const hasProfileHonorStyle = computed(() => honor.value?.id === props.honorId &&
+  honorGroup.value?.honorType === 'character' &&
+  ((props.honorBackgroundId ?? 0) > 0 || (!props.sub && (props.honorWordId ?? 0) > 0)))
+
+const characterArt = computed(() => {
+  const rarity = ['low', 'middle', 'high', 'highest'].indexOf(honorRarity.value ?? '') + 1
+  const group = honorGroup.value
+  if (group?.honorType !== 'character' || honor.value?.id !== props.honorId) return null
+  const backgroundBundle = props.backgroundAssetbundleName ?? (hasProfileHonorStyle.value
+    ? resolveProfileHonorStyle(masterStore.cache.honorBackgrounds, group.id, props.honorBackgroundId)
+    : undefined)
+  const wordBundle = props.wordAssetbundleName ?? (hasProfileHonorStyle.value && !props.sub
+    ? resolveProfileHonorStyle(masterStore.cache.honorWords, group.id, props.honorWordId)
+    : undefined)
+  if (!backgroundBundle || (!props.sub && (!rarity || !wordBundle))) return null
+  const root = `${assetsHost.value}/startapp`
+  const background = `${root}/honor_background/${backgroundBundle}/degree_${props.sub ? 'sub' : 'main'}.png`
+  const word = props.sub ? '' : `${root}/honor_word/${wordBundle}_0${rarity}.png`
+  return { background, word }
+})
+
+const customArt = computed(() => {
+  const art = characterArt.value
+  return art && failedCustomImage.value !== `${art.background}|${art.word}` ? art : null
+})
+
+function onCustomImageError(event: Event) {
+  const art = customArt.value
+  const href = (event.currentTarget as SVGImageElement).getAttribute('href')
+  if (art && (href === art.background || href === art.word)) {
+    failedCustomImage.value = `${art.background}|${art.word}`
+  }
+}
 
 const effectiveAssetbundleName = computed(() => {
   if (!honor.value) return ''
@@ -99,29 +145,30 @@ const effectiveAssetbundleName = computed(() => {
   return ''
 })
 
-const levelStarsNormal = computed(() => {
-  if (isLiveMaster.value || !props.honorLevel || !isDrawHonorLevel.value) return 0
-  return Math.min(5, props.honorLevel)
+const levelAppearance = computed(() => {
+  const level = isLiveMaster.value || !isDrawHonorLevel.value ? 0 : props.honorLevel
+  if (honorGroup.value?.honorType === 'birthday' && honorGroup.value.frameName) {
+    return { normalDots: Math.min(5, level), upgradedDots: 0, medalTier: 0 }
+  }
+  return getHonorLevelAppearance(level, honorGroup.value?.isMedalDisplayed === true)
 })
 
-const levelStarsGold = computed(() => {
-  if (isLiveMaster.value || !props.honorLevel || !isDrawHonorLevel.value) return 0
-  return Math.max(0, props.honorLevel - 5)
-})
+const medalImage = computed(() => levelAppearance.value.medalTier
+  ? `${assetsHost.value}/startapp/honor_medal/medal/icon_degree_medal${levelAppearance.value.medalTier}.png`
+  : '')
 
 const starStartX = computed(() => {
   if (honorGroup.value?.honorType === 'birthday') return 180
   return 50
 })
 
+const liveMasterProgress = computed(() => props.progress ?? props.userHonorMissions?.find(
+  mission => mission.honorMissionType === honor.value?.honorMissionType,
+)?.progress ?? 0)
+
 const liveMasterStars = computed(() => {
   if (!isLiveMaster.value) return []
-  // 这里的算法根据 Python 代码似乎是 (progress // 10) % 10 + 1 ?
-  // Python: star_count = (progress // 10) % 10 + 1
-  // Wait, Python: (progress // 10) % 10 + 1. 
-  // Example: 629 -> 62 // 10 = 6? No. 629 // 10 = 62. 62 % 10 = 2. 2+1=3 stars.
-  // Example: 598 -> 59 % 10 = 9. 9+1=10 stars.
-  const starCount = Math.floor(liveMasterProgress.value / 10) % 10 + 1
+  const starCount = getLiveMasterHonorStarCount(props.honorLevel)
   
   const starsPos = [
     { x: 223, y: 68 - 8 }, { x: 216, y: 56 - 8 }, { x: 208, y: 42 - 8 }, { x: 216, y: 27 - 8 }, { x: 223, y: 13 - 8 },
@@ -157,12 +204,6 @@ async function loadHonor() {
     isLiveMaster.value = !foundHonor.assetbundleName && !!foundHonor.honorMissionType
     
     if (isLiveMaster.value) {
-      if (props.progress !== undefined) {
-        liveMasterProgress.value = props.progress
-      } else {
-        const mission = props.userHonorMissions?.find(m => m.honorMissionType === foundHonor.honorMissionType)
-        liveMasterProgress.value = mission?.progress || 0
-      }
       isDrawHonorLevel.value = false // Live Master 不画普通星星
     } else {
       // 普通称号星星逻辑
@@ -183,7 +224,7 @@ async function loadHonor() {
 
     // 构建各部分图片
     buildDegreeImage(foundHonor, foundGroup)
-    buildFrameImage(foundHonor, foundGroup)
+    buildFrameImage(foundGroup)
     buildRankImage(foundHonor, foundGroup)
     buildLevelIcon(foundHonor, foundGroup)
   } catch {
@@ -202,9 +243,9 @@ function buildDegreeImage(_h: HonorInfo, group?: HonorGroup) {
   }
 }
 
-function buildFrameImage(h: HonorInfo, group?: HonorGroup) {
+function buildFrameImage(group?: HonorGroup) {
   const suffix = props.sub ? 's' : 'm'
-  const rarity: string | undefined = h.honorRarity || h.levels.find(l => l.level === props.honorLevel)?.honorRarity
+  const rarity = honorRarity.value
   if (!rarity) return
 
   // Live Master 可能会有 frameName? Python 没明确说，但 honors.json 可能会有
@@ -256,7 +297,17 @@ function buildLevelIcon(h: HonorInfo, group?: HonorGroup) {
 // ---------- Lifecycle ----------
 onMounted(() => loadHonor())
 
-watch(() => [props.honorId, props.honorLevel, props.sub, props.userHonorMissions], () => {
+watch([hasProfileHonorStyle, () => props.sub, () => masterStore.cacheRevision], ([hasStyle, sub]) => {
+  if (!hasStyle) return
+  if (!masterStore.cache.honorBackgrounds) {
+    void masterStore.getMaster<HonorStyleOption>('honorBackgrounds').catch(() => {})
+  }
+  if (!sub && !masterStore.cache.honorWords) {
+    void masterStore.getMaster<HonorStyleOption>('honorWords').catch(() => {})
+  }
+})
+
+watch(() => [props.honorId, props.honorLevel, props.sub], () => {
   // 重置
   degreeImage.value = ''
   degreeFrameImage.value = ''
@@ -274,6 +325,17 @@ watch(() => [props.honorId, props.honorLevel, props.sub, props.userHonorMissions
   >
     <!-- 背景图 -->
     <image
+      v-if="customArt"
+      :key="customArt.background"
+      :href="customArt.background"
+      x="0" y="0"
+      height="80"
+      :width="viewBoxWidth"
+      @error="onCustomImageError"
+    />
+    <image
+      v-else
+      :key="degreeImage"
       :href="degreeImage"
       x="0" y="0"
       height="80"
@@ -281,6 +343,15 @@ watch(() => [props.honorId, props.honorLevel, props.sub, props.userHonorMissions
       @error="handleSvgImageError"
     />
     <!-- 边框 -->
+    <image
+      v-if="customArt?.word"
+      :key="customArt.word"
+      :href="customArt.word"
+      x="0" y="0"
+      height="80"
+      :width="viewBoxWidth"
+      @error="onCustomImageError"
+    />
     <image
       v-if="degreeFrameImage"
       :href="degreeFrameImage"
@@ -328,7 +399,7 @@ watch(() => [props.honorId, props.honorLevel, props.sub, props.userHonorMissions
     <template v-else>
       <!-- 等级星星 (≤5) -->
       <image
-        v-for="idx in levelStarsNormal"
+        v-for="idx in levelAppearance.normalDots"
         :key="'star-' + idx"
         :href="degreeLevelIcon"
         :x="starStartX + (idx - 1) * 16"
@@ -338,7 +409,7 @@ watch(() => [props.honorId, props.honorLevel, props.sub, props.userHonorMissions
       />
       <!-- 等级金星 (>5) -->
       <image
-        v-for="idx in levelStarsGold"
+        v-for="idx in levelAppearance.upgradedDots"
         :key="'gold-' + idx"
         href="/honor/icon_degreeLv6.png"
         :x="50 + (idx - 1) * 16"
@@ -354,6 +425,15 @@ watch(() => [props.honorId, props.honorLevel, props.sub, props.userHonorMissions
         :y="isWorldLinkDegree ? 0 : (sub ? 40 : 0)"
         :width="isWorldLinkDegree ? viewBoxWidth : (sub ? 158 : 180)"
         :height="isWorldLinkDegree ? 80 : (sub ? 40 : 78)"
+        @error="handleSvgImageError"
+      />
+      <image
+        v-if="medalImage"
+        :key="medalImage"
+        :href="medalImage"
+        x="0" y="0"
+        :width="sub ? 52 : 64"
+        :height="sub ? 58 : 72"
         @error="handleSvgImageError"
       />
     </template>

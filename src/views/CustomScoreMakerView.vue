@@ -15,6 +15,7 @@ import { difficultyStyle } from '@/utils/difficulty'
 import { cardImageVariant } from '@/utils/card'
 import { trackEvent } from '@/utils/analytics'
 import { useCharacterName } from '@/composables/useCharacterName'
+import type { ProfileHonorData } from '@/types/profile'
 import ZhText from '@/components/ZhText.vue'
 
 type FeedTab = 'ranking' | 'new' | 'search' | 'official_all'
@@ -163,15 +164,6 @@ interface AuthorUserCard {
   defaultImage?: string
 }
 
-interface AuthorProfileHonor {
-  seq: number
-  profileHonorType: string
-  honorId: number
-  honorLevel: number
-  bondsHonorViewType: string
-  bondsHonorWordId: number
-}
-
 interface AuthorProfile {
   name: string
   userCard?: AuthorUserCard
@@ -181,7 +173,7 @@ interface AuthorProfile {
     twitterId?: string
     profileImageType?: string
   }
-  userProfileHonors?: AuthorProfileHonor[]
+  userProfileHonors?: ProfileHonorData[]
   userHonorMissions?: Array<{ honorMissionType: string; progress: number }>
   isMysekaiOwnerAcceptVisitForFriend?: boolean
   userPlayerFrames?: unknown[]
