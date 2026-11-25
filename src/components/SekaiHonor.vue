@@ -57,6 +57,10 @@ const props = withDefaults(defineProps<{
   progress?: number
 }>(), {
   sub: false,
+  backgroundAssetbundleName: undefined,
+  wordAssetbundleName: undefined,
+  honorBackgroundId: null,
+  honorWordId: null,
   userHonorMissions: () => [],
   progress: undefined
 })
