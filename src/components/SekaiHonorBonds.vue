@@ -210,7 +210,9 @@ async function loadHonor() {
   if (props.bondsHonorWordId) {
     const word = bondsHonorWords.find(w => w.id === props.bondsHonorWordId)
     if (word) {
-      const url = `${assetsHost.value}/startapp/bonds_honor/word/${word.assetbundleName}_01.png`
+      // 游戏按称号稀有度取字样：low/middle/high 对应 _01/_02/_03。
+      const rarityIndex = ['low', 'middle', 'high', 'highest'].indexOf(foundHonor.honorRarity) + 1 || 1
+      const url = `${assetsHost.value}/startapp/bonds_honor/word/${word.assetbundleName}_${String(rarityIndex).padStart(2, '0')}.png`
       wordImage.value = url
       try {
         const size = await getRemoteImageSize(url)

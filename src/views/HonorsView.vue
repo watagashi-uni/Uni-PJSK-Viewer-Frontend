@@ -279,8 +279,9 @@ function honorStyles(honor: HonorData, level: number) {
   }
 }
 
+// 未选择或所选样式在当前等级不可用时，和游戏一样用该组 seq 最小的样式。
 function findHonorStyle(styles: HonorStyleOption[], id?: number | null) {
-  return styles.find(style => style.id === id) ?? styles[styles.length - 1]
+  return styles.find(style => style.id === id) ?? styles[0]
 }
 
 function honorStyleProps(styles: ReturnType<typeof honorStyles>, backgroundId?: number | null, wordId?: number | null) {
@@ -290,9 +291,6 @@ function honorStyleProps(styles: ReturnType<typeof honorStyles>, backgroundId?: 
   return { backgroundAssetbundleName: background?.assetbundleName, wordAssetbundleName: word?.assetbundleName }
 }
 
-const listHonorStyles = computed(() => new Map(paginatedHonors.value.map(honor => [
-  honor.id, honorStyleProps(honorStyles(honor, normalOwnedMap.value.get(honor.id) || maxLevel(honor.levels))),
-])))
 const selectedHonorStyles = computed(() => selectedHonor.value
   ? honorStyles(selectedHonor.value, selectedHonorLevel.value)
   : { backgrounds: [], words: [] })
@@ -516,7 +514,6 @@ onMounted(async () => {
                 :honor-id="honor.id"
                 :honor-level="normalOwnedMap.get(honor.id) || maxLevel(honor.levels)"
                 :progress="honorPreviewProgress(honor, normalOwnedMap.get(honor.id) || maxLevel(honor.levels))"
-                v-bind="listHonorStyles.get(honor.id)"
               />
               <span v-if="normalOwnedMap.has(honor.id)" class="absolute -top-1.5 -right-1.5 badge badge-success badge-xs gap-1 shadow-sm"><CheckCircle2 class="w-3 h-3" />Lv.{{ normalOwnedMap.get(honor.id) }}</span>
             </div>
