@@ -40,5 +40,5 @@ const sub = computed(() => translated.value ? (zhFirst.value ? props.text || '' 
   <span v-if="!sub && mainClass" :class="mainClass" class="block">{{ main }}</span>
   <template v-else-if="!sub">{{ main }}</template>
   <template v-else-if="layout === 'inline'"><span :lang="zhFirst ? 'zh-CN' : undefined">{{ main }}<span v-if="aiMark && zhFirst" class="zh-ai" title="机器翻译">AI</span></span><span class="zh-inline" :class="subClass" :lang="zhFirst ? 'ja' : 'zh-CN'"> / {{ sub }}<span v-if="aiMark && !zhFirst" class="zh-ai" title="机器翻译">AI</span></span></template>
-  <template v-else><span :class="mainClass ? [mainClass, 'block'] : undefined" :lang="zhFirst ? 'zh-CN' : undefined">{{ main }}<span v-if="aiMark && zhFirst" class="zh-ai" title="机器翻译">AI</span></span><span class="zh-sub" :class="subClass" :lang="zhFirst ? 'ja' : 'zh-CN'">{{ sub }}<span v-if="aiMark && !zhFirst" class="zh-ai" title="机器翻译">AI</span></span></template>
+  <template v-else><span :class="mainClass ? [mainClass, 'block'] : undefined" :lang="zhFirst ? 'zh-CN' : undefined"><span class="zh-text">{{ main }}</span><span v-if="aiMark && zhFirst" class="zh-ai" title="机器翻译">AI</span></span><span class="zh-sub" :class="subClass" :lang="zhFirst ? 'ja' : 'zh-CN'"><span class="zh-text">{{ sub }}</span><span v-if="aiMark && !zhFirst" class="zh-ai" title="机器翻译">AI</span></span></template>
 </template>
