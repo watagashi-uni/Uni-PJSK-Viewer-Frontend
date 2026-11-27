@@ -14,9 +14,10 @@ export interface Release {
  */
 export const releases: Release[] = [
   {
-    version: '2.21.13', date: '2026-11-28', title: '逐字歌词亮起不再闪暗',
+    version: '2.21.13', date: '2026-11-28', title: '歌词亮起与换行',
     changes: [
       '修复逐字歌词在下一句亮起时，未唱到的字会先暗一下再恢复的问题。',
+      '同一句中途换人唱时，放得下的整句保持一行显示，放不下时才在换人处换行。',
     ],
   },
   {

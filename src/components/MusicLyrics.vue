@@ -71,8 +71,8 @@ interface Segment { text: string; fill?: Fill }
  * `head`, the bit it must not be separated from when the row wraps; `tail` follows freely.
  */
 type RenderRun =
-  | { kind: 'ruby'; reading: string; segments: Segment[]; avatars?: SingerAvatar[]; timed: boolean; breaks?: boolean }
-  | { kind: 'text'; avatars?: SingerAvatar[]; head: Segment[]; tail: Segment[]; breaks?: boolean }
+  | { kind: 'ruby'; reading: string; segments: Segment[]; avatars?: SingerAvatar[]; timed: boolean; breaks?: boolean; pad?: boolean }
+  | { kind: 'text'; avatars?: SingerAvatar[]; head: Segment[]; tail: Segment[]; breaks?: boolean; pad?: boolean }
 /** From `start` on, these portraits are the ones singing (until the next voice of the line). */
 interface Voice { start: number; keys: string[] }
 interface LineItem { kind: 'line'; start: number; end: number; line: LyricLine; runs: RenderRun[]; singerKeys: string[]; voices?: Voice[] }
@@ -99,6 +99,8 @@ const following = ref(true)
 const anchor = ref(-1)
 /** Rows lit as current: being sung, or about to be (CUE_LEAD_SEC). */
 const activeRows = ref<number[]>([])
+/** Rows where the singers trade off but the whole line fits on one row: kept on one row (see fitVoices). */
+const joined = shallowRef<ReadonlySet<number>>(new Set())
 const viewport = ref<HTMLElement>()
 const track = ref<HTMLElement>()
 
@@ -268,6 +270,8 @@ const items = computed<Item[]>(() => {
     let previousText = ''
     for (const run of runs) {
       if (run.avatars) run.breaks = !!previousText && !previousText.endsWith('\n')
+      // Kept on the same row (see fitVoices), it needs some room unless a space already gives it.
+      if (run.breaks) run.pad = !/\s$/.test(previousText)
       const text = (run.kind === 'ruby' ? run.segments : [...run.head, ...run.tail]).map(s => s.text).join('')
       if (text) previousText = text
     }
@@ -573,9 +577,36 @@ watch(following, (value) => {
   if (value && live.value) follow(true)
 }, { flush: 'post' })
 
+/** Rows where another voice comes in partway through the line. */
+const voiceRows = computed(() => items.value.flatMap((item, index) => item.kind === 'line' && item.runs.some(run => run.breaks) ? [index] : []))
+
+/**
+ * A new voice starts its own row only when the line would wrap anyway. Every such line is laid
+ * out once on a single row, all in one pass, to see whether it fits the width it is given.
+ * Returns whether any row changed.
+ */
+function fitVoices(): boolean {
+  const list = track.value
+  const next = new Set<number>()
+  if (list && voiceRows.value.length) {
+    list.classList.add('ly-measuring')
+    for (const index of voiceRows.value) {
+      const line = rowElement(index)?.querySelector<HTMLElement>('.ly-line')
+      const original = line?.querySelector<HTMLElement>('.ly-original')
+      if (line && original && original.offsetWidth <= line.clientWidth) next.add(index)
+    }
+    list.classList.remove('ly-measuring')
+  }
+  const previous = joined.value
+  if (next.size === previous.size && [...next].every(index => previous.has(index))) return false
+  joined.value = next
+  return true
+}
+
 // Layout changed under the current line: put it back without a flourish.
 watch([translated, rubied, romanized, items, expanded, live, headRows], async () => {
   await nextTick()
+  if (fitVoices()) await nextTick()
   if (!live.value) stopGlides()
   else if (following.value) follow(false)
 }, { flush: 'post' })
@@ -599,8 +630,9 @@ watch(romanized, (value) => {
 
 watch(viewport, (box, _old, onCleanup) => {
   if (!box) return
-  resizeObserver = new ResizeObserver(() => {
+  resizeObserver = new ResizeObserver(async () => {
     box.style.setProperty('--ly-height', `${box.clientHeight}px`)
+    if (fitVoices()) await nextTick()
     if (live.value && following.value) follow(false)
   })
   resizeObserver.observe(box)
@@ -727,12 +759,12 @@ onBeforeUnmount(() => {
               v-for="(item, index) in items"
               :key="index"
               class="ly-row"
-              :class="{ active: isActive(index), past: live && index < anchor, 'ly-row--gap': item.kind === 'gap' }"
+              :class="{ active: isActive(index), past: live && index < anchor, 'ly-row--gap': item.kind === 'gap', 'ly-row--joined': joined.has(index) }"
               :style="rowStyle(index)"
             >
               <div v-if="item.kind === 'gap'" class="ly-gap" aria-hidden="true"><i></i><i></i><i></i></div>
               <button v-else class="ly-line" :aria-current="isActive(index) ? 'true' : undefined" @click="seek(item.start)">
-                <span class="ly-original" lang="ja"><template v-for="(run, n) in item.runs" :key="n"><span v-if="run.kind === 'ruby'" class="ly-ruby" :class="run.avatars && ['ly-glue', { 'ly-glue--break': run.breaks }]"><SingerAvatars v-if="run.avatars" class="ly-handover" :singers="run.avatars" :size="variant === 'immersive' ? 28 : 22" /><ruby><template v-for="(segment, k) in run.segments" :key="k"><span v-if="segment.fill" class="ly-word" :data-s="segment.fill.start" :data-e="segment.fill.end" :data-a="segment.fill.share?.[0]" :data-b="segment.fill.share?.[1]">{{ segment.text }}</span><template v-else>{{ segment.text }}</template></template><template v-if="rubied"><rp>(</rp><rt :class="{ 'ly-word': run.timed }">{{ run.reading }}</rt><rp>)</rp></template></ruby></span><template v-else><span v-if="run.avatars" class="ly-glue" :class="{ 'ly-glue--break': run.breaks }"><SingerAvatars class="ly-handover" :singers="run.avatars" :size="variant === 'immersive' ? 28 : 22" /><template v-for="(segment, k) in run.head" :key="k"><span v-if="segment.fill" class="ly-word" :data-s="segment.fill.start" :data-e="segment.fill.end" :data-a="segment.fill.share?.[0]" :data-b="segment.fill.share?.[1]">{{ segment.text }}</span><template v-else>{{ segment.text }}</template></template></span><template v-for="(segment, k) in run.tail" :key="k"><span v-if="segment.fill" class="ly-word" :data-s="segment.fill.start" :data-e="segment.fill.end" :data-a="segment.fill.share?.[0]" :data-b="segment.fill.share?.[1]">{{ segment.text }}</span><template v-else>{{ segment.text }}</template></template></template></template></span>
+                <span class="ly-original" lang="ja"><template v-for="(run, n) in item.runs" :key="n"><span v-if="run.kind === 'ruby'" class="ly-ruby" :class="run.avatars && ['ly-glue', { 'ly-glue--break': run.breaks, 'ly-glue--pad': run.pad }]"><SingerAvatars v-if="run.avatars" class="ly-handover" :singers="run.avatars" :size="variant === 'immersive' ? 28 : 22" /><ruby><template v-for="(segment, k) in run.segments" :key="k"><span v-if="segment.fill" class="ly-word" :data-s="segment.fill.start" :data-e="segment.fill.end" :data-a="segment.fill.share?.[0]" :data-b="segment.fill.share?.[1]">{{ segment.text }}</span><template v-else>{{ segment.text }}</template></template><template v-if="rubied"><rp>(</rp><rt :class="{ 'ly-word': run.timed }">{{ run.reading }}</rt><rp>)</rp></template></ruby></span><template v-else><span v-if="run.avatars" class="ly-glue" :class="{ 'ly-glue--break': run.breaks, 'ly-glue--pad': run.pad }"><SingerAvatars class="ly-handover" :singers="run.avatars" :size="variant === 'immersive' ? 28 : 22" /><template v-for="(segment, k) in run.head" :key="k"><span v-if="segment.fill" class="ly-word" :data-s="segment.fill.start" :data-e="segment.fill.end" :data-a="segment.fill.share?.[0]" :data-b="segment.fill.share?.[1]">{{ segment.text }}</span><template v-else>{{ segment.text }}</template></template></span><template v-for="(segment, k) in run.tail" :key="k"><span v-if="segment.fill" class="ly-word" :data-s="segment.fill.start" :data-e="segment.fill.end" :data-a="segment.fill.share?.[0]" :data-b="segment.fill.share?.[1]">{{ segment.text }}</span><template v-else>{{ segment.text }}</template></template></template></template></span>
                 <span v-if="romanized && item.line.romaji" class="ly-romaji" lang="ja-Latn">{{ item.line.romaji }}</span>
                 <span v-if="translated && item.line.translation" class="ly-translation" lang="zh-CN">{{ item.line.translation }}</span>
               </button>
@@ -1105,9 +1137,27 @@ onBeforeUnmount(() => {
   white-space: nowrap;
 }
 
-/* When the singers change inside a line, the next voice starts its own row, portrait first. */
+/* When the singers change inside a line, the next voice starts its own row, portrait first,
+   unless the whole line fits on one row (see fitVoices). There the portrait keeps a little
+   room from the words before it, where no space already does. */
 .ly-glue--break::before {
   content: '\A';
+  white-space: pre;
+}
+
+.ly-row--joined .ly-glue--break::before,
+.ly-measuring .ly-glue--break::before {
+  content: none;
+}
+
+.ly-row--joined .ly-glue--pad > .ly-handover,
+.ly-measuring .ly-glue--pad > .ly-handover {
+  margin-left: 0.4em;
+}
+
+/* Measuring: each line laid out on one row (explicit line ends kept) at its natural width. */
+.ly-measuring .ly-original {
+  width: max-content;
   white-space: pre;
 }
 
