@@ -14,6 +14,12 @@ export interface Release {
  */
 export const releases: Release[] = [
   {
+    version: '2.21.11', date: '2026-11-28', title: '歌词滚动提前到位',
+    changes: [
+      '滚动歌词会在下一句开唱前提前滚动并亮起，唱到这一句时已经停在中间，不再慢半拍。',
+    ],
+  },
+  {
     version: '2.21.10', date: '2026-11-25', title: '称号显示与预览修正',
     changes: [
       '角色称号超过 Lv.10 后等级豆重新计数，并显示对应的等级奖牌。',

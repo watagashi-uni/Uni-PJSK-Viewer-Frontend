@@ -53,6 +53,12 @@ const GLIDE_RATE = 10
  * audio clock may read back a hair earlier, which would otherwise leave the line above current.
  */
 const CUE_SLACK_SEC = 0.01
+/**
+ * The view moves on to a line, and lights it, this much before it is sung, so that by its
+ * cue the line has glided into place (see GLIDE_RATE) and is already bright. Its words
+ * still fill on their own times, and the portraits outside follow the voice being heard.
+ */
+const CUE_LEAD_SEC = 0.4
 /** Phone-sized windows, where a line wraps into tall rows and only a few of them are in view. */
 const NARROW_QUERY = '(max-width: 899px)'
 
@@ -89,9 +95,9 @@ const rubied = ref(readPreference(RUBY_KEY))
  */
 const romanized = ref(readPreference(ROMAJI_KEY, false) && !translated.value)
 const following = ref(true)
-/** Row the view is centred on: the last one that has started. -1 before the first. */
+/** Row the view is centred on: the last one that has started, or is about to (CUE_LEAD_SEC). -1 before the first. */
 const anchor = ref(-1)
-/** Rows being sung right now. */
+/** Rows lit as current: being sung, or about to be (CUE_LEAD_SEC). */
 const activeRows = ref<number[]>([])
 const viewport = ref<HTMLElement>()
 const track = ref<HTMLElement>()
@@ -283,11 +289,14 @@ function tick(time: number) {
   const list = items.value
   let last = -1
   const active: number[] = []
+  const sung: number[] = []
   for (let i = 0; i < list.length; i++) {
     const item = list[i]!
-    if (item.start > time + CUE_SLACK_SEC) break
+    if (item.start > time + CUE_LEAD_SEC) break
     last = i
-    if (time < item.end) active.push(i)
+    if (time >= item.end) continue
+    active.push(i)
+    if (item.start <= time + CUE_SLACK_SEC) sung.push(i)
   }
   // Rows of one cue start together: the view rests on the first of them, where the cue begins.
   let rest = last
@@ -296,7 +305,7 @@ function tick(time: number) {
   const previous = activeRows.value
   if (active.length !== previous.length || active.some((row, n) => row !== previous[n])) activeRows.value = active
   paint(time, active)
-  reportSinging(time, active)
+  reportSinging(time, sung)
 }
 
 /** Whoever is heard now: on a line where the singers trade off, the voice that has come in last. */
