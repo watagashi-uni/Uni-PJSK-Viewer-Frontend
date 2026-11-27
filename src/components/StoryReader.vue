@@ -234,6 +234,18 @@ async function jump(line: number) {
     await mountPlayer()
   } else { player?.setAuto(false); await player?.jumpTo(frame.snippetIndex) }
 }
+/**
+ * Once the scene is playing, the next line comes as from a tap on the stage: the line being typed
+ * finishes, then the story moves on. Jumping there instead rebuilds the stage, and the BGM with it.
+ */
+function next() {
+  if (mode.value === 'stage' && playerReady.value && started.value && player) {
+    notice.value = ''
+    player.advance()
+    return
+  }
+  void jump(index.value + 1)
+}
 function toggleAuto() {
   if (!playerReady.value) return
   auto.value = !auto.value
@@ -254,7 +266,7 @@ function keydown(event: KeyboardEvent) {
   }
   if ((event.target as HTMLElement)?.closest('input,textarea,select,button,a') || event.ctrlKey || event.metaKey || event.altKey || mode.value !== 'stage') return
   if (['ArrowRight', 'ArrowLeft', ' '].includes(event.key)) event.preventDefault()
-  if (event.key === 'ArrowRight') void jump(index.value + 1)
+  if (event.key === 'ArrowRight') next()
   if (event.key === 'ArrowLeft') void jump(index.value - 1)
   if (event.key === ' ') toggleAuto()
 }
@@ -322,7 +334,7 @@ onBeforeUnmount(() => {
           <div class="flex items-center gap-1">
             <button class="btn btn-sm btn-circle btn-ghost" aria-label="上一句" :disabled="index === 0 || (mode === 'stage' && !playerReady)" @click="jump(index - 1)"><ChevronLeft class="w-5 h-5" /></button>
             <button class="btn btn-sm btn-primary" :disabled="mode !== 'stage' || !playerReady" :aria-pressed="auto" @click="toggleAuto">{{ auto ? '停止自动' : '自动播放' }}</button>
-            <button class="btn btn-sm btn-circle btn-ghost" aria-label="下一句" :disabled="index >= frames.length - 1 || (mode === 'stage' && !playerReady)" @click="jump(index + 1)"><ChevronRight class="w-5 h-5" /></button>
+            <button class="btn btn-sm btn-circle btn-ghost" aria-label="下一句" :disabled="index >= frames.length - 1 || (mode === 'stage' && !playerReady)" @click="next"><ChevronRight class="w-5 h-5" /></button>
             <span class="text-xs opacity-50">{{ frames.length ? index + 1 : 0 }} / {{ frames.length }}</span>
           </div>
           <div class="flex items-center gap-1">

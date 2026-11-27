@@ -1010,9 +1010,16 @@ onBeforeUnmount(() => {
   white-space: pre-wrap;
 }
 
-/* Sung text is solid, text still to come is faint, and the boundary sweeps across each timed unit. */
+/* Sung text is solid, text still to come is faint, and the boundary sweeps across each timed unit.
+   The shadow that softens a waiting line goes at once here: it is drawn over text filled from
+   its background, so while it faded out the whole line looked sung, then dropped back to faint
+   (lines are lit a moment before their cue, see CUE_LEAD_SEC). The ink is set at once too, or
+   the fill would fade in from the line's transparent waiting colour and the words blink out.
+   Only the line's opacity eases in. */
 .ly-row.active .ly-word {
   --p: -6%;
+  color: var(--ly-ink);
+  text-shadow: none;
   background-image: linear-gradient(to right, currentColor calc(var(--p) - 6%), color-mix(in srgb, currentColor 34%, transparent) calc(var(--p) + 6%));
   background-clip: text;
   -webkit-background-clip: text;
