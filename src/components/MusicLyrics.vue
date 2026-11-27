@@ -972,12 +972,21 @@ onBeforeUnmount(() => {
 /* Lines waiting their turn recede with distance; the reader can still pull any of them forward.
    They are softened by hiding the glyphs and showing only a blurred shadow of them. A blur
    filter on the row would look the same, but Safari draws a black line along the edge of a
-   filtered row that lies next to the line being repainted while it is sung. */
+   filtered row that lies next to the line being repainted while it is sung.
+   The shadow itself is faint, rather than the whole line: a line lit just before its cue then
+   shows its words still to come at about the brightness they had while waiting. Faded with
+   opacity, the faint fill met the line's own low opacity and the words dipped for a moment. */
 .live .ly-line {
-  opacity: var(--ly-rest);
+  opacity: 1;
   color: transparent;
-  text-shadow: 0 0 calc(min(var(--distance, 0), 4) * 1.5px) var(--ly-ink);
+  text-shadow: 0 0 calc(min(var(--distance, 0), 4) * 1.5px) color-mix(in srgb, var(--ly-ink) calc(var(--ly-rest) * 100%), transparent);
   transform: scale(0.96);
+}
+
+/* Portraits are not drawn by the shadow: they recede on their own. */
+.live .ly-line .ly-handover {
+  opacity: var(--ly-rest);
+  transition: opacity 0.5s ease;
 }
 
 .live .ly-row.active .ly-line,
@@ -986,6 +995,24 @@ onBeforeUnmount(() => {
   opacity: 1;
   color: var(--ly-ink);
   text-shadow: none;
+}
+
+.live .ly-row.active .ly-line .ly-handover,
+.live .ly-line:hover .ly-handover,
+.live .ly-line:focus-visible .ly-handover,
+.browsing .ly-line .ly-handover {
+  opacity: 1;
+}
+
+@supports not (color: color-mix(in srgb, red, blue)) {
+  .live .ly-line {
+    opacity: var(--ly-rest);
+    text-shadow: 0 0 calc(min(var(--distance, 0), 4) * 1.5px) var(--ly-ink);
+  }
+
+  .live .ly-line .ly-handover {
+    opacity: 1;
+  }
 }
 
 .live .ly-row.active .ly-line {
@@ -1014,8 +1041,7 @@ onBeforeUnmount(() => {
    The shadow that softens a waiting line goes at once here: it is drawn over text filled from
    its background, so while it faded out the whole line looked sung, then dropped back to faint
    (lines are lit a moment before their cue, see CUE_LEAD_SEC). The ink is set at once too, or
-   the fill would fade in from the line's transparent waiting colour and the words blink out.
-   Only the line's opacity eases in. */
+   the fill would fade in from the line's transparent waiting colour and the words blink out. */
 .ly-row.active .ly-word {
   --p: -6%;
   color: var(--ly-ink);
@@ -1184,6 +1210,22 @@ onBeforeUnmount(() => {
     transform: none !important;
     color: var(--ly-ink) !important;
     text-shadow: none !important;
+  }
+
+  /* Lines waiting their turn are plain faint text here, with no shadow to fade. */
+  .live .ly-line {
+    color: color-mix(in srgb, var(--ly-ink) calc(var(--ly-rest) * 100%), transparent) !important;
+  }
+
+  .live .ly-row.active .ly-line,
+  .live .ly-line:hover,
+  .live .ly-line:focus-visible,
+  .browsing .ly-line {
+    color: var(--ly-ink) !important;
+  }
+
+  .ly-handover {
+    transition: none !important;
   }
 
   .ly-gap i {
