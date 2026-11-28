@@ -1,7 +1,7 @@
 import type { Component } from 'vue'
 import {
   Home, Music, Image, Users, Shirt, Trophy, Smile, Boxes, Wrench, BookOpen,
-  Calendar, BarChart3, Gift, Radio, CalendarDays,
+  Calendar, BarChart3, Gift, Radio, AudioLines, CalendarDays,
   Zap, FileImage, PenLine, Dices,
   User, History, Layers3, House, Settings, Info, Megaphone,
 } from 'lucide-vue-next'
@@ -52,6 +52,7 @@ export const navGroups: NavGroup[] = [
       { to: '/ranking', label: '实时榜线', icon: BarChart3, description: '当期活动的排名和分数线', keywords: 'ranking 排行 榜单 分数线' },
       { to: '/gachas', label: '卡池', icon: Gift, description: '招募卡池和出现率', keywords: 'gacha 招募 抽卡 扭蛋' },
       { to: '/vlives', label: '虚拟 Live', icon: Radio, description: '演出排期和节目单', keywords: 'virtual live 演唱会 afterlive' },
+      { to: '/connect-live', label: 'Connect Live', icon: AudioLines, description: '历届 Connect Live 的曲目、演唱者和音源', keywords: 'connect live コネクトライブ 演唱会 公演 音源 串烧 メドレー' },
       { to: '/calendar', label: '游戏日历', icon: CalendarDays, description: '活动、卡池、歌曲和生日的日程', keywords: 'calendar 日程 时间表' },
     ],
   },

@@ -5,6 +5,8 @@ import {
   linePerformerIds, loadSongLyrics, lyricGaps, lyricParts, lyricRuns, lyricsForVocal, pieceProgress, untimedFill, wordProgress,
   SAME_CUE_SEC, type LyricLine, type LyricsPayload, type LyricWord,
 } from '@/api/lyrics'
+import { loadConnectLiveLyrics } from '@/api/connectLive'
+import type { ConnectLiveRef } from '@/utils/playerTracks'
 import { useMasterStore } from '@/stores/master'
 import { useSingerAvatars } from '@/composables/useSingerAvatars'
 import SingerAvatars, { type SingerAvatar } from '@/components/player/SingerAvatars.vue'
@@ -28,7 +30,9 @@ const props = withDefaults(defineProps<{
   trimStart?: number
   /** panel: a card inside a page. immersive: fills a dark full-screen view. sidebar: fills a narrow column beside the page. */
   variant?: 'panel' | 'immersive' | 'sidebar'
-}>(), { vocalId: undefined, assetbundle: undefined, vocalType: undefined, clock: undefined, trimStart: 0, variant: 'panel' })
+  /** A Connect Live recording: its own lyrics resource, timed for that recording. */
+  connectLive?: ConnectLiveRef
+}>(), { vocalId: undefined, assetbundle: undefined, vocalType: undefined, clock: undefined, trimStart: 0, variant: 'panel', connectLive: undefined })
 
 const emit = defineEmits<{
   seek: [time: number]
@@ -132,7 +136,8 @@ async function load() {
   failed.value = false
   following.value = true
   try {
-    const data = await loadSongLyrics(props.musicId)
+    const live = props.connectLive
+    const data = live ? await loadConnectLiveLyrics(live.bundle, live.lyrics) : await loadSongLyrics(props.musicId)
     if (serial === request) resource.value = data
   } catch {
     if (serial === request) failed.value = true
@@ -140,13 +145,15 @@ async function load() {
     if (serial === request) loading.value = false
   }
 }
-watch(() => props.musicId, load, { immediate: true })
+watch(() => [props.musicId, props.connectLive?.bundle, props.connectLive?.lyrics], load, { immediate: true })
 
 /**
  * The lines for the rendition being heard. Every rendition is sung to the same backing
  * track and shares one timeline; the singers are shown where they were annotated for it.
  */
-const selection = computed(() => resource.value && lyricsForVocal(resource.value, { vocalId: props.vocalId, assetbundle: props.assetbundle }))
+const selection = computed(() => resource.value && lyricsForVocal(resource.value, props.connectLive
+  ? { assetbundle: props.connectLive.bundle }
+  : { vocalId: props.vocalId, assetbundle: props.assetbundle }))
 const lyrics = computed(() => selection.value?.lyrics ?? null)
 // Another rendition picked: back to the current line.
 watch([() => props.vocalId, () => props.assetbundle], () => resume())

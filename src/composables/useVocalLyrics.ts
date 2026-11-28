@@ -1,6 +1,14 @@
 import { computed, ref, shallowRef, watch } from 'vue'
 import { loadSongLyrics, lyricsForVocal, type LyricsPayload } from '@/api/lyrics'
+import { loadConnectLiveLyrics } from '@/api/connectLive'
 import type { PlayerTrackInfo } from '@/utils/playerTracks'
+
+/** Which lyrics resource a track reads: the song's, or the one timed for a Connect Live recording. */
+export function lyricsKey(track: PlayerTrackInfo | null | undefined): string | undefined {
+  if (!track) return undefined
+  if (track.connectLive) return `live:${track.connectLive.bundle}:${track.connectLive.lyrics ?? ''}`
+  return `song:${track.musicId}`
+}
 
 /**
  * The lyrics of a song rendition, timed for the audio being heard, as the karaoke views use them.
@@ -9,17 +17,18 @@ import type { PlayerTrackInfo } from '@/utils/playerTracks'
  */
 export function useVocalLyrics(track: () => PlayerTrackInfo | null | undefined) {
   const resource = shallowRef<LyricsPayload | null>(null)
-  const loadedFor = ref<number | null>(null)
+  const loadedFor = ref<string | null>(null)
   const state = ref<'idle' | 'loading' | 'ready' | 'failed'>('idle')
   let request = 0
 
-  async function load(musicId: number) {
+  async function load(key: string, current: PlayerTrackInfo) {
     const serial = ++request
-    loadedFor.value = musicId
+    loadedFor.value = key
     resource.value = null
     state.value = 'loading'
     try {
-      const data = await loadSongLyrics(musicId)
+      const live = current.connectLive
+      const data = live ? await loadConnectLiveLyrics(live.bundle, live.lyrics) : await loadSongLyrics(current.musicId)
       if (serial !== request) return
       resource.value = data
       state.value = 'ready'
@@ -28,15 +37,17 @@ export function useVocalLyrics(track: () => PlayerTrackInfo | null | undefined) 
     }
   }
 
-  watch(() => track()?.musicId, (musicId) => {
-    if (musicId !== undefined && (musicId !== loadedFor.value || state.value === 'failed')) void load(musicId)
+  watch(() => lyricsKey(track()), (key) => {
+    const current = track()
+    if (key !== undefined && current && (key !== loadedFor.value || state.value === 'failed')) void load(key, current)
   }, { immediate: true })
 
   const selection = computed(() => {
     const data = resource.value
     const current = track()
-    if (!data || !current || data.musicId !== current.musicId) return null
-    return lyricsForVocal(data, { vocalId: current.vocalId, assetbundle: current.vocalAssetbundle })
+    if (!data || !current || loadedFor.value !== lyricsKey(current)) return null
+    if (!current.connectLive && data.musicId !== current.musicId) return null
+    return lyricsForVocal(data, { vocalId: current.connectLive ? undefined : current.vocalId, assetbundle: current.vocalAssetbundle })
   })
   const lyrics = computed(() => (selection.value?.lyrics.lines.length ? selection.value.lyrics : null))
   const instrumental = computed(() => track()?.vocalType === 'instrumental')

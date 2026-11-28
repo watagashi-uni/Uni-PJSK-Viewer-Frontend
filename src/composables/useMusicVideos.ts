@@ -45,7 +45,8 @@ export function useMusicVideos() {
   }
 
   function sourcesFor(track: { musicId: number; vocalId: number; vocalType: string } | null | undefined): MusicVideoSource[] {
-    if (!track) return []
+    // A Connect Live recording is its own performance: the game MVs are timed for other audio.
+    if (!track || track.vocalType === 'connect_live') return []
     return musicVideoSources(track.musicId, { id: track.vocalId, type: track.vocalType }, categories.value?.get(track.musicId), variants.value.get(track.vocalId))
   }
 

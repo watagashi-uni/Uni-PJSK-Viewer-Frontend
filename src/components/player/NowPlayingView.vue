@@ -91,9 +91,13 @@ watch([glowA, glowB, () => player.isPlaying], ([a, b, playing]) => {
 const renditions = ref<PlayerTrackInfo[]>([])
 const vocalMenuOpen = ref(false)
 let renditionRequest = 0
-watch([() => track.value?.musicId, open], async ([musicId, isOpen]) => {
+watch([() => (track.value?.connectLive ? undefined : track.value?.musicId), open], async ([musicId, isOpen]) => {
   vocalMenuOpen.value = false
-  if (!isOpen || musicId === undefined) return
+  // A Connect Live recording is one performance: it has no other renditions to switch to.
+  if (!isOpen || musicId === undefined) {
+    if (track.value?.connectLive) renditions.value = []
+    return
+  }
   if (renditions.value[0]?.musicId === musicId) return
   const serial = ++renditionRequest
   renditions.value = []
@@ -123,9 +127,10 @@ function close() {
 }
 
 function openSongPage() {
-  const id = track.value?.musicId
+  const current = track.value
   close()
-  if (id !== undefined) void router.push(`/musics/${id}`)
+  if (current?.connectLive) void router.push(`/connect-live/${current.connectLive.liveId}`)
+  else if (current) void router.push(`/musics/${current.musicId}`)
 }
 
 function seekFromLyrics(time: number) {
@@ -271,7 +276,7 @@ onBeforeUnmount(() => { document.documentElement.style.overflow = '' })
                 <button class="np-icon" aria-label="下一首" title="下一首" :disabled="!player.hasNext" @click="player.next()">
                   <SkipForward class="h-7 w-7" fill="currentColor" />
                 </button>
-                <button class="np-icon np-icon--small" aria-label="歌曲详情" title="歌曲详情" @click="openSongPage">
+                <button class="np-icon np-icon--small" :aria-label="track.connectLive ? '演出详情' : '歌曲详情'" :title="track.connectLive ? '演出详情' : '歌曲详情'" @click="openSongPage">
                   <Info class="h-5 w-5" />
                 </button>
               </div>
@@ -307,6 +312,7 @@ onBeforeUnmount(() => { document.documentElement.style.overflow = '' })
               :playing="player.isPlaying"
               :clock="player.sampleTime"
               :trim-start="track.trimStart"
+              :connect-live="track.connectLive"
               @seek="seekFromLyrics"
               @singing="singing = $event"
             />

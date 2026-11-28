@@ -9,9 +9,10 @@ import {
   shuffleUpcoming as shuffleUpcomingState, type QueueState, type RepeatMode,
 } from '@/utils/playerQueue'
 import {
-  buildTrack, isPlayerTrack, loadTrackSources, trackAudioPath, trackCoverPath, trackFor,
+  buildTrack, isPlayerTrack, loadTrackSources, sameRecording, trackAudioPath, trackCoverPath, trackFor,
   type PlayerTrack, type PlayerTrackInfo, type TrackSources,
 } from '@/utils/playerTracks'
+import { CONNECT_LIVE_HOST } from '@/api/connectLive'
 
 const STORAGE_KEY = 'player_state'
 const LYRICS_SIDEBAR_KEY = 'player_lyricsSidebar'
@@ -91,7 +92,8 @@ export const usePlayerStore = defineStore('player', () => {
 
   /** The original MP3 (downloads); playback uses the 192 kbps rendition. */
   function audioUrl(track: PlayerTrackInfo): string {
-    return `${settings.assetsHost}${trackAudioPath(track)}`
+    // Connect Live recordings are only published on the overseas host.
+    return `${track.connectLive ? CONNECT_LIVE_HOST : settings.assetsHost}${trackAudioPath(track)}`
   }
 
   function coverUrl(track: PlayerTrackInfo): string {
@@ -413,12 +415,18 @@ export const usePlayerStore = defineStore('player', () => {
   }
 
   function sameRendition(a: PlayerTrackInfo, b: PlayerTrackInfo): boolean {
-    return a.musicId === b.musicId && a.vocalId === b.vocalId
+    return sameRecording(a, b)
   }
 
+  /** The current entry is this song (in this rendition), heard from the game audio. */
   function isCurrent(musicId: number, vocalId?: number): boolean {
     const track = current.value
-    return !!track && track.musicId === musicId && (vocalId === undefined || track.vocalId === vocalId)
+    return !!track && !track.connectLive && track.musicId === musicId && (vocalId === undefined || track.vocalId === vocalId)
+  }
+
+  /** The current entry is this Connect Live performance. */
+  function isCurrentLive(bundle: string): boolean {
+    return current.value?.connectLive?.bundle === bundle
   }
 
   /** Replace the whole queue and start at the given position. */
@@ -673,7 +681,7 @@ export const usePlayerStore = defineStore('player', () => {
     queue, index, current, upcoming, hasNext,
     isPlaying, isBuffering, isLoaded, hasError, currentTime, duration, volume, muted, repeat, nowPlayingOpen, nowPlayingPanel,
     lyricsSidebarOpen, lyricsSidebarShown, toggleLyrics,
-    audioUrl, coverUrl, isCurrent, sampleTime,
+    audioUrl, coverUrl, isCurrent, isCurrentLive, sampleTime,
     play, pause, toggle, seek, playFrom, skip, next, previous, setVolume, toggleMute, cycleRepeat,
     playTracks, playNow, playNext, enqueue, jumpTo, switchRendition, remove, move, clearUpcoming, shuffleUpcoming, close, openNowPlaying,
     trackOf, tracksOf, renditionsOf, initialize,

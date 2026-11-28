@@ -13,7 +13,20 @@ export interface PlayerSinger {
   color?: string
 }
 
+/** A song as performed at a Connect Live: its own recording (and lyrics timed for it), not a game rendition. */
+export interface ConnectLiveRef {
+  /** Audio bundle of the performance, e.g. se_010_sp_live_trilogy02_0167_01_full */
+  bundle: string
+  /** Virtual live it was performed at. */
+  liveId: number
+  /** Content hash of its lyrics resource, when there is one. */
+  lyrics?: string
+  /** Artwork path when the song has no jacket (guest songs): the live's banner. */
+  cover?: string
+}
+
 export interface PlayerTrackInfo {
+  /** The song; 0 for a Connect Live performance of a song that is not in the game. */
   musicId: number
   vocalId: number
   title: string
@@ -29,6 +42,7 @@ export interface PlayerTrackInfo {
   /** Leading silence to skip, in seconds. */
   trimStart: number
   singers: PlayerSinger[]
+  connectLive?: ConnectLiveRef
 }
 
 /** A queue entry: the same rendition may be queued twice, so entries carry their own id. */
@@ -136,12 +150,33 @@ export async function loadTrackSources(getMaster: <T>(name: string) => Promise<T
   return { musics, vocals, characters, outsideCharacters, characterUnits, assetVariants }
 }
 
-export function trackAudioPath(track: Pick<PlayerTrackInfo, 'vocalAssetbundle'>): string {
+export function trackAudioPath(track: Pick<PlayerTrackInfo, 'vocalAssetbundle' | 'connectLive'>): string {
+  if (track.connectLive) return connectLiveAudioPath(track.connectLive.bundle)
   return `/ondemand/music/long/${track.vocalAssetbundle}/${track.vocalAssetbundle}.mp3`
 }
 
-export function trackCoverPath(track: Pick<PlayerTrackInfo, 'musicAssetbundle' | 'jacketAssetbundle'>): string {
+/** Connect Live recordings are published apart from the game assets (original MP3; a 128 kbps AAC sits next to it). */
+export function connectLiveAudioPath(bundle: string): string {
+  return `/connect-live/audio/${bundle}.mp3`
+}
+
+export function trackCoverPath(track: Pick<PlayerTrackInfo, 'musicAssetbundle' | 'jacketAssetbundle' | 'connectLive'>): string {
+  if (!track.musicAssetbundle && track.connectLive?.cover) return track.connectLive.cover
   return `/startapp/music/jacket/${track.musicAssetbundle}/${track.jacketAssetbundle || track.musicAssetbundle}.png`
+}
+
+/** Two entries are the same recording: the same rendition of a song, or the same Connect Live performance. */
+export function sameRecording(a: Pick<PlayerTrackInfo, 'musicId' | 'vocalId' | 'connectLive'>, b: Pick<PlayerTrackInfo, 'musicId' | 'vocalId' | 'connectLive'>): boolean {
+  if (a.connectLive || b.connectLive) return !!a.connectLive && a.connectLive.bundle === b.connectLive?.bundle
+  return a.musicId === b.musicId && a.vocalId === b.vocalId
+}
+
+function isConnectLiveRef(value: unknown): value is ConnectLiveRef {
+  if (!value || typeof value !== 'object') return false
+  const c = value as Record<string, unknown>
+  return typeof c.bundle === 'string' && /^[\w-]+$/.test(c.bundle) && Number.isInteger(c.liveId)
+    && (c.lyrics === undefined || (typeof c.lyrics === 'string' && /^[a-f0-9]{16}$/.test(c.lyrics)))
+    && (c.cover === undefined || (typeof c.cover === 'string' && /^\/[\w/.-]+$/.test(c.cover)))
 }
 
 /** Portrait for a game character; outside characters have none. */
@@ -154,10 +189,13 @@ export function isPlayerTrack(value: unknown): value is PlayerTrack {
   if (!value || typeof value !== 'object') return false
   const t = value as Record<string, unknown>
   const text = (key: string) => typeof t[key] === 'string'
+  const live = t.connectLive
+  if (live !== undefined && !isConnectLiveRef(live)) return false
   return text('uid') && Number.isInteger(t.musicId) && Number.isInteger(t.vocalId)
     && text('title') && text('composer') && text('caption') && text('vocalType')
-    && text('musicAssetbundle') && /^[\w-]+$/.test(t.musicAssetbundle as string)
-    && text('vocalAssetbundle') && /^[\w-]+$/.test(t.vocalAssetbundle as string)
+    // A Connect Live performance of a song not in the game has no jacket and no game audio bundle.
+    && text('musicAssetbundle') && (/^[\w-]+$/.test(t.musicAssetbundle as string) || (!!live && t.musicAssetbundle === ''))
+    && text('vocalAssetbundle') && (/^[\w-]+$/.test(t.vocalAssetbundle as string) || (!!live && t.vocalAssetbundle === ''))
     && (t.jacketAssetbundle === undefined || (text('jacketAssetbundle') && /^[\w-]+$/.test(t.jacketAssetbundle as string)))
     && typeof t.trimStart === 'number' && Number.isFinite(t.trimStart) && t.trimStart >= 0
     && Array.isArray(t.singers)

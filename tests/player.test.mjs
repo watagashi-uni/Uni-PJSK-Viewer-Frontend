@@ -137,3 +137,33 @@ test('a restored queue only keeps complete, safe track records', () => {
   assert.equal(tracks.isPlayerTrack(null), false)
   assert.equal(tracks.isPlayerTrack('track'), false)
 })
+
+test('a Connect Live performance plays its own recording and is told apart from the game renditions', () => {
+  const live = {
+    uid: 'u2', musicId: 167, vocalId: 0, title: 'オルターエゴ', composer: '', caption: 'Connect Live · AWAKE Real Pulse DAY1',
+    vocalType: 'connect_live', musicAssetbundle: 'jacket_s_167', vocalAssetbundle: 'se_010_sp_live_trilogy02_0167_01_full', trimStart: 0,
+    singers: [{ type: 'game', id: 11 }, { type: 'outside', id: 0, name: '逆先夏目' }],
+    connectLive: { bundle: 'se_010_sp_live_trilogy02_0167_01_full', liveId: 525, lyrics: '0123456789abcdef' },
+  }
+  assert.equal(tracks.trackAudioPath(live), '/connect-live/audio/se_010_sp_live_trilogy02_0167_01_full.mp3')
+  assert.equal(tracks.isPlayerTrack(live), true)
+  // a guest song has no jacket: the live's banner stands in
+  const guest = { ...live, musicId: 0, musicAssetbundle: '', connectLive: { ...live.connectLive, cover: '/ondemand/virtual_live/select/banner/010_sp_live/010_sp_live.png' } }
+  assert.equal(tracks.isPlayerTrack(guest), true)
+  assert.equal(tracks.trackCoverPath(guest), '/ondemand/virtual_live/select/banner/010_sp_live/010_sp_live.png')
+  assert.equal(tracks.isPlayerTrack({ ...guest, connectLive: undefined }), false)
+  assert.equal(tracks.isPlayerTrack({ ...live, connectLive: { ...live.connectLive, bundle: '../x' } }), false)
+  assert.equal(tracks.isPlayerTrack({ ...live, connectLive: { ...live.connectLive, lyrics: 'nothex' } }), false)
+  const game = { musicId: 167, vocalId: 0, vocalAssetbundle: 'se_0167_01' }
+  assert.equal(tracks.sameRecording(live, game), false)
+  assert.equal(tracks.sameRecording(live, { ...live, uid: 'u3' }), true)
+  assert.equal(tracks.sameRecording(game, { ...game }), true)
+})
+
+test('a Connect Live recording plays from its 128k AAC and falls back to the MP3', () => {
+  const derived = load('../src/utils/derivedAssets.ts')
+  const mp3 = 'https://assets.unipjsk.com/connect-live/audio/se_0063_01_full.mp3'
+  assert.equal(derived.playbackAudioUrl(mp3), 'https://assets.unipjsk.com/connect-live/audio/se_0063_01_full_128k.m4a')
+  assert.equal(derived.originalAudioUrl('https://assets.unipjsk.com/connect-live/audio/se_0063_01_full_128k.m4a'), mp3)
+  assert.equal(derived.playbackAudioUrl('https://example.com/connect-live/audio/x.mp3'), 'https://example.com/connect-live/audio/x.mp3')
+})

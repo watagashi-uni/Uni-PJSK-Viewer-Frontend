@@ -87,6 +87,7 @@ function seekFromLyrics(time: number) {
           :playing="player.isPlaying"
           :clock="player.sampleTime"
           :trim-start="track.trimStart"
+          :connect-live="track.connectLive"
           @seek="seekFromLyrics"
           @singing="singing = $event"
         />

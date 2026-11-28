@@ -44,7 +44,8 @@ export function useSingerAvatars() {
         }
       }
       const name = singer.name || ''
-      return { key: `outside-${singer.id}`, name: zhOutside.t('name', name) || name, src: null }
+      // Named guests (Connect Live) carry no id: their name tells them apart.
+      return { key: singer.id ? `outside-${singer.id}` : `guest-${name}`, name: zhOutside.t('name', name) || name, src: null }
     })
   }
 

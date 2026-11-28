@@ -202,6 +202,18 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '虚拟 Live 详情' },
     },
     {
+        path: '/connect-live',
+        name: 'ConnectLives',
+        component: () => import('@/views/ConnectLivesView.vue'),
+        meta: { title: 'Connect Live', spoilerList: true },
+    },
+    {
+        path: '/connect-live/:id',
+        name: 'ConnectLiveDetail',
+        component: () => import('@/views/ConnectLiveDetailView.vue'),
+        meta: { title: 'Connect Live 详情' },
+    },
+    {
         path: '/ranking',
         name: 'EventRanking',
         component: () => import('@/views/EventRankingView.vue'),

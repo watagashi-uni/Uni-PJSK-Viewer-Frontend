@@ -14,6 +14,15 @@ export interface Release {
  */
 export const releases: Release[] = [
   {
+    version: '2.22.0', date: '2026-11-28', title: 'Connect Live',
+    changes: [
+      '新增 Connect Live 板块，收录历届 Connect Live 的公演曲目、演唱者和串烧分段，各场公演曲目不同时可以切换查看。',
+      '可以直接播放演出音源，和歌曲试听共用播放器，支持播放全部、加入队列和锁屏控制。',
+      '大部分演出曲目带滚动歌词，附假名和中文翻译，按演出录音重新对齐；对不上的段落不显示歌词。',
+      '虚拟 Live 详情页的 Connect Live 场次可以跳到对应的曲目与音源。',
+    ],
+  },
+  {
     version: '2.21.16', date: '2026-11-28', title: '更新不打断浏览',
     changes: [
       '网站发布新版本后不再把正在看的页面直接刷新，而是在你下次打开其他页面时自动换成新版本；只切换筛选或翻页参数时不会刷新。',
