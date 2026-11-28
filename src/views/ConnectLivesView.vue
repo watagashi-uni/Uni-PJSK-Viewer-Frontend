@@ -91,10 +91,12 @@ function formatDate(timestamp: number): string {
         :key="live.id"
         :to="`/connect-live/${live.id}`"
         class="group block overflow-hidden rounded-xl border border-base-300 bg-base-100 transition hover:border-primary/35 hover:shadow-md"
+        :class="{ 'cl-spoiler': live.startAt > Date.now() }"
       >
         <figure class="relative aspect-[122/52] bg-base-200">
           <AssetImage :src="`${settings.assetsHost}${bannerPath(live.assetbundleName)}`" :alt="live.name" class="h-full w-full object-cover" />
           <span class="absolute right-2 top-2 badge badge-sm border-0 bg-black/50 text-white">#{{ live.id }}</span>
+          <span v-if="live.startAt > Date.now()" class="absolute left-2 top-2 badge badge-sm badge-warning" title="还没开场，请勿转载或截图外传">剧透</span>
         </figure>
         <div class="space-y-2.5 p-3">
           <h2 class="line-clamp-2 min-h-10 text-[15px] font-bold leading-5 transition-colors group-hover:text-primary">
@@ -110,3 +112,9 @@ function formatDate(timestamp: number): string {
     </div>
   </div>
 </template>
+
+<style scoped>
+.cl-spoiler {
+  border-color: color-mix(in oklab, var(--color-warning) 55%, var(--color-base-300));
+}
+</style>

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { AudioLines, Calendar, ChevronLeft, Clock, ListPlus, ListVideo, Loader2, Pause, Play, Radio, ScrollText } from 'lucide-vue-next'
+import { AudioLines, Calendar, ChevronLeft, Clock, EyeOff, ListPlus, ListVideo, Loader2, Pause, Play, Radio, ScrollText } from 'lucide-vue-next'
 import AssetImage from '@/components/AssetImage.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import ZhText from '@/components/ZhText.vue'
@@ -42,7 +42,10 @@ const loading = ref(true)
 const error = ref('')
 const showIndex = ref(0)
 
-useSpoilerWatermark(() => !!live.value && live.value.startAt > Date.now())
+/** Before the live opens its setlist and recordings are a spoiler: shown only with spoilers on, and marked. */
+const unreleased = computed(() => !!live.value && live.value.startAt > Date.now())
+const hidden = computed(() => unreleased.value && !settings.showSpoilers)
+useSpoilerWatermark(() => unreleased.value && settings.showSpoilers)
 
 async function load(id: number) {
   loading.value = true
@@ -75,7 +78,7 @@ const schedules = computed(() => (live.value?.virtualLiveSchedules || []).filter
 const totalDuration = computed(() => (show.value?.tracks || []).reduce((sum, t) => sum + (t.duration || 0), 0))
 
 function playerTrack(track: ConnectLiveTrack, label: string): PlayerTrackInfo | null {
-  if (!live.value || !sources.value) return null
+  if (!live.value || !sources.value || hidden.value) return null
   return connectLiveTrack(track, live.value, label, sources.value)
 }
 
@@ -145,11 +148,23 @@ function formatTotal(seconds: number): string {
       <RouterLink to="/connect-live" class="btn btn-primary mt-4">返回列表</RouterLink>
     </div>
 
+    <div v-else-if="hidden" class="rounded-xl border border-base-200 bg-base-100 px-4 py-20 text-center">
+      <EyeOff class="mx-auto h-8 w-8 text-base-content/40" />
+      <p class="mt-3 text-lg text-base-content/60">这场 Connect Live 还没开场，曲目和音源已隐藏</p>
+      <p class="mt-1 text-sm text-base-content/45">可在<RouterLink to="/settings" class="link">设置</RouterLink>中开启剧透显示。</p>
+      <RouterLink to="/connect-live" class="btn btn-primary btn-sm mt-4">返回列表</RouterLink>
+    </div>
+
     <template v-else>
       <PageHeader :title="zhVirtualLives.label('name', live.name)" :description="`#${live.id} · Connect Live`">
         <template #icon><AudioLines class="h-8 w-8 text-primary" /></template>
         <template #actions><button type="button" class="btn btn-sm btn-ghost" @click="goBack"><ChevronLeft class="h-4 w-4" />返回列表</button></template>
       </PageHeader>
+
+      <p v-if="unreleased" class="cl-spoiler-note" role="note">
+        <EyeOff class="h-4 w-4 shrink-0" />
+        <span><span class="badge badge-warning badge-sm mr-1.5 align-middle">剧透</span>这场 Connect Live 还没开场，以下曲目和音源来自提前放出的游戏数据，请勿转载或截图外传。</span>
+      </p>
 
       <section class="grid grid-cols-1 overflow-hidden rounded-xl border border-base-300 bg-base-100 md:grid-cols-[minmax(0,1.35fr)_minmax(17rem,.75fr)]">
         <figure class="flex aspect-[122/52] items-center justify-center bg-base-200/70 md:aspect-auto">
@@ -259,6 +274,22 @@ function formatTotal(seconds: number): string {
 </template>
 
 <style scoped>
+.cl-spoiler-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid color-mix(in oklab, var(--color-warning) 45%, var(--color-base-300));
+  border-radius: var(--radius-field);
+  background-color: color-mix(in oklab, var(--color-warning) 12%, var(--color-base-100));
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.cl-spoiler-note svg {
+  margin-top: 0.15rem;
+}
+
 .cl-list {
   display: flex;
   flex-direction: column;

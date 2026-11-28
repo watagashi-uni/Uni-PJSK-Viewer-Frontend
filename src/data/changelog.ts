@@ -14,6 +14,12 @@ export interface Release {
  */
 export const releases: Release[] = [
   {
+    version: '2.22.1', date: '2026-11-29', title: 'Connect Live 防剧透',
+    changes: [
+      '还没开场的 Connect Live 跟随剧透开关：关闭时不显示曲目，也不能播放；开启后照常显示，并标上「剧透」和水印。',
+    ],
+  },
+  {
     version: '2.22.0', date: '2026-11-28', title: 'Connect Live',
     changes: [
       '新增 Connect Live 板块，收录历届 Connect Live 的公演曲目、演唱者和串烧分段，各场公演曲目不同时可以切换查看。',

@@ -491,7 +491,7 @@ function cleanInformation(description: string): string {
       <PageHeader :title="zhVirtualLives.label('name', vlive.name)" :description="`${vliveSubtitle(vlive.name)}#${vlive.id} · ${typeMap[vlive.virtualLiveType]?.label || vlive.virtualLiveType} · ${vlive.virtualLivePlatform.toUpperCase()}`">
         <template #icon><Radio class="h-8 w-8 text-primary" /></template>
         <template #actions>
-          <RouterLink v-if="hasConnectLive" :to="`/connect-live/${vlive.id}`" class="btn btn-sm btn-primary gap-1"><AudioLines class="h-4 w-4" />曲目与音源</RouterLink>
+          <RouterLink v-if="hasConnectLive && (settingsStore.showSpoilers || vlive.startAt <= Date.now())" :to="`/connect-live/${vlive.id}`" class="btn btn-sm btn-primary gap-1"><AudioLines class="h-4 w-4" />曲目与音源</RouterLink>
           <button type="button" class="btn btn-sm btn-ghost" @click="goBack"><ChevronLeft class="h-4 w-4" />返回列表</button>
         </template>
       </PageHeader>
