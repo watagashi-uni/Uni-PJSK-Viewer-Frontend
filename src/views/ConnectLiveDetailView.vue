@@ -167,7 +167,7 @@ function formatTotal(seconds: number): string {
       </p>
 
       <section class="grid grid-cols-1 overflow-hidden rounded-xl border border-base-300 bg-base-100 md:grid-cols-[minmax(0,1.35fr)_minmax(17rem,.75fr)]">
-        <figure class="flex aspect-[122/52] items-center justify-center bg-base-200/70 md:aspect-auto">
+        <figure class="flex aspect-[33/10] items-center justify-center bg-base-200/70 p-3 md:aspect-auto">
           <AssetImage :src="`${settings.assetsHost}${bannerPath(live.assetbundleName)}`" :alt="live.name" class="h-full max-h-64 w-full object-contain" />
         </figure>
         <div class="flex flex-col justify-center gap-3 p-4 md:border-l md:border-base-200 md:p-5">

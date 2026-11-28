@@ -14,6 +14,12 @@ export interface Release {
  */
 export const releases: Release[] = [
   {
+    version: '2.22.2', date: '2026-11-29', title: 'Connect Live 封面',
+    changes: [
+      'Connect Live 的封面按原图比例完整显示，不再裁掉右侧的票根。',
+    ],
+  },
+  {
     version: '2.22.1', date: '2026-11-29', title: 'Connect Live 防剧透',
     changes: [
       '还没开场的 Connect Live 跟随剧透开关：关闭时不显示曲目，也不能播放；开启后照常显示，并标上「剧透」和水印。',

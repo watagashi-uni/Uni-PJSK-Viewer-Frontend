@@ -93,9 +93,8 @@ function formatDate(timestamp: number): string {
         class="group block overflow-hidden rounded-xl border border-base-300 bg-base-100 transition hover:border-primary/35 hover:shadow-md"
         :class="{ 'cl-spoiler': live.startAt > Date.now() }"
       >
-        <figure class="relative aspect-[122/52] bg-base-200">
-          <AssetImage :src="`${settings.assetsHost}${bannerPath(live.assetbundleName)}`" :alt="live.name" class="h-full w-full object-cover" />
-          <span class="absolute right-2 top-2 badge badge-sm border-0 bg-black/50 text-white">#{{ live.id }}</span>
+        <figure class="relative aspect-[33/10] bg-base-200/60 p-2">
+          <AssetImage :src="`${settings.assetsHost}${bannerPath(live.assetbundleName)}`" :alt="live.name" class="h-full w-full object-contain" />
           <span v-if="live.startAt > Date.now()" class="absolute left-2 top-2 badge badge-sm badge-warning" title="还没开场，请勿转载或截图外传">剧透</span>
         </figure>
         <div class="space-y-2.5 p-3">
@@ -104,6 +103,7 @@ function formatDate(timestamp: number): string {
           </h2>
           <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-base-content/60">
             <span class="inline-flex items-center gap-1"><Calendar class="h-3.5 w-3.5" />{{ formatDate(firstShow(live)) }}</span>
+            <span class="tabular-nums text-base-content/40">#{{ live.id }}</span>
             <span class="inline-flex items-center gap-1"><Disc3 class="h-3.5 w-3.5" />{{ songCount(entries[String(live.id)]!) }} 首</span>
             <span v-if="entries[String(live.id)]!.shows.length > 1" class="inline-flex items-center gap-1"><Mic2 class="h-3.5 w-3.5" />{{ entries[String(live.id)]!.shows.length }} 种公演曲目</span>
           </div>
