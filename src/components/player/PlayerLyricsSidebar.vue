@@ -43,8 +43,7 @@ watch([cover, glow], async ([url, canvas]) => {
 }, { flush: 'post' })
 
 function seekFromLyrics(time: number) {
-  player.seek(time)
-  if (!player.isPlaying) player.play()
+  player.playFrom(time)
 }
 </script>
 

@@ -360,8 +360,7 @@ function seekToLyric(time: number) {
   if (!track) return
   // 还没在播放这个版本：点歌词即从该句开始播放
   if (!isActiveVocal.value) player.playNow(track)
-  player.seek(time)
-  if (!player.isPlaying) player.play()
+  player.playFrom(time)
 }
 
 // 播放 / 暂停；这首歌还不在播放器里时，立即开始播放并保留已有队列

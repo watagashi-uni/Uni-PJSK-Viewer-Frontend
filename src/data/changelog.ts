@@ -14,6 +14,12 @@ export interface Release {
  */
 export const releases: Release[] = [
   {
+    version: '2.21.14', date: '2026-11-28', title: '点歌词跳转',
+    changes: [
+      '修复 Safari 中点击某句歌词后要停顿一下才出声、漏掉开头几个字的问题。',
+    ],
+  },
+  {
     version: '2.21.13', date: '2026-11-28', title: '歌词亮起与换行',
     changes: [
       '修复逐字歌词在下一句亮起时，未唱到的字会先暗一下再恢复的问题。',

@@ -23,6 +23,8 @@ const REPEAT_MODES: readonly RepeatMode[] = ['off', 'all', 'one']
 /** "Previous" restarts the song once it has played this long, like most players. */
 const RESTART_THRESHOLD_SEC = 3
 const SKIP_SEC = 10
+/** Give up waiting for a seek to land and play anyway, so a stuck seek does not leave the player silent. */
+const LANDING_TIMEOUT_MS = 5000
 
 interface StoredState {
   v: 1
@@ -79,6 +81,10 @@ export const usePlayerStore = defineStore('player', () => {
   let pendingSeek: number | null = null
   /** A new source is starting: the pause that unloading the old one emits is not the user pausing. */
   let switching = false
+  /** The element has been played once (from a tap), so later plays may start outside a tap. */
+  let unlocked = false
+  /** Bumped to call off a pending play-after-seek (see seekThenPlay). */
+  let landing = 0
   let trackedUid: string | null = null
   let uidSeed = 0
   let lastPositionSavedAt = 0
@@ -100,6 +106,7 @@ export const usePlayerStore = defineStore('player', () => {
     el.muted = muted.value
     el.addEventListener('play', () => {
       switching = false
+      unlocked = true
       isPlaying.value = true
       const track = current.value
       // Only the first play of each queue entry counts; pausing and resuming is not a new listen.
@@ -130,7 +137,10 @@ export const usePlayerStore = defineStore('player', () => {
       hasError.value = false
       if (pendingSeek !== null) {
         const target = Math.min(pendingSeek, Math.max(0, duration.value - 0.25))
-        if (Math.abs(el.currentTime - target) > 0.25) el.currentTime = target
+        if (Math.abs(el.currentTime - target) > 0.25) {
+          if (el.paused) el.currentTime = target
+          else seekThenPlay(el, target)
+        }
         currentTime.value = target
         pendingSeek = null
       }
@@ -172,8 +182,39 @@ export const usePlayerStore = defineStore('player', () => {
     })
   }
 
+  /**
+   * Move to `target` and play on from exactly there. Safari keeps its clock running through a
+   * seek made while playing, so the first moments after the target go unheard (the start of a
+   * tapped lyric line). Seeking while paused and resuming once the seek has landed avoids that.
+   * An element that has never played needs a tap to start, so that one plays straight away.
+   */
+  function seekThenPlay(el: HTMLAudioElement, target: number) {
+    const token = ++landing
+    if (!unlocked) {
+      el.currentTime = target
+      startPlayback()
+      return
+    }
+    isPlaying.value = true
+    if (!el.paused) {
+      // Not the user pausing: keep the controls showing "playing" through the seek.
+      switching = true
+      el.pause()
+    }
+    el.currentTime = target
+    let timer = 0
+    const go = () => {
+      el.removeEventListener('seeked', go)
+      clearTimeout(timer)
+      if (token === landing) startPlayback()
+    }
+    el.addEventListener('seeked', go)
+    timer = window.setTimeout(go, LANDING_TIMEOUT_MS)
+  }
+
   /** Point the element at the current track. `seekTo` keeps a position (rendition switch, restored session). */
   function loadCurrent(autoplay: boolean, seekTo?: number) {
+    landing++
     const track = current.value
     if (!track) {
       unload()
@@ -198,6 +239,7 @@ export const usePlayerStore = defineStore('player', () => {
   }
 
   function unload() {
+    landing++
     switching = false
     sourceUid = null
     pendingSeek = null
@@ -261,6 +303,7 @@ export const usePlayerStore = defineStore('player', () => {
   }
 
   function pause() {
+    landing++
     switching = false
     if (audio && !audio.paused) audio.pause()
     else isPlaying.value = false
@@ -279,6 +322,26 @@ export const usePlayerStore = defineStore('player', () => {
     currentTime.value = target
     if (audio && sourceUid === track.uid && isLoaded.value) audio.currentTime = target
     else if (sourceUid === track.uid) pendingSeek = target
+    updatePositionState()
+  }
+
+  /** Play the current track from `time`, starting exactly there (a tapped lyric line). */
+  function playFrom(time: number) {
+    const track = current.value
+    if (!track || !Number.isFinite(time)) return
+    if (sourceUid !== track.uid || hasError.value) {
+      loadCurrent(true, time)
+      return
+    }
+    const limit = duration.value > 0 ? duration.value : Number.POSITIVE_INFINITY
+    const target = Math.max(0, Math.min(limit, time))
+    currentTime.value = target
+    if (audio && isLoaded.value) seekThenPlay(audio, target)
+    else {
+      // Metadata is still on its way: the seek is applied, then played from, once it arrives.
+      pendingSeek = target
+      startPlayback()
+    }
     updatePositionState()
   }
 
@@ -611,7 +674,7 @@ export const usePlayerStore = defineStore('player', () => {
     isPlaying, isBuffering, isLoaded, hasError, currentTime, duration, volume, muted, repeat, nowPlayingOpen, nowPlayingPanel,
     lyricsSidebarOpen, lyricsSidebarShown, toggleLyrics,
     audioUrl, coverUrl, isCurrent, sampleTime,
-    play, pause, toggle, seek, skip, next, previous, setVolume, toggleMute, cycleRepeat,
+    play, pause, toggle, seek, playFrom, skip, next, previous, setVolume, toggleMute, cycleRepeat,
     playTracks, playNow, playNext, enqueue, jumpTo, switchRendition, remove, move, clearUpcoming, shuffleUpcoming, close, openNowPlaying,
     trackOf, tracksOf, renditionsOf, initialize,
   }

@@ -129,8 +129,7 @@ function openSongPage() {
 }
 
 function seekFromLyrics(time: number) {
-  player.seek(time)
-  if (!player.isPlaying) player.play()
+  player.playFrom(time)
 }
 
 function onVolumeInput(event: Event) {
