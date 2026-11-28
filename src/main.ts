@@ -4,7 +4,7 @@ import router from './router'
 import App from './App.vue'
 import './style.css'
 // Registers the service worker and its forced-update reload handshake.
-import './pwa'
+import { installUpdateOnNavigation } from './pwa'
 import { markStartupSuccessful } from './utils/startupRecovery'
 import { installDerivedImageFallback } from './utils/derivedAssets'
 
@@ -17,6 +17,7 @@ const head = createHead()
 // 使用插件
 app.use(createPinia())
 app.use(router)
+installUpdateOnNavigation(router)
 app.use(head)
 
 // 尚未发布 WebP 的图片回退原图

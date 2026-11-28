@@ -18,8 +18,9 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       // 强制更新：新 SW 装好立即接管（skipWaiting + clientsClaim），push-sw.js 通知
-      // 所有页面刷新到新版本，不再等用户点击。保留 prompt 是为了不让插件再注入
-      // 自己的自动刷新逻辑，刷新统一由 push-sw.js 的握手负责。
+      // 所有页面切到新版本，不弹提示。页面不原地刷新，而是在用户下次跳到别的页面时
+      // 整页加载（src/pwa.ts）。保留 prompt 是为了不让插件再注入自己的自动刷新逻辑，
+      // 刷新统一由 push-sw.js 的握手负责。
       registerType: 'prompt',
       injectRegister: 'auto',
       workbox: {

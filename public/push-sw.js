@@ -1,8 +1,9 @@
 /* global clients */
 // Updates are forced and do not wait for the user: workbox skips waiting and
-// claims clients, then every open window reloads into the new build. Pages
-// from this build onwards acknowledge the message and reload themselves;
-// older pages never answer, so they are navigated directly.
+// claims clients, then every open window moves to the new build. Pages that
+// acknowledge the message take care of it themselves (src/pwa.ts loads the
+// next page the visitor opens in full); older pages never answer, so they are
+// navigated directly.
 const reloadMessage = 'PWA_RELOAD';
 const reloadAckMessage = 'PWA_RELOAD_ACK';
 const reloadAckTimeoutMs = 3000;

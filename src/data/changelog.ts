@@ -14,6 +14,12 @@ export interface Release {
  */
 export const releases: Release[] = [
   {
+    version: '2.21.16', date: '2026-11-28', title: '更新不打断浏览',
+    changes: [
+      '网站发布新版本后不再把正在看的页面直接刷新，而是在你下次打开其他页面时自动换成新版本；只切换筛选或翻页参数时不会刷新。',
+    ],
+  },
+  {
     version: '2.21.15', date: '2026-11-28', title: '活动大图省流量',
     changes: [
       '首页、活动列表、活动详情和剧情页的活动背景图与 logo 改用 WebP，背景图从约 3.6 MB 降到约 0.3 MB；活动详情的图片下载仍是原图。',
