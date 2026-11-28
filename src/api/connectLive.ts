@@ -138,6 +138,25 @@ export function playerSingers(singers: ConnectLiveSinger[], sources: Pick<TrackS
 
 export interface LiveInfo { id: number; name: string; assetbundleName: string }
 
+export interface LiveTiming {
+  startAt: number
+  virtualLiveSchedules?: { startAt: number; isAfterEvent?: boolean }[]
+}
+
+/**
+ * When each show of a live begins, in order. The virtual live opens days before its first show,
+ * so the setlist counts as unreleased until the show itself starts; after-event talks are not shows.
+ */
+export function showStarts(live: LiveTiming): number[] {
+  const starts = (live.virtualLiveSchedules || []).filter(s => !s.isAfterEvent).map(s => s.startAt).sort((a, b) => a - b)
+  return starts.length ? starts : [live.startAt]
+}
+
+/** When a live's first show begins: before that its setlist and recordings are a spoiler. */
+export function liveOpensAt(live: LiveTiming): number {
+  return showStarts(live)[0]!
+}
+
 /** A performance as a track the site-wide player can queue. */
 export function connectLiveTrack(track: ConnectLiveTrack, live: LiveInfo, showLabel: string, sources: TrackSources): PlayerTrackInfo {
   const musicId = coverMusicId(track)

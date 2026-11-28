@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { AudioLines, Calendar, Disc3, Mic2, Search } from 'lucide-vue-next'
 import AssetImage from '@/components/AssetImage.vue'
 import PageHeader from '@/components/PageHeader.vue'
@@ -7,7 +7,7 @@ import ZhText from '@/components/ZhText.vue'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
 import { useZh } from '@/composables/useZh'
-import { bannerPath, loadConnectLiveIndex, type ConnectLiveEntry } from '@/api/connectLive'
+import { bannerPath, liveOpensAt, loadConnectLiveIndex, type ConnectLiveEntry } from '@/api/connectLive'
 
 interface StreamingLive {
   id: number
@@ -41,10 +41,12 @@ onMounted(async () => {
   }
 })
 
-/** First show of a live (rehearsals and technical tests have no setlist and are left out). */
-function firstShow(live: StreamingLive): number {
-  const starts = (live.virtualLiveSchedules || []).filter(s => !s.isAfterEvent).map(s => s.startAt)
-  return starts.length ? Math.min(...starts) : live.startAt
+const now = ref(Date.now())
+const clock = setInterval(() => { now.value = Date.now() }, 30_000)
+onBeforeUnmount(() => clearInterval(clock))
+
+function unreleased(live: StreamingLive): boolean {
+  return liveOpensAt(live) > now.value
 }
 
 function songCount(entry: ConnectLiveEntry): number {
@@ -55,10 +57,10 @@ const shown = computed(() => {
   const q = query.value.trim().toLowerCase()
   return lives.value
     .filter(live => entries.value[String(live.id)])
-    .filter(live => settings.showSpoilers || live.startAt <= Date.now())
+    .filter(live => settings.showSpoilers || !unreleased(live))
     .filter(live => !q || zhVirtualLives.searchText('name', live.name).toLowerCase().includes(q) || String(live.id).includes(q)
       || entries.value[String(live.id)]!.shows.some(show => show.tracks.some(t => t.title.toLowerCase().includes(q))))
-    .sort((a, b) => firstShow(b) - firstShow(a))
+    .sort((a, b) => liveOpensAt(b) - liveOpensAt(a))
 })
 
 const totalSongs = computed(() => shown.value.reduce((sum, live) => sum + songCount(entries.value[String(live.id)]!), 0))
@@ -91,18 +93,18 @@ function formatDate(timestamp: number): string {
         :key="live.id"
         :to="`/connect-live/${live.id}`"
         class="group block overflow-hidden rounded-xl border border-base-300 bg-base-100 transition hover:border-primary/35 hover:shadow-md"
-        :class="{ 'cl-spoiler': live.startAt > Date.now() }"
+        :class="{ 'cl-spoiler': unreleased(live) }"
       >
         <figure class="relative aspect-[33/10] bg-base-200/60 p-2">
           <AssetImage :src="`${settings.assetsHost}${bannerPath(live.assetbundleName)}`" :alt="live.name" class="h-full w-full object-contain" />
-          <span v-if="live.startAt > Date.now()" class="absolute left-2 top-2 badge badge-sm badge-warning" title="还没开场，请勿转载或截图外传">剧透</span>
+          <span v-if="unreleased(live)" class="absolute left-2 top-2 badge badge-sm badge-warning" title="还没开场，请勿转载或截图外传">剧透</span>
         </figure>
         <div class="space-y-2.5 p-3">
           <h2 class="line-clamp-2 min-h-10 text-[15px] font-bold leading-5 transition-colors group-hover:text-primary">
             <ZhText :text="live.name" table="virtualLives" path="name" sub-class="text-xs font-normal" />
           </h2>
           <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-base-content/60">
-            <span class="inline-flex items-center gap-1"><Calendar class="h-3.5 w-3.5" />{{ formatDate(firstShow(live)) }}</span>
+            <span class="inline-flex items-center gap-1"><Calendar class="h-3.5 w-3.5" />{{ formatDate(liveOpensAt(live)) }}</span>
             <span class="tabular-nums text-base-content/40">#{{ live.id }}</span>
             <span class="inline-flex items-center gap-1"><Disc3 class="h-3.5 w-3.5" />{{ songCount(entries[String(live.id)]!) }} 首</span>
             <span v-if="entries[String(live.id)]!.shows.length > 1" class="inline-flex items-center gap-1"><Mic2 class="h-3.5 w-3.5" />{{ entries[String(live.id)]!.shows.length }} 种公演曲目</span>

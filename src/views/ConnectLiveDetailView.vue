@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { AudioLines, Calendar, ChevronLeft, Clock, EyeOff, ListPlus, ListVideo, Loader2, Pause, Play, Radio, ScrollText } from 'lucide-vue-next'
 import AssetImage from '@/components/AssetImage.vue'
@@ -16,7 +16,7 @@ import { useSpoilerWatermark } from '@/composables/useSpoilerWatermark'
 import { displayImageUrl } from '@/utils/derivedAssets'
 import { loadTrackSources, trackCoverPath, type PlayerTrackInfo, type TrackSources } from '@/utils/playerTracks'
 import {
-  bannerPath, connectLiveTrack, loadConnectLiveIndex, playerSingers,
+  bannerPath, connectLiveTrack, loadConnectLiveIndex, playerSingers, showStarts,
   type ConnectLiveEntry, type ConnectLiveSinger, type ConnectLiveTrack, type LiveInfo,
 } from '@/api/connectLive'
 
@@ -42,10 +42,6 @@ const loading = ref(true)
 const error = ref('')
 const showIndex = ref(0)
 
-/** Before the live opens its setlist and recordings are a spoiler: shown only with spoilers on, and marked. */
-const unreleased = computed(() => !!live.value && live.value.startAt > Date.now())
-const hidden = computed(() => unreleased.value && !settings.showSpoilers)
-useSpoilerWatermark(() => unreleased.value && settings.showSpoilers)
 
 async function load(id: number) {
   loading.value = true
@@ -71,8 +67,30 @@ async function load(id: number) {
 watch(() => Number(route.params.id), id => { void load(id) }, { immediate: true })
 
 const shows = computed(() => entry.value?.shows ?? [])
-const show = computed(() => shows.value[showIndex.value] ?? shows.value[0] ?? null)
 const extras = computed(() => entry.value?.extras ?? [])
+
+// A show's setlist is a spoiler until that show starts (the virtual live opens days earlier, and
+// later shows can sing other songs): shown only with spoilers on, and then marked.
+const now = ref(Date.now())
+const clock = setInterval(() => { now.value = Date.now() }, 30_000)
+onBeforeUnmount(() => clearInterval(clock))
+const starts = computed(() => (live.value ? showStarts(live.value) : []))
+function showUnreleased(i: number): boolean {
+  const list = starts.value
+  if (!list.length) return false
+  const at = shows.value.length > 1 ? (list[i] ?? list[list.length - 1]!) : list[0]!
+  return at > now.value
+}
+const visibleShows = computed(() => shows.value.map((s, i) => ({ show: s, index: i })).filter(({ index }) => settings.showSpoilers || !showUnreleased(index)))
+const hiddenShows = computed(() => shows.value.length - visibleShows.value.length)
+/** Nothing of the live can be shown yet. */
+const hidden = computed(() => !!live.value && !visibleShows.value.length)
+const currentIndex = computed(() => visibleShows.value.find(v => v.index === showIndex.value)?.index ?? visibleShows.value[0]?.index ?? 0)
+const show = computed(() => (hidden.value ? null : shows.value[currentIndex.value] ?? null))
+const unreleased = computed(() => !hidden.value && showUnreleased(currentIndex.value))
+const extrasUnreleased = computed(() => !!starts.value.length && starts.value[starts.value.length - 1]! > now.value)
+const shownExtras = computed(() => (settings.showSpoilers || !extrasUnreleased.value ? extras.value : []))
+useSpoilerWatermark(() => settings.showSpoilers && (unreleased.value || (extrasUnreleased.value && shownExtras.value.length > 0)))
 
 const schedules = computed(() => (live.value?.virtualLiveSchedules || []).filter(s => !s.isAfterEvent).sort((a, b) => a.startAt - b.startAt))
 const totalDuration = computed(() => (show.value?.tracks || []).reduce((sum, t) => sum + (t.duration || 0), 0))
@@ -150,7 +168,7 @@ function formatTotal(seconds: number): string {
 
     <div v-else-if="hidden" class="rounded-xl border border-base-200 bg-base-100 px-4 py-20 text-center">
       <EyeOff class="mx-auto h-8 w-8 text-base-content/40" />
-      <p class="mt-3 text-lg text-base-content/60">这场 Connect Live 还没开场，曲目和音源已隐藏</p>
+      <p class="mt-3 text-lg text-base-content/60">这场 Connect Live 还没开演，曲目和音源已隐藏</p>
       <p class="mt-1 text-sm text-base-content/45">可在<RouterLink to="/settings" class="link">设置</RouterLink>中开启剧透显示。</p>
       <RouterLink to="/connect-live" class="btn btn-primary btn-sm mt-4">返回列表</RouterLink>
     </div>
@@ -163,7 +181,7 @@ function formatTotal(seconds: number): string {
 
       <p v-if="unreleased" class="cl-spoiler-note" role="note">
         <EyeOff class="h-4 w-4 shrink-0" />
-        <span><span class="badge badge-warning badge-sm mr-1.5 align-middle">剧透</span>这场 Connect Live 还没开场，以下曲目和音源来自提前放出的游戏数据，请勿转载或截图外传。</span>
+        <span><span class="badge badge-warning badge-sm mr-1.5 align-middle">剧透</span>这场公演还没开演，以下曲目和音源来自提前放出的游戏数据，请勿转载或截图外传。</span>
       </p>
 
       <section class="grid grid-cols-1 overflow-hidden rounded-xl border border-base-300 bg-base-100 md:grid-cols-[minmax(0,1.35fr)_minmax(17rem,.75fr)]">
@@ -193,22 +211,24 @@ function formatTotal(seconds: number): string {
       <section class="rounded-xl border border-base-300 bg-base-100 p-3 md:p-4">
         <div class="mb-3 flex flex-wrap items-center justify-between gap-2 px-1">
           <h2 class="flex items-center gap-2 text-lg font-bold"><ListVideo class="h-5 w-5 text-primary" />曲目</h2>
-          <div v-if="shows.length > 1" role="tablist" class="tabs tabs-box tabs-sm">
+          <div v-if="visibleShows.length > 1" role="tablist" class="tabs tabs-box tabs-sm">
             <button
-              v-for="(s, i) in shows"
+              v-for="{ show: s, index: i } in visibleShows"
               :key="s.label"
               role="tab"
               type="button"
-              class="tab"
-              :class="{ 'tab-active': showIndex === i }"
-              :aria-selected="showIndex === i"
+              class="tab gap-1"
+              :class="{ 'tab-active': currentIndex === i }"
+              :aria-selected="currentIndex === i"
               @click="showIndex = i"
             >
-              {{ s.label }}
+              {{ s.label }}<span v-if="showUnreleased(i)" class="badge badge-warning badge-xs">剧透</span>
             </button>
           </div>
         </div>
-        <p v-if="shows.length > 1" class="mb-2 px-1 text-xs text-base-content/50">各场公演的曲目或演唱者有差异，可切换查看。</p>
+        <p v-if="shows.length > 1" class="mb-2 px-1 text-xs text-base-content/50">
+          各场公演的曲目或演唱者有差异，可切换查看。<template v-if="hiddenShows">还没开演的公演曲目已隐藏，可在<RouterLink to="/settings" class="link">设置</RouterLink>中开启剧透显示。</template>
+        </p>
 
         <ol v-if="show" class="cl-list">
           <li v-for="(t, i) in show.tracks" :key="t.bundle" class="cl-row" :class="{ current: player.isCurrentLive(t.bundle) }">
@@ -247,12 +267,12 @@ function formatTotal(seconds: number): string {
         </ol>
       </section>
 
-      <section v-if="extras.length" class="rounded-xl border border-base-300 bg-base-100 p-3 md:p-4">
-        <h2 class="mb-1 px-1 text-lg font-bold">其他音源</h2>
+      <section v-if="shownExtras.length" class="rounded-xl border border-base-300 bg-base-100 p-3 md:p-4">
+        <h2 class="mb-1 flex items-center gap-2 px-1 text-lg font-bold">其他音源<span v-if="extrasUnreleased" class="badge badge-warning badge-sm">剧透</span></h2>
         <p class="mb-2 px-1 text-xs text-base-content/50">游戏数据中有、但没有出现在公演曲目里的音源。</p>
         <ol class="cl-list">
-          <li v-for="(t, i) in extras" :key="t.bundle" class="cl-row" :class="{ current: player.isCurrentLive(t.bundle) }">
-            <button type="button" class="cl-art" :aria-label="`播放「${t.title}」`" @click="playFrom(extras, i, '其他音源')">
+          <li v-for="(t, i) in shownExtras" :key="t.bundle" class="cl-row" :class="{ current: player.isCurrentLive(t.bundle) }">
+            <button type="button" class="cl-art" :aria-label="`播放「${t.title}」`" @click="playFrom(shownExtras, i, '其他音源')">
               <img :src="coverOf(t, '其他音源')" alt="" loading="lazy" crossorigin="anonymous" />
               <span class="cl-art-overlay"><Pause v-if="player.isCurrentLive(t.bundle) && player.isPlaying" class="h-5 w-5" fill="currentColor" /><Play v-else class="ml-0.5 h-5 w-5" fill="currentColor" /></span>
             </button>
