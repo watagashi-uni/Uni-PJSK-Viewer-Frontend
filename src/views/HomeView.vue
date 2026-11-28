@@ -54,6 +54,7 @@ import type { Gacha } from '@/types/gacha'
 import { cardImageVariant } from '@/utils/card'
 import ZhText from '@/components/ZhText.vue'
 import { SCHEDULE_ZH } from '@/composables/useResourceZh'
+import { getEventBackgroundUrl, getEventLogoUrl } from '@/utils/event'
 
 const events = ref<EventData[]>([])
 const musics = ref<MusicData[]>([])
@@ -445,7 +446,7 @@ onMounted(async () => {
             <img
               v-if="!eventArtFailed"
               :key="currentEvent.assetbundleName"
-              :src="`${assetsHost}/ondemand/event/${currentEvent.assetbundleName}/screen/bg.png`"
+              :src="getEventBackgroundUrl(currentEvent, assetsHost)"
               alt=""
               class="kv__art"
               crossorigin="anonymous"
@@ -455,7 +456,7 @@ onMounted(async () => {
             <div class="kv__body pointer-events-none relative">
               <img
                 v-if="!eventLogoFailed"
-                :src="`${assetsHost}/ondemand/event/${currentEvent.assetbundleName}/logo/logo.png`"
+                :src="getEventLogoUrl(currentEvent, assetsHost)"
                 :alt="currentEvent.name"
                 class="kv__logo"
                 crossorigin="anonymous"

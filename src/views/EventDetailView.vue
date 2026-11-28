@@ -18,7 +18,7 @@ import SekaiHonor from '@/components/SekaiHonor.vue'
 import AccountSelector from '@/components/AccountSelector.vue'
 import type { EventData } from '@/types/master'
 import { cardImageVariant } from '@/utils/card'
-import { getEventBannerUrl, getEventLogoUrl, isTestEvent } from '@/utils/event'
+import { getEventBackgroundUrl, getEventBannerUrl, getEventLogoUrl, isTestEvent } from '@/utils/event'
 import ZhText from '@/components/ZhText.vue'
 import { useResourceZh } from '@/composables/useResourceZh'
 import StorySummaryPanel from '@/components/StorySummaryPanel.vue'
@@ -356,7 +356,7 @@ const heroArtFailed = ref(false)
 const heroLogoFailed = ref(false)
 const heroArtUrl = computed(() => {
   if (!event.value?.assetbundleName || heroArtFailed.value) return ''
-  return `${assetsHost.value}/ondemand/event/${event.value.assetbundleName}/screen/bg.png`
+  return getEventBackgroundUrl(event.value, assetsHost.value)
 })
 const heroLogoUrl = computed(() => (event.value ? getEventLogoUrl(event.value, assetsHost.value) : ''))
 

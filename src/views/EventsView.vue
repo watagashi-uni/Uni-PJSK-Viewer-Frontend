@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useMasterStore } from '@/stores/master'
 import { useSettingsStore } from '@/stores/settings'
 import { Calendar, ChevronRight, Trophy, Users, EyeOff, Globe, Search } from 'lucide-vue-next'
-import { getEventLogoUrl, isTestEvent } from '@/utils/event'
+import { getEventBackgroundUrl, getEventLogoUrl, isTestEvent } from '@/utils/event'
 import EventBanner from '@/components/EventBanner.vue'
 import type { EventData } from '@/types/master'
 import { pushListPage, readQueryPage, readQueryString, replaceListQuery } from '@/utils/routeQuery'
@@ -147,7 +147,7 @@ onMounted(loadData)
     >
       <img
         v-if="!featuredArtFailed"
-        :src="`${assetsHost}/ondemand/event/${featuredEvent.assetbundleName}/screen/bg.png`"
+        :src="getEventBackgroundUrl(featuredEvent, assetsHost)"
         alt=""
         class="kv__art"
         crossorigin="anonymous"

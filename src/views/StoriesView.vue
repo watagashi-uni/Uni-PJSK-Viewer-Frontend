@@ -20,6 +20,7 @@ import { isTrainedOnlyCard } from '@/utils/card'
 import { trackEvent } from '@/utils/analytics'
 import StorySummaryPanel from '@/components/StorySummaryPanel.vue'
 import { useStorySummaryStore } from '@/stores/storySummaries'
+import { getEventBackgroundUrl, getEventLogoUrl } from '@/utils/event'
 
 interface StoryEpisode {
   id: number
@@ -237,10 +238,10 @@ const scenarioUrls = computed(() => {
 const storyArtFailed = ref(false)
 const storyLogoFailed = ref(false)
 const selectedStoryArtUrl = computed(() => selectedStory.value?.kind === 'event' && selectedStory.value.assetbundleName
-  ? `${assetsHost.value}/ondemand/event/${selectedStory.value.assetbundleName}/screen/bg.png`
+  ? getEventBackgroundUrl(selectedStory.value, assetsHost.value)
   : '')
 const selectedStoryLogoUrl = computed(() => selectedStory.value?.kind === 'event'
-  ? `${assetsHost.value}/ondemand/event/${selectedStory.value.assetbundleName}/logo/logo.png`
+  ? getEventLogoUrl(selectedStory.value, assetsHost.value)
   : '')
 watch(selectedStoryArtUrl, () => {
   storyArtFailed.value = false

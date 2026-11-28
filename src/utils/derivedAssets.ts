@@ -9,6 +9,7 @@ const WEBP_RULES: [RegExp, string][] = [
   [/(\/?startapp\/thumbnail\/music_jacket\/[^/?#]+)\.png$/, '$1.webp'],
   [/(\/?startapp\/character\/member\/[^/?#]+\/card_(?:normal|after_training))\.(?:jpg|png)$/, '$1.webp'],
   [/(\/?startapp\/thumbnail\/chara\/[^/?#]+)\.png$/, '$1.webp'],
+  [/(\/?ondemand\/event\/[^/?#]+\/(?:screen\/bg|logo\/logo))\.png$/, '$1.webp'],
 ]
 
 // The original each WebP replaced on screen (cards were shown as JPG).
@@ -17,6 +18,7 @@ const FALLBACK_RULES: [RegExp, string][] = [
   [/(\/?startapp\/thumbnail\/music_jacket\/[^/?#]+)\.webp$/, '$1.png'],
   [/(\/?startapp\/character\/member\/[^/?#]+\/card_(?:normal|after_training))\.webp$/, '$1.jpg'],
   [/(\/?startapp\/thumbnail\/chara\/[^/?#]+)\.webp$/, '$1.png'],
+  [/(\/?ondemand\/event\/[^/?#]+\/(?:screen\/bg|logo\/logo))\.webp$/, '$1.png'],
 ]
 
 function rewrite(url: string, rules: [RegExp, string][]): string | null {
@@ -27,7 +29,7 @@ function rewrite(url: string, rules: [RegExp, string][]): string | null {
   return null
 }
 
-/** WebP for showing a jacket, jacket thumbnail, card or card thumbnail; other URLs unchanged. */
+/** WebP for showing a jacket, jacket thumbnail, card, card thumbnail, event background or event logo; other URLs unchanged. */
 export function displayImageUrl(url: string): string {
   return rewrite(url, WEBP_RULES) ?? url
 }

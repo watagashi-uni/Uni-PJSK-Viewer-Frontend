@@ -27,6 +27,7 @@ import { difficultyStyle } from '@/utils/difficulty'
 import { trackEvent } from '@/utils/analytics'
 import { useCharacterName } from '@/composables/useCharacterName'
 import ZhText from '@/components/ZhText.vue'
+import { getEventLogoUrl } from '@/utils/event'
 
 interface MusicDiffData {
   id: number
@@ -545,7 +546,7 @@ const rarityList = [
                 <template v-if="selectedEvent">
                   <div class="w-12 h-12 flex-shrink-0 bg-base-300 rounded overflow-hidden flex items-center justify-center shadow-inner">
                     <AssetImage 
-                      :src="`${assetsHost}/ondemand/event/${selectedEvent.assetbundleName}/logo/logo.png`"
+                      :src="getEventLogoUrl(selectedEvent, assetsHost)"
                       class="max-w-full max-h-full object-contain"
                     />
                   </div>
@@ -575,7 +576,7 @@ const rarityList = [
                   >
                     <div class="w-14 h-14 flex-shrink-0 bg-base-300 rounded-md overflow-hidden flex items-center justify-center shadow-inner">
                       <AssetImage 
-                        :src="`${assetsHost}/ondemand/event/${e.assetbundleName}/logo/logo.png`"
+                        :src="getEventLogoUrl(e, assetsHost)"
                         class="max-w-full max-h-full object-contain p-1"
                       />
                     </div>

@@ -1,4 +1,5 @@
 import type { EventData } from '@/types/master'
+import { displayImageUrl } from '@/utils/derivedAssets'
 
 type EventAssets = Pick<EventData, 'eventType' | 'assetbundleName'>
 
@@ -8,9 +9,15 @@ export function isTestEvent(event: EventAssets): boolean {
     && /^event_cheerfutest\d*_\d{4}$/.test(event.assetbundleName)
 }
 
-export function getEventLogoUrl(event: EventAssets, assetsHost: string): string {
+// logo 和背景大图用于页面展示，取 WebP；下载原图的地方自己拼 PNG 地址
+export function getEventLogoUrl(event: Pick<EventData, 'assetbundleName'>, assetsHost: string): string {
   if (!event.assetbundleName) return ''
-  return `${assetsHost}/ondemand/event/${event.assetbundleName}/logo/logo.png`
+  return displayImageUrl(`${assetsHost}/ondemand/event/${event.assetbundleName}/logo/logo.png`)
+}
+
+export function getEventBackgroundUrl(event: Pick<EventData, 'assetbundleName'>, assetsHost: string): string {
+  if (!event.assetbundleName) return ''
+  return displayImageUrl(`${assetsHost}/ondemand/event/${event.assetbundleName}/screen/bg.png`)
 }
 
 export function getEventBannerUrl(event: EventAssets, assetsHost: string): string {

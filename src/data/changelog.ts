@@ -14,6 +14,12 @@ export interface Release {
  */
 export const releases: Release[] = [
   {
+    version: '2.21.15', date: '2026-11-28', title: '活动大图省流量',
+    changes: [
+      '首页、活动列表、活动详情和剧情页的活动背景图与 logo 改用 WebP，背景图从约 3.6 MB 降到约 0.3 MB；活动详情的图片下载仍是原图。',
+    ],
+  },
+  {
     version: '2.21.14', date: '2026-11-28', title: '点歌词跳转',
     changes: [
       '修复 Safari 中点击某句歌词后要停顿一下才出声、漏掉开头几个字的问题。',
